@@ -1,0 +1,54 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    function isAuth()     { return request.auth != null; }
+    function isOwner(uid) { return request.auth.uid == uid; }
+    function isMember(cid) {
+      return request.auth.uid in
+          get(/databases/$(database)/documents/casas/$(cid)).data.members;
+    }
+
+    // ── users ────────────────────────────────────────────────────────────────
+    match /users/{uid} {
+      allow read, write: if isAuth() && isOwner(uid);
+    }
+
+    // ── casas ────────────────────────────────────────────────────────────────
+    match /casas/{cid} {
+      allow read: if isAuth() && request.auth.uid in resource.data.members;
+      // joinCode y members se mutan vía Cloud Function transaccional
+      // (createCasa/joinCasa) -- nunca con un create/update directo del
+      // cliente. El nombre es la única excepción: cualquier miembro puede
+      // renombrar la casa sin pasar por una función, no es un dato sensible.
+      allow create: if false;
+      allow update: if isAuth() && isMember(cid)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nombre']);
+
+      match /habitaciones/{hid} {
+        allow read, write: if isAuth() && isMember(cid);
+      }
+
+      match /elementos/{eid} {
+        allow read, write: if isAuth() && isMember(cid);
+      }
+
+      // La historia de la casa (sección 12 del spec de producto) -- de
+      // momento editable por cualquier miembro para poder corregir errores;
+      // el endurecimiento a append-only con auditoría (sección 46) queda
+      // para cuando haya más de un miembro real por casa.
+      match /eventos/{evid} {
+        allow read, write: if isAuth() && isMember(cid);
+      }
+
+      match /documentos/{did} {
+        allow read, write: if isAuth() && isMember(cid);
+      }
+
+      match /trabajos/{tid} {
+        allow read, write: if isAuth() && isMember(cid);
+      }
+    }
+  }
+}

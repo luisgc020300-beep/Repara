@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "199074592333",
+    "project_id": "repara-hogar-app",
+    "storage_bucket": "repara-hogar-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:199074592333:android:94a0d761e267706b084e04",
+        "android_client_info": {
+          "package_name": "com.riskrunner.repara"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCk78ygZpaBFF4tnQPBKW-XU33PACuYMxo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
