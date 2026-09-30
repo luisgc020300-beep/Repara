@@ -8,10 +8,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../models/casa.dart';
+import '../models/contacto.dart';
 import '../models/habitacion.dart';
 import '../models/trabajo.dart';
+import '../services/contacto_service.dart';
 import '../services/habitacion_service.dart';
 import '../services/trabajo_service.dart';
+import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
 
 class NuevoTrabajoScreen extends StatefulWidget {
@@ -41,6 +44,20 @@ class _NuevoTrabajoScreenState extends State<NuevoTrabajoScreen> {
     _profesionalContactoCtrl.dispose();
     _presupuestoCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _elegirDeContactos() async {
+    final contacto = await showModalBottomSheet<Contacto>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => _SelectorContactos(casaId: widget.casa.id),
+    );
+    if (contacto == null) return;
+    setState(() {
+      _profesionalNombreCtrl.text = contacto.nombre;
+      _profesionalContactoCtrl.text = contacto.telefono;
+    });
   }
 
   Future<void> _guardar() async {
@@ -113,7 +130,17 @@ class _NuevoTrabajoScreenState extends State<NuevoTrabajoScreen> {
             },
           ),
           const SizedBox(height: 16),
-          const Text('¿Quién lo va a hacer?', style: TextStyle(fontWeight: FontWeight.w600)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('¿Quién lo va a hacer?', style: TextStyle(fontWeight: FontWeight.w600)),
+              TextButton.icon(
+                onPressed: _elegirDeContactos,
+                icon: const Icon(Icons.contacts_outlined, size: 18),
+                label: const Text('De mis contactos'),
+              ),
+            ],
+          ),
           const SizedBox(height: 8),
           TextField(controller: _profesionalNombreCtrl, decoration: const InputDecoration(labelText: 'Nombre del profesional')),
           const SizedBox(height: 12),
@@ -145,3 +172,60 @@ String _nombreTipoTrabajo(TipoTrabajo t) => switch (t) {
       TipoTrabajo.instalacion => 'Instalación',
       TipoTrabajo.otro => 'Otro',
     };
+
+class _SelectorContactos extends StatelessWidget {
+  const _SelectorContactos({required this.casaId});
+
+  final String casaId;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Elige un contacto', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 16),
+            ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.5),
+              child: StreamBuilder<List<Contacto>>(
+                stream: ContactoService.streamContactos(casaId),
+                builder: (context, snapshot) {
+                  final contactos = snapshot.data ?? [];
+                  if (contactos.isEmpty) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: Text(
+                        'Todavía no tienes contactos guardados. Añádelos desde la pestaña Contactos.',
+                        style: TextStyle(color: context.colors.inkMuted),
+                      ),
+                    );
+                  }
+                  return ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: contactos.length,
+                    itemBuilder: (context, i) {
+                      final c = contactos[i];
+                      return ListTile(
+                        leading: Icon(
+                          c.tipo == TipoContacto.empresa ? Icons.business_outlined : Icons.person_outline,
+                          color: context.colors.brand,
+                        ),
+                        title: Text(c.nombre),
+                        subtitle: Text(c.especialidad?.isNotEmpty == true ? '${c.especialidad} · ${c.telefono}' : c.telefono),
+                        onTap: () => Navigator.pop(context, c),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
