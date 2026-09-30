@@ -103,9 +103,14 @@ class ElementoDetailScreen extends StatelessWidget {
                 children: [
                   Text('Documentos', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
                   TextButton.icon(
-                    onPressed: () => iniciarNuevoDocumento(context, casaId: casa.id, elementoId: elemento.id),
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('Añadir'),
+                    onPressed: () => iniciarNuevoDocumento(
+                      context,
+                      casaId: casa.id,
+                      elementoId: elemento.id,
+                      habitacionId: elemento.habitacionId,
+                    ),
+                    icon: const Icon(Icons.document_scanner_outlined, size: 18),
+                    label: const Text('Escanear documento'),
                   ),
                 ],
               ),

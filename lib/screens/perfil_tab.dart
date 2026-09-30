@@ -6,6 +6,7 @@ import '../models/casa.dart';
 import '../services/casa_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
+import 'documentos_casa_screen.dart';
 
 class PerfilTab extends StatelessWidget {
   const PerfilTab({required this.casa, super.key});
@@ -46,6 +47,16 @@ class PerfilTab extends StatelessWidget {
               title: Text(casa.nombre),
               subtitle: const Text('Toca para cambiar el nombre'),
               onTap: () => _renombrar(context),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Card(
+            child: ListTile(
+              leading: Icon(Icons.folder_open_outlined, color: context.colors.brand),
+              title: const Text('Documentos'),
+              subtitle: const Text('Facturas, presupuestos y garantías guardados'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DocumentosCasaScreen(casa: casa))),
             ),
           ),
           const SizedBox(height: 8),

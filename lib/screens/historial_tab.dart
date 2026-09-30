@@ -9,6 +9,7 @@ import '../models/casa.dart';
 import '../models/evento.dart';
 import '../services/evento_service.dart';
 import '../theme/design_tokens.dart';
+import 'menu_anadir.dart';
 
 class HistorialTab extends StatefulWidget {
   const HistorialTab({required this.casa, super.key});
@@ -26,6 +27,10 @@ class _HistorialTabState extends State<HistorialTab> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Historial')),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => mostrarMenuAnadir(context, casaId: widget.casa.id),
+        child: const Icon(Icons.add),
+      ),
       body: Column(
         children: [
           Padding(

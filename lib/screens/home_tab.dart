@@ -12,7 +12,7 @@ import '../models/evento.dart';
 import '../services/elemento_service.dart';
 import '../services/evento_service.dart';
 import '../theme/design_tokens.dart';
-import 'nuevo_evento_sheet.dart';
+import 'menu_anadir.dart';
 
 class HomeTab extends StatelessWidget {
   const HomeTab({required this.casa, super.key});
@@ -24,7 +24,7 @@ class HomeTab extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: Text(casa.nombre)),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => mostrarNuevoEventoSheet(context, casaId: casa.id),
+        onPressed: () => mostrarMenuAnadir(context, casaId: casa.id),
         icon: const Icon(Icons.add),
         label: const Text('Añadir'),
       ),

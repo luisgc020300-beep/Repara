@@ -111,34 +111,90 @@ exports.joinCasa = onCall({ region: REGION }, async (request) => {
 
 // =============================================================================
 // 3. CLASIFICAR DOCUMENTO CON IA
-// Recibe una imagen (base64) de una factura/presupuesto/garantía y devuelve
-// una sugerencia de tipo/fecha/proveedor/importe. NUNCA escribe directamente
-// en Firestore -- el cliente siempre pide confirmación al propietario antes
-// de guardar nada (sección 61 del spec: la IA ayuda, nunca decide sola).
+// Recibe una o varias páginas (base64, imagen o PDF) de una factura/
+// presupuesto/garantía y devuelve una sugerencia estructurada de datos.
+// NUNCA escribe directamente en Firestore -- el cliente siempre pide
+// confirmación al propietario antes de guardar nada (sección 61 del spec:
+// la IA ayuda, nunca decide sola).
 // =============================================================================
+const TIPOS_MEDIA_VALIDOS = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'];
+
 exports.classifyDocument = onCall(
   { region: REGION, secrets: [_anthropicKey], timeoutSeconds: 60 },
   async (request) => {
     if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
 
-    const { imageBase64, mediaType, elementosDisponibles } = request.data || {};
-    if (typeof imageBase64 !== 'string' || !imageBase64) {
-      throw new HttpsError('invalid-argument', 'Falta la imagen del documento.');
+    // [paginas] es la forma nueva (varias páginas de un mismo documento);
+    // se mantiene el nombre antiguo imageBase64/mediaType como fallback para
+    // no romper si algo sigue llamando a la forma vieja.
+    const { paginas, imageBase64, mediaType, elementosDisponibles, trabajosDisponibles } = request.data || {};
+    const listaPaginas = Array.isArray(paginas) && paginas.length
+        ? paginas
+        : (typeof imageBase64 === 'string' && imageBase64 ? [{ data: imageBase64, mediaType: mediaType || 'image/jpeg' }] : []);
+
+    if (!listaPaginas.length) {
+      throw new HttpsError('invalid-argument', 'Falta el documento a analizar.');
     }
-    const tipoMedia = typeof mediaType === 'string' ? mediaType : 'image/jpeg';
-    // Lista de nombres de elementos de la casa (p.ej. "Aire acondicionado
-    // salón", "Caldera") para que la IA pueda sugerir con cuál se relaciona
-    // el documento, sin inventar uno que no existe.
+    if (listaPaginas.length > 10) {
+      throw new HttpsError('invalid-argument', 'Demasiadas páginas en un mismo documento (máximo 10).');
+    }
+    for (const p of listaPaginas) {
+      if (typeof p.data !== 'string' || !p.data) {
+        throw new HttpsError('invalid-argument', 'Página de documento inválida.');
+      }
+      if (!TIPOS_MEDIA_VALIDOS.includes(p.mediaType)) {
+        throw new HttpsError('invalid-argument', `Formato no admitido: ${p.mediaType}`);
+      }
+    }
+
+    // Nombres existentes en la casa para que la IA pueda sugerir con cuál se
+    // relaciona el documento, sin inventar uno que no existe -- el cliente
+    // decide si acepta la sugerencia o elige otro/crea uno nuevo.
     const listaElementos = Array.isArray(elementosDisponibles) ? elementosDisponibles.slice(0, 50) : [];
+    const listaTrabajos = Array.isArray(trabajosDisponibles) ? trabajosDisponibles.slice(0, 50) : [];
 
     const apiKey = _anthropicKey.value();
     if (!apiKey) throw new HttpsError('internal', 'API key no configurada en el servidor.');
 
-    const systemPrompt = `Eres un asistente que clasifica documentos del hogar (facturas, presupuestos, garantías, manuales, contratos) a partir de una foto o escaneo.
+    const systemPrompt = `Eres un asistente que extrae información de documentos del hogar (facturas, presupuestos, garantías, manuales, contratos) a partir de una o varias fotos/páginas escaneadas del MISMO documento.
 Devuelve EXCLUSIVAMENTE un objeto JSON con esta forma exacta, sin texto adicional ni markdown:
-{"tipo":"factura|presupuesto|garantia|manual|contrato|otro","fecha":"YYYY-MM-DD o null","proveedor":"nombre o null","importe":numero o null,"elementoSugerido":"uno de los nombres de la lista o null","confianza":"alta|media|baja"}
-Nunca inventes un dato que no puedas leer en la imagen: si no se ve, usa null. La fecha es la del documento (fecha de emisión/factura), no la de hoy.
-Elementos existentes en esta casa: ${listaElementos.length ? listaElementos.join(', ') : '(ninguno todavía)'}`;
+{
+  "tipo": "factura|presupuesto|garantia|manual|contrato|otro",
+  "fecha": "YYYY-MM-DD o null",
+  "fechaVencimiento": "YYYY-MM-DD o null",
+  "proveedor": "nombre del profesional o empresa emisora, o null",
+  "nifCif": "identificador fiscal del emisor, o null",
+  "numeroReferencia": "número de factura/presupuesto, o null",
+  "importe": numero total o null,
+  "baseImponible": numero o null,
+  "impuestos": numero (importe de impuestos, no porcentaje) o null,
+  "moneda": "EUR u otra, o null",
+  "descripcionTrabajo": "descripción breve del servicio/reparación en 1-2 frases, o null",
+  "garantiaTexto": "texto literal sobre garantía si aparece, o null",
+  "observaciones": "cualquier detalle relevante que no encaje en los campos anteriores, o null",
+  "elementoSugerido": "uno de los nombres EXACTOS de la lista de elementos, o null",
+  "trabajoSugerido": "uno de los nombres EXACTOS de la lista de trabajos, o null",
+  "confianza": "alta|media|baja"
+}
+Reglas estrictas:
+- Nunca inventes un dato que no puedas leer en el documento: si no se ve o no aparece, usa null.
+- "importe" es el total final del documento, no un subtotal.
+- La fecha es la del documento (emisión/factura), nunca la de hoy.
+- "elementoSugerido" y "trabajoSugerido" deben ser EXACTAMENTE uno de los nombres de las listas de abajo, o null si ninguno encaja -- nunca inventes un nombre nuevo aquí.
+- "confianza" baja significa que la imagen es difícil de leer o el documento es ambiguo.
+Elementos existentes en esta casa: ${listaElementos.length ? listaElementos.join(', ') : '(ninguno todavía)'}
+Trabajos existentes en esta casa: ${listaTrabajos.length ? listaTrabajos.join(', ') : '(ninguno todavía)'}`;
+
+    const contenido = listaPaginas.map((p) => ({
+      type: p.mediaType === 'application/pdf' ? 'document' : 'image',
+      source: { type: 'base64', media_type: p.mediaType, data: p.data },
+    }));
+    contenido.push({
+      type: 'text',
+      text: listaPaginas.length > 1
+          ? `Estas ${listaPaginas.length} imágenes son páginas del MISMO documento. Analízalas juntas y devuelve solo el JSON pedido.`
+          : 'Analiza este documento y devuelve solo el JSON pedido.',
+    });
 
     let res;
     try {
@@ -151,17 +207,9 @@ Elementos existentes en esta casa: ${listaElementos.length ? listaElementos.join
         },
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
-          max_tokens: 1024,
+          max_tokens: 1536,
           system: systemPrompt,
-          messages: [
-            {
-              role: 'user',
-              content: [
-                { type: 'image', source: { type: 'base64', media_type: tipoMedia, data: imageBase64 } },
-                { type: 'text', text: 'Clasifica este documento y devuelve solo el JSON pedido.' },
-              ],
-            },
-          ],
+          messages: [{ role: 'user', content: contenido }],
         }),
       });
     } catch (e) {
@@ -171,7 +219,9 @@ Elementos existentes en esta casa: ${listaElementos.length ? listaElementos.join
 
     if (!res.ok) {
       const body = await res.text().catch(() => '');
-      console.error(`classifyDocument Anthropic error ${res.status}:`, body);
+      // Nunca se registra el contenido del documento -- solo el estado del
+      // fallo, para no dejar datos de facturas de usuarios en los logs.
+      console.error(`classifyDocument Anthropic error ${res.status}:`, body.slice(0, 300));
       throw new HttpsError('internal', `Error del servicio de IA: ${res.status}`);
     }
 
@@ -182,10 +232,11 @@ Elementos existentes en esta casa: ${listaElementos.length ? listaElementos.join
       return { ok: true, sugerencia: parsed };
     } catch (e) {
       // Si el modelo no devuelve JSON válido, no se revienta la función --
-      // se manda el texto crudo y el cliente cae al flujo de clasificación
-      // manual (ver estadoIA en lib/models/documento.dart).
-      console.error('classifyDocument: respuesta no parseable como JSON:', textoRespuesta);
-      return { ok: true, sugerencia: null, raw: textoRespuesta };
+      // el cliente cae al flujo de clasificación manual (ver estadoIA en
+      // lib/models/documento.dart). Nunca se afirma que el documento se
+      // procesó correctamente cuando esto pasa.
+      console.error('classifyDocument: respuesta no parseable como JSON');
+      return { ok: true, sugerencia: null };
     }
   }
 );
