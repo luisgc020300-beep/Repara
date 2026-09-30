@@ -1,6 +1,7 @@
 // lib/screens/login_screen.dart
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../theme/design_tokens.dart';
 
@@ -44,6 +45,10 @@ class _LoginScreenState extends State<LoginScreen> {
           password: _passCtrl.text,
         );
       }
+      // Cierra el contexto de autofill al confirmarse el login/registro --
+      // sin esto, en Android el aviso de "guardar contraseña" del gestor
+      // del sistema no siempre llega a mostrarse tras cambiar de pantalla.
+      TextInput.finishAutofillContext();
     } on FirebaseAuthException catch (e) {
       setState(() => _error = e.message ?? 'Error de autenticación');
     } finally {
@@ -78,18 +83,26 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: TextStyle(color: context.colors.inkMuted),
                   ),
                   const SizedBox(height: 32),
-                  TextFormField(
-                    controller: _emailCtrl,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(labelText: 'Correo'),
-                    validator: (v) => (v == null || !v.contains('@')) ? 'Correo no válido' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _passCtrl,
-                    obscureText: true,
-                    decoration: const InputDecoration(labelText: 'Contraseña'),
-                    validator: (v) => (v == null || v.length < 6) ? 'Mínimo 6 caracteres' : null,
+                  AutofillGroup(
+                    child: Column(
+                      children: [
+                        TextFormField(
+                          controller: _emailCtrl,
+                          keyboardType: TextInputType.emailAddress,
+                          autofillHints: const [AutofillHints.email],
+                          decoration: const InputDecoration(labelText: 'Correo'),
+                          validator: (v) => (v == null || !v.contains('@')) ? 'Correo no válido' : null,
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _passCtrl,
+                          obscureText: true,
+                          autofillHints: [_esRegistro ? AutofillHints.newPassword : AutofillHints.password],
+                          decoration: const InputDecoration(labelText: 'Contraseña'),
+                          validator: (v) => (v == null || v.length < 6) ? 'Mínimo 6 caracteres' : null,
+                        ),
+                      ],
+                    ),
                   ),
                   if (_error != null) ...[
                     const SizedBox(height: 12),
