@@ -4,7 +4,10 @@
 // usuario. El profesional solicita, el propietario aprueba o rechaza --
 // nunca al revés, y la Cloud Function responderCambioAlcance lo impone
 // aunque alguien manipule el cliente.
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../models/cambio_alcance.dart';
 import '../screens/presupuestos_section.dart' show RolEnTrabajo;
@@ -111,6 +114,24 @@ class _CambioCard extends StatelessWidget {
               const SizedBox(height: 4),
               Text('Coste adicional: +${cambio.importeAdicional!.toStringAsFixed(2)} €', style: const TextStyle(fontWeight: FontWeight.w600)),
             ],
+            if (cambio.fotos.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 70,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: cambio.fotos.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 6),
+                  itemBuilder: (context, i) => GestureDetector(
+                    onTap: () => _verFotoCompleta(context, cambio.fotos[i]),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(cambio.fotos[i], width: 70, height: 70, fit: BoxFit.cover),
+                    ),
+                  ),
+                ),
+              ),
+            ],
             if (cambio.estado == EstadoCambioAlcance.pendiente && rol == RolEnTrabajo.propietario) ...[
               const SizedBox(height: 10),
               Row(
@@ -126,6 +147,20 @@ class _CambioCard extends StatelessWidget {
       ),
     );
   }
+
+  void _verFotoCompleta(BuildContext context, String url) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        child: InteractiveViewer(child: Image.network(url)),
+      ),
+    );
+  }
+}
+
+class _LineaFoto {
+  const _LineaFoto(this.archivo);
+  final File archivo;
 }
 
 class _FormularioCambioSheet extends StatefulWidget {
@@ -143,6 +178,7 @@ class _FormularioCambioSheetState extends State<_FormularioCambioSheet> {
   final _descripcionCtrl = TextEditingController();
   final _motivoCtrl = TextEditingController();
   final _importeCtrl = TextEditingController();
+  final List<_LineaFoto> _fotos = [];
   bool _guardando = false;
 
   @override
@@ -154,11 +190,46 @@ class _FormularioCambioSheetState extends State<_FormularioCambioSheet> {
     super.dispose();
   }
 
+  Future<void> _anadirFotos() async {
+    final picker = ImagePicker();
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Wrap(children: [
+          ListTile(
+            leading: const Icon(Icons.photo_camera_outlined),
+            title: const Text('Hacer una foto'),
+            onTap: () async {
+              final navigator = Navigator.of(ctx);
+              final foto = await picker.pickImage(source: ImageSource.camera, imageQuality: 85);
+              navigator.pop();
+              if (foto != null) setState(() => _fotos.add(_LineaFoto(File(foto.path))));
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.photo_library_outlined),
+            title: const Text('Elegir de la galería'),
+            onTap: () async {
+              final navigator = Navigator.of(ctx);
+              final fotos = await picker.pickMultiImage(imageQuality: 85);
+              navigator.pop();
+              if (fotos.isNotEmpty) setState(() => _fotos.addAll(fotos.map((f) => _LineaFoto(File(f.path)))));
+            },
+          ),
+        ]),
+      ),
+    );
+  }
+
   Future<void> _enviar() async {
     final titulo = _tituloCtrl.text.trim();
     if (titulo.isEmpty) return;
     setState(() => _guardando = true);
     try {
+      final urls = <String>[];
+      for (final f in _fotos) {
+        urls.add(await CambioAlcanceService.subirFoto(widget.casaId, f.archivo, f.archivo.path.split(Platform.pathSeparator).last));
+      }
       await CambioAlcanceService.crear(
         casaId: widget.casaId,
         trabajoId: widget.trabajoId,
@@ -166,6 +237,7 @@ class _FormularioCambioSheetState extends State<_FormularioCambioSheet> {
         descripcion: _descripcionCtrl.text.trim().isEmpty ? null : _descripcionCtrl.text.trim(),
         motivo: _motivoCtrl.text.trim().isEmpty ? null : _motivoCtrl.text.trim(),
         importeAdicional: double.tryParse(_importeCtrl.text.replaceAll(',', '.')),
+        fotos: urls,
       );
       if (mounted) {
         AppError.showSuccess(context, 'Solicitud enviada al propietario.');
@@ -199,6 +271,38 @@ class _FormularioCambioSheetState extends State<_FormularioCambioSheet> {
               controller: _importeCtrl,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               decoration: const InputDecoration(labelText: 'Coste adicional (€)'),
+            ),
+            const SizedBox(height: 12),
+            if (_fotos.isNotEmpty)
+              SizedBox(
+                height: 80,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _fotos.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 8),
+                  itemBuilder: (context, i) => Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Image.file(_fotos[i].archivo, width: 80, height: 80, fit: BoxFit.cover),
+                      ),
+                      Positioned(
+                        top: 2,
+                        right: 2,
+                        child: InkWell(
+                          onTap: () => setState(() => _fotos.removeAt(i)),
+                          child: const CircleAvatar(radius: 10, backgroundColor: Colors.black54, child: Icon(Icons.close, size: 12, color: Colors.white)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: _anadirFotos,
+              icon: const Icon(Icons.add_a_photo_outlined, size: 18),
+              label: Text(_fotos.isEmpty ? 'Añadir fotos' : 'Añadir más fotos'),
             ),
             const SizedBox(height: 16),
             FilledButton(

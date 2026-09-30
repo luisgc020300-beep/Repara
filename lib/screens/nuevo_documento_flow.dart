@@ -402,7 +402,7 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
 
       final urls = <String>[];
       for (final p in widget.paginas) {
-        urls.add(await DocumentoService.subirArchivo(widget.casaId, p.archivo, p.nombre));
+        urls.add(await DocumentoService.subirArchivo(widget.casaId, p.archivo, p.nombre, trabajoId: _trabajoId));
       }
       final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
 

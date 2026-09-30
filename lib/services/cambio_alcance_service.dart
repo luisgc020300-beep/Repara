@@ -1,6 +1,9 @@
 // lib/services/cambio_alcance_service.dart
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 import '../models/cambio_alcance.dart';
 
@@ -10,6 +13,14 @@ class CambioAlcanceService {
 
   static CollectionReference<Map<String, dynamic>> _col(String casaId, String trabajoId) =>
       _db.collection('casas').doc(casaId).collection('trabajos').doc(trabajoId).collection('cambiosAlcance');
+
+  static Future<String> subirFoto(String casaId, File archivo, String nombreArchivo) async {
+    final ref = FirebaseStorage.instance
+        .ref()
+        .child('casas/$casaId/cambiosAlcance/${DateTime.now().millisecondsSinceEpoch}_$nombreArchivo');
+    await ref.putFile(archivo);
+    return ref.getDownloadURL();
+  }
 
   static Stream<List<CambioAlcance>> streamCambios(String casaId, String trabajoId) {
     return _col(casaId, trabajoId).orderBy('createdAt', descending: true).snapshots().map(

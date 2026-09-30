@@ -100,10 +100,17 @@ class DocumentoService {
         (s) => s.docs.map(Documento.fromDoc).toList());
   }
 
-  static Future<String> subirArchivo(String casaId, File archivo, String nombreArchivo) async {
+  /// [trabajoId] cambia la carpeta de destino en Storage -- un profesional
+  /// no miembro de la casa solo tiene permiso de escritura (storage.rules)
+  /// bajo la carpeta de SU trabajo concreto, nunca en la carpeta general de
+  /// documentos de la casa. Sin esto, aunque Firestore permitiera crear el
+  /// registro del documento, la subida del archivo en sí fallaría por
+  /// permisos de Storage.
+  static Future<String> subirArchivo(String casaId, File archivo, String nombreArchivo, {String? trabajoId}) async {
+    final carpeta = trabajoId != null ? 'porTrabajo/$trabajoId' : 'generales';
     final ref = FirebaseStorage.instance
         .ref()
-        .child('casas/$casaId/documentos/${DateTime.now().millisecondsSinceEpoch}_$nombreArchivo');
+        .child('casas/$casaId/documentos/$carpeta/${DateTime.now().millisecondsSinceEpoch}_$nombreArchivo');
     await ref.putFile(archivo);
     return ref.getDownloadURL();
   }

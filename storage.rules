@@ -1,12 +1,38 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Documentos/fotos de una casa -- solo sus miembros pueden leer o subir,
-    // comprobado contra el mismo documento de Firestore que ya gobierna el
-    // acceso a los datos de esa casa (casas/{casaId}.members).
-    match /casas/{casaId}/{allPaths=**} {
-      allow read, write: if request.auth != null &&
+    function isMember(casaId) {
+      return request.auth != null &&
           request.auth.uid in firestore.get(/databases/(default)/documents/casas/$(casaId)).data.members;
+    }
+    function esProfesionalDelTrabajo(casaId, trabajoId) {
+      return request.auth != null &&
+          request.auth.uid == firestore.get(/databases/(default)/documents/casas/$(casaId)/trabajos/$(trabajoId)).data.profesionalUid;
+    }
+
+    // Documentos generales de la casa (sin trabajo asociado) -- solo
+    // miembros, igual que siempre.
+    match /casas/{casaId}/documentos/generales/{allPaths=**} {
+      allow read, write: if isMember(casaId);
+    }
+
+    // Documentos ligados a un trabajo concreto -- además de los miembros,
+    // el profesional asignado a ESE trabajo puede subir/leer aquí (nunca en
+    // la carpeta "generales" de arriba, ni en la de otro trabajo).
+    match /casas/{casaId}/documentos/porTrabajo/{trabajoId}/{allPaths=**} {
+      allow read, write: if isMember(casaId) || esProfesionalDelTrabajo(casaId, trabajoId);
+    }
+
+    // Fotos de ScopeGuard (cambios de alcance) -- mismo criterio: miembros
+    // de la casa o el profesional de ese trabajo concreto.
+    match /casas/{casaId}/trabajos/{trabajoId}/cambiosAlcance/{allPaths=**} {
+      allow read, write: if isMember(casaId) || esProfesionalDelTrabajo(casaId, trabajoId);
+    }
+
+    // Resto de rutas de la casa (elementos, contactos, etc.) -- solo
+    // miembros, comportamiento original.
+    match /casas/{casaId}/{allPaths=**} {
+      allow read, write: if isMember(casaId);
     }
   }
 }
