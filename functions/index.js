@@ -312,13 +312,16 @@ exports.responderInvitacion = onCall({ region: REGION }, async (request) => {
       throw new HttpsError('failed-precondition', 'Esta invitación ya se respondió.');
     }
 
+    let nombreProfesional = null;
+    if (aceptar) {
+      const userSnap = await tx.get(db.collection('users').doc(uid));
+      nombreProfesional = userSnap.exists ? (userSnap.data().displayName || null) : null;
+    }
+
     tx.update(invitacionRef, { estado: aceptar ? 'aceptada' : 'rechazada' });
 
     if (aceptar) {
       const trabajoRef = db.collection('casas').doc(inv.casaId).collection('trabajos').doc(inv.trabajoId);
-      const userSnap = await tx.get(db.collection('users').doc(uid));
-      const nombreProfesional = userSnap.exists ? (userSnap.data().displayName || null) : null;
-
       tx.update(trabajoRef, {
         profesionalUid: uid,
         ...(nombreProfesional ? { profesionalNombre: nombreProfesional } : {}),
