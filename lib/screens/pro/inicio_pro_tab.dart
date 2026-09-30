@@ -12,6 +12,7 @@ import '../../services/invitacion_service.dart';
 import '../../services/profesional_service.dart';
 import '../../theme/design_tokens.dart';
 import '../../widgets/app_error.dart';
+import '../../widgets/boton_notificaciones.dart';
 
 class InicioProTab extends StatelessWidget {
   const InicioProTab({super.key});
@@ -19,7 +20,7 @@ class InicioProTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Repara Pro')),
+      appBar: AppBar(title: const Text('Repara Pro'), actions: const [BotonNotificaciones()]),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [

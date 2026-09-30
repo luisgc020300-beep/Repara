@@ -19,7 +19,9 @@ import '../services/invitacion_service.dart';
 import '../services/trabajo_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
+import 'cambio_alcance_section.dart';
 import 'nuevo_documento_flow.dart';
+import 'presupuestos_section.dart';
 
 class TrabajoDetailScreen extends StatelessWidget {
   const TrabajoDetailScreen({required this.casa, required this.trabajoId, super.key});
@@ -122,6 +124,10 @@ class TrabajoDetailScreen extends StatelessWidget {
               Text('Profesional', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
               const SizedBox(height: 8),
               _SeccionInvitarProfesional(casa: casa, trabajo: trabajo),
+              const SizedBox(height: 20),
+              PresupuestosSection(casaId: casa.id, trabajoId: trabajo.id, rol: RolEnTrabajo.propietario),
+              const SizedBox(height: 20),
+              CambiosAlcanceSection(casaId: casa.id, trabajoId: trabajo.id, rol: RolEnTrabajo.propietario),
               const SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,

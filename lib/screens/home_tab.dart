@@ -12,6 +12,7 @@ import '../models/evento.dart';
 import '../services/elemento_service.dart';
 import '../services/evento_service.dart';
 import '../theme/design_tokens.dart';
+import '../widgets/boton_notificaciones.dart';
 import 'menu_anadir.dart';
 
 class HomeTab extends StatelessWidget {
@@ -22,7 +23,7 @@ class HomeTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(casa.nombre)),
+      appBar: AppBar(title: Text(casa.nombre), actions: const [BotonNotificaciones()]),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => mostrarMenuAnadir(context, casaId: casa.id),
         icon: const Icon(Icons.add),

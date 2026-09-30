@@ -245,6 +245,386 @@ exports.responderInvitacion = onCall({ region: REGION }, async (request) => {
 });
 
 // =============================================================================
+// Helpers compartidos — notificaciones internas y eventos de historial
+// (sección 22 del spec: nada de esto debe vivir desconectado del historial
+// de la vivienda).
+// =============================================================================
+async function crearNotificacion(uid, tipo, titulo, cuerpo, extra) {
+  await db.collection('notificaciones').add({
+    uid,
+    tipo,
+    titulo,
+    cuerpo,
+    leida: false,
+    createdAt: FieldValue.serverTimestamp(),
+    ...(extra || {}),
+  });
+}
+
+async function crearEventoHistorial(casaId, evento) {
+  await db.collection('casas').doc(casaId).collection('eventos').add({
+    documentoIds: [],
+    ...evento,
+    fecha: evento.fecha || FieldValue.serverTimestamp(),
+    createdAt: FieldValue.serverTimestamp(),
+  });
+}
+
+function redondear2(n) {
+  return Math.round((Number(n) || 0) * 100) / 100;
+}
+
+function validarLineas(lineas) {
+  if (!Array.isArray(lineas) || lineas.length === 0) {
+    throw new HttpsError('invalid-argument', 'El presupuesto necesita al menos una línea.');
+  }
+  if (lineas.length > 50) {
+    throw new HttpsError('invalid-argument', 'Demasiadas líneas en el presupuesto (máximo 50).');
+  }
+  return lineas.map((l) => {
+    const descripcion = typeof l.descripcion === 'string' ? l.descripcion.trim().slice(0, 200) : '';
+    const cantidad = Number(l.cantidad);
+    const precioUnitario = Number(l.precioUnitario);
+    const ivaPorcentaje = l.ivaPorcentaje == null ? 21 : Number(l.ivaPorcentaje);
+    if (!descripcion) throw new HttpsError('invalid-argument', 'Cada línea necesita una descripción.');
+    if (!Number.isFinite(cantidad) || cantidad <= 0) throw new HttpsError('invalid-argument', 'Cantidad inválida en una línea.');
+    if (!Number.isFinite(precioUnitario) || precioUnitario < 0) throw new HttpsError('invalid-argument', 'Precio inválido en una línea.');
+    if (!Number.isFinite(ivaPorcentaje) || ivaPorcentaje < 0 || ivaPorcentaje > 100) throw new HttpsError('invalid-argument', 'IVA inválido en una línea.');
+    return { descripcion, cantidad, precioUnitario, ivaPorcentaje };
+  });
+}
+
+// Nunca se confía en subtotal/iva/total que pudiera mandar el cliente
+// (sección 16 del spec: "no confiar únicamente en cálculos del cliente") --
+// se recalculan siempre aquí a partir de las líneas ya validadas.
+function calcularTotales(lineas) {
+  let subtotal = 0;
+  let iva = 0;
+  for (const l of lineas) {
+    const importeLinea = l.cantidad * l.precioUnitario;
+    subtotal += importeLinea;
+    iva += importeLinea * (l.ivaPorcentaje / 100);
+  }
+  return { subtotal: redondear2(subtotal), iva: redondear2(iva), total: redondear2(subtotal + iva) };
+}
+
+async function getTrabajoOThrow(casaId, trabajoId) {
+  const ref = db.collection('casas').doc(casaId).collection('trabajos').doc(trabajoId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpsError('not-found', 'El trabajo no existe.');
+  return { ref, snap, data: snap.data() };
+}
+
+async function esMiembroCasa(casaId, uid) {
+  const snap = await db.collection('casas').doc(casaId).get();
+  return snap.exists && (snap.data().members || []).includes(uid);
+}
+
+// =============================================================================
+// PRESUPUESTOS — casas/{cid}/trabajos/{tid}/presupuestos/{pid}
+// Todas las escrituras pasan por aquí (las reglas de Firestore deniegan
+// escritura directa del cliente) para que subtotal/IVA/total nunca dependan
+// de lo que mande la app, y para impedir que el profesional se autoapruebe.
+// =============================================================================
+
+exports.crearPresupuesto = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+  const uid = request.auth.uid;
+  const { casaId, trabajoId, notas } = request.data || {};
+  if (!casaId || !trabajoId) throw new HttpsError('invalid-argument', 'Faltan datos.');
+  const lineas = validarLineas(request.data?.lineas);
+
+  const { ref: trabajoRef, data: trabajo } = await getTrabajoOThrow(casaId, trabajoId);
+  const esProfesionalAsignado = trabajo.profesionalUid === uid;
+  if (!esProfesionalAsignado && !(await esMiembroCasa(casaId, uid))) {
+    throw new HttpsError('permission-denied', 'No tienes acceso a este trabajo.');
+  }
+
+  const totales = calcularTotales(lineas);
+  const presupuestosCol = trabajoRef.collection('presupuestos');
+  const existentesSnap = await presupuestosCol.get();
+  const numero = existentesSnap.docs.filter((d) => !d.data().presupuestoAnteriorId).length + 1;
+
+  const ref = await presupuestosCol.add({
+    numero,
+    version: 1,
+    estado: 'borrador',
+    lineas,
+    notas: typeof notas === 'string' ? notas.trim().slice(0, 1000) : null,
+    presupuestoAnteriorId: null,
+    ...totales,
+    creadoPorUid: uid,
+    fechaCreacion: FieldValue.serverTimestamp(),
+    fechaEnvio: null,
+    fechaRespuesta: null,
+  });
+
+  return { ok: true, presupuestoId: ref.id, ...totales };
+});
+
+exports.actualizarLineasPresupuesto = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+  const uid = request.auth.uid;
+  const { casaId, trabajoId, presupuestoId, notas } = request.data || {};
+  if (!casaId || !trabajoId || !presupuestoId) throw new HttpsError('invalid-argument', 'Faltan datos.');
+  const lineas = validarLineas(request.data?.lineas);
+
+  const ref = db.collection('casas').doc(casaId).collection('trabajos').doc(trabajoId).collection('presupuestos').doc(presupuestoId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpsError('not-found', 'El presupuesto no existe.');
+  const p = snap.data();
+  if (p.creadoPorUid !== uid) throw new HttpsError('permission-denied', 'Solo quien lo creó puede editarlo.');
+  if (p.estado !== 'borrador') throw new HttpsError('failed-precondition', 'Solo se puede editar un presupuesto en borrador.');
+
+  const totales = calcularTotales(lineas);
+  await ref.update({ lineas, notas: typeof notas === 'string' ? notas.trim().slice(0, 1000) : p.notas, ...totales });
+  return { ok: true, ...totales };
+});
+
+exports.enviarPresupuesto = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+  const uid = request.auth.uid;
+  const { casaId, trabajoId, presupuestoId } = request.data || {};
+  if (!casaId || !trabajoId || !presupuestoId) throw new HttpsError('invalid-argument', 'Faltan datos.');
+
+  const trabajoRef = db.collection('casas').doc(casaId).collection('trabajos').doc(trabajoId);
+  const ref = trabajoRef.collection('presupuestos').doc(presupuestoId);
+  const [snap, trabajoSnap] = await Promise.all([ref.get(), trabajoRef.get()]);
+  if (!snap.exists || !trabajoSnap.exists) throw new HttpsError('not-found', 'No encontrado.');
+  const p = snap.data();
+  if (p.creadoPorUid !== uid) throw new HttpsError('permission-denied', 'Solo quien lo creó puede enviarlo.');
+  if (p.estado !== 'borrador') throw new HttpsError('failed-precondition', 'Este presupuesto ya se envió.');
+
+  await ref.update({ estado: 'enviado', fechaEnvio: FieldValue.serverTimestamp() });
+
+  const trabajo = trabajoSnap.data();
+  const casaSnap = await db.collection('casas').doc(casaId).get();
+  for (const memberUid of casaSnap.data().members || []) {
+    await crearNotificacion(memberUid, 'presupuesto_enviado',
+      'Nuevo presupuesto', `Has recibido un presupuesto de ${p.total.toFixed(2)} € para "${trabajo.titulo}".`,
+      { casaId, trabajoId, presupuestoId });
+  }
+  return { ok: true };
+});
+
+exports.responderPresupuesto = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+  const uid = request.auth.uid;
+  const { casaId, trabajoId, presupuestoId, aceptar } = request.data || {};
+  if (!casaId || !trabajoId || !presupuestoId || typeof aceptar !== 'boolean') {
+    throw new HttpsError('invalid-argument', 'Faltan datos.');
+  }
+  if (!(await esMiembroCasa(casaId, uid))) throw new HttpsError('permission-denied', 'No perteneces a esa casa.');
+
+  const trabajoRef = db.collection('casas').doc(casaId).collection('trabajos').doc(trabajoId);
+  const ref = trabajoRef.collection('presupuestos').doc(presupuestoId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpsError('not-found', 'El presupuesto no existe.');
+  const p = snap.data();
+  // Nunca se permite que quien creó el presupuesto sea también quien lo
+  // aprueba (sección 18 del spec: "No permitir que el profesional se
+  // autoapruebe un presupuesto").
+  if (p.creadoPorUid === uid) throw new HttpsError('permission-denied', 'No puedes aprobar tu propio presupuesto.');
+  if (p.estado !== 'enviado') throw new HttpsError('failed-precondition', 'Este presupuesto no está pendiente de respuesta.');
+
+  await ref.update({
+    estado: aceptar ? 'aceptado' : 'rechazado',
+    fechaRespuesta: FieldValue.serverTimestamp(),
+    respondidoPorUid: uid,
+  });
+
+  if (aceptar) {
+    await trabajoRef.update({ presupuesto: p.total, estado: 'presupuestado' });
+  }
+
+  await crearEventoHistorial(casaId, {
+    tipo: 'nota',
+    titulo: aceptar ? `Presupuesto aceptado (${p.total.toFixed(2)} €)` : 'Presupuesto rechazado',
+    trabajoId,
+    coste: aceptar ? p.total : null,
+    createdBy: uid,
+  });
+
+  if (p.creadoPorUid) {
+    await crearNotificacion(p.creadoPorUid, aceptar ? 'presupuesto_aceptado' : 'presupuesto_rechazado',
+      aceptar ? 'Presupuesto aceptado' : 'Presupuesto rechazado',
+      aceptar ? `Te han aceptado el presupuesto de ${p.total.toFixed(2)} €.` : 'Te han rechazado un presupuesto.',
+      { casaId, trabajoId, presupuestoId });
+  }
+  return { ok: true };
+});
+
+exports.crearNuevaVersionPresupuesto = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+  const uid = request.auth.uid;
+  const { casaId, trabajoId, presupuestoAnteriorId, notas } = request.data || {};
+  if (!casaId || !trabajoId || !presupuestoAnteriorId) throw new HttpsError('invalid-argument', 'Faltan datos.');
+  const lineas = validarLineas(request.data?.lineas);
+
+  const trabajoRef = db.collection('casas').doc(casaId).collection('trabajos').doc(trabajoId);
+  const anteriorRef = trabajoRef.collection('presupuestos').doc(presupuestoAnteriorId);
+  const anteriorSnap = await anteriorRef.get();
+  if (!anteriorSnap.exists) throw new HttpsError('not-found', 'El presupuesto anterior no existe.');
+  const anterior = anteriorSnap.data();
+  if (anterior.creadoPorUid !== uid) throw new HttpsError('permission-denied', 'Solo quien creó el presupuesto puede revisarlo.');
+  // Solo se versiona un presupuesto ya cerrado (rechazado) -- nunca se
+  // reescribe uno enviado o aceptado (sección 17: "no debe sobrescribirse
+  // destructivamente después de haber sido enviado").
+  if (anterior.estado !== 'rechazado') throw new HttpsError('failed-precondition', 'Solo se puede crear una nueva versión de un presupuesto rechazado.');
+
+  const totales = calcularTotales(lineas);
+  const ref = await trabajoRef.collection('presupuestos').add({
+    numero: anterior.numero,
+    version: anterior.version + 1,
+    estado: 'borrador',
+    lineas,
+    notas: typeof notas === 'string' ? notas.trim().slice(0, 1000) : null,
+    presupuestoAnteriorId,
+    ...totales,
+    creadoPorUid: uid,
+    fechaCreacion: FieldValue.serverTimestamp(),
+    fechaEnvio: null,
+    fechaRespuesta: null,
+  });
+
+  return { ok: true, presupuestoId: ref.id, ...totales };
+});
+
+// =============================================================================
+// SCOPEGUARD — cambios de alcance, casas/{cid}/trabajos/{tid}/cambiosAlcance
+// =============================================================================
+
+exports.crearCambioAlcance = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+  const uid = request.auth.uid;
+  const { casaId, trabajoId, titulo, descripcion, motivo, importeAdicional, tiempoAdicionalHoras, fotos, presupuestoId } = request.data || {};
+  if (!casaId || !trabajoId || typeof titulo !== 'string' || !titulo.trim()) {
+    throw new HttpsError('invalid-argument', 'Faltan datos.');
+  }
+  const { ref: trabajoRef, data: trabajo } = await getTrabajoOThrow(casaId, trabajoId);
+  if (trabajo.profesionalUid !== uid) {
+    throw new HttpsError('permission-denied', 'Solo el profesional asignado puede solicitar un cambio de alcance.');
+  }
+  const importe = importeAdicional == null ? null : Number(importeAdicional);
+  if (importe != null && !Number.isFinite(importe)) throw new HttpsError('invalid-argument', 'Importe adicional inválido.');
+
+  const ref = await trabajoRef.collection('cambiosAlcance').add({
+    titulo: titulo.trim().slice(0, 120),
+    descripcion: typeof descripcion === 'string' ? descripcion.trim().slice(0, 1000) : null,
+    motivo: typeof motivo === 'string' ? motivo.trim().slice(0, 1000) : null,
+    fotos: Array.isArray(fotos) ? fotos.slice(0, 10) : [],
+    importeAdicional: importe,
+    tiempoAdicionalHoras: tiempoAdicionalHoras == null ? null : Number(tiempoAdicionalHoras),
+    presupuestoId: typeof presupuestoId === 'string' ? presupuestoId : null,
+    estado: 'pendiente',
+    creadoPorUid: uid,
+    createdAt: FieldValue.serverTimestamp(),
+  });
+
+  const casaSnap = await db.collection('casas').doc(casaId).get();
+  for (const memberUid of casaSnap.data().members || []) {
+    await crearNotificacion(memberUid, 'cambio_alcance_solicitado',
+      'Cambio de alcance solicitado', `Se ha solicitado un cambio en "${trabajo.titulo}": ${titulo.trim()}`,
+      { casaId, trabajoId, cambioAlcanceId: ref.id });
+  }
+  return { ok: true, cambioAlcanceId: ref.id };
+});
+
+exports.responderCambioAlcance = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+  const uid = request.auth.uid;
+  const { casaId, trabajoId, cambioAlcanceId, aprobar } = request.data || {};
+  if (!casaId || !trabajoId || !cambioAlcanceId || typeof aprobar !== 'boolean') {
+    throw new HttpsError('invalid-argument', 'Faltan datos.');
+  }
+  if (!(await esMiembroCasa(casaId, uid))) throw new HttpsError('permission-denied', 'No perteneces a esa casa.');
+
+  const trabajoRef = db.collection('casas').doc(casaId).collection('trabajos').doc(trabajoId);
+  const ref = trabajoRef.collection('cambiosAlcance').doc(cambioAlcanceId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpsError('not-found', 'El cambio de alcance no existe.');
+  const c = snap.data();
+  // El profesional NO puede aprobarse a sí mismo el cambio que él mismo
+  // solicitó (sección 20: "El profesional NO debe poder convertir
+  // unilateralmente el cambio en aprobado").
+  if (c.creadoPorUid === uid) throw new HttpsError('permission-denied', 'No puedes aprobar tu propia solicitud.');
+  if (c.estado !== 'pendiente') throw new HttpsError('failed-precondition', 'Esta solicitud ya se respondió.');
+
+  await ref.update(aprobar
+    ? { estado: 'aprobado', aprobadoPorUid: uid, aprobadoAt: FieldValue.serverTimestamp() }
+    : { estado: 'rechazado', rechazadoPorUid: uid, rechazadoAt: FieldValue.serverTimestamp() });
+
+  if (aprobar && c.importeAdicional) {
+    const trabajoSnap = await trabajoRef.get();
+    const presupuestoActual = Number(trabajoSnap.data().presupuesto) || 0;
+    await trabajoRef.update({ presupuesto: redondear2(presupuestoActual + c.importeAdicional) });
+  }
+
+  await crearEventoHistorial(casaId, {
+    tipo: 'nota',
+    titulo: aprobar ? `Cambio de alcance aprobado: ${c.titulo}` : `Cambio de alcance rechazado: ${c.titulo}`,
+    trabajoId,
+    coste: aprobar ? c.importeAdicional : null,
+    createdBy: uid,
+  });
+
+  await crearNotificacion(c.creadoPorUid, aprobar ? 'cambio_alcance_aprobado' : 'cambio_alcance_rechazado',
+    aprobar ? 'Cambio de alcance aprobado' : 'Cambio de alcance rechazado',
+    `Tu solicitud "${c.titulo}" ha sido ${aprobar ? 'aprobada' : 'rechazada'}.`,
+    { casaId, trabajoId, cambioAlcanceId });
+
+  return { ok: true };
+});
+
+exports.cancelarCambioAlcance = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+  const uid = request.auth.uid;
+  const { casaId, trabajoId, cambioAlcanceId } = request.data || {};
+  if (!casaId || !trabajoId || !cambioAlcanceId) throw new HttpsError('invalid-argument', 'Faltan datos.');
+
+  const ref = db.collection('casas').doc(casaId).collection('trabajos').doc(trabajoId).collection('cambiosAlcance').doc(cambioAlcanceId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpsError('not-found', 'No existe.');
+  if (snap.data().creadoPorUid !== uid) throw new HttpsError('permission-denied', 'Solo quien lo creó puede cancelarlo.');
+  if (snap.data().estado !== 'pendiente') throw new HttpsError('failed-precondition', 'Ya se respondió a esta solicitud.');
+  await ref.update({ estado: 'cancelado' });
+  return { ok: true };
+});
+
+// =============================================================================
+// FINALIZAR TRABAJO (lado profesional) — sección 28 del spec: queda
+// registrado como finalizado por el profesional; el propietario conserva la
+// capacidad de revisar/completar el registro desde Hogar.
+// =============================================================================
+exports.finalizarTrabajoProfesional = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+  const uid = request.auth.uid;
+  const { casaId, trabajoId } = request.data || {};
+  if (!casaId || !trabajoId) throw new HttpsError('invalid-argument', 'Faltan datos.');
+
+  const { ref: trabajoRef, data: trabajo } = await getTrabajoOThrow(casaId, trabajoId);
+  if (trabajo.profesionalUid !== uid) throw new HttpsError('permission-denied', 'No eres el profesional de este trabajo.');
+
+  await trabajoRef.update({ estado: 'terminado' });
+  await crearEventoHistorial(casaId, {
+    tipo: 'nota',
+    titulo: `${trabajo.titulo} -- finalizado por el profesional`,
+    trabajoId,
+    coste: trabajo.presupuesto || null,
+    profesionalNombre: trabajo.profesionalNombre || null,
+    createdBy: uid,
+  });
+
+  const casaSnap = await db.collection('casas').doc(casaId).get();
+  for (const memberUid of casaSnap.data().members || []) {
+    await crearNotificacion(memberUid, 'trabajo_finalizado',
+      'Trabajo finalizado', `El profesional ha marcado "${trabajo.titulo}" como finalizado.`,
+      { casaId, trabajoId });
+  }
+  return { ok: true };
+});
+
+// =============================================================================
 // 3. CLASIFICAR DOCUMENTO CON IA
 // Recibe una o varias páginas (base64, imagen o PDF) de una factura/
 // presupuesto/garantía y devuelve una sugerencia estructurada de datos.

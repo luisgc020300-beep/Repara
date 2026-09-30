@@ -38,8 +38,17 @@ Future<void> iniciarNuevoDocumento(
   );
   if (confirmadas == null || confirmadas.isEmpty || !context.mounted) return;
 
-  final elementos = await ElementoService.streamElementos(casaId).first;
-  final trabajos = await TrabajoService.streamTrabajos(casaId).first;
+  // Un profesional invitado a un trabajo concreto no tiene permiso para
+  // listar TODOS los elementos/trabajos de la casa (solo el suyo) -- en ese
+  // caso se sigue sin listas de sugerencia en vez de reventar el flujo.
+  List<Elemento> elementos = const [];
+  List<Trabajo> trabajos = const [];
+  try {
+    elementos = await ElementoService.streamElementos(casaId).first;
+    trabajos = await TrabajoService.streamTrabajos(casaId).first;
+  } catch (e) {
+    // sin acceso a las listas completas -- se continúa sin sugerencias.
+  }
   if (!context.mounted) return;
 
   SugerenciaIA? sugerencia;
@@ -584,25 +593,36 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
             ),
             const SizedBox(height: 20),
             _seccion(context, 'Relación con tu casa'),
-            DropdownButtonFormField<String?>(
-              initialValue: _elementoId,
-              decoration: const InputDecoration(labelText: 'Elemento relacionado (opcional)'),
-              items: [
-                const DropdownMenuItem(value: null, child: Text('Sin elemento específico')),
-                ...widget.elementos.map((e) => DropdownMenuItem(value: e.id, child: Text(e.nombre))),
-              ],
-              onChanged: (v) => setState(() => _elementoId = v),
-            ),
+            // Si ya se abrió el escáner desde la ficha de un elemento/trabajo
+            // concreto (widget.*Inicial), ese vínculo queda fijo -- no se
+            // ofrece un desplegable que además, para un profesional sin
+            // permiso para listar TODOS los elementos/trabajos de la casa,
+            // ni siquiera podría rellenarse con opciones.
+            if (widget.elementoIdInicial != null)
+              _VinculoFijo(icono: Icons.category_outlined, texto: _tituloElemento(widget.elementos, widget.elementoIdInicial!))
+            else
+              DropdownButtonFormField<String?>(
+                initialValue: _elementoId,
+                decoration: const InputDecoration(labelText: 'Elemento relacionado (opcional)'),
+                items: [
+                  const DropdownMenuItem(value: null, child: Text('Sin elemento específico')),
+                  ...widget.elementos.map((e) => DropdownMenuItem(value: e.id, child: Text(e.nombre))),
+                ],
+                onChanged: (v) => setState(() => _elementoId = v),
+              ),
             const SizedBox(height: 12),
-            DropdownButtonFormField<String?>(
-              initialValue: _trabajoId,
-              decoration: const InputDecoration(labelText: 'Trabajo relacionado (opcional)'),
-              items: [
-                const DropdownMenuItem(value: null, child: Text('Sin trabajo específico')),
-                ...widget.trabajos.map((t) => DropdownMenuItem(value: t.id, child: Text(t.titulo))),
-              ],
-              onChanged: (v) => setState(() => _trabajoId = v),
-            ),
+            if (widget.trabajoIdInicial != null)
+              _VinculoFijo(icono: Icons.build_outlined, texto: _tituloTrabajo(widget.trabajos, widget.trabajoIdInicial!))
+            else
+              DropdownButtonFormField<String?>(
+                initialValue: _trabajoId,
+                decoration: const InputDecoration(labelText: 'Trabajo relacionado (opcional)'),
+                items: [
+                  const DropdownMenuItem(value: null, child: Text('Sin trabajo específico')),
+                  ...widget.trabajos.map((t) => DropdownMenuItem(value: t.id, child: Text(t.titulo))),
+                ],
+                onChanged: (v) => setState(() => _trabajoId = v),
+              ),
             const SizedBox(height: 12),
             DropdownButtonFormField<TipoEvento>(
               initialValue: _tipoEvento,
@@ -632,6 +652,36 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
       ),
     );
   }
+}
+
+class _VinculoFijo extends StatelessWidget {
+  const _VinculoFijo({required this.icono, required this.texto});
+
+  final IconData icono;
+  final String texto;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      decoration: BoxDecoration(color: context.colors.surfaceMuted, borderRadius: BorderRadius.circular(12)),
+      child: Row(children: [Icon(icono, size: 18, color: context.colors.inkMuted), const SizedBox(width: 8), Text(texto)]),
+    );
+  }
+}
+
+String _tituloElemento(List<Elemento> elementos, String id) {
+  for (final e in elementos) {
+    if (e.id == id) return e.nombre;
+  }
+  return 'Elemento de esta ficha';
+}
+
+String _tituloTrabajo(List<Trabajo> trabajos, String id) {
+  for (final t in trabajos) {
+    if (t.id == id) return t.titulo;
+  }
+  return 'Este trabajo';
 }
 
 Widget _seccion(BuildContext context, String titulo) => Padding(

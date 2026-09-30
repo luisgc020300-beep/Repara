@@ -63,8 +63,24 @@ service cloud.firestore {
         allow read, write: if isAuth() && isMember(cid);
       }
 
+      // Un documento es visible/gestionable por los miembros de la casa como
+      // siempre. Si además está ligado a un trabajo concreto (trabajoId), el
+      // profesional asignado a ESE trabajo también puede verlo y añadir
+      // documentos nuevos a él -- nunca a documentos de otras habitaciones o
+      // sin relación con su trabajo (sección 24 del spec: acceso específico,
+      // nunca a todos los documentos de la casa).
       match /documentos/{did} {
-        allow read, write: if isAuth() && isMember(cid);
+        allow read: if isAuth() && (
+          isMember(cid) ||
+          (resource.data.trabajoId != null &&
+           get(/databases/$(database)/documents/casas/$(cid)/trabajos/$(resource.data.trabajoId)).data.profesionalUid == request.auth.uid)
+        );
+        allow create: if isAuth() && (
+          isMember(cid) ||
+          (request.resource.data.trabajoId != null &&
+           get(/databases/$(database)/documents/casas/$(cid)/trabajos/$(request.resource.data.trabajoId)).data.profesionalUid == request.auth.uid)
+        );
+        allow update, delete: if isAuth() && isMember(cid);
       }
 
       // Un trabajo es visible/editable por los miembros de la casa como
@@ -82,7 +98,36 @@ service cloud.firestore {
            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado', 'presupuesto']))
         );
         allow delete: if isAuth() && isMember(cid);
+
+        // Presupuestos formales (sección 15 del spec) -- toda escritura pasa
+        // por Cloud Functions (crearPresupuesto, enviarPresupuesto,
+        // responderPresupuesto...) para que los totales se calculen siempre
+        // en servidor y nadie pueda autoaprobarse el suyo. El cliente solo
+        // lee, y solo si es miembro de la casa o el profesional de ESE
+        // trabajo concreto.
+        match /presupuestos/{pid} {
+          allow read: if isAuth() && (isMember(cid) || get(/databases/$(database)/documents/casas/$(cid)/trabajos/$(tid)).data.profesionalUid == request.auth.uid);
+          allow write: if false;
+        }
+
+        // ScopeGuard -- cambios de alcance (sección 19 del spec). Misma
+        // lógica: todo escrito por Cloud Functions, el cliente solo lee.
+        match /cambiosAlcance/{caid} {
+          allow read: if isAuth() && (isMember(cid) || get(/databases/$(database)/documents/casas/$(cid)/trabajos/$(tid)).data.profesionalUid == request.auth.uid);
+          allow write: if false;
+        }
       }
+    }
+
+    // ── notificaciones internas (sección 29 del spec) ───────────────────────
+    // Las crean siempre las Cloud Functions (Admin SDK, no pasa por estas
+    // reglas) -- el cliente solo lee las suyas y puede marcarlas como
+    // leídas, nunca crear ni borrar ni tocar el contenido.
+    match /notificaciones/{nid} {
+      allow read: if isAuth() && resource.data.uid == request.auth.uid;
+      allow update: if isAuth() && resource.data.uid == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['leida']);
+      allow create, delete: if false;
     }
   }
 }
