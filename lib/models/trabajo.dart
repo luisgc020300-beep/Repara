@@ -1,12 +1,13 @@
 // lib/models/trabajo.dart
 //
 // Un trabajo es una intervención puntual (avería, reparación, mantenimiento,
-// reforma, instalación) sobre la casa o un elemento concreto. En v1 el
-// profesional es texto libre (nombre/contacto), no una cuenta invitada por
-// enlace -- ese flujo (sección 15 del spec) es una pieza grande de por sí y
-// queda para una fase posterior; aquí ya se cumple el principio de "no
-// obligar a un marketplace" porque no hace falta que el profesional tenga
-// cuenta para que el trabajo quede registrado.
+// reforma, instalación) sobre la casa o un elemento concreto. El profesional
+// puede ser solo texto libre (nombre/contacto, sin cuenta -- cumple el
+// principio de "no obligar a un marketplace") o, si se invita a una cuenta
+// profesional real de Repara y acepta (ver InvitacionService), quedar
+// vinculado por [profesionalUid]. Cuando hay [profesionalUid], ese
+// profesional puede leer este documento y actualizar su estado/presupuesto
+// aunque no sea miembro de la casa (ver firestore.rules).
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum TipoTrabajo { averia, reparacion, mantenimiento, reforma, instalacion, otro }
@@ -34,6 +35,7 @@ class Trabajo {
     this.elementoId,
     this.profesionalNombre,
     this.profesionalContacto,
+    this.profesionalUid,
     this.presupuesto,
     this.createdAt,
     this.createdBy,
@@ -48,6 +50,7 @@ class Trabajo {
   final String? elementoId;
   final String? profesionalNombre;
   final String? profesionalContacto;
+  final String? profesionalUid;
   final double? presupuesto;
   final DateTime? createdAt;
   final String? createdBy;
@@ -64,6 +67,7 @@ class Trabajo {
       elementoId: data['elementoId'] as String?,
       profesionalNombre: data['profesionalNombre'] as String?,
       profesionalContacto: data['profesionalContacto'] as String?,
+      profesionalUid: data['profesionalUid'] as String?,
       presupuesto: (data['presupuesto'] as num?)?.toDouble(),
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
       createdBy: data['createdBy'] as String?,
@@ -79,6 +83,7 @@ class Trabajo {
         if (elementoId != null) 'elementoId': elementoId,
         if (profesionalNombre != null) 'profesionalNombre': profesionalNombre,
         if (profesionalContacto != null) 'profesionalContacto': profesionalContacto,
+        if (profesionalUid != null) 'profesionalUid': profesionalUid,
         if (presupuesto != null) 'presupuesto': presupuesto,
         'createdAt': FieldValue.serverTimestamp(),
       };

@@ -15,6 +15,27 @@ service cloud.firestore {
       allow read, write: if isAuth() && isOwner(uid);
     }
 
+    // ── profesionales (perfil profesional, sección 17 del spec) ────────────────
+    // Solo el propio profesional lee/escribe su ficha -- el propietario nunca
+    // la consulta directamente, solo a través de invitarProfesional (Cloud
+    // Function con Admin SDK, que no pasa por estas reglas).
+    match /profesionales/{uid} {
+      allow read, write: if isAuth() && isOwner(uid);
+    }
+
+    // ── invitaciones (propietario invita a un profesional a UN trabajo) ────────
+    match /invitaciones/{iid} {
+      allow read: if isAuth() && (resource.data.propietarioUid == request.auth.uid || resource.data.profesionalUid == request.auth.uid);
+      // Solo se crean vía Cloud Function (invitarProfesional), que valida
+      // pertenencia a la casa y que el email corresponde a un profesional
+      // real -- el cliente nunca crea esto directamente.
+      allow create: if false;
+      // El profesional invitado puede aceptar/rechazar -- nada más.
+      allow update: if isAuth() && resource.data.profesionalUid == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado']);
+      allow delete: if false;
+    }
+
     // ── casas ────────────────────────────────────────────────────────────────
     match /casas/{cid} {
       allow read: if isAuth() && request.auth.uid in resource.data.members;
@@ -46,8 +67,21 @@ service cloud.firestore {
         allow read, write: if isAuth() && isMember(cid);
       }
 
+      // Un trabajo es visible/editable por los miembros de la casa como
+      // siempre, y ADEMÁS por el profesional asignado en profesionalUid (si
+      // lo hay) -- ese profesional no es miembro de la casa, así que esto es
+      // una segunda vía de acceso, no una sustitución de isMember(). Su
+      // escritura queda limitada a estado/presupuesto: nunca puede cambiar el
+      // título, la descripción ni reasignarse a sí mismo otro trabajo.
       match /trabajos/{tid} {
-        allow read, write: if isAuth() && isMember(cid);
+        allow read: if isAuth() && (isMember(cid) || resource.data.profesionalUid == request.auth.uid);
+        allow create: if isAuth() && isMember(cid);
+        allow update: if isAuth() && (
+          isMember(cid) ||
+          (resource.data.profesionalUid == request.auth.uid &&
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado', 'presupuesto']))
+        );
+        allow delete: if isAuth() && isMember(cid);
       }
     }
   }

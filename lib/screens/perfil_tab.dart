@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 
 import '../models/casa.dart';
 import '../services/casa_service.dart';
+import '../services/profesional_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
 import 'documentos_casa_screen.dart';
+import 'pro/repara_pro_shell_screen.dart';
 
 class PerfilTab extends StatelessWidget {
   const PerfilTab({required this.casa, super.key});
@@ -77,6 +79,8 @@ class PerfilTab extends StatelessWidget {
               ),
             ),
           ],
+          const SizedBox(height: 8),
+          _SeccionProfesional(),
           const SizedBox(height: 24),
           OutlinedButton.icon(
             onPressed: () => FirebaseAuth.instance.signOut(),
@@ -85,6 +89,60 @@ class PerfilTab extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Autoservicio de rol (sección 5 del spec: una persona puede tener varios
+/// roles). Activar el modo profesional no cambia nada de Repara Hogar --
+/// solo añade un acceso nuevo a Repara Pro desde este mismo Perfil.
+class _SeccionProfesional extends StatefulWidget {
+  @override
+  State<_SeccionProfesional> createState() => _SeccionProfesionalState();
+}
+
+class _SeccionProfesionalState extends State<_SeccionProfesional> {
+  bool _activando = false;
+
+  Future<void> _activar() async {
+    setState(() => _activando = true);
+    try {
+      await ProfesionalService.activarModoProfesional();
+    } catch (e) {
+      if (mounted) AppError.show(context, 'No se pudo activar el modo profesional.');
+    } finally {
+      if (mounted) setState(() => _activando = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<bool>(
+      stream: ProfesionalService.streamEsProfesional(),
+      builder: (context, snapshot) {
+        final esProfesional = snapshot.data ?? false;
+        if (!esProfesional) {
+          return Card(
+            child: ListTile(
+              leading: Icon(Icons.engineering_outlined, color: context.colors.brand),
+              title: const Text('¿Trabajas como profesional?'),
+              subtitle: const Text('Activa el modo profesional para gestionar trabajos que te inviten'),
+              trailing: _activando
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                  : TextButton(onPressed: _activar, child: const Text('Activar')),
+            ),
+          );
+        }
+        return Card(
+          child: ListTile(
+            leading: Icon(Icons.engineering_outlined, color: context.colors.brand),
+            title: const Text('Modo profesional'),
+            subtitle: const Text('Ver tus trabajos, clientes y presupuestos'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReparaProShellScreen())),
+          ),
+        );
+      },
     );
   }
 }

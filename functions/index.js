@@ -7,6 +7,7 @@ const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { defineSecret } = require('firebase-functions/params');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+const { getAuth } = require('firebase-admin/auth');
 
 initializeApp();
 const db = getFirestore();
@@ -107,6 +108,140 @@ exports.joinCasa = onCall({ region: REGION }, async (request) => {
   });
 
   return { ok: true, casaId };
+});
+
+// =============================================================================
+// REPARA PRO — rol profesional, invitación a un trabajo y aceptación
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// 3a. ACTIVAR MODO PROFESIONAL
+// Autoservicio (sección 5 del spec: una persona puede tener varios roles) --
+// no requiere aprobación, solo crea el perfil si no existe todavía.
+// -----------------------------------------------------------------------------
+exports.activarModoProfesional = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+  const uid = request.auth.uid;
+
+  await db.collection('users').doc(uid).set({ esProfesional: true }, { merge: true });
+
+  const profRef = db.collection('profesionales').doc(uid);
+  const profSnap = await profRef.get();
+  if (!profSnap.exists) {
+    await profRef.set({ createdAt: FieldValue.serverTimestamp() });
+  }
+  return { ok: true };
+});
+
+// -----------------------------------------------------------------------------
+// 3b. INVITAR PROFESIONAL A UN TRABAJO
+// Solo por email de una cuenta que YA es profesional en Repara (decisión
+// explícita del CEO: sin enlaces públicos por ahora). Nunca expone si el
+// email pertenece o no a alguien -- mismo mensaje de error para "no existe"
+// y "existe pero no es profesional", así no se puede usar para verificar
+// cuentas ajenas.
+// -----------------------------------------------------------------------------
+exports.invitarProfesional = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+  const propietarioUid = request.auth.uid;
+  const { casaId, trabajoId, emailProfesional } = request.data || {};
+  const email = typeof emailProfesional === 'string' ? emailProfesional.trim().toLowerCase() : '';
+  if (!casaId || !trabajoId || !email) {
+    throw new HttpsError('invalid-argument', 'Faltan datos para la invitación.');
+  }
+
+  const casaRef = db.collection('casas').doc(casaId);
+  const trabajoRef = casaRef.collection('trabajos').doc(trabajoId);
+  const [casaSnap, trabajoSnap] = await Promise.all([casaRef.get(), trabajoRef.get()]);
+  if (!casaSnap.exists || !(casaSnap.data().members || []).includes(propietarioUid)) {
+    throw new HttpsError('permission-denied', 'No perteneces a esa casa.');
+  }
+  if (!trabajoSnap.exists) throw new HttpsError('not-found', 'El trabajo no existe.');
+
+  const MENSAJE_NO_PROFESIONAL = 'Ese correo no corresponde a una cuenta profesional en Repara. Pide a esa persona que active el modo profesional primero.';
+
+  let usuarioAuth;
+  try {
+    usuarioAuth = await getAuth().getUserByEmail(email);
+  } catch (e) {
+    throw new HttpsError('not-found', MENSAJE_NO_PROFESIONAL);
+  }
+
+  const profesionalUid = usuarioAuth.uid;
+  if (profesionalUid === propietarioUid) {
+    throw new HttpsError('invalid-argument', 'No puedes invitarte a ti mismo.');
+  }
+  const userSnap = await db.collection('users').doc(profesionalUid).get();
+  if (!userSnap.exists || userSnap.data().esProfesional !== true) {
+    throw new HttpsError('not-found', MENSAJE_NO_PROFESIONAL);
+  }
+
+  const invitacionRef = db.collection('invitaciones').doc();
+  await invitacionRef.set({
+    casaId,
+    trabajoId,
+    trabajoTitulo: trabajoSnap.data().titulo || '',
+    casaNombre: casaSnap.data().nombre || 'Una casa',
+    propietarioUid,
+    profesionalUid,
+    profesionalEmail: email,
+    estado: 'pendiente',
+    createdAt: FieldValue.serverTimestamp(),
+  });
+
+  return { ok: true, invitacionId: invitacionRef.id };
+});
+
+// -----------------------------------------------------------------------------
+// 3c. RESPONDER A UNA INVITACIÓN (aceptar/rechazar)
+// Al aceptar: vincula profesionalUid en el trabajo y guarda una copia ligera
+// en users/{uid}.trabajosProRefs para que "Trabajos"/"Clientes" en REPARA
+// Pro no necesiten permiso de lectura sobre la casa entera.
+// -----------------------------------------------------------------------------
+exports.responderInvitacion = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+  const uid = request.auth.uid;
+  const { invitacionId, aceptar } = request.data || {};
+  if (!invitacionId || typeof aceptar !== 'boolean') {
+    throw new HttpsError('invalid-argument', 'Faltan datos.');
+  }
+
+  const invitacionRef = db.collection('invitaciones').doc(invitacionId);
+
+  await db.runTransaction(async (tx) => {
+    const invSnap = await tx.get(invitacionRef);
+    if (!invSnap.exists) throw new HttpsError('not-found', 'La invitación ya no existe.');
+    const inv = invSnap.data();
+    if (inv.profesionalUid !== uid) {
+      throw new HttpsError('permission-denied', 'Esta invitación no es tuya.');
+    }
+    if (inv.estado !== 'pendiente') {
+      throw new HttpsError('failed-precondition', 'Esta invitación ya se respondió.');
+    }
+
+    tx.update(invitacionRef, { estado: aceptar ? 'aceptada' : 'rechazada' });
+
+    if (aceptar) {
+      const trabajoRef = db.collection('casas').doc(inv.casaId).collection('trabajos').doc(inv.trabajoId);
+      const userSnap = await tx.get(db.collection('users').doc(uid));
+      const nombreProfesional = userSnap.exists ? (userSnap.data().displayName || null) : null;
+
+      tx.update(trabajoRef, {
+        profesionalUid: uid,
+        ...(nombreProfesional ? { profesionalNombre: nombreProfesional } : {}),
+      });
+      tx.set(db.collection('users').doc(uid), {
+        trabajosProRefs: FieldValue.arrayUnion({
+          casaId: inv.casaId,
+          trabajoId: inv.trabajoId,
+          trabajoTitulo: inv.trabajoTitulo,
+          casaNombre: inv.casaNombre,
+        }),
+      }, { merge: true });
+    }
+  });
+
+  return { ok: true };
 });
 
 // =============================================================================

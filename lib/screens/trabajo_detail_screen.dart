@@ -4,15 +4,18 @@
 // ScopeGuard/cambios de alcance todavía). Al finalizar, se ofrece volcar el
 // trabajo como un evento permanente en el historial de la casa (sección 21:
 // "¿Qué quieres guardar en el historial de la vivienda?").
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../models/casa.dart';
 import '../models/documento.dart';
 import '../models/evento.dart';
+import '../models/invitacion.dart';
 import '../models/trabajo.dart';
 import '../services/documento_service.dart';
 import '../services/evento_service.dart';
+import '../services/invitacion_service.dart';
 import '../services/trabajo_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
@@ -116,6 +119,10 @@ class TrabajoDetailScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 20),
+              Text('Profesional', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              _SeccionInvitarProfesional(casa: casa, trabajo: trabajo),
+              const SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -154,6 +161,111 @@ class TrabajoDetailScreen extends StatelessWidget {
                 },
               ),
             ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Invitar a un profesional que ya tiene cuenta en Repara (sección 15 del
+/// spec, simplificado a solo email -- ver decisión del CEO). Si ya hay un
+/// profesional vinculado, muestra quién es en vez del formulario.
+class _SeccionInvitarProfesional extends StatefulWidget {
+  const _SeccionInvitarProfesional({required this.casa, required this.trabajo});
+
+  final Casa casa;
+  final Trabajo trabajo;
+
+  @override
+  State<_SeccionInvitarProfesional> createState() => _SeccionInvitarProfesionalState();
+}
+
+class _SeccionInvitarProfesionalState extends State<_SeccionInvitarProfesional> {
+  final _emailCtrl = TextEditingController();
+  bool _enviando = false;
+
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _invitar() async {
+    final email = _emailCtrl.text.trim();
+    if (email.isEmpty) return;
+    setState(() => _enviando = true);
+    try {
+      await InvitacionService.invitarProfesional(
+        casaId: widget.casa.id,
+        trabajoId: widget.trabajo.id,
+        emailProfesional: email,
+      );
+      _emailCtrl.clear();
+      if (mounted) AppError.showSuccess(context, 'Invitación enviada.');
+    } on FirebaseFunctionsException catch (e) {
+      if (mounted) AppError.show(context, e.message ?? 'No se pudo enviar la invitación.');
+    } catch (e) {
+      if (mounted) AppError.show(context, 'No se pudo enviar la invitación.');
+    } finally {
+      if (mounted) setState(() => _enviando = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.trabajo.profesionalUid != null) {
+      return Card(
+        child: ListTile(
+          leading: Icon(Icons.verified_user_outlined, color: context.colors.success),
+          title: Text(widget.trabajo.profesionalNombre ?? 'Profesional vinculado'),
+          subtitle: const Text('Puede ver este trabajo y actualizar su estado'),
+        ),
+      );
+    }
+
+    return StreamBuilder<Invitacion?>(
+      stream: InvitacionService.streamUltimaInvitacionDe(widget.trabajo.id),
+      builder: (context, snapshot) {
+        final invitacion = snapshot.data;
+        if (invitacion != null && invitacion.estado == EstadoInvitacion.pendiente) {
+          return Card(
+            child: ListTile(
+              leading: Icon(Icons.hourglass_top_outlined, color: context.colors.warning),
+              title: Text('Invitación enviada a ${invitacion.profesionalEmail}'),
+              subtitle: const Text('Esperando respuesta'),
+            ),
+          );
+        }
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (invitacion != null && invitacion.estado == EstadoInvitacion.rechazada) ...[
+                  Text('${invitacion.profesionalEmail} rechazó la invitación anterior.', style: TextStyle(color: context.colors.error)),
+                  const SizedBox(height: 8),
+                ],
+                const Text('Invita a un profesional que ya tenga cuenta en Repara para que pueda ver este trabajo.'),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _emailCtrl,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: const InputDecoration(labelText: 'Correo del profesional'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _enviando
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                        : FilledButton(onPressed: _invitar, child: const Text('Invitar')),
+                  ],
+                ),
+              ],
+            ),
           ),
         );
       },
