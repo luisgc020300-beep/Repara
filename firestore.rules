@@ -55,6 +55,12 @@ service cloud.firestore {
         allow read, write: if isAuth() && isMember(cid);
       }
 
+      // Libreta privada de profesionales de confianza de la casa -- nunca
+      // visible fuera de sus miembros, no es un listado público.
+      match /contactos/{ctid} {
+        allow read, write: if isAuth() && isMember(cid);
+      }
+
       // La historia de la casa (sección 12 del spec de producto) -- de
       // momento editable por cualquier miembro para poder corregir errores;
       // el endurecimiento a append-only con auditoría (sección 46) queda

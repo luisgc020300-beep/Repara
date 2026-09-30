@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../models/casa.dart';
 import '../services/casa_service.dart';
-import 'historial_tab.dart';
+import 'contactos_tab.dart';
 import 'casa_tab.dart';
 import 'home_tab.dart';
 import 'perfil_tab.dart';
@@ -32,9 +32,9 @@ class _CasaShellScreenState extends State<CasaShellScreen> {
         final casa = snapshot.data!;
         final tabs = [
           HomeTab(casa: casa),
-          HistorialTab(casa: casa),
           CasaTab(casa: casa),
           TrabajosTab(casa: casa),
+          ContactosTab(casa: casa),
           PerfilTab(casa: casa),
         ];
         return Scaffold(
@@ -44,9 +44,9 @@ class _CasaShellScreenState extends State<CasaShellScreen> {
             onTap: (i) => setState(() => _index = i),
             items: const [
               BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Inicio'),
-              BottomNavigationBarItem(icon: Icon(Icons.history), label: 'Historial'),
               BottomNavigationBarItem(icon: Icon(Icons.house_outlined), activeIcon: Icon(Icons.house), label: 'Casa'),
               BottomNavigationBarItem(icon: Icon(Icons.build_outlined), activeIcon: Icon(Icons.build), label: 'Trabajos'),
+              BottomNavigationBarItem(icon: Icon(Icons.contact_phone_outlined), activeIcon: Icon(Icons.contact_phone), label: 'Contactos'),
               BottomNavigationBarItem(icon: Icon(Icons.person_outline), activeIcon: Icon(Icons.person), label: 'Perfil'),
             ],
           ),
