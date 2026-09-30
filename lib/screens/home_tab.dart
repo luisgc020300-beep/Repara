@@ -13,6 +13,7 @@ import '../models/evento.dart';
 import '../services/elemento_service.dart';
 import '../services/evento_service.dart';
 import '../theme/design_tokens.dart';
+import '../widgets/boton_ajustes.dart';
 import '../widgets/boton_notificaciones.dart';
 import 'menu_anadir.dart';
 
@@ -31,7 +32,7 @@ class _HomeTabState extends State<HomeTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.casa.nombre), actions: const [BotonNotificaciones()]),
+      appBar: AppBar(title: Text(widget.casa.nombre), actions: const [BotonNotificaciones(), BotonAjustes()]),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => mostrarMenuAnadir(context, casaId: widget.casa.id),
         icon: const Icon(Icons.add),

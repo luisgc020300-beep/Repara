@@ -13,6 +13,7 @@ import '../../services/invitacion_service.dart';
 import '../../services/profesional_service.dart';
 import '../../theme/design_tokens.dart';
 import '../../widgets/app_error.dart';
+import '../../widgets/boton_ajustes.dart';
 import '../../widgets/boton_notificaciones.dart';
 
 const _mensajeInvitarCliente = 'Llevo el mantenimiento de tus trabajos con Repara -- así queda todo el historial, '
@@ -25,7 +26,7 @@ class InicioProTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Repara Pro'), actions: const [BotonNotificaciones()]),
+      appBar: AppBar(title: const Text('Repara Pro'), actions: const [BotonNotificaciones(), BotonAjustes()]),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [

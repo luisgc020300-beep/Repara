@@ -7,8 +7,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:repara/theme/design_tokens.dart';
 
 void main() {
-  testWidgets('El tema de Repara se construye sin errores', (WidgetTester tester) async {
-    await tester.pumpWidget(MaterialApp(theme: buildReparaTheme(), home: const Scaffold()));
+  testWidgets('Los temas claro y oscuro de Repara se construyen sin errores', (WidgetTester tester) async {
+    await tester.pumpWidget(MaterialApp(theme: buildReparaLightTheme(), home: const Scaffold()));
+    expect(find.byType(Scaffold), findsOneWidget);
+
+    await tester.pumpWidget(MaterialApp(theme: buildReparaDarkTheme(), home: const Scaffold()));
     expect(find.byType(Scaffold), findsOneWidget);
   });
 }

@@ -8,6 +8,7 @@ import '../services/invitacion_service.dart';
 import '../services/profesional_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
+import '../widgets/boton_ajustes.dart';
 import 'documentos_casa_screen.dart';
 import 'pro/repara_pro_shell_screen.dart';
 
@@ -72,7 +73,7 @@ class PerfilTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Perfil')),
+      appBar: AppBar(title: const Text('Perfil'), actions: const [BotonAjustes()]),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [

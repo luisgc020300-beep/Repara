@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import '../../models/profesional.dart';
 import '../../services/profesional_service.dart';
 import '../../theme/design_tokens.dart';
+import '../../widgets/boton_ajustes.dart';
 
 class ClientesProTab extends StatelessWidget {
   const ClientesProTab({super.key});
@@ -17,7 +18,7 @@ class ClientesProTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Clientes')),
+      appBar: AppBar(title: const Text('Clientes'), actions: const [BotonAjustes()]),
       body: StreamBuilder<List<TrabajoProRef>>(
         stream: ProfesionalService.streamTrabajosProRefs(),
         builder: (context, snapshot) {

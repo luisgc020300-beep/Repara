@@ -6,6 +6,7 @@ import '../../models/profesional.dart';
 import '../../services/profesional_service.dart';
 import '../../theme/design_tokens.dart';
 import '../../widgets/app_error.dart';
+import '../../widgets/boton_ajustes.dart';
 
 class PerfilProTab extends StatefulWidget {
   const PerfilProTab({super.key});
@@ -43,7 +44,7 @@ class _PerfilProTabState extends State<PerfilProTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Perfil profesional')),
+      appBar: AppBar(title: const Text('Perfil profesional'), actions: const [BotonAjustes()]),
       body: StreamBuilder<Profesional?>(
         stream: ProfesionalService.streamPerfilPropio(),
         builder: (context, snapshot) {

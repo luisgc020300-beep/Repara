@@ -5,6 +5,7 @@ import '../models/casa.dart';
 import '../models/trabajo.dart';
 import '../services/trabajo_service.dart';
 import '../theme/design_tokens.dart';
+import '../widgets/boton_ajustes.dart';
 import 'nuevo_trabajo_screen.dart';
 import 'trabajo_detail_screen.dart';
 
@@ -16,7 +17,7 @@ class TrabajosTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Trabajos')),
+      appBar: AppBar(title: const Text('Trabajos'), actions: const [BotonAjustes()]),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => NuevoTrabajoScreen(casa: casa))),
         icon: const Icon(Icons.add),

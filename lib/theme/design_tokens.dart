@@ -1,11 +1,9 @@
 // lib/theme/design_tokens.dart
 //
-// Identidad visual de Repara: "la ficha viva de la casa". A diferencia de
-// RiskRunner (táctico, oscuro) o Convive (corcho de piso compartido), Repara
-// necesita transmitir calma y confianza doméstica -- fondo claro, cálido,
-// nunca blanco puro ni gris frío de software de gestión. Un único tema claro
-// (sin modo oscuro en v1): la app se piensa para consultarse en el salón o
-// enseñarse a un profesional, no para uso nocturno prolongado como correr.
+// Identidad visual de Repara: "la ficha viva de la casa". Fondo cálido,
+// nunca blanco puro ni negro puro. El modo oscuro (añadido a petición del
+// CEO) mantiene la misma calma -- no es el táctico/oscuro de RiskRunner,
+// es la misma paleta cálida invertida, no un tema distinto.
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -24,12 +22,12 @@ class ReparaColors extends ThemeExtension<ReparaColors> {
     required this.error,
   });
 
-  final Color background; // fondo general -- marfil roto
+  final Color background; // fondo general -- marfil roto / carbón cálido
   final Color surface; // tarjetas
   final Color surfaceMuted; // campos de entrada, filas alternas
-  final Color ink; // texto principal -- negro carbón, no negro puro
-  final Color inkMuted; // texto secundario -- gris cálido
-  final Color brand; // verde salvia profundo -- color de marca
+  final Color ink; // texto principal
+  final Color inkMuted; // texto secundario
+  final Color brand; // verde salvia -- color de marca
   final Color brandOn; // texto/icono sobre un fondo de marca relleno
   final Color sand; // acento secundario -- beige/arena
   final Color success;
@@ -48,6 +46,20 @@ class ReparaColors extends ThemeExtension<ReparaColors> {
     success: Color(0xFF3E7A4F),
     warning: Color(0xFFB8842E),
     error: Color(0xFFB4463A),
+  );
+
+  static const dark = ReparaColors(
+    background: Color(0xFF1B1E1B),
+    surface: Color(0xFF242824),
+    surfaceMuted: Color(0xFF2E332E),
+    ink: Color(0xFFF2EFE8),
+    inkMuted: Color(0xFFA8A79C),
+    brand: Color(0xFF84AC92),
+    brandOn: Color(0xFF0F2016),
+    sand: Color(0xFFCBB98C),
+    success: Color(0xFF6FBF8B),
+    warning: Color(0xFFD9A548),
+    error: Color(0xFFE0776A),
   );
 
   @override
@@ -84,25 +96,26 @@ extension ReparaThemeContextX on BuildContext {
 class ReparaText {
   ReparaText._();
 
-  static TextTheme uiTextTheme() {
-    final base = ThemeData.light().textTheme;
+  static TextTheme uiTextTheme(Brightness brightness) {
+    final base = brightness == Brightness.dark ? ThemeData.dark().textTheme : ThemeData.light().textTheme;
+    final palette = brightness == Brightness.dark ? ReparaColors.dark : ReparaColors.light;
     return GoogleFonts.interTextTheme(base).apply(
-      bodyColor: ReparaColors.light.ink,
-      displayColor: ReparaColors.light.ink,
+      bodyColor: palette.ink,
+      displayColor: palette.ink,
     );
   }
 }
 
-ThemeData buildReparaTheme() {
-  final palette = ReparaColors.light;
-  final textTheme = ReparaText.uiTextTheme();
+ThemeData _buildReparaTheme(Brightness brightness) {
+  final palette = brightness == Brightness.dark ? ReparaColors.dark : ReparaColors.light;
+  final textTheme = ReparaText.uiTextTheme(brightness);
   return ThemeData(
-    brightness: Brightness.light,
+    brightness: brightness,
     scaffoldBackgroundColor: palette.background,
     textTheme: textTheme,
     extensions: [palette],
     colorScheme: ColorScheme(
-      brightness: Brightness.light,
+      brightness: brightness,
       surface: palette.surface,
       onSurface: palette.ink,
       primary: palette.brand,
@@ -166,9 +179,12 @@ ThemeData buildReparaTheme() {
     ),
     snackBarTheme: SnackBarThemeData(
       backgroundColor: palette.ink,
-      contentTextStyle: const TextStyle(color: Colors.white),
+      contentTextStyle: TextStyle(color: palette.background),
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
     ),
   );
 }
+
+ThemeData buildReparaLightTheme() => _buildReparaTheme(Brightness.light);
+ThemeData buildReparaDarkTheme() => _buildReparaTheme(Brightness.dark);

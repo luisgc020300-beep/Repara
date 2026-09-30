@@ -8,6 +8,7 @@ import '../models/casa.dart';
 import '../models/contacto.dart';
 import '../services/contacto_service.dart';
 import '../theme/design_tokens.dart';
+import '../widgets/boton_ajustes.dart';
 import 'contacto_acciones.dart';
 import 'nuevo_contacto_sheet.dart';
 
@@ -19,7 +20,7 @@ class ContactosTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Contactos')),
+      appBar: AppBar(title: const Text('Contactos'), actions: const [BotonAjustes()]),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => mostrarNuevoContactoSheet(context, casaId: casa.id),
         icon: const Icon(Icons.add),

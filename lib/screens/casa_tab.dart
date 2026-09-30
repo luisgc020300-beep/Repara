@@ -11,6 +11,7 @@ import '../services/elemento_service.dart';
 import '../services/habitacion_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
+import '../widgets/boton_ajustes.dart';
 import 'elemento_detail_screen.dart';
 import 'nuevo_elemento_screen.dart';
 
@@ -43,7 +44,7 @@ class CasaTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Tu casa')),
+      appBar: AppBar(title: const Text('Tu casa'), actions: const [BotonAjustes()]),
       body: StreamBuilder<List<Habitacion>>(
         stream: HabitacionService.streamHabitaciones(casa.id),
         builder: (context, snapshot) {
