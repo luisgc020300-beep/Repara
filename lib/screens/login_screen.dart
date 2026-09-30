@@ -69,7 +69,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Icon(Icons.home_work_outlined, size: 56, color: context.colors.brand),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: Image.asset('assets/icon/app_icon.png', width: 88, height: 88),
+                  ),
                   const SizedBox(height: 16),
                   Text(
                     'Repara',
