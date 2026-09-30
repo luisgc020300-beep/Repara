@@ -20,6 +20,24 @@ class CasaShellScreen extends StatefulWidget {
 
 class _CasaShellScreenState extends State<CasaShellScreen> {
   int _index = 0;
+  // Controla el PageView del cuerpo -- permite deslizar entre pestañas con
+  // el dedo, no solo tocando la barra de abajo (mismo patrón que Convive).
+  final _pageController = PageController();
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _onPageChanged(int i) => setState(() => _index = i);
+
+  void _cambiarPestana(int i) {
+    // Salto directo, sin animación -- deslizar con el dedo ya tiene su
+    // propia animación nativa del PageView; tocar una pestaña lejana no
+    // debería sobrevolar visualmente las de en medio.
+    _pageController.jumpToPage(i);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,17 +49,21 @@ class _CasaShellScreenState extends State<CasaShellScreen> {
         }
         final casa = snapshot.data!;
         final tabs = [
-          HomeTab(casa: casa),
-          CasaTab(casa: casa),
-          TrabajosTab(casa: casa),
-          ContactosTab(casa: casa),
-          PerfilTab(casa: casa),
+          _KeepAlivePage(child: HomeTab(casa: casa)),
+          _KeepAlivePage(child: CasaTab(casa: casa)),
+          _KeepAlivePage(child: TrabajosTab(casa: casa)),
+          _KeepAlivePage(child: ContactosTab(casa: casa)),
+          _KeepAlivePage(child: PerfilTab(casa: casa)),
         ];
         return Scaffold(
-          body: IndexedStack(index: _index, children: tabs),
+          body: PageView(
+            controller: _pageController,
+            onPageChanged: _onPageChanged,
+            children: tabs,
+          ),
           bottomNavigationBar: BottomNavigationBar(
             currentIndex: _index,
-            onTap: (i) => setState(() => _index = i),
+            onTap: _cambiarPestana,
             items: const [
               BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Inicio'),
               BottomNavigationBarItem(icon: Icon(Icons.house_outlined), activeIcon: Icon(Icons.house), label: 'Casa'),
@@ -53,5 +75,30 @@ class _CasaShellScreenState extends State<CasaShellScreen> {
         );
       },
     );
+  }
+}
+
+// Sin esto, el PageView desmonta cada pestaña en cuanto sale de la pantalla
+// al deslizar (a diferencia del IndexedStack de antes, que las mantenía
+// todas montadas) -- reconstruiría HomeTab/CasaTab/etc. desde cero cada vez
+// que vuelves a ella, perdiendo la posición de scroll y re-suscribiendo sus
+// streams sin necesidad.
+class _KeepAlivePage extends StatefulWidget {
+  const _KeepAlivePage({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_KeepAlivePage> createState() => _KeepAlivePageState();
+}
+
+class _KeepAlivePageState extends State<_KeepAlivePage> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
   }
 }
