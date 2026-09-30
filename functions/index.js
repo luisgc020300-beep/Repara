@@ -6,7 +6,7 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { defineSecret } = require('firebase-functions/params');
 const { initializeApp } = require('firebase-admin/app');
-const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestore');
 const { getAuth } = require('firebase-admin/auth');
 
 initializeApp();
@@ -135,18 +135,37 @@ exports.activarModoProfesional = onCall({ region: REGION }, async (request) => {
 
 // -----------------------------------------------------------------------------
 // 3b. INVITAR PROFESIONAL A UN TRABAJO
-// Solo por email de una cuenta que YA es profesional en Repara (decisión
-// explícita del CEO: sin enlaces públicos por ahora). Nunca expone si el
-// email pertenece o no a alguien -- mismo mensaje de error para "no existe"
-// y "existe pero no es profesional", así no se puede usar para verificar
-// cuentas ajenas.
+// Si el email corresponde a una cuenta profesional YA existente, funciona
+// como siempre (invitación directa). Si NO existe cuenta, en vez de fallar
+// se genera un CÓDIGO DE INVITACIÓN ABIERTA (mismo patrón que el código
+// para unirse a una casa) que el propietario comparte por su cuenta
+// (WhatsApp/SMS) -- la persona invitada lo canjea desde la app una vez
+// tiene cuenta (ver canjearCodigoInvitacion). Esto es lo que permite que el
+// crecimiento del lado profesional no dependa de que ya exista gente
+// registrada -- sigue siendo una invitación 1 a 1 de alguien que ya
+// conoces, no un listado público.
 // -----------------------------------------------------------------------------
+const CODIGO_INVITACION_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+
+async function generarCodigoInvitacionUnico() {
+  for (let intento = 0; intento < 10; intento++) {
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+      code += CODIGO_INVITACION_CHARS[Math.floor(Math.random() * CODIGO_INVITACION_CHARS.length)];
+    }
+    const existe = await db.collection('invitacionesAbiertas').doc(code).get();
+    if (!existe.exists) return code;
+  }
+  throw new HttpsError('internal', 'No se pudo generar un código de invitación único.');
+}
+
 exports.invitarProfesional = onCall({ region: REGION }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
   const propietarioUid = request.auth.uid;
-  const { casaId, trabajoId, emailProfesional } = request.data || {};
+  const { casaId, trabajoId, emailProfesional, telefonoProfesional } = request.data || {};
   const email = typeof emailProfesional === 'string' ? emailProfesional.trim().toLowerCase() : '';
-  if (!casaId || !trabajoId || !email) {
+  const telefono = typeof telefonoProfesional === 'string' ? telefonoProfesional.trim() : '';
+  if (!casaId || !trabajoId || (!email && !telefono)) {
     throw new HttpsError('invalid-argument', 'Faltan datos para la invitación.');
   }
 
@@ -158,38 +177,112 @@ exports.invitarProfesional = onCall({ region: REGION }, async (request) => {
   }
   if (!trabajoSnap.exists) throw new HttpsError('not-found', 'El trabajo no existe.');
 
-  const MENSAJE_NO_PROFESIONAL = 'Ese correo no corresponde a una cuenta profesional en Repara. Pide a esa persona que active el modo profesional primero.';
-
-  let usuarioAuth;
-  try {
-    usuarioAuth = await getAuth().getUserByEmail(email);
-  } catch (e) {
-    throw new HttpsError('not-found', MENSAJE_NO_PROFESIONAL);
+  let profesionalUid = null;
+  if (email) {
+    try {
+      const usuarioAuth = await getAuth().getUserByEmail(email);
+      if (usuarioAuth.uid === propietarioUid) {
+        throw new HttpsError('invalid-argument', 'No puedes invitarte a ti mismo.');
+      }
+      const userSnap = await db.collection('users').doc(usuarioAuth.uid).get();
+      if (userSnap.exists && userSnap.data().esProfesional === true) {
+        profesionalUid = usuarioAuth.uid;
+      }
+    } catch (e) {
+      if (e instanceof HttpsError) throw e;
+      // getUserByEmail lanza si no existe cuenta con ese email -- se trata
+      // igual que "existe pero no es profesional": cae al código abierto.
+    }
   }
 
-  const profesionalUid = usuarioAuth.uid;
-  if (profesionalUid === propietarioUid) {
-    throw new HttpsError('invalid-argument', 'No puedes invitarte a ti mismo.');
-  }
-  const userSnap = await db.collection('users').doc(profesionalUid).get();
-  if (!userSnap.exists || userSnap.data().esProfesional !== true) {
-    throw new HttpsError('not-found', MENSAJE_NO_PROFESIONAL);
+  if (profesionalUid) {
+    const invitacionRef = db.collection('invitaciones').doc();
+    await invitacionRef.set({
+      casaId,
+      trabajoId,
+      trabajoTitulo: trabajoSnap.data().titulo || '',
+      casaNombre: casaSnap.data().nombre || 'Una casa',
+      propietarioUid,
+      profesionalUid,
+      profesionalEmail: email,
+      estado: 'pendiente',
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    return { ok: true, tipo: 'directa', invitacionId: invitacionRef.id };
   }
 
-  const invitacionRef = db.collection('invitaciones').doc();
-  await invitacionRef.set({
+  // Sin cuenta profesional encontrada -- código abierto para compartir a
+  // mano. Válido 30 días; pasado ese plazo el propietario puede generar
+  // otro sin problema (no hay límite de reintentos, es su propio contacto).
+  const codigo = await generarCodigoInvitacionUnico();
+  await db.collection('invitacionesAbiertas').doc(codigo).set({
     casaId,
     trabajoId,
     trabajoTitulo: trabajoSnap.data().titulo || '',
     casaNombre: casaSnap.data().nombre || 'Una casa',
     propietarioUid,
-    profesionalUid,
-    profesionalEmail: email,
-    estado: 'pendiente',
+    contactoEmail: email || null,
+    contactoTelefono: telefono || null,
+    estado: 'pendiente_registro',
     createdAt: FieldValue.serverTimestamp(),
+    expiraEn: Timestamp.fromMillis(Date.now() + 30 * 24 * 60 * 60 * 1000),
+  });
+  return { ok: true, tipo: 'abierta', codigo };
+});
+
+// -----------------------------------------------------------------------------
+// 3b-bis. CANJEAR UN CÓDIGO DE INVITACIÓN ABIERTA
+// Lo llama la persona invitada, ya con su propia cuenta de Repara (nueva o
+// existente). Activa el modo profesional si no lo tenía, y crea la
+// invitación normal en estado "pendiente" -- sigue exigiendo aceptación
+// explícita desde Inicio Pro, canjear el código no vincula nada todavía.
+// -----------------------------------------------------------------------------
+exports.canjearCodigoInvitacion = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+  const uid = request.auth.uid;
+  const raw = typeof request.data?.codigo === 'string' ? request.data.codigo : '';
+  const codigo = raw.trim().toUpperCase();
+  if (!codigo) throw new HttpsError('invalid-argument', 'Código inválido.');
+
+  const abiertaRef = db.collection('invitacionesAbiertas').doc(codigo);
+
+  const resultado = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(abiertaRef);
+    if (!snap.exists) throw new HttpsError('not-found', 'No existe ninguna invitación con ese código.');
+    const inv = snap.data();
+    if (inv.estado !== 'pendiente_registro') {
+      throw new HttpsError('failed-precondition', 'Este código ya se ha usado.');
+    }
+    if (inv.expiraEn && inv.expiraEn.toMillis() < Date.now()) {
+      throw new HttpsError('failed-precondition', 'Este código ha caducado. Pide uno nuevo.');
+    }
+    if (inv.propietarioUid === uid) {
+      throw new HttpsError('invalid-argument', 'No puedes canjear tu propia invitación.');
+    }
+
+    const invitacionRef = db.collection('invitaciones').doc();
+    tx.set(invitacionRef, {
+      casaId: inv.casaId,
+      trabajoId: inv.trabajoId,
+      trabajoTitulo: inv.trabajoTitulo,
+      casaNombre: inv.casaNombre,
+      propietarioUid: inv.propietarioUid,
+      profesionalUid: uid,
+      profesionalEmail: inv.contactoEmail || '',
+      estado: 'pendiente',
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    tx.update(abiertaRef, { estado: 'canjeado', profesionalUidCanjeo: uid });
+    tx.set(db.collection('users').doc(uid), { esProfesional: true }, { merge: true });
+
+    return { casaNombre: inv.casaNombre, trabajoTitulo: inv.trabajoTitulo };
   });
 
-  return { ok: true, invitacionId: invitacionRef.id };
+  const profRef = db.collection('profesionales').doc(uid);
+  const profSnap = await profRef.get();
+  if (!profSnap.exists) await profRef.set({ createdAt: FieldValue.serverTimestamp() });
+
+  return { ok: true, ...resultado };
 });
 
 // -----------------------------------------------------------------------------

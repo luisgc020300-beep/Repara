@@ -5,21 +5,46 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/invitacion.dart';
 
+/// Resultado de invitarProfesional: 'directa' si ya existía una cuenta
+/// profesional con ese email (invitación normal); 'abierta' si no existía
+/// cuenta y se generó un código para compartir a mano.
+class ResultadoInvitacion {
+  const ResultadoInvitacion({required this.esDirecta, this.codigo});
+  final bool esDirecta;
+  final String? codigo;
+}
+
 class InvitacionService {
   static final _db = FirebaseFirestore.instance;
   static const _region = 'europe-west1';
 
-  static Future<void> invitarProfesional({
+  static Future<ResultadoInvitacion> invitarProfesional({
     required String casaId,
     required String trabajoId,
-    required String emailProfesional,
+    String? emailProfesional,
+    String? telefonoProfesional,
   }) async {
     final callable = FirebaseFunctions.instanceFor(region: _region).httpsCallable('invitarProfesional');
-    await callable.call<Map<String, dynamic>>({
+    final result = await callable.call<Map<String, dynamic>>({
       'casaId': casaId,
       'trabajoId': trabajoId,
-      'emailProfesional': emailProfesional,
+      'emailProfesional': ?emailProfesional,
+      'telefonoProfesional': ?telefonoProfesional,
     });
+    final tipo = result.data['tipo'] as String?;
+    return ResultadoInvitacion(esDirecta: tipo == 'directa', codigo: result.data['codigo'] as String?);
+  }
+
+  /// Lo llama quien recibe un código de invitación (sección "idea 1" del
+  /// bucle viral): no necesita tener cuenta profesional activada de
+  /// antemano, esta función la activa si hace falta.
+  static Future<({String casaNombre, String trabajoTitulo})> canjearCodigo(String codigo) async {
+    final callable = FirebaseFunctions.instanceFor(region: _region).httpsCallable('canjearCodigoInvitacion');
+    final result = await callable.call<Map<String, dynamic>>({'codigo': codigo});
+    return (
+      casaNombre: result.data['casaNombre'] as String? ?? '',
+      trabajoTitulo: result.data['trabajoTitulo'] as String? ?? '',
+    );
   }
 
   static Future<void> responder(String invitacionId, {required bool aceptar}) async {

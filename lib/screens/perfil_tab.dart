@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../models/casa.dart';
 import '../services/casa_service.dart';
+import '../services/invitacion_service.dart';
 import '../services/profesional_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
@@ -33,6 +34,38 @@ class PerfilTab extends StatelessWidget {
       await CasaService.renombrarCasa(casa.id, nombre);
     } catch (e) {
       if (context.mounted) AppError.show(context, 'No se pudo renombrar la casa.');
+    }
+  }
+
+  Future<void> _canjearCodigo(BuildContext context) async {
+    final ctrl = TextEditingController();
+    final codigo = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Código de invitación'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          textCapitalization: TextCapitalization.characters,
+          decoration: const InputDecoration(hintText: 'Ej. AB12CD'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, ctrl.text.trim()), child: const Text('Canjear')),
+        ],
+      ),
+    );
+    if (codigo == null || codigo.isEmpty || !context.mounted) return;
+    try {
+      final resultado = await InvitacionService.canjearCodigo(codigo);
+      if (context.mounted) {
+        AppError.showSuccess(
+          context,
+          'Vinculado a "${resultado.trabajoTitulo}" en ${resultado.casaNombre}. Acéptalo desde Inicio Pro.',
+        );
+      }
+    } catch (e) {
+      if (context.mounted) AppError.show(context, 'Ese código no es válido o ya se ha usado.');
     }
   }
 
@@ -81,6 +114,15 @@ class PerfilTab extends StatelessWidget {
           ],
           const SizedBox(height: 8),
           _SeccionProfesional(),
+          const SizedBox(height: 8),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.confirmation_number_outlined),
+              title: const Text('¿Tienes un código de invitación?'),
+              subtitle: const Text('Un cliente te lo habrá pasado para un trabajo suyo'),
+              onTap: () => _canjearCodigo(context),
+            ),
+          ),
           const SizedBox(height: 24),
           OutlinedButton.icon(
             onPressed: () => FirebaseAuth.instance.signOut(),

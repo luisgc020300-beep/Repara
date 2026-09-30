@@ -5,6 +5,7 @@
 // invitaciones pendientes -- es la única acción que de verdad requiere
 // atención inmediata en el flujo actual.
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../models/invitacion.dart';
 import '../../models/profesional.dart';
@@ -13,6 +14,10 @@ import '../../services/profesional_service.dart';
 import '../../theme/design_tokens.dart';
 import '../../widgets/app_error.dart';
 import '../../widgets/boton_notificaciones.dart';
+
+const _mensajeInvitarCliente = 'Llevo el mantenimiento de tus trabajos con Repara -- así queda todo el historial, '
+    'presupuestos y fotos organizados en un solo sitio, no perdido entre WhatsApps. '
+    'Créate una cuenta gratis y así te puedo mandar presupuestos y avisarte de cambios directamente ahí.';
 
 class InicioProTab extends StatelessWidget {
   const InicioProTab({super.key});
@@ -45,15 +50,30 @@ class InicioProTab extends StatelessWidget {
           StreamBuilder<List<TrabajoProRef>>(
             stream: ProfesionalService.streamTrabajosProRefs(),
             builder: (context, snapshot) {
-              final total = snapshot.data?.length ?? 0;
+              final trabajos = snapshot.data ?? const <TrabajoProRef>[];
+              final totalCasas = trabajos.map((t) => t.casaId).toSet().length;
               return Card(
                 child: ListTile(
                   leading: Icon(Icons.build_outlined, color: context.colors.brand),
-                  title: Text('$total trabajo${total == 1 ? '' : 's'} activo${total == 1 ? '' : 's'}'),
-                  subtitle: const Text('Revisa la pestaña Trabajos para ver el detalle'),
+                  title: Text('${trabajos.length} trabajo${trabajos.length == 1 ? '' : 's'} activo${trabajos.length == 1 ? '' : 's'}'),
+                  subtitle: Text(
+                    totalCasas == 0
+                        ? 'Revisa la pestaña Trabajos para ver el detalle'
+                        : 'Repartidos en $totalCasas casa${totalCasas == 1 ? '' : 's'} distinta${totalCasas == 1 ? '' : 's'}',
+                  ),
                 ),
               );
             },
+          ),
+          const SizedBox(height: 8),
+          Card(
+            child: ListTile(
+              leading: Icon(Icons.person_add_alt_outlined, color: context.colors.brand),
+              title: const Text('Invita a un cliente a Repara'),
+              subtitle: const Text('Para que puedas mandarle presupuestos y avisos desde aquí'),
+              trailing: const Icon(Icons.share_outlined, size: 18),
+              onTap: () => Share.share(_mensajeInvitarCliente),
+            ),
           ),
         ],
       ),

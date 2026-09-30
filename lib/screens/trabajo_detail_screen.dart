@@ -7,6 +7,7 @@
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../models/casa.dart';
 import '../models/documento.dart';
@@ -189,32 +190,57 @@ class _SeccionInvitarProfesional extends StatefulWidget {
 
 class _SeccionInvitarProfesionalState extends State<_SeccionInvitarProfesional> {
   final _emailCtrl = TextEditingController();
+  final _telefonoCtrl = TextEditingController();
   bool _enviando = false;
+  // El código abierto no se guarda en Firestore para mostrarlo aquí -- el
+  // propietario ya lo tiene compartido; esto solo evita que desaparezca de
+  // la pantalla en cuanto se genera, mientras sigue en esta ficha.
+  String? _ultimoCodigoGenerado;
 
   @override
   void dispose() {
     _emailCtrl.dispose();
+    _telefonoCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _invitar() async {
     final email = _emailCtrl.text.trim();
-    if (email.isEmpty) return;
+    final telefono = _telefonoCtrl.text.trim();
+    if (email.isEmpty && telefono.isEmpty) return;
     setState(() => _enviando = true);
     try {
-      await InvitacionService.invitarProfesional(
+      final resultado = await InvitacionService.invitarProfesional(
         casaId: widget.casa.id,
         trabajoId: widget.trabajo.id,
-        emailProfesional: email,
+        emailProfesional: email.isEmpty ? null : email,
+        telefonoProfesional: telefono.isEmpty ? null : telefono,
       );
       _emailCtrl.clear();
-      if (mounted) AppError.showSuccess(context, 'Invitación enviada.');
+      _telefonoCtrl.clear();
+      if (resultado.esDirecta) {
+        if (mounted) AppError.showSuccess(context, 'Invitación enviada.');
+      } else if (mounted) {
+        setState(() => _ultimoCodigoGenerado = resultado.codigo);
+        await _compartirCodigo(resultado.codigo!);
+      }
     } on FirebaseFunctionsException catch (e) {
       if (mounted) AppError.show(context, e.message ?? 'No se pudo enviar la invitación.');
     } catch (e) {
       if (mounted) AppError.show(context, 'No se pudo enviar la invitación.');
     } finally {
       if (mounted) setState(() => _enviando = false);
+    }
+  }
+
+  Future<void> _compartirCodigo(String codigo) async {
+    final mensaje = 'Te invito a "${widget.trabajo.titulo}" en Repara.\n'
+        'Descárgate la app, crea tu cuenta y activa el modo profesional, y luego introduce este código de invitación: $codigo';
+    try {
+      await Share.share(mensaje);
+    } catch (e) {
+      // El código ya se generó y se muestra en pantalla -- que falle el
+      // selector de compartir no debe parecer que la invitación falló.
     }
   }
 
@@ -249,26 +275,52 @@ class _SeccionInvitarProfesionalState extends State<_SeccionInvitarProfesional> 
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (_ultimoCodigoGenerado != null) ...[
+                  Row(
+                    children: [
+                      Icon(Icons.qr_code_2_outlined, color: context.colors.brand),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Código para compartir: $_ultimoCodigoGenerado',
+                          style: const TextStyle(fontWeight: FontWeight.w700, letterSpacing: 1),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.share_outlined, size: 20),
+                        onPressed: () => _compartirCodigo(_ultimoCodigoGenerado!),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    'Esa persona no tiene todavía cuenta profesional en Repara. Cuando se registre, introduce este código para vincularse a este trabajo.',
+                    style: TextStyle(color: context.colors.inkMuted, fontSize: 12),
+                  ),
+                  const Divider(height: 20),
+                ],
                 if (invitacion != null && invitacion.estado == EstadoInvitacion.rechazada) ...[
                   Text('${invitacion.profesionalEmail} rechazó la invitación anterior.', style: TextStyle(color: context.colors.error)),
                   const SizedBox(height: 8),
                 ],
-                const Text('Invita a un profesional que ya tenga cuenta en Repara para que pueda ver este trabajo.'),
+                const Text('Invita a tu profesional de confianza -- si ya tiene cuenta en Repara, le llega directo; si no, te doy un código para que se lo mandes tú.'),
                 const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _emailCtrl,
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: const InputDecoration(labelText: 'Correo del profesional'),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    _enviando
-                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                        : FilledButton(onPressed: _invitar, child: const Text('Invitar')),
-                  ],
+                TextField(
+                  controller: _emailCtrl,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(labelText: 'Correo del profesional (opcional)'),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _telefonoCtrl,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(labelText: 'Teléfono (opcional)'),
+                ),
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: _enviando
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                      : FilledButton(onPressed: _invitar, child: const Text('Invitar')),
                 ),
               ],
             ),

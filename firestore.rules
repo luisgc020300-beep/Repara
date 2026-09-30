@@ -125,6 +125,16 @@ service cloud.firestore {
       }
     }
 
+    // ── invitacionesAbiertas (código para profesionales sin cuenta todavía) ────
+    // Nunca se lee ni se escribe directamente desde el cliente: se generan y
+    // canjean solo a través de invitarProfesional/canjearCodigoInvitacion
+    // (Cloud Functions con Admin SDK, que no pasan por estas reglas). Igual
+    // que con "invitaciones", el propietario nunca consulta esto por su
+    // cuenta -- el código se lo queda él mismo para compartirlo a mano.
+    match /invitacionesAbiertas/{codigo} {
+      allow read, write: if false;
+    }
+
     // ── notificaciones internas (sección 29 del spec) ───────────────────────
     // Las crean siempre las Cloud Functions (Admin SDK, no pasa por estas
     // reglas) -- el cliente solo lee las suyas y puede marcarlas como
