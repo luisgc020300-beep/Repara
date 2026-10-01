@@ -32,7 +32,7 @@ class _HomeTabState extends State<HomeTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.casa.nombre), actions: const [BotonNotificaciones(), BotonAjustes()]),
+      appBar: AppBar(title: Text(widget.casa.nombre), actions: const [BotonNotificaciones(modoPro: false), BotonAjustes()]),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => mostrarMenuAnadir(context, casaId: widget.casa.id),
         icon: const Icon(Icons.add),

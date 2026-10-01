@@ -6,11 +6,42 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../models/notificacion.dart';
+import '../services/casa_service.dart';
 import '../services/notificacion_service.dart';
 import '../theme/design_tokens.dart';
+import 'pro/trabajo_pro_detail_screen.dart';
+import 'trabajo_detail_screen.dart';
 
 class NotificacionesScreen extends StatelessWidget {
-  const NotificacionesScreen({super.key});
+  const NotificacionesScreen({required this.modoPro, super.key});
+
+  /// true si se abrió desde Repara Pro -- filtra la lista a solo las
+  /// notificaciones de ese lado y decide a qué pantalla de trabajo navegar.
+  final bool modoPro;
+
+  Future<void> _abrirTrabajo(BuildContext context, Notificacion n) async {
+    if (!n.leida) await NotificacionService.marcarLeida(n.id);
+    final casaId = n.casaId;
+    final trabajoId = n.trabajoId;
+    if (casaId == null || trabajoId == null || !context.mounted) return;
+
+    if (modoPro) {
+      // El profesional no es miembro de la casa (ver firestore.rules) -- solo
+      // tiene acceso al trabajo concreto, no hace falta ni se puede leer la
+      // casa entera.
+      await Navigator.push<void>(
+        context,
+        MaterialPageRoute(builder: (_) => TrabajoProDetailScreen(casaId: casaId, trabajoId: trabajoId)),
+      );
+      return;
+    }
+    final casa = await CasaService.streamCasa(casaId).first;
+    if (!context.mounted) return;
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(builder: (_) => TrabajoDetailScreen(casa: casa, trabajoId: trabajoId)),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +50,7 @@ class NotificacionesScreen extends StatelessWidget {
       body: StreamBuilder<List<Notificacion>>(
         stream: NotificacionService.streamMisNotificaciones(),
         builder: (context, snapshot) {
-          final notificaciones = snapshot.data ?? [];
+          final notificaciones = (snapshot.data ?? []).where((n) => n.esParaProfesional == modoPro).toList();
           if (notificaciones.isEmpty) {
             return Center(child: Text('No tienes notificaciones todavía.', style: TextStyle(color: context.colors.inkMuted)));
           }
@@ -36,9 +67,7 @@ class NotificacionesScreen extends StatelessWidget {
                   title: Text(n.titulo, style: TextStyle(fontWeight: n.leida ? FontWeight.w500 : FontWeight.w700)),
                   subtitle: Text(n.cuerpo),
                   trailing: n.createdAt != null ? Text(DateFormat('d MMM', 'es_ES').format(n.createdAt!)) : null,
-                  onTap: () {
-                    if (!n.leida) NotificacionService.marcarLeida(n.id);
-                  },
+                  onTap: () => _abrirTrabajo(context, n),
                 ),
               );
             },
