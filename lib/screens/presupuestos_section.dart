@@ -282,11 +282,32 @@ class _EditorPresupuestoSheetState extends State<_EditorPresupuestoSheet> {
                     ),
                     Row(
                       children: [
-                        Expanded(child: TextField(controller: l.cantidadCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Cantidad'))),
+                        Expanded(
+                          flex: 2,
+                          child: TextField(
+                            controller: l.cantidadCtrl,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(labelText: 'Cant.', isDense: true),
+                          ),
+                        ),
                         const SizedBox(width: 8),
-                        Expanded(child: TextField(controller: l.precioCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Precio (€)'))),
+                        Expanded(
+                          flex: 3,
+                          child: TextField(
+                            controller: l.precioCtrl,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(labelText: 'Precio (€)', isDense: true),
+                          ),
+                        ),
                         const SizedBox(width: 8),
-                        Expanded(child: TextField(controller: l.ivaCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'IVA %'))),
+                        Expanded(
+                          flex: 2,
+                          child: TextField(
+                            controller: l.ivaCtrl,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(labelText: 'IVA %', isDense: true),
+                          ),
+                        ),
                       ],
                     ),
                   ],
