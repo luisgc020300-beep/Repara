@@ -513,6 +513,17 @@ exports.responderPresupuesto = onCall({ region: REGION }, async (request) => {
   if (!(await esMiembroCasa(casaId, uid))) throw new HttpsError('permission-denied', 'No perteneces a esa casa.');
 
   const trabajoRef = db.collection('casas').doc(casaId).collection('trabajos').doc(trabajoId);
+  const trabajoSnap = await trabajoRef.get();
+  if (!trabajoSnap.exists) throw new HttpsError('not-found', 'El trabajo no existe.');
+  // Un trabajo ya cerrado no debe poder "reabrirse" en silencio al aceptar
+  // un presupuesto -- si no se bloquea aquí, el estado pasa a
+  // 'presupuestado', el botón de Finalizar del propietario reaparece y, al
+  // volver a pulsarlo, se duplica el evento de historial del mismo trabajo.
+  const estadoTrabajo = trabajoSnap.data().estado;
+  if (estadoTrabajo === 'terminado' || estadoTrabajo === 'archivado') {
+    throw new HttpsError('failed-precondition', 'Este trabajo ya está finalizado, no se pueden responder presupuestos.');
+  }
+
   const ref = trabajoRef.collection('presupuestos').doc(presupuestoId);
   const snap = await ref.get();
   if (!snap.exists) throw new HttpsError('not-found', 'El presupuesto no existe.');
@@ -700,6 +711,9 @@ exports.finalizarTrabajoProfesional = onCall({ region: REGION }, async (request)
 
   const { ref: trabajoRef, data: trabajo } = await getTrabajoOThrow(casaId, trabajoId);
   if (trabajo.profesionalUid !== uid) throw new HttpsError('permission-denied', 'No eres el profesional de este trabajo.');
+  if (trabajo.estado === 'terminado' || trabajo.estado === 'archivado') {
+    throw new HttpsError('failed-precondition', 'Este trabajo ya estaba finalizado.');
+  }
 
   await trabajoRef.update({ estado: 'terminado' });
   await crearEventoHistorial(casaId, {
