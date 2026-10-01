@@ -53,7 +53,12 @@ Future<void> iniciarNuevoDocumento(
 
   SugerenciaIA? sugerencia;
   String? errorIA;
-  await showDialog<void>(
+  // OJO: no se hace `await` aquí -- este diálogo es solo un indicador de
+  // carga (sin botones, sin cierre al tocar fuera) y se cierra a mano en el
+  // finally de abajo. Si se espera a que showDialog se resuelva antes de
+  // seguir, el código nunca llega a llamar a la IA (nada lo puede cerrar
+  // antes) y el "Analizando documento…" se queda para siempre.
+  showDialog<void>(
     context: context,
     barrierDismissible: false,
     builder: (ctx) => const AlertDialog(
@@ -69,7 +74,7 @@ Future<void> iniciarNuevoDocumento(
       confirmadas,
       elementosDisponibles: elementos.map((e) => e.nombre).toList(),
       trabajosDisponibles: trabajos.map((t) => t.titulo).toList(),
-    );
+    ).timeout(const Duration(seconds: 30));
   } catch (e) {
     errorIA = 'No se pudo contactar con el servicio de IA. Puedes rellenar los datos a mano.';
   } finally {
@@ -110,7 +115,12 @@ Future<List<PaginaDocumento>?> _elegirPaginas(BuildContext context) async {
           title: const Text('Hacer una foto'),
           onTap: () async {
             final navigator = Navigator.of(ctx);
-            final foto = await picker.pickImage(source: ImageSource.camera, imageQuality: 85);
+            final foto = await picker.pickImage(
+              source: ImageSource.camera,
+              imageQuality: 85,
+              maxWidth: 1600,
+              maxHeight: 1600,
+            );
             if (foto == null) return navigator.pop(null);
             navigator.pop([_paginaDesdeXFile(foto)]);
           },
@@ -121,7 +131,7 @@ Future<List<PaginaDocumento>?> _elegirPaginas(BuildContext context) async {
           subtitle: const Text('Puedes seleccionar varias fotos si el documento tiene varias páginas'),
           onTap: () async {
             final navigator = Navigator.of(ctx);
-            final fotos = await picker.pickMultiImage(imageQuality: 85);
+            final fotos = await picker.pickMultiImage(imageQuality: 85, maxWidth: 1600, maxHeight: 1600);
             if (fotos.isEmpty) return navigator.pop(null);
             navigator.pop(fotos.map(_paginaDesdeXFile).toList());
           },
