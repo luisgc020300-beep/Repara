@@ -108,6 +108,7 @@ class _PagoDetailScreenState extends State<PagoDetailScreen> {
   Widget build(BuildContext context) {
     final soloLectura = !widget.editable;
     return Scaffold(
+      backgroundColor: context.colors.background,
       appBar: AppBar(
         title: Text(widget.pago == null ? 'Nuevo pago' : 'Detalle del pago'),
         actions: [
@@ -117,7 +118,13 @@ class _PagoDetailScreenState extends State<PagoDetailScreen> {
       ),
       body: ListView(
         padding: const EdgeInsets.all(20),
-        children: soloLectura ? _vistaSoloLectura(context) : _formularioEditable(),
+        children: [
+          soloLectura ? _cabeceraSoloLectura(context) : _cabeceraEditable(context),
+          const SizedBox(height: 24),
+          _seccion(context, 'Detalles'),
+          const SizedBox(height: 8),
+          soloLectura ? _tarjetaSoloLectura(context) : _tarjetaEditable(context),
+        ],
       ),
       bottomNavigationBar: soloLectura
           ? null
@@ -135,72 +142,174 @@ class _PagoDetailScreenState extends State<PagoDetailScreen> {
     );
   }
 
-  List<Widget> _formularioEditable() => [
-        OutlinedButton.icon(
-          onPressed: _elegirFecha,
-          icon: const Icon(Icons.calendar_today_outlined, size: 16),
-          label: Text('${_fecha.day}/${_fecha.month}/${_fecha.year}'),
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _importeCtrl,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          style: const TextStyle(fontWeight: FontWeight.w700),
-          decoration: const InputDecoration(labelText: 'Importe pagado (€)'),
-        ),
-        const SizedBox(height: 12),
-        DropdownButtonFormField<MetodoPago?>(
-          initialValue: _metodo,
-          decoration: const InputDecoration(labelText: 'Método (opcional)'),
-          items: [
-            const DropdownMenuItem(value: null, child: Text('Sin especificar')),
-            ...MetodoPago.values.map((m) => DropdownMenuItem(value: m, child: Text(_nombreMetodo(m)))),
-          ],
-          onChanged: (v) => setState(() => _metodo = v),
-        ),
-        const SizedBox(height: 12),
-        TextField(controller: _conceptoCtrl, decoration: const InputDecoration(labelText: 'Concepto (p.ej. Primer pago · 50%)')),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _descripcionCtrl,
-          minLines: 1,
-          maxLines: 4,
-          decoration: const InputDecoration(labelText: 'Descripción (opcional)'),
-        ),
-      ];
-
-  List<Widget> _vistaSoloLectura(BuildContext context) {
-    final p = widget.pago!;
-    return [
-      _Fila(label: 'Fecha', valor: DateFormat('d MMMM yyyy', 'es_ES').format(p.fecha)),
-      _Fila(label: 'Importe', valor: '${_formato(p.importe)} €'),
-      if (p.metodo != null) _Fila(label: 'Método', valor: _nombreMetodo(p.metodo!)),
-      if (p.concepto != null) _Fila(label: 'Concepto', valor: p.concepto!),
-      if (p.descripcion != null) _Fila(label: 'Descripción', valor: p.descripcion!),
-    ];
+  // Tarjeta tipo "recibo" -- el importe es lo primero que se ve, como en un
+  // justificante real, en vez de un campo de texto más entre otros.
+  Widget _cabeceraEditable(BuildContext context) {
+    return _TarjetaRecibo(
+      child: Column(
+        children: [
+          Icon(Icons.payments_outlined, color: context.colors.brandOn, size: 26),
+          const SizedBox(height: 10),
+          IntrinsicWidth(
+            child: TextField(
+              controller: _importeCtrl,
+              autofocus: widget.pago == null,
+              textAlign: TextAlign.center,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              style: TextStyle(color: context.colors.brandOn, fontSize: 40, fontWeight: FontWeight.w800, height: 1),
+              decoration: InputDecoration(
+                isDense: true,
+                filled: false,
+                border: InputBorder.none,
+                hintText: '0',
+                hintStyle: TextStyle(color: context.colors.brandOn.withValues(alpha: 0.4)),
+                suffixText: ' €',
+                suffixStyle: TextStyle(color: context.colors.brandOn.withValues(alpha: 0.85), fontSize: 22, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          TextButton.icon(
+            onPressed: _elegirFecha,
+            style: TextButton.styleFrom(foregroundColor: context.colors.brandOn.withValues(alpha: 0.9)),
+            icon: const Icon(Icons.calendar_today_outlined, size: 14),
+            label: Text(DateFormat('d MMMM yyyy', 'es_ES').format(_fecha), style: const TextStyle(fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
   }
-}
 
-class _Fila extends StatelessWidget {
-  const _Fila({required this.label, required this.valor});
-  final String label;
-  final String valor;
+  Widget _cabeceraSoloLectura(BuildContext context) {
+    final p = widget.pago!;
+    return _TarjetaRecibo(
+      child: Column(
+        children: [
+          Icon(Icons.payments_outlined, color: context.colors.brandOn, size: 26),
+          const SizedBox(height: 10),
+          Text('${_formato(p.importe)} €', style: TextStyle(color: context.colors.brandOn, fontSize: 40, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 6),
+          Text(
+            DateFormat('d MMMM yyyy', 'es_ES').format(p.fecha),
+            style: TextStyle(color: context.colors.brandOn.withValues(alpha: 0.9), fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
+  }
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _tarjetaEditable(BuildContext context) {
+    return Card(
+      child: Column(
+        children: [
+          _filaConIcono(
+            context,
+            icono: Icons.account_balance_wallet_outlined,
+            child: DropdownButtonFormField<MetodoPago?>(
+              initialValue: _metodo,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'Método', border: InputBorder.none, filled: false, isDense: true),
+              items: [
+                const DropdownMenuItem(value: null, child: Text('Sin especificar')),
+                ...MetodoPago.values.map((m) => DropdownMenuItem(value: m, child: Text(_nombreMetodo(m)))),
+              ],
+              onChanged: (v) => setState(() => _metodo = v),
+            ),
+          ),
+          Divider(height: 1, indent: 52, color: context.colors.inkMuted.withValues(alpha: 0.15)),
+          _filaConIcono(
+            context,
+            icono: Icons.short_text_outlined,
+            child: TextField(
+              controller: _conceptoCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Concepto',
+                hintText: 'p.ej. Primer pago · 50%',
+                border: InputBorder.none,
+                filled: false,
+                isDense: true,
+              ),
+            ),
+          ),
+          Divider(height: 1, indent: 52, color: context.colors.inkMuted.withValues(alpha: 0.15)),
+          _filaConIcono(
+            context,
+            icono: Icons.notes_outlined,
+            child: TextField(
+              controller: _descripcionCtrl,
+              minLines: 1,
+              maxLines: 4,
+              decoration: const InputDecoration(labelText: 'Descripción (opcional)', border: InputBorder.none, filled: false, isDense: true),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _tarjetaSoloLectura(BuildContext context) {
+    final p = widget.pago!;
+    return Card(
+      child: Column(
+        children: [
+          _filaConIcono(context, icono: Icons.account_balance_wallet_outlined, child: _textoFila(context, 'Método', p.metodo != null ? _nombreMetodo(p.metodo!) : 'Sin especificar')),
+          Divider(height: 1, indent: 52, color: context.colors.inkMuted.withValues(alpha: 0.15)),
+          _filaConIcono(context, icono: Icons.short_text_outlined, child: _textoFila(context, 'Concepto', p.concepto ?? 'Sin concepto')),
+          Divider(height: 1, indent: 52, color: context.colors.inkMuted.withValues(alpha: 0.15)),
+          _filaConIcono(context, icono: Icons.notes_outlined, child: _textoFila(context, 'Descripción', p.descripcion ?? 'Sin descripción')),
+        ],
+      ),
+    );
+  }
+
+  Widget _filaConIcono(BuildContext context, {required IconData icono, required Widget child}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(icono, size: 20, color: context.colors.inkMuted),
+          const SizedBox(width: 16),
+          Expanded(child: child),
+        ],
+      ),
+    );
+  }
+
+  Widget _textoFila(BuildContext context, String label, String valor) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TextStyle(fontSize: 12, color: context.colors.inkMuted)),
+          Text(label, style: TextStyle(fontSize: 11, color: context.colors.inkMuted)),
           const SizedBox(height: 2),
-          Text(valor, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          Text(valor, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
         ],
       ),
     );
   }
 }
+
+class _TarjetaRecibo extends StatelessWidget {
+  const _TarjetaRecibo({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+      decoration: BoxDecoration(color: context.colors.brand, borderRadius: BorderRadius.circular(20)),
+      child: child,
+    );
+  }
+}
+
+Widget _seccion(BuildContext context, String titulo) => Text(
+      titulo,
+      style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700, color: context.colors.brand),
+    );
 
 String _nombreMetodo(MetodoPago m) => switch (m) {
       MetodoPago.bizum => 'Bizum',
