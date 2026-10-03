@@ -20,6 +20,7 @@ import '../services/invitacion_service.dart';
 import '../services/trabajo_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
+import '../widgets/progreso_pago.dart';
 import 'cambio_alcance_section.dart';
 import 'nuevo_documento_flow.dart';
 import 'presupuestos_section.dart';
@@ -43,6 +44,28 @@ class TrabajoDetailScreen extends StatelessWidget {
       ),
     );
     if (confirmar != true) return;
+
+    // Aviso, no bloqueo (decisión del CEO): que falte pago no debe impedir
+    // cerrar un trabajo si el cobro llega más tarde (transferencia,
+    // financiación...), pero sí se avisa para no perderlo de vista.
+    if (!trabajo.pagadoCompleto && context.mounted) {
+      final seguir = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Todavía no está pagado del todo'),
+          content: Text(
+            'Llevas pagado ${trabajo.pagado.toStringAsFixed(2)} € de ${trabajo.presupuesto!.toStringAsFixed(2)} €. '
+            '¿Quieres finalizar igualmente?',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Finalizar igualmente')),
+          ],
+        ),
+      );
+      if (seguir != true) return;
+    }
+    if (!context.mounted) return;
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
     try {
       await EventoService.crear(
@@ -116,6 +139,8 @@ class TrabajoDetailScreen extends StatelessWidget {
                       if (trabajo.presupuesto != null) ...[
                         const SizedBox(height: 4),
                         Text('Presupuesto: ${trabajo.presupuesto!.toStringAsFixed(0)} €'),
+                        const SizedBox(height: 10),
+                        ProgresoPago(casaId: casa.id, trabajo: trabajo, editable: true),
                       ],
                     ],
                   ),
