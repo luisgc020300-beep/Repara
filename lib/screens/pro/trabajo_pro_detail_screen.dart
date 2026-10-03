@@ -10,12 +10,14 @@ import 'package:flutter/material.dart';
 import '../../models/documento.dart';
 import '../../models/trabajo.dart';
 import '../../services/documento_service.dart';
+import '../../services/pago_service.dart';
 import '../../services/trabajo_service.dart';
 import '../../theme/design_tokens.dart';
 import '../../widgets/app_error.dart';
 import '../../widgets/progreso_pago.dart';
 import '../cambio_alcance_section.dart';
 import '../nuevo_documento_flow.dart';
+import '../pagos_section.dart';
 import '../presupuestos_section.dart';
 
 class TrabajoProDetailScreen extends StatelessWidget {
@@ -41,22 +43,25 @@ class TrabajoProDetailScreen extends StatelessWidget {
     // Mismo aviso no bloqueante que en el lado del propietario: al
     // profesional también le interesa no perder de vista un cobro
     // pendiente, pero no se le impide cerrar el trabajo por ello.
-    if (!trabajo.pagadoCompleto && context.mounted) {
-      final seguir = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('El cliente todavía no ha pagado del todo'),
-          content: Text(
-            'Lleva pagado ${trabajo.pagado.toStringAsFixed(2)} € de ${trabajo.presupuesto!.toStringAsFixed(2)} €. '
-            '¿Quieres finalizar igualmente?',
+    if (trabajo.presupuesto != null) {
+      final pagado = await PagoService.totalPagado(casaId, trabajoId);
+      if (pagado < trabajo.presupuesto! && context.mounted) {
+        final seguir = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('El cliente todavía no ha pagado del todo'),
+            content: Text(
+              'Lleva pagado ${pagado.toStringAsFixed(2)} € de ${trabajo.presupuesto!.toStringAsFixed(2)} €. '
+              '¿Quieres finalizar igualmente?',
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+              FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Finalizar igualmente')),
+            ],
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Finalizar igualmente')),
-          ],
-        ),
-      );
-      if (seguir != true) return;
+        );
+        if (seguir != true) return;
+      }
     }
     if (!context.mounted) return;
     try {
@@ -113,7 +118,7 @@ class TrabajoProDetailScreen extends StatelessWidget {
                         const SizedBox(height: 8),
                         Text('Presupuesto acordado: ${trabajo.presupuesto!.toStringAsFixed(2)} €', style: const TextStyle(fontWeight: FontWeight.w600)),
                         const SizedBox(height: 10),
-                        ProgresoPago(casaId: casaId, trabajo: trabajo, editable: false),
+                        ProgresoPago(casaId: casaId, trabajoId: trabajoId, presupuesto: trabajo.presupuesto!),
                       ],
                     ],
                   ),
@@ -123,6 +128,8 @@ class TrabajoProDetailScreen extends StatelessWidget {
               PresupuestosSection(casaId: casaId, trabajoId: trabajoId, rol: RolEnTrabajo.profesional),
               const SizedBox(height: 20),
               CambiosAlcanceSection(casaId: casaId, trabajoId: trabajoId, rol: RolEnTrabajo.profesional),
+              const SizedBox(height: 20),
+              PagosSection(casaId: casaId, trabajoId: trabajoId, rol: RolEnTrabajo.profesional),
               const SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,

@@ -122,6 +122,17 @@ service cloud.firestore {
           allow read: if isAuth() && (isMember(cid) || get(/databases/$(database)/documents/casas/$(cid)/trabajos/$(tid)).data.profesionalUid == request.auth.uid);
           allow write: if false;
         }
+
+        // Pagos registrados por el propietario contra el presupuesto del
+        // trabajo. A diferencia de presupuestos/cambiosAlcance, aquí no hay
+        // una aprobación entre dos partes que proteger -- solo el
+        // propietario escribe sus propios pagos, directo desde el cliente.
+        // El profesional asignado los lee con todo el detalle, pero nunca
+        // puede crearlos, editarlos ni borrarlos.
+        match /pagos/{pagoid} {
+          allow read: if isAuth() && (isMember(cid) || get(/databases/$(database)/documents/casas/$(cid)/trabajos/$(tid)).data.profesionalUid == request.auth.uid);
+          allow write: if isAuth() && isMember(cid);
+        }
       }
     }
 

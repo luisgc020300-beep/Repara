@@ -37,7 +37,6 @@ class Trabajo {
     this.profesionalContacto,
     this.profesionalUid,
     this.presupuesto,
-    this.pagado = 0,
     this.createdAt,
     this.createdBy,
   });
@@ -53,26 +52,8 @@ class Trabajo {
   final String? profesionalContacto;
   final String? profesionalUid;
   final double? presupuesto;
-  // Cuánto se ha pagado hasta ahora del [presupuesto] -- da igual si ese
-  // precio viene de un presupuesto formal aceptado en la app o de lo que el
-  // propietario escribió a mano al crear el trabajo (sección pedida por el
-  // CEO: "venga de donde venga el presupuesto, que haya un apartado de
-  // cuánto llevas pagado"). Solo lo edita el propietario; el profesional
-  // asignado lo ve pero no lo toca (ver firestore.rules).
-  final double pagado;
   final DateTime? createdAt;
   final String? createdBy;
-
-  /// null si no hay precio con el que comparar -- no tiene sentido mostrar
-  /// un porcentaje sin presupuesto.
-  double? get porcentajePagado {
-    if (presupuesto == null || presupuesto == 0) return null;
-    return (pagado / presupuesto!).clamp(0, 1).toDouble();
-  }
-
-  /// true también cuando no hay presupuesto fijado -- no hay nada pendiente
-  /// que avisar si todavía no se sabe el precio.
-  bool get pagadoCompleto => presupuesto == null || pagado >= presupuesto!;
 
   factory Trabajo.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? {};
@@ -88,7 +69,6 @@ class Trabajo {
       profesionalContacto: data['profesionalContacto'] as String?,
       profesionalUid: data['profesionalUid'] as String?,
       presupuesto: (data['presupuesto'] as num?)?.toDouble(),
-      pagado: (data['pagado'] as num?)?.toDouble() ?? 0,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
       createdBy: data['createdBy'] as String?,
     );
@@ -105,7 +85,6 @@ class Trabajo {
         if (profesionalContacto != null) 'profesionalContacto': profesionalContacto,
         if (profesionalUid != null) 'profesionalUid': profesionalUid,
         if (presupuesto != null) 'presupuesto': presupuesto,
-        'pagado': pagado,
         'createdAt': FieldValue.serverTimestamp(),
       };
 }
