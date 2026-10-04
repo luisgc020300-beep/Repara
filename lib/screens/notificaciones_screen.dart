@@ -37,7 +37,14 @@ class NotificacionesScreen extends StatelessWidget {
       await Navigator.push<void>(
         context,
         MaterialPageRoute(
-          builder: (_) => PagoDetailScreen(casaId: casaId, trabajoId: trabajoId, trabajoTitulo: trabajo.titulo, editable: false, pago: pago),
+          builder: (_) => PagoDetailScreen(
+            casaId: casaId,
+            trabajoId: trabajoId,
+            trabajoTitulo: trabajo.titulo,
+            presupuesto: trabajo.presupuesto,
+            editable: false,
+            pago: pago,
+          ),
         ),
       );
       return;

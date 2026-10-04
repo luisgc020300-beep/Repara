@@ -18,6 +18,7 @@ class PagoDetailScreen extends StatefulWidget {
     required this.casaId,
     required this.trabajoId,
     required this.trabajoTitulo,
+    required this.presupuesto,
     required this.editable,
     this.pago,
     super.key,
@@ -26,6 +27,9 @@ class PagoDetailScreen extends StatefulWidget {
   final String casaId;
   final String trabajoId;
   final String trabajoTitulo;
+  /// null si el trabajo todavía no tiene un precio fijado -- en ese caso no
+  /// hay límite contra el que comparar y se deja pagar libremente.
+  final double? presupuesto;
   final bool editable;
 
   /// null = se está creando un pago nuevo.
@@ -66,6 +70,28 @@ class _PagoDetailScreenState extends State<PagoDetailScreen> {
       AppError.show(context, 'Introduce un importe válido.');
       return;
     }
+
+    // No se puede pagar más de lo presupuestado -- si el profesional sube
+    // el presupuesto (o se acepta uno nuevo), ese límite sube solo, porque
+    // aquí siempre se compara contra el valor en vivo de trabajo.presupuesto.
+    final presupuesto = widget.presupuesto;
+    if (presupuesto != null) {
+      final totalActual = await PagoService.totalPagado(widget.casaId, widget.trabajoId);
+      final totalSinEste = totalActual - (widget.pago?.importe ?? 0);
+      final nuevoTotal = totalSinEste + importe;
+      if (nuevoTotal > presupuesto + 0.01) {
+        final disponible = (presupuesto - totalSinEste).clamp(0, presupuesto);
+        if (mounted) {
+          AppError.show(
+            context,
+            'Ese importe supera el presupuesto (${presupuesto.toStringAsFixed(2)} €). '
+            'Como mucho puedes registrar ${disponible.toStringAsFixed(2)} € en este pago.',
+          );
+        }
+        return;
+      }
+    }
+
     setState(() => _guardando = true);
     final pago = Pago(
       id: widget.pago?.id ?? '',

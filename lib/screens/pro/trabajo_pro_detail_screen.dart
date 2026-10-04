@@ -129,7 +129,13 @@ class TrabajoProDetailScreen extends StatelessWidget {
               const SizedBox(height: 20),
               CambiosAlcanceSection(casaId: casaId, trabajoId: trabajoId, rol: RolEnTrabajo.profesional),
               const SizedBox(height: 20),
-              PagosSection(casaId: casaId, trabajoId: trabajoId, trabajoTitulo: trabajo.titulo, rol: RolEnTrabajo.profesional),
+              PagosSection(
+                casaId: casaId,
+                trabajoId: trabajoId,
+                trabajoTitulo: trabajo.titulo,
+                presupuesto: trabajo.presupuesto,
+                rol: RolEnTrabajo.profesional,
+              ),
               const SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
