@@ -4,6 +4,7 @@
 // Deploy: firebase deploy --only functions
 
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
+const { onDocumentCreated } = require('firebase-functions/v2/firestore');
 const { defineSecret } = require('firebase-functions/params');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestore');
@@ -733,6 +734,33 @@ exports.finalizarTrabajoProfesional = onCall({ region: REGION }, async (request)
   }
   return { ok: true };
 });
+
+// =============================================================================
+// NOTIFICAR AL PROFESIONAL CUANDO SE LE REGISTRA UN PAGO
+// Los pagos se escriben directo desde el cliente (ver PagoService -- aquí no
+// hay ninguna aprobación entre dos partes que proteger, a diferencia de
+// presupuestos/cambiosAlcance), pero crear una notificación sí necesita
+// Admin SDK porque firestore.rules deniega su escritura directa. Por eso
+// esto es un trigger sobre la propia escritura, no una Cloud Function que
+// llame el cliente.
+// =============================================================================
+exports.onPagoCreado = onDocumentCreated(
+  { region: REGION, document: 'casas/{casaId}/trabajos/{trabajoId}/pagos/{pagoId}' },
+  async (event) => {
+    const pago = event.data?.data();
+    if (!pago) return;
+    const { casaId, trabajoId, pagoId } = event.params;
+
+    const trabajoSnap = await db.collection('casas').doc(casaId).collection('trabajos').doc(trabajoId).get();
+    if (!trabajoSnap.exists) return;
+    const trabajo = trabajoSnap.data();
+    if (!trabajo.profesionalUid) return; // sin profesional en la app, nadie a quien avisar
+
+    await crearNotificacion(trabajo.profesionalUid, 'pago_registrado',
+      'Nuevo pago registrado', `Te han registrado un pago de ${Number(pago.importe || 0).toFixed(2)} € en "${trabajo.titulo}".`,
+      { casaId, trabajoId, pagoId });
+  }
+);
 
 // =============================================================================
 // 3. CLASIFICAR DOCUMENTO CON IA

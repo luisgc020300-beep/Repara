@@ -8,7 +8,10 @@ import 'package:intl/intl.dart';
 import '../models/notificacion.dart';
 import '../services/casa_service.dart';
 import '../services/notificacion_service.dart';
+import '../services/pago_service.dart';
+import '../services/trabajo_service.dart';
 import '../theme/design_tokens.dart';
+import 'pago_detail_screen.dart';
 import 'pro/trabajo_pro_detail_screen.dart';
 import 'trabajo_detail_screen.dart';
 
@@ -24,6 +27,21 @@ class NotificacionesScreen extends StatelessWidget {
     final casaId = n.casaId;
     final trabajoId = n.trabajoId;
     if (casaId == null || trabajoId == null || !context.mounted) return;
+
+    // "Te han registrado un pago" lleva directo al detalle de ESE pago, no
+    // solo al trabajo -- es lo que el profesional quiere ver primero.
+    if (n.tipo == 'pago_registrado' && n.pagoId != null) {
+      final trabajo = await TrabajoService.streamTrabajo(casaId, trabajoId).first;
+      final pago = await PagoService.obtenerPago(casaId, trabajoId, n.pagoId!);
+      if (!context.mounted || trabajo == null || pago == null) return;
+      await Navigator.push<void>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PagoDetailScreen(casaId: casaId, trabajoId: trabajoId, trabajoTitulo: trabajo.titulo, editable: false, pago: pago),
+        ),
+      );
+      return;
+    }
 
     if (modoPro) {
       // El profesional no es miembro de la casa (ver firestore.rules) -- solo
@@ -82,5 +100,6 @@ IconData _iconoTipo(String tipo) => switch (tipo) {
       'presupuesto_enviado' || 'presupuesto_aceptado' || 'presupuesto_rechazado' => Icons.request_quote_outlined,
       'cambio_alcance_solicitado' || 'cambio_alcance_aprobado' || 'cambio_alcance_rechazado' => Icons.rule_outlined,
       'trabajo_finalizado' => Icons.check_circle_outline,
+      'pago_registrado' => Icons.payments_outlined,
       _ => Icons.notifications_outlined,
     };

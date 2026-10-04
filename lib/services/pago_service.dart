@@ -40,4 +40,11 @@ class PagoService {
     final snap = await _col(casaId, trabajoId).get();
     return snap.docs.fold<double>(0, (acc, d) => acc + ((d.data()['importe'] as num?)?.toDouble() ?? 0));
   }
+
+  /// Lectura puntual de un pago concreto -- usada al abrir la notificación
+  /// de "te han registrado un pago" (ver notificaciones_screen.dart).
+  static Future<Pago?> obtenerPago(String casaId, String trabajoId, String pagoId) async {
+    final doc = await _col(casaId, trabajoId).doc(pagoId).get();
+    return doc.exists ? Pago.fromDoc(doc) : null;
+  }
 }
