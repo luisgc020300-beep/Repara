@@ -15,6 +15,7 @@ import '../services/evento_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/boton_ajustes.dart';
 import '../widgets/boton_notificaciones.dart';
+import 'garantias_proximas_screen.dart';
 import 'menu_anadir.dart';
 
 class HomeTab extends StatefulWidget {
@@ -49,21 +50,29 @@ class _HomeTabState extends State<HomeTab> {
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                 child: Card(
                   color: context.colors.warning.withValues(alpha: 0.12),
-                  child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Row(
-                      children: [
-                        Icon(Icons.shield_outlined, color: context.colors.warning),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            elementos.length == 1
-                                ? 'La garantía de "${elementos.first.nombre}" termina pronto.'
-                                : '${elementos.length} garantías están a punto de terminar.',
-                            style: TextStyle(color: context.colors.ink, fontWeight: FontWeight.w600),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => GarantiasProximasScreen(casa: widget.casa, elementos: elementos)),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Row(
+                        children: [
+                          Icon(Icons.shield_outlined, color: context.colors.warning),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              elementos.length == 1
+                                  ? 'La garantía de "${elementos.first.nombre}" termina pronto.'
+                                  : '${elementos.length} garantías están a punto de terminar.',
+                              style: TextStyle(color: context.colors.ink, fontWeight: FontWeight.w600),
+                            ),
                           ),
-                        ),
-                      ],
+                          Icon(Icons.chevron_right, color: context.colors.inkMuted),
+                        ],
+                      ),
                     ),
                   ),
                 ),
