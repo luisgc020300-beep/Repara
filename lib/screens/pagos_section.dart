@@ -13,10 +13,11 @@ import 'pago_detail_screen.dart';
 import 'presupuestos_section.dart' show RolEnTrabajo;
 
 class PagosSection extends StatelessWidget {
-  const PagosSection({required this.casaId, required this.trabajoId, required this.rol, super.key});
+  const PagosSection({required this.casaId, required this.trabajoId, required this.trabajoTitulo, required this.rol, super.key});
 
   final String casaId;
   final String trabajoId;
+  final String trabajoTitulo;
   final RolEnTrabajo rol;
 
   @override
@@ -37,7 +38,7 @@ class PagosSection extends StatelessWidget {
                   TextButton.icon(
                     onPressed: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => PagoDetailScreen(casaId: casaId, trabajoId: trabajoId, editable: true)),
+                      MaterialPageRoute(builder: (_) => PagoDetailScreen(casaId: casaId, trabajoId: trabajoId, trabajoTitulo: trabajoTitulo, editable: true)),
                     ),
                     icon: const Icon(Icons.add, size: 18),
                     label: const Text('Añadir pago'),
@@ -61,7 +62,7 @@ class PagosSection extends StatelessWidget {
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => PagoDetailScreen(casaId: casaId, trabajoId: trabajoId, editable: editable, pago: p),
+                          builder: (_) => PagoDetailScreen(casaId: casaId, trabajoId: trabajoId, trabajoTitulo: trabajoTitulo, editable: editable, pago: p),
                         ),
                       ),
                     ),

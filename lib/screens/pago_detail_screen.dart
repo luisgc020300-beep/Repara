@@ -1,9 +1,10 @@
 // lib/screens/pago_detail_screen.dart
 //
-// Detalle de un pago concreto de un trabajo -- editable para el propietario
-// (quien registra lo que ha pagado), solo lectura para el profesional
-// asignado a ese trabajo (se entera de todo el detalle sin poder tocarlo).
-// Ver screens/pagos_section.dart para el listado que abre esta pantalla.
+// Detalle de un pago concreto de un trabajo, con aspecto de recibo formal
+// (número, fecha, filas con regla) -- editable para el propietario (quien
+// registra lo que ha pagado), solo lectura para el profesional asignado a
+// ese trabajo (se entera de todo el detalle sin poder tocarlo). Ver
+// screens/pagos_section.dart para el listado que abre esta pantalla.
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -16,6 +17,7 @@ class PagoDetailScreen extends StatefulWidget {
   const PagoDetailScreen({
     required this.casaId,
     required this.trabajoId,
+    required this.trabajoTitulo,
     required this.editable,
     this.pago,
     super.key,
@@ -23,6 +25,7 @@ class PagoDetailScreen extends StatefulWidget {
 
   final String casaId;
   final String trabajoId;
+  final String trabajoTitulo;
   final bool editable;
 
   /// null = se está creando un pago nuevo.
@@ -41,6 +44,8 @@ class _PagoDetailScreenState extends State<PagoDetailScreen> {
   bool _guardando = false;
 
   static String _formato(double v) => v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(2);
+
+  String get _numeroRecibo => widget.pago == null ? '—' : widget.pago!.id.substring(widget.pago!.id.length - 6).toUpperCase();
 
   @override
   void dispose() {
@@ -106,7 +111,6 @@ class _PagoDetailScreenState extends State<PagoDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final soloLectura = !widget.editable;
     return Scaffold(
       backgroundColor: context.colors.background,
       appBar: AppBar(
@@ -118,15 +122,9 @@ class _PagoDetailScreenState extends State<PagoDetailScreen> {
       ),
       body: ListView(
         padding: const EdgeInsets.all(20),
-        children: [
-          soloLectura ? _cabeceraSoloLectura(context) : _cabeceraEditable(context),
-          const SizedBox(height: 24),
-          _seccion(context, 'Detalles'),
-          const SizedBox(height: 8),
-          soloLectura ? _tarjetaSoloLectura(context) : _tarjetaEditable(context),
-        ],
+        children: [_tarjetaRecibo(context)],
       ),
-      bottomNavigationBar: soloLectura
+      bottomNavigationBar: !widget.editable
           ? null
           : SafeArea(
               child: Padding(
@@ -142,174 +140,146 @@ class _PagoDetailScreenState extends State<PagoDetailScreen> {
     );
   }
 
-  // Tarjeta tipo "recibo" -- el importe es lo primero que se ve, como en un
-  // justificante real, en vez de un campo de texto más entre otros.
-  Widget _cabeceraEditable(BuildContext context) {
-    return _TarjetaRecibo(
-      child: Column(
-        children: [
-          Icon(Icons.payments_outlined, color: context.colors.brandOn, size: 26),
-          const SizedBox(height: 10),
-          IntrinsicWidth(
-            child: TextField(
-              controller: _importeCtrl,
-              autofocus: widget.pago == null,
-              textAlign: TextAlign.center,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              style: TextStyle(color: context.colors.brandOn, fontSize: 40, fontWeight: FontWeight.w800, height: 1),
-              decoration: InputDecoration(
-                isDense: true,
-                filled: false,
-                border: InputBorder.none,
-                hintText: '0',
-                hintStyle: TextStyle(color: context.colors.brandOn.withValues(alpha: 0.4)),
-                suffixText: ' €',
-                suffixStyle: TextStyle(color: context.colors.brandOn.withValues(alpha: 0.85), fontSize: 22, fontWeight: FontWeight.w700),
-              ),
-            ),
-          ),
-          const SizedBox(height: 4),
-          TextButton.icon(
-            onPressed: _elegirFecha,
-            style: TextButton.styleFrom(foregroundColor: context.colors.brandOn.withValues(alpha: 0.9)),
-            icon: const Icon(Icons.calendar_today_outlined, size: 14),
-            label: Text(DateFormat('d MMMM yyyy', 'es_ES').format(_fecha), style: const TextStyle(fontWeight: FontWeight.w600)),
-          ),
-        ],
+  Widget _tarjetaRecibo(BuildContext context) {
+    final lineaColor = context.colors.inkMuted.withValues(alpha: 0.18);
+    return Container(
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: lineaColor),
       ),
-    );
-  }
-
-  Widget _cabeceraSoloLectura(BuildContext context) {
-    final p = widget.pago!;
-    return _TarjetaRecibo(
-      child: Column(
-        children: [
-          Icon(Icons.payments_outlined, color: context.colors.brandOn, size: 26),
-          const SizedBox(height: 10),
-          Text('${_formato(p.importe)} €', style: TextStyle(color: context.colors.brandOn, fontSize: 40, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 6),
-          Text(
-            DateFormat('d MMMM yyyy', 'es_ES').format(p.fecha),
-            style: TextStyle(color: context.colors.brandOn.withValues(alpha: 0.9), fontWeight: FontWeight.w600),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _tarjetaEditable(BuildContext context) {
-    return Card(
-      child: Column(
-        children: [
-          _filaConIcono(
-            context,
-            icono: Icons.account_balance_wallet_outlined,
-            child: DropdownButtonFormField<MetodoPago?>(
-              initialValue: _metodo,
-              isExpanded: true,
-              decoration: const InputDecoration(labelText: 'Método', border: InputBorder.none, filled: false, isDense: true),
-              items: [
-                const DropdownMenuItem(value: null, child: Text('Sin especificar')),
-                ...MetodoPago.values.map((m) => DropdownMenuItem(value: m, child: Text(_nombreMetodo(m)))),
-              ],
-              onChanged: (v) => setState(() => _metodo = v),
-            ),
-          ),
-          Divider(height: 1, indent: 52, color: context.colors.inkMuted.withValues(alpha: 0.15)),
-          _filaConIcono(
-            context,
-            icono: Icons.short_text_outlined,
-            child: TextField(
-              controller: _conceptoCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Concepto',
-                hintText: 'p.ej. Primer pago · 50%',
-                border: InputBorder.none,
-                filled: false,
-                isDense: true,
-              ),
-            ),
-          ),
-          Divider(height: 1, indent: 52, color: context.colors.inkMuted.withValues(alpha: 0.15)),
-          _filaConIcono(
-            context,
-            icono: Icons.notes_outlined,
-            child: TextField(
-              controller: _descripcionCtrl,
-              minLines: 1,
-              maxLines: 4,
-              decoration: const InputDecoration(labelText: 'Descripción (opcional)', border: InputBorder.none, filled: false, isDense: true),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _tarjetaSoloLectura(BuildContext context) {
-    final p = widget.pago!;
-    return Card(
-      child: Column(
-        children: [
-          _filaConIcono(context, icono: Icons.account_balance_wallet_outlined, child: _textoFila(context, 'Método', p.metodo != null ? _nombreMetodo(p.metodo!) : 'Sin especificar')),
-          Divider(height: 1, indent: 52, color: context.colors.inkMuted.withValues(alpha: 0.15)),
-          _filaConIcono(context, icono: Icons.short_text_outlined, child: _textoFila(context, 'Concepto', p.concepto ?? 'Sin concepto')),
-          Divider(height: 1, indent: 52, color: context.colors.inkMuted.withValues(alpha: 0.15)),
-          _filaConIcono(context, icono: Icons.notes_outlined, child: _textoFila(context, 'Descripción', p.descripcion ?? 'Sin descripción')),
-        ],
-      ),
-    );
-  }
-
-  Widget _filaConIcono(BuildContext context, {required IconData icono, required Widget child}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Icon(icono, size: 20, color: context.colors.inkMuted),
-          const SizedBox(width: 16),
-          Expanded(child: child),
-        ],
-      ),
-    );
-  }
-
-  Widget _textoFila(BuildContext context, String label, String valor) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TextStyle(fontSize: 11, color: context.colors.inkMuted)),
-          const SizedBox(height: 2),
-          Text(valor, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+          // Cabecera: título "RECIBO" + icono a la izquierda, número y fecha
+          // a la derecha -- mismo esquema que un recibo de papel real.
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.receipt_long_outlined, color: context.colors.brand, size: 28),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'RECIBO',
+                      style: TextStyle(color: context.colors.brand, fontWeight: FontWeight.w800, fontSize: 20, letterSpacing: 1.2),
+                    ),
+                    Text(widget.trabajoTitulo, style: TextStyle(color: context.colors.inkMuted, fontSize: 13)),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text('Nº $_numeroRecibo', style: TextStyle(color: context.colors.inkMuted, fontSize: 12, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 4),
+                  widget.editable
+                      ? InkWell(
+                          onTap: _elegirFecha,
+                          child: Row(
+                            children: [
+                              Text(
+                                DateFormat('d MMM yyyy', 'es_ES').format(_fecha),
+                                style: TextStyle(color: context.colors.ink, fontWeight: FontWeight.w600, fontSize: 13),
+                              ),
+                              const SizedBox(width: 2),
+                              Icon(Icons.edit_calendar_outlined, size: 14, color: context.colors.inkMuted),
+                            ],
+                          ),
+                        )
+                      : Text(
+                          DateFormat('d MMM yyyy', 'es_ES').format(_fecha),
+                          style: TextStyle(color: context.colors.ink, fontWeight: FontWeight.w600, fontSize: 13),
+                        ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Divider(height: 1, thickness: 1.2, color: lineaColor),
+          const SizedBox(height: 18),
+
+          // Cantidad recibida -- la fila más importante del recibo.
+          _filaEtiqueta(context, 'CANTIDAD RECIBIDA'),
+          const SizedBox(height: 6),
+          widget.editable
+              ? TextField(
+                  controller: _importeCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  style: TextStyle(color: context.colors.brand, fontSize: 32, fontWeight: FontWeight.w800),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    filled: false,
+                    border: InputBorder.none,
+                    hintText: '0',
+                    suffixText: ' €',
+                    suffixStyle: TextStyle(color: context.colors.brand, fontSize: 20, fontWeight: FontWeight.w700),
+                  ),
+                )
+              : Text('${_formato(widget.pago!.importe)} €', style: TextStyle(color: context.colors.brand, fontSize: 32, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 14),
+          Divider(height: 1, color: lineaColor),
+          const SizedBox(height: 14),
+
+          _filaEtiqueta(context, 'PARA EL PAGO DE'),
+          const SizedBox(height: 6),
+          widget.editable
+              ? TextField(
+                  controller: _conceptoCtrl,
+                  decoration: const InputDecoration(isDense: true, filled: false, border: InputBorder.none, hintText: 'p.ej. Primer pago · 50%'),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                )
+              : Text(
+                  widget.pago!.concepto?.isNotEmpty == true ? widget.pago!.concepto! : 'Sin concepto',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+          const SizedBox(height: 14),
+          Divider(height: 1, color: lineaColor),
+          const SizedBox(height: 14),
+
+          _filaEtiqueta(context, 'MÉTODO DE PAGO'),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: MetodoPago.values.map((m) {
+              final seleccionado = _metodo == m;
+              return ChoiceChip(
+                label: Text(_nombreMetodo(m)),
+                selected: seleccionado,
+                onSelected: widget.editable ? (_) => setState(() => _metodo = seleccionado ? null : m) : null,
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 14),
+          Divider(height: 1, color: lineaColor),
+          const SizedBox(height: 14),
+
+          _filaEtiqueta(context, 'DESCRIPCIÓN (OPCIONAL)'),
+          const SizedBox(height: 6),
+          widget.editable
+              ? TextField(
+                  controller: _descripcionCtrl,
+                  minLines: 1,
+                  maxLines: 4,
+                  decoration: const InputDecoration(isDense: true, filled: false, border: InputBorder.none, hintText: 'Notas sobre este pago'),
+                )
+              : Text(
+                  widget.pago!.descripcion?.isNotEmpty == true ? widget.pago!.descripcion! : 'Sin descripción',
+                  style: TextStyle(color: context.colors.inkMuted),
+                ),
         ],
       ),
     );
   }
-}
 
-class _TarjetaRecibo extends StatelessWidget {
-  const _TarjetaRecibo({required this.child});
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
-      decoration: BoxDecoration(color: context.colors.brand, borderRadius: BorderRadius.circular(20)),
-      child: child,
-    );
+  Widget _filaEtiqueta(BuildContext context, String texto) {
+    return Text(texto, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: context.colors.inkMuted, letterSpacing: 0.6));
   }
 }
-
-Widget _seccion(BuildContext context, String titulo) => Text(
-      titulo,
-      style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700, color: context.colors.brand),
-    );
 
 String _nombreMetodo(MetodoPago m) => switch (m) {
       MetodoPago.bizum => 'Bizum',
