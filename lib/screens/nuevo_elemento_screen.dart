@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../models/casa.dart';
 import '../models/elemento.dart';
 import '../services/elemento_service.dart';
+import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
 
 class NuevoElementoScreen extends StatefulWidget {
@@ -22,9 +23,11 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
   final _modeloCtrl = TextEditingController();
   final _costeCtrl = TextEditingController();
   final _profesionalCtrl = TextEditingController();
+  final _intervaloCtrl = TextEditingController();
   DateTime? _fechaInstalacion;
   DateTime? _garantiaHasta;
   bool _guardando = false;
+  bool _sugiriendo = false;
 
   @override
   void dispose() {
@@ -33,14 +36,49 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
     _modeloCtrl.dispose();
     _costeCtrl.dispose();
     _profesionalCtrl.dispose();
+    _intervaloCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _sugerirIntervalo() async {
+    final nombre = _nombreCtrl.text.trim();
+    if (nombre.isEmpty) {
+      AppError.show(context, 'Escribe antes el nombre del elemento.');
+      return;
+    }
+    setState(() => _sugiriendo = true);
+    try {
+      final sugerencia = await ElementoService.sugerirIntervaloMantenimiento(
+        nombre: nombre,
+        marca: _marcaCtrl.text.trim().isEmpty ? null : _marcaCtrl.text.trim(),
+        modelo: _modeloCtrl.text.trim().isEmpty ? null : _modeloCtrl.text.trim(),
+      );
+      if (!mounted) return;
+      if (sugerencia.intervaloMeses == null) {
+        AppError.show(context, sugerencia.motivo ?? 'La IA no sugiere una revisión periódica para esto.');
+      } else {
+        setState(() => _intervaloCtrl.text = sugerencia.intervaloMeses.toString());
+        AppError.showSuccess(
+          context,
+          sugerencia.motivo ?? 'Sugerencia: revisar cada ${sugerencia.intervaloMeses} meses.',
+        );
+      }
+    } catch (e) {
+      if (mounted) AppError.show(context, 'No se pudo contactar con el servicio de IA.');
+    } finally {
+      if (mounted) setState(() => _sugiriendo = false);
+    }
   }
 
   Future<void> _guardar() async {
     final nombre = _nombreCtrl.text.trim();
     if (nombre.isEmpty) return;
+    final intervaloMeses = int.tryParse(_intervaloCtrl.text.trim());
     setState(() => _guardando = true);
     try {
+      final base = _fechaInstalacion ?? DateTime.now();
+      final proximoMantenimiento =
+          intervaloMeses == null ? null : DateTime(base.year, base.month + intervaloMeses, base.day);
       await ElementoService.crear(
         widget.casa.id,
         Elemento(
@@ -53,6 +91,8 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
           coste: double.tryParse(_costeCtrl.text.replaceAll(',', '.')),
           profesionalNombre: _profesionalCtrl.text.trim().isEmpty ? null : _profesionalCtrl.text.trim(),
           garantiaHasta: _garantiaHasta,
+          intervaloMantenimientoMeses: intervaloMeses,
+          proximoMantenimiento: proximoMantenimiento,
         ),
       );
       if (mounted) Navigator.pop(context);
@@ -127,6 +167,34 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
             label: Text(_garantiaHasta == null
                 ? 'Garantía hasta'
                 : '${_garantiaHasta!.day}/${_garantiaHasta!.month}/${_garantiaHasta!.year}'),
+          ),
+          const SizedBox(height: 20),
+          Text('Revisión periódica (opcional)', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700, color: context.colors.brand)),
+          const SizedBox(height: 4),
+          Text(
+            'Repara te avisará cuando toque revisarlo. Puedes escribir el número a mano o pedirle una sugerencia a la IA según el tipo de elemento.',
+            style: TextStyle(fontSize: 12, color: context.colors.inkMuted),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _intervaloCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Revisar cada cuántos meses'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              OutlinedButton.icon(
+                onPressed: _sugiriendo ? null : _sugerirIntervalo,
+                icon: _sugiriendo
+                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.auto_awesome_outlined, size: 18),
+                label: const Text('Sugerir con IA'),
+              ),
+            ],
           ),
           const SizedBox(height: 24),
           FilledButton(

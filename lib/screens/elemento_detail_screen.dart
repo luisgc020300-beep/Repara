@@ -4,6 +4,7 @@
 // que el spec marca como "estrella" porque representan la propuesta de
 // valor: convertir un aparato suelto en una identidad digital con su propio
 // historial y documentación.
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -15,6 +16,7 @@ import '../services/documento_service.dart';
 import '../services/elemento_service.dart';
 import '../services/evento_service.dart';
 import '../theme/design_tokens.dart';
+import '../widgets/app_error.dart';
 import 'nuevo_documento_flow.dart';
 import 'nuevo_evento_sheet.dart';
 
@@ -23,6 +25,84 @@ class ElementoDetailScreen extends StatelessWidget {
 
   final Casa casa;
   final String elementoId;
+
+  Future<void> _editarMantenimiento(BuildContext context, Elemento elemento) async {
+    final intervaloCtrl = TextEditingController(text: elemento.intervaloMantenimientoMeses?.toString() ?? '');
+    DateTime? proxima = elemento.proximoMantenimiento;
+
+    final guardar = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setStateDialog) => AlertDialog(
+          title: const Text('Revisión periódica'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: intervaloCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Revisar cada cuántos meses'),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  final elegida = await showDatePicker(
+                    context: ctx,
+                    initialDate: proxima ?? DateTime.now(),
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime(2100),
+                  );
+                  if (elegida != null) setStateDialog(() => proxima = elegida);
+                },
+                icon: const Icon(Icons.calendar_today_outlined, size: 16),
+                label: Text(proxima == null ? 'Próxima revisión' : '${proxima!.day}/${proxima!.month}/${proxima!.year}'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Guardar')),
+          ],
+        ),
+      ),
+    );
+    if (guardar != true) return;
+    try {
+      await ElementoService.actualizarMantenimiento(
+        casa.id,
+        elemento.id,
+        intervaloMeses: int.tryParse(intervaloCtrl.text.trim()),
+        proximoMantenimiento: proxima,
+      );
+    } catch (e) {
+      if (context.mounted) AppError.show(context, 'No se pudo guardar la revisión periódica.');
+    }
+  }
+
+  Future<void> _marcarRevisionHecha(BuildContext context, Elemento elemento) async {
+    final intervalo = elemento.intervaloMantenimientoMeses;
+    if (intervalo == null) return;
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    try {
+      await EventoService.crear(
+        casa.id,
+        Evento(
+          id: '',
+          tipo: TipoEvento.revision,
+          titulo: 'Revisión periódica · ${elemento.nombre}',
+          elementoId: elemento.id,
+          habitacionId: elemento.habitacionId,
+          fecha: DateTime.now(),
+        ),
+        createdBy: uid,
+      );
+      await ElementoService.marcarRevisionHecha(casa.id, elemento.id, intervalo);
+      if (context.mounted) AppError.showSuccess(context, 'Revisión registrada. Próxima en $intervalo meses.');
+    } catch (e) {
+      if (context.mounted) AppError.show(context, 'No se pudo registrar la revisión.');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -67,7 +147,15 @@ class ElementoDetailScreen extends StatelessWidget {
           body: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              _FichaCard(elemento: elemento),
+              _FichaCard(elemento: elemento, onEditarMantenimiento: () => _editarMantenimiento(context, elemento)),
+              if (elemento.intervaloMantenimientoMeses != null) ...[
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: () => _marcarRevisionHecha(context, elemento),
+                  icon: const Icon(Icons.check_circle_outline, size: 18),
+                  label: const Text('Marcar revisión como hecha'),
+                ),
+              ],
               const SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -135,9 +223,10 @@ class ElementoDetailScreen extends StatelessWidget {
 }
 
 class _FichaCard extends StatelessWidget {
-  const _FichaCard({required this.elemento});
+  const _FichaCard({required this.elemento, required this.onEditarMantenimiento});
 
   final Elemento elemento;
+  final VoidCallback onEditarMantenimiento;
 
   @override
   Widget build(BuildContext context) {
@@ -159,6 +248,14 @@ class _FichaCard extends StatelessWidget {
                 valor: DateFormat('d MMMM yyyy', 'es_ES').format(elemento.garantiaHasta!),
                 destacado: elemento.garantiaProximaAVencer,
               ),
+            _Fila(
+              label: 'Próxima revisión',
+              valor: elemento.proximoMantenimiento != null
+                  ? DateFormat('d MMMM yyyy', 'es_ES').format(elemento.proximoMantenimiento!)
+                  : 'Sin configurar',
+              destacado: elemento.revisionPendiente,
+              onTap: onEditarMantenimiento,
+            ),
           ],
         ),
       ),
@@ -167,15 +264,16 @@ class _FichaCard extends StatelessWidget {
 }
 
 class _Fila extends StatelessWidget {
-  const _Fila({required this.label, required this.valor, this.destacado = false});
+  const _Fila({required this.label, required this.valor, this.destacado = false, this.onTap});
 
   final String label;
   final String valor;
   final bool destacado;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    final fila = Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
@@ -189,9 +287,12 @@ class _Fila extends StatelessWidget {
               ),
             ),
           ),
+          if (onTap != null) Icon(Icons.edit_outlined, size: 16, color: context.colors.inkMuted),
         ],
       ),
     );
+    if (onTap == null) return fila;
+    return InkWell(onTap: onTap, borderRadius: BorderRadius.circular(8), child: fila);
   }
 }
 

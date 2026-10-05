@@ -17,6 +17,7 @@ import '../widgets/boton_ajustes.dart';
 import '../widgets/boton_notificaciones.dart';
 import 'garantias_proximas_screen.dart';
 import 'menu_anadir.dart';
+import 'revisiones_pendientes_screen.dart';
 
 class HomeTab extends StatefulWidget {
   const HomeTab({required this.casa, super.key});
@@ -67,6 +68,44 @@ class _HomeTabState extends State<HomeTab> {
                               elementos.length == 1
                                   ? 'La garantía de "${elementos.first.nombre}" termina pronto.'
                                   : '${elementos.length} garantías están a punto de terminar.',
+                              style: TextStyle(color: context.colors.ink, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                          Icon(Icons.chevron_right, color: context.colors.inkMuted),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+          FutureBuilder<List<Elemento>>(
+            future: ElementoService.conRevisionPendiente(widget.casa.id),
+            builder: (context, snapshot) {
+              final elementos = snapshot.data ?? [];
+              if (elementos.isEmpty) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: Card(
+                  color: context.colors.brand.withValues(alpha: 0.10),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => RevisionesPendientesScreen(casa: widget.casa, elementos: elementos)),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Row(
+                        children: [
+                          Icon(Icons.build_circle_outlined, color: context.colors.brand),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              elementos.length == 1
+                                  ? 'Toca revisar "${elementos.first.nombre}".'
+                                  : '${elementos.length} elementos tienen una revisión pendiente.',
                               style: TextStyle(color: context.colors.ink, fontWeight: FontWeight.w600),
                             ),
                           ),

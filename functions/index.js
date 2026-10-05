@@ -893,3 +893,80 @@ Trabajos existentes en esta casa: ${listaTrabajos.length ? listaTrabajos.join(',
     }
   }
 );
+
+// =============================================================================
+// 4. SUGERIR INTERVALO DE MANTENIMIENTO (calendario autogenerado por tipo de
+// elemento, para no depender de que el propietario se acuerde solo). La IA
+// solo SUGIERE un número de meses típico para ese tipo de aparato; el
+// propietario lo ve y puede cambiarlo o dejarlo en blanco antes de guardar,
+// igual que con classifyDocument -- nunca escribe nada directamente.
+// =============================================================================
+exports.sugerirIntervaloMantenimiento = onCall(
+  { region: REGION, secrets: [_anthropicKey], timeoutSeconds: 30 },
+  async (request) => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+    const { nombre, marca, modelo } = request.data || {};
+    if (typeof nombre !== 'string' || !nombre.trim()) {
+      throw new HttpsError('invalid-argument', 'Falta el nombre del elemento.');
+    }
+
+    const apiKey = _anthropicKey.value();
+    if (!apiKey) throw new HttpsError('internal', 'API key no configurada en el servidor.');
+
+    const systemPrompt = `Eres un asistente que sugiere cada cuántos meses conviene revisar o hacer mantenimiento a un aparato o instalación del hogar, a partir de su nombre, marca y modelo.
+Devuelve EXCLUSIVAMENTE un objeto JSON con esta forma exacta, sin texto adicional ni markdown:
+{
+  "intervaloMeses": numero entero entre 1 y 60, o null,
+  "motivo": "una frase breve en español explicando por qué ese intervalo, o por qué no aplica"
+}
+Reglas estrictas:
+- Usa el intervalo típico recomendado habitualmente para ese TIPO de aparato (p.ej. caldera de gas ~12 meses, aire acondicionado ~12 meses, extintor ~12 meses, termo eléctrico ~24 meses, filtro de agua ~6 meses).
+- Si el nombre no corresponde a nada con mantenimiento periódico conocido (p.ej. una mesa, un sofá, una lámpara decorativa), devuelve intervaloMeses: null y explica brevemente por qué en "motivo".
+- Nunca afirmes conocer el manual exacto de ese modelo concreto -- da siempre el intervalo típico general para ese tipo de aparato, nunca un dato inventado como si viniera del fabricante exacto.`;
+
+    const detalle = [
+      `Nombre: ${nombre.trim()}`,
+      marca ? `Marca: ${String(marca).trim()}` : null,
+      modelo ? `Modelo: ${String(modelo).trim()}` : null,
+    ].filter(Boolean).join('\n');
+
+    let res;
+    try {
+      res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 300,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: detalle }],
+        }),
+      });
+    } catch (e) {
+      console.error('sugerirIntervaloMantenimiento fetch error:', e);
+      throw new HttpsError('unavailable', 'No se pudo contactar con el servicio de IA.');
+    }
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      console.error(`sugerirIntervaloMantenimiento Anthropic error ${res.status}:`, body.slice(0, 300));
+      throw new HttpsError('internal', `Error del servicio de IA: ${res.status}`);
+    }
+
+    const data = await res.json();
+    const textoRespuesta = data.content?.[0]?.text || '{}';
+    try {
+      const parsed = JSON.parse(textoRespuesta);
+      const bruto = Number(parsed.intervaloMeses);
+      const intervalo = Number.isFinite(bruto) ? Math.max(1, Math.min(60, Math.round(bruto))) : null;
+      return { ok: true, intervaloMeses: intervalo, motivo: typeof parsed.motivo === 'string' ? parsed.motivo : null };
+    } catch (e) {
+      console.error('sugerirIntervaloMantenimiento: respuesta no parseable como JSON');
+      return { ok: true, intervaloMeses: null, motivo: null };
+    }
+  }
+);
