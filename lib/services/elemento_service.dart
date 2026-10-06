@@ -51,6 +51,27 @@ class ElementoService {
     return snap.docs.map(Elemento.fromDoc).where((e) => e.revisionPendiente).toList();
   }
 
+  /// TODOS los elementos con una fecha de garantía guardada, pendiente o no
+  /// -- el aviso de Inicio solo enseña lo urgente (<=30 días), pero "encontrar
+  /// una garantía" (auditoría de producto, octubre 2026) necesita poder
+  /// consultar también las que vencen más adelante, no solo las que aprietan.
+  static Future<List<Elemento>> conGarantia(String casaId) async {
+    final snap = await _col(casaId).get();
+    final elementos = snap.docs.map(Elemento.fromDoc).where((e) => e.garantiaHasta != null).toList();
+    elementos.sort((a, b) => a.garantiaHasta!.compareTo(b.garantiaHasta!));
+    return elementos;
+  }
+
+  /// TODOS los elementos con un calendario de mantenimiento configurado,
+  /// pendiente o no -- mismo motivo que [conGarantia]: "ver qué mantenimiento
+  /// está pendiente" no debe depender de que ya esté a punto de vencer.
+  static Future<List<Elemento>> conMantenimientoConfigurado(String casaId) async {
+    final snap = await _col(casaId).get();
+    final elementos = snap.docs.map(Elemento.fromDoc).where((e) => e.proximoMantenimiento != null).toList();
+    elementos.sort((a, b) => a.proximoMantenimiento!.compareTo(b.proximoMantenimiento!));
+    return elementos;
+  }
+
   /// Avanza la próxima revisión [intervaloMeses] meses desde HOY (no desde
   /// la fecha antigua) -- si estaba muy atrasada, no tiene sentido arrastrar
   /// ese retraso para siempre.

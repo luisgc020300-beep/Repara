@@ -44,7 +44,7 @@ class CasaTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Tu casa'), actions: const [BotonAjustes()]),
+      appBar: AppBar(title: const Text('Tu casa'), actions: [BotonAjustes(casa: casa)]),
       body: StreamBuilder<List<Habitacion>>(
         stream: HabitacionService.streamHabitaciones(casa.id),
         builder: (context, snapshot) {

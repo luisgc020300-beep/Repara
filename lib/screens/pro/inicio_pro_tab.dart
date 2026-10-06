@@ -26,7 +26,7 @@ class InicioProTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Repara Pro'), actions: const [BotonNotificaciones(modoPro: true), BotonAjustes()]),
+      appBar: AppBar(title: const Text('Repara Pro'), actions: const [BotonNotificaciones(modoPro: true), BotonAjustes(modoPro: true)]),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [

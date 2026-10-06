@@ -6,7 +6,6 @@ import '../services/casa_service.dart';
 import 'contactos_tab.dart';
 import 'casa_tab.dart';
 import 'home_tab.dart';
-import 'perfil_tab.dart';
 import 'trabajos_tab.dart';
 
 class CasaShellScreen extends StatefulWidget {
@@ -53,7 +52,6 @@ class _CasaShellScreenState extends State<CasaShellScreen> {
           _KeepAlivePage(child: CasaTab(casa: casa)),
           _KeepAlivePage(child: TrabajosTab(casa: casa)),
           _KeepAlivePage(child: ContactosTab(casa: casa)),
-          _KeepAlivePage(child: PerfilTab(casa: casa)),
         ];
         return Scaffold(
           body: PageView(
@@ -69,7 +67,6 @@ class _CasaShellScreenState extends State<CasaShellScreen> {
               BottomNavigationBarItem(icon: Icon(Icons.house_outlined), activeIcon: Icon(Icons.house), label: 'Casa'),
               BottomNavigationBarItem(icon: Icon(Icons.build_outlined), activeIcon: Icon(Icons.build), label: 'Trabajos'),
               BottomNavigationBarItem(icon: Icon(Icons.contact_phone_outlined), activeIcon: Icon(Icons.contact_phone), label: 'Contactos'),
-              BottomNavigationBarItem(icon: Icon(Icons.person_outline), activeIcon: Icon(Icons.person), label: 'Perfil'),
             ],
           ),
         );

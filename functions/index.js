@@ -23,6 +23,32 @@ const _anthropicKey = defineSecret('ANTHROPIC_API_KEY');
 // Sin 0/O/1/I/L -- se confunden fácil al leer un código en voz alta o a mano.
 const JOIN_CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 
+// =============================================================================
+// LÍMITE DIARIO DE USO DE IA (auditoría de seguridad, octubre 2026) -- App
+// Check sigue en modo Monitor (no Enforce) porque las builds actuales son
+// sideloaded, no vienen de una tienda, y Enforce las bloquearía a todas.
+// Mientras tanto, esto acota el coste real de Anthropic por usuario ante un
+// bucle de reintento o un abuso puntual, sin depender de App Check.
+// Generoso a propósito: nunca debe notarse en uso normal.
+// =============================================================================
+const LIMITE_IA_DIARIO = 30;
+
+async function verificarYRegistrarUsoIA(uid) {
+  const hoy = new Date().toISOString().slice(0, 10);
+  const ref = db.collection('usoIA').doc(`${uid}_${hoy}`);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const actual = snap.exists ? (snap.data().llamadas || 0) : 0;
+    if (actual >= LIMITE_IA_DIARIO) {
+      throw new HttpsError(
+        'resource-exhausted',
+        'Has alcanzado el límite diario de análisis con IA. Inténtalo de nuevo mañana.'
+      );
+    }
+    tx.set(ref, { uid, fecha: hoy, llamadas: actual + 1, ultimaLlamada: FieldValue.serverTimestamp() }, { merge: true });
+  });
+}
+
 async function generarCodigoUnico() {
   for (let intento = 0; intento < 10; intento++) {
     let code = '';
@@ -799,6 +825,7 @@ exports.classifyDocument = onCall(
         throw new HttpsError('invalid-argument', `Formato no admitido: ${p.mediaType}`);
       }
     }
+    await verificarYRegistrarUsoIA(request.auth.uid);
 
     // Nombres existentes en la casa para que la IA pueda sugerir con cuál se
     // relaciona el documento, sin inventar uno que no existe -- el cliente
@@ -909,6 +936,7 @@ exports.sugerirIntervaloMantenimiento = onCall(
     if (typeof nombre !== 'string' || !nombre.trim()) {
       throw new HttpsError('invalid-argument', 'Falta el nombre del elemento.');
     }
+    await verificarYRegistrarUsoIA(request.auth.uid);
 
     const apiKey = _anthropicKey.value();
     if (!apiKey) throw new HttpsError('internal', 'API key no configurada en el servidor.');

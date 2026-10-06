@@ -98,8 +98,15 @@ service cloud.firestore {
       match /trabajos/{tid} {
         allow read: if isAuth() && (isMember(cid) || resource.data.profesionalUid == request.auth.uid);
         allow create: if isAuth() && isMember(cid);
+        // profesionalUid NUNCA es escribible por un miembro -- solo
+        // responderInvitacion (Cloud Function, Admin SDK, salta estas
+        // reglas) lo asigna, tras el apretón de manos de invitación y
+        // aceptación. Sin esto, cualquier miembro podría escribir
+        // directamente un uid ajeno en este campo y darle acceso al trabajo
+        // sin pasar por invitar/aceptar -- hallazgo de la auditoría de
+        // seguridad (octubre 2026).
         allow update: if isAuth() && (
-          isMember(cid) ||
+          (isMember(cid) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['profesionalUid'])) ||
           (resource.data.profesionalUid == request.auth.uid &&
            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado', 'presupuesto']))
         );
@@ -143,6 +150,13 @@ service cloud.firestore {
     // que con "invitaciones", el propietario nunca consulta esto por su
     // cuenta -- el código se lo queda él mismo para compartirlo a mano.
     match /invitacionesAbiertas/{codigo} {
+      allow read, write: if false;
+    }
+
+    // ── usoIA (límite diario de llamadas a la IA por usuario) ───────────────
+    // Solo lo leen/escriben las Cloud Functions con Admin SDK -- el cliente
+    // nunca necesita ni debe tocar su propio contador.
+    match /usoIA/{id} {
       allow read, write: if false;
     }
 

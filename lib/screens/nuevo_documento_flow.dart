@@ -6,6 +6,7 @@
 // guardar nada (sección 61: nunca se asume información no confirmada).
 import 'dart:io';
 
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -75,6 +76,12 @@ Future<void> iniciarNuevoDocumento(
       elementosDisponibles: elementos.map((e) => e.nombre).toList(),
       trabajosDisponibles: trabajos.map((t) => t.titulo).toList(),
     ).timeout(const Duration(seconds: 30));
+  } on FirebaseFunctionsException catch (e) {
+    // 'resource-exhausted' es el límite diario de IA -- su mensaje ya es
+    // claro para el usuario, a diferencia del resto de fallos de red.
+    errorIA = e.code == 'resource-exhausted'
+        ? (e.message ?? 'Has alcanzado el límite diario de análisis con IA.')
+        : 'No se pudo contactar con el servicio de IA. Puedes rellenar los datos a mano.';
   } catch (e) {
     errorIA = 'No se pudo contactar con el servicio de IA. Puedes rellenar los datos a mano.';
   } finally {
@@ -329,6 +336,15 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
   late String? _trabajoId = widget.trabajoIdInicial ?? _buscarIdPorNombre(widget.trabajos, widget.sugerencia?.trabajoSugerido);
   bool _guardando = false;
 
+  // Auto-crear elemento (auditoría de producto, octubre 2026): si la IA
+  // detecta un elemento que no existe todavía en la casa, en vez de perder
+  // esa sugerencia se ofrece crearlo ya con los datos que ya se han
+  // extraído del documento -- un documento nunca debe quedar aislado.
+  late bool _crearElementoNuevo = widget.elementoIdInicial == null &&
+      widget.sugerencia?.elementoSugerido != null &&
+      _elementoId == null;
+  late final _nuevoElementoNombreCtrl = TextEditingController(text: widget.sugerencia?.elementoSugerido ?? '');
+
   static String _formatoImporte(double? v) => v == null ? '' : v.toStringAsFixed(2);
 
   static String? _buscarIdPorNombre(List<dynamic> lista, String? nombre) {
@@ -357,6 +373,7 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
     _descripcionCtrl.dispose();
     _garantiaCtrl.dispose();
     _observacionesCtrl.dispose();
+    _nuevoElementoNombreCtrl.dispose();
     super.dispose();
   }
 
@@ -408,6 +425,21 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
             return;
           }
         }
+      }
+
+      if (_crearElementoNuevo && _nuevoElementoNombreCtrl.text.trim().isNotEmpty) {
+        _elementoId = await ElementoService.crear(
+          widget.casaId,
+          Elemento(
+            id: '',
+            nombre: _nuevoElementoNombreCtrl.text.trim(),
+            habitacionId: widget.habitacionIdInicial,
+            coste: _importe,
+            fechaInstalacion: _fecha,
+            garantiaHasta: _fechaVencimiento,
+            profesionalNombre: _proveedor,
+          ),
+        );
       }
 
       final urls = <String>[];
@@ -610,6 +642,40 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
             // ni siquiera podría rellenarse con opciones.
             if (widget.elementoIdInicial != null)
               _VinculoFijo(icono: Icons.category_outlined, texto: _tituloElemento(widget.elementos, widget.elementoIdInicial!))
+            else if (_crearElementoNuevo)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: context.colors.brand.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(12)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.auto_awesome_outlined, size: 18, color: context.colors.brand),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'La IA no encontró ningún elemento con este nombre. Se creará uno nuevo con los datos de este documento.',
+                            style: TextStyle(fontSize: 12, color: context.colors.inkMuted),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: _nuevoElementoNombreCtrl,
+                      decoration: const InputDecoration(labelText: 'Nombre del elemento nuevo', isDense: true),
+                    ),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton(
+                        onPressed: () => setState(() => _crearElementoNuevo = false),
+                        child: const Text('No crear, elegir uno que ya existe'),
+                      ),
+                    ),
+                  ],
+                ),
+              )
             else
               DropdownButtonFormField<String?>(
                 initialValue: _elementoId,

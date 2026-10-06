@@ -17,7 +17,7 @@ class TrabajosTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Trabajos'), actions: const [BotonAjustes()]),
+      appBar: AppBar(title: const Text('Trabajos'), actions: [BotonAjustes(casa: casa)]),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => NuevoTrabajoScreen(casa: casa))),
         icon: const Icon(Icons.add),

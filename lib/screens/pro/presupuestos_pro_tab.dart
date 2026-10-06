@@ -98,7 +98,7 @@ class _PresupuestosProTabState extends State<PresupuestosProTab> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Presupuestos'), actions: const [BotonAjustes()]),
+      appBar: AppBar(title: const Text('Presupuestos'), actions: const [BotonAjustes(modoPro: true)]),
       body: _cargando
           ? const Center(child: CircularProgressIndicator())
           : todos.isEmpty

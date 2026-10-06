@@ -20,7 +20,7 @@ class ContactosTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Contactos'), actions: const [BotonAjustes()]),
+      appBar: AppBar(title: const Text('Contactos'), actions: [BotonAjustes(casa: casa)]),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => mostrarNuevoContactoSheet(context, casaId: casa.id),
         icon: const Icon(Icons.add),

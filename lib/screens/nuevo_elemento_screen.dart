@@ -1,4 +1,5 @@
 // lib/screens/nuevo_elemento_screen.dart
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
 import '../models/casa.dart';
@@ -61,6 +62,15 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
         AppError.showSuccess(
           context,
           sugerencia.motivo ?? 'Sugerencia: revisar cada ${sugerencia.intervaloMeses} meses.',
+        );
+      }
+    } on FirebaseFunctionsException catch (e) {
+      if (mounted) {
+        AppError.show(
+          context,
+          e.code == 'resource-exhausted'
+              ? (e.message ?? 'Has alcanzado el límite diario de análisis con IA.')
+              : 'No se pudo contactar con el servicio de IA.',
         );
       }
     } catch (e) {

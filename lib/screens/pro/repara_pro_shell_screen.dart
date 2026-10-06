@@ -6,9 +6,7 @@
 // navegación de Hogar.
 import 'package:flutter/material.dart';
 
-import 'clientes_pro_tab.dart';
 import 'inicio_pro_tab.dart';
-import 'perfil_pro_tab.dart';
 import 'presupuestos_pro_tab.dart';
 import 'trabajos_pro_tab.dart';
 
@@ -40,9 +38,7 @@ class _ReparaProShellScreenState extends State<ReparaProShellScreen> {
     const tabs = [
       _KeepAlivePage(child: InicioProTab()),
       _KeepAlivePage(child: TrabajosProTab()),
-      _KeepAlivePage(child: ClientesProTab()),
       _KeepAlivePage(child: PresupuestosProTab()),
-      _KeepAlivePage(child: PerfilProTab()),
     ];
     return Scaffold(
       body: PageView(
@@ -56,9 +52,7 @@ class _ReparaProShellScreenState extends State<ReparaProShellScreen> {
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.dashboard_outlined), activeIcon: Icon(Icons.dashboard), label: 'Inicio Pro'),
           BottomNavigationBarItem(icon: Icon(Icons.build_outlined), activeIcon: Icon(Icons.build), label: 'Trabajos'),
-          BottomNavigationBarItem(icon: Icon(Icons.people_outline), activeIcon: Icon(Icons.people), label: 'Clientes'),
           BottomNavigationBarItem(icon: Icon(Icons.request_quote_outlined), activeIcon: Icon(Icons.request_quote), label: 'Presupuestos'),
-          BottomNavigationBarItem(icon: Icon(Icons.person_outline), activeIcon: Icon(Icons.person), label: 'Perfil'),
         ],
       ),
     );
