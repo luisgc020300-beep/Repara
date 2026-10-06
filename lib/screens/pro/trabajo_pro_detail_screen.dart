@@ -68,8 +68,8 @@ class TrabajoProDetailScreen extends StatelessWidget {
       final callable = FirebaseFunctions.instanceFor(region: 'europe-west1').httpsCallable('finalizarTrabajoProfesional');
       await callable.call<Map<String, dynamic>>({'casaId': casaId, 'trabajoId': trabajoId});
       if (context.mounted) AppError.showSuccess(context, 'Trabajo marcado como finalizado.');
-    } catch (e) {
-      if (context.mounted) AppError.show(context, 'No se pudo finalizar el trabajo.');
+    } catch (e, st) {
+      if (context.mounted) AppError.show(context, 'No se pudo finalizar el trabajo.', error: e, stackTrace: st);
     }
   }
 
@@ -139,7 +139,12 @@ class TrabajoProDetailScreen extends StatelessWidget {
               const SizedBox(height: 20),
               PresupuestosSection(casaId: casaId, trabajoId: trabajoId, rol: RolEnTrabajo.profesional),
               const SizedBox(height: 20),
-              CambiosAlcanceSection(casaId: casaId, trabajoId: trabajoId, rol: RolEnTrabajo.profesional),
+              CambiosAlcanceSection(
+                casaId: casaId,
+                trabajoId: trabajoId,
+                rol: RolEnTrabajo.profesional,
+                trabajoCerrado: trabajo.estado == EstadoTrabajo.terminado || trabajo.estado == EstadoTrabajo.archivado,
+              ),
               const SizedBox(height: 20),
               PagosSection(
                 casaId: casaId,

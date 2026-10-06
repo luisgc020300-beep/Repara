@@ -65,7 +65,10 @@ class _NuevoTrabajoScreenState extends State<NuevoTrabajoScreen> {
 
   Future<void> _guardar() async {
     final titulo = _tituloCtrl.text.trim();
-    if (titulo.isEmpty) return;
+    if (titulo.isEmpty) {
+      AppError.show(context, 'Escribe un título para el trabajo.');
+      return;
+    }
     setState(() => _guardando = true);
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
     try {
@@ -86,8 +89,8 @@ class _NuevoTrabajoScreenState extends State<NuevoTrabajoScreen> {
       );
       unawaited(AnalyticsService.workCreated(tipo: _tipo.name));
       if (mounted) Navigator.pop(context);
-    } catch (e) {
-      if (mounted) AppError.show(context, 'No se pudo crear el trabajo.');
+    } catch (e, st) {
+      if (mounted) AppError.show(context, 'No se pudo crear el trabajo.', error: e, stackTrace: st);
     } finally {
       if (mounted) setState(() => _guardando = false);
     }

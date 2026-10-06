@@ -90,8 +90,8 @@ class TrabajoDetailScreen extends StatelessWidget {
       if (pagadoDelTodo && trabajo.profesionalUid != null && context.mounted) {
         await _ofrecerCompartir(context, trabajo);
       }
-    } catch (e) {
-      if (context.mounted) AppError.show(context, 'No se pudo finalizar el trabajo.');
+    } catch (e, st) {
+      if (context.mounted) AppError.show(context, 'No se pudo finalizar el trabajo.', error: e, stackTrace: st);
     }
   }
 
@@ -198,7 +198,12 @@ class TrabajoDetailScreen extends StatelessWidget {
               const SizedBox(height: 20),
               PresupuestosSection(casaId: casa.id, trabajoId: trabajo.id, rol: RolEnTrabajo.propietario),
               const SizedBox(height: 20),
-              CambiosAlcanceSection(casaId: casa.id, trabajoId: trabajo.id, rol: RolEnTrabajo.propietario),
+              CambiosAlcanceSection(
+                casaId: casa.id,
+                trabajoId: trabajo.id,
+                rol: RolEnTrabajo.propietario,
+                trabajoCerrado: trabajo.estado == EstadoTrabajo.terminado || trabajo.estado == EstadoTrabajo.archivado,
+              ),
               const SizedBox(height: 20),
               PagosSection(
                 casaId: casa.id,
@@ -303,12 +308,39 @@ class _SeccionInvitarProfesionalState extends State<_SeccionInvitarProfesional> 
         setState(() => _ultimoCodigoGenerado = resultado.codigo);
         await _compartirCodigo(resultado.codigo!);
       }
-    } on FirebaseFunctionsException catch (e) {
-      if (mounted) AppError.show(context, e.message ?? 'No se pudo enviar la invitación.');
-    } catch (e) {
-      if (mounted) AppError.show(context, 'No se pudo enviar la invitación.');
+    } on FirebaseFunctionsException catch (e, st) {
+      if (mounted) AppError.show(context, e.message ?? 'No se pudo enviar la invitación.', error: e, stackTrace: st);
+    } catch (e, st) {
+      if (mounted) AppError.show(context, 'No se pudo enviar la invitación.', error: e, stackTrace: st);
     } finally {
       if (mounted) setState(() => _enviando = false);
+    }
+  }
+
+  bool _cancelando = false;
+
+  Future<void> _cancelarInvitacion(String invitacionId) async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('¿Cancelar invitación?'),
+        content: const Text('Podrás invitar a otro profesional para este trabajo.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Seguir esperando')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Cancelar invitación')),
+        ],
+      ),
+    );
+    if (confirmar != true || !mounted) return;
+    setState(() => _cancelando = true);
+    try {
+      await InvitacionService.cancelar(invitacionId);
+    } on FirebaseFunctionsException catch (e, st) {
+      if (mounted) AppError.show(context, e.message ?? 'No se pudo cancelar la invitación.', error: e, stackTrace: st);
+    } catch (e, st) {
+      if (mounted) AppError.show(context, 'No se pudo cancelar la invitación.', error: e, stackTrace: st);
+    } finally {
+      if (mounted) setState(() => _cancelando = false);
     }
   }
 
@@ -345,6 +377,12 @@ class _SeccionInvitarProfesionalState extends State<_SeccionInvitarProfesional> 
               leading: Icon(Icons.hourglass_top_outlined, color: context.colors.warning),
               title: Text('Invitación enviada a ${invitacion.profesionalEmail}'),
               subtitle: const Text('Esperando respuesta'),
+              trailing: _cancelando
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  : TextButton(
+                      onPressed: () => _cancelarInvitacion(invitacion.id),
+                      child: const Text('Cancelar'),
+                    ),
             ),
           );
         }

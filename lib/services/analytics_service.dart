@@ -37,6 +37,7 @@ class AnalyticsService {
 
   // ── ONBOARDING / VIVIENDA ────────────────────────────────────────────────
   static Future<void> homeCreated() => _log('home_created');
+  static Future<void> homeJoined() => _log('home_joined');
   static Future<void> firstElementCreated() => _log('first_element_created');
   static Future<void> firstDocumentUploaded() => _log('first_document_uploaded');
   static Future<void> documentAiExtractionCompleted({required bool exito, String? confianza}) =>

@@ -6,6 +6,7 @@
 // documento ya dentro de la app, no en un formulario largo antes de entrar.
 import 'dart:async';
 
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -37,13 +38,20 @@ class _OnboardingCasaScreenState extends State<OnboardingCasaScreen> {
 
   Future<void> _crear() async {
     final nombre = _nombreCtrl.text.trim();
-    if (nombre.isEmpty) return;
+    if (nombre.isEmpty) {
+      AppError.show(context, 'Escribe un nombre para tu casa.');
+      return;
+    }
     setState(() => _cargando = true);
     try {
       await CasaService.createCasa(nombre);
       unawaited(AnalyticsService.homeCreated());
-    } catch (e) {
-      if (mounted) AppError.show(context, 'No se pudo crear la casa. Inténtalo de nuevo.');
+    } on FirebaseFunctionsException catch (e, st) {
+      if (mounted) {
+        AppError.show(context, e.message ?? 'No se pudo crear la casa. Inténtalo de nuevo.', error: e, stackTrace: st);
+      }
+    } catch (e, st) {
+      if (mounted) AppError.show(context, 'No se pudo crear la casa. Inténtalo de nuevo.', error: e, stackTrace: st);
     } finally {
       if (mounted) setState(() => _cargando = false);
     }
@@ -51,12 +59,24 @@ class _OnboardingCasaScreenState extends State<OnboardingCasaScreen> {
 
   Future<void> _unirseACasa() async {
     final codigo = _codigoCtrl.text.trim();
-    if (codigo.isEmpty) return;
+    if (codigo.isEmpty) {
+      AppError.show(context, 'Escribe el código de la casa.');
+      return;
+    }
     setState(() => _cargando = true);
     try {
       await CasaService.joinCasa(codigo);
-    } catch (e) {
-      if (mounted) AppError.show(context, 'Código no válido o la casa ya no existe.');
+      unawaited(AnalyticsService.homeJoined());
+    } on FirebaseFunctionsException catch (e, st) {
+      // El backend (joinCasa) ya distingue código inválido / casa llena /
+      // casa borrada / límite de intentos con un mensaje claro -- mostrarlo
+      // tal cual en vez de uno genérico (auditoría de producto, octubre
+      // 2026: el genérico hacía parecer "tu error" a un simple rate-limit).
+      if (mounted) {
+        AppError.show(context, e.message ?? 'Código no válido o la casa ya no existe.', error: e, stackTrace: st);
+      }
+    } catch (e, st) {
+      if (mounted) AppError.show(context, 'Código no válido o la casa ya no existe.', error: e, stackTrace: st);
     } finally {
       if (mounted) setState(() => _cargando = false);
     }

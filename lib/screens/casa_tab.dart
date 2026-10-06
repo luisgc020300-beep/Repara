@@ -35,7 +35,11 @@ class CasaTab extends StatelessWidget {
         ],
       ),
     );
-    if (nombre == null || nombre.isEmpty) return;
+    if (nombre == null) return;
+    if (nombre.isEmpty) {
+      if (context.mounted) AppError.show(context, 'Escribe un nombre para la habitación.');
+      return;
+    }
     try {
       await HabitacionService.crear(casa.id, nombre, orden: orden);
     } catch (e) {

@@ -7,6 +7,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -18,11 +19,23 @@ import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
 
 class CambiosAlcanceSection extends StatelessWidget {
-  const CambiosAlcanceSection({required this.casaId, required this.trabajoId, required this.rol, super.key});
+  const CambiosAlcanceSection({
+    required this.casaId,
+    required this.trabajoId,
+    required this.rol,
+    this.trabajoCerrado = false,
+    super.key,
+  });
 
   final String casaId;
   final String trabajoId;
   final RolEnTrabajo rol;
+
+  /// true si el trabajo ya está terminado/archivado (auditoría de producto,
+  /// octubre 2026): un trabajo cerrado no admite nuevas solicitudes ni
+  /// respuestas a las pendientes -- la Cloud Function ya lo bloquea, esto
+  /// solo evita mostrar un botón que terminaría en un error evitable.
+  final bool trabajoCerrado;
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +50,7 @@ class CambiosAlcanceSection extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('Cambios del trabajo', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-                if (rol == RolEnTrabajo.profesional)
+                if (rol == RolEnTrabajo.profesional && !trabajoCerrado)
                   TextButton.icon(
                     onPressed: () => _abrirFormulario(context),
                     icon: const Icon(Icons.add, size: 18),
@@ -48,7 +61,13 @@ class CambiosAlcanceSection extends StatelessWidget {
             if (cambios.isEmpty)
               Text('Sin cambios solicitados.', style: TextStyle(color: context.colors.inkMuted))
             else
-              ...cambios.map((c) => _CambioCard(casaId: casaId, trabajoId: trabajoId, cambio: c, rol: rol)),
+              ...cambios.map((c) => _CambioCard(
+                    casaId: casaId,
+                    trabajoId: trabajoId,
+                    cambio: c,
+                    rol: rol,
+                    trabajoCerrado: trabajoCerrado,
+                  )),
           ],
         );
       },
@@ -66,12 +85,19 @@ class CambiosAlcanceSection extends StatelessWidget {
 }
 
 class _CambioCard extends StatelessWidget {
-  const _CambioCard({required this.casaId, required this.trabajoId, required this.cambio, required this.rol});
+  const _CambioCard({
+    required this.casaId,
+    required this.trabajoId,
+    required this.cambio,
+    required this.rol,
+    this.trabajoCerrado = false,
+  });
 
   final String casaId;
   final String trabajoId;
   final CambioAlcance cambio;
   final RolEnTrabajo rol;
+  final bool trabajoCerrado;
 
   Color _color(BuildContext context) => switch (cambio.estado) {
         EstadoCambioAlcance.pendiente => context.colors.warning,
@@ -84,8 +110,12 @@ class _CambioCard extends StatelessWidget {
     try {
       await CambioAlcanceService.responder(casaId: casaId, trabajoId: trabajoId, cambioAlcanceId: cambio.id, aprobar: aprobar);
       if (aprobar) unawaited(AnalyticsService.scopeChangeAccepted());
-    } catch (e) {
-      if (context.mounted) AppError.show(context, 'No se pudo responder a la solicitud.');
+    } on FirebaseFunctionsException catch (e, st) {
+      if (context.mounted) {
+        AppError.show(context, e.message ?? 'No se pudo responder a la solicitud.', error: e, stackTrace: st);
+      }
+    } catch (e, st) {
+      if (context.mounted) AppError.show(context, 'No se pudo responder a la solicitud.', error: e, stackTrace: st);
     }
   }
 
@@ -135,7 +165,7 @@ class _CambioCard extends StatelessWidget {
                 ),
               ),
             ],
-            if (cambio.estado == EstadoCambioAlcance.pendiente && rol == RolEnTrabajo.propietario) ...[
+            if (cambio.estado == EstadoCambioAlcance.pendiente && rol == RolEnTrabajo.propietario && !trabajoCerrado) ...[
               const SizedBox(height: 10),
               Row(
                 children: [
@@ -205,6 +235,7 @@ class _FormularioCambioSheetState extends State<_FormularioCambioSheet> {
             onTap: () async {
               final navigator = Navigator.of(ctx);
               final foto = await picker.pickImage(source: ImageSource.camera, imageQuality: 85);
+              if (!mounted) return;
               navigator.pop();
               if (foto != null) setState(() => _fotos.add(_LineaFoto(File(foto.path))));
             },
@@ -215,6 +246,7 @@ class _FormularioCambioSheetState extends State<_FormularioCambioSheet> {
             onTap: () async {
               final navigator = Navigator.of(ctx);
               final fotos = await picker.pickMultiImage(imageQuality: 85);
+              if (!mounted) return;
               navigator.pop();
               if (fotos.isNotEmpty) setState(() => _fotos.addAll(fotos.map((f) => _LineaFoto(File(f.path)))));
             },
@@ -226,7 +258,10 @@ class _FormularioCambioSheetState extends State<_FormularioCambioSheet> {
 
   Future<void> _enviar() async {
     final titulo = _tituloCtrl.text.trim();
-    if (titulo.isEmpty) return;
+    if (titulo.isEmpty) {
+      AppError.show(context, 'Escribe un título para la solicitud.');
+      return;
+    }
     setState(() => _guardando = true);
     try {
       final urls = <String>[];
@@ -247,8 +282,10 @@ class _FormularioCambioSheetState extends State<_FormularioCambioSheet> {
         AppError.showSuccess(context, 'Solicitud enviada al propietario.');
         Navigator.pop(context);
       }
-    } catch (e) {
-      if (mounted) AppError.show(context, 'No se pudo enviar la solicitud.');
+    } on FirebaseFunctionsException catch (e, st) {
+      if (mounted) AppError.show(context, e.message ?? 'No se pudo enviar la solicitud.', error: e, stackTrace: st);
+    } catch (e, st) {
+      if (mounted) AppError.show(context, 'No se pudo enviar la solicitud.', error: e, stackTrace: st);
     } finally {
       if (mounted) setState(() => _guardando = false);
     }

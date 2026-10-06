@@ -56,7 +56,10 @@ class _NuevoEventoFormState extends State<_NuevoEventoForm> {
 
   Future<void> _guardar() async {
     final titulo = _tituloCtrl.text.trim();
-    if (titulo.isEmpty) return;
+    if (titulo.isEmpty) {
+      AppError.show(context, 'Escribe un título para el evento.');
+      return;
+    }
     setState(() => _guardando = true);
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
     try {

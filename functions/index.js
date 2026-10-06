@@ -392,6 +392,29 @@ exports.responderInvitacion = onCall({ region: REGION }, async (request) => {
   return { ok: true };
 });
 
+// -----------------------------------------------------------------------------
+// 3d. CANCELAR UNA INVITACIÓN PENDIENTE (lado propietario) -- auditoría de
+// producto, octubre 2026: sin esto, si el profesional invitado nunca
+// responde, el propietario se queda sin ninguna vía en la app para
+// desbloquear ese trabajo e invitar a otra persona.
+// -----------------------------------------------------------------------------
+exports.cancelarInvitacion = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+  const uid = request.auth.uid;
+  const { invitacionId } = request.data || {};
+  if (!invitacionId) throw new HttpsError('invalid-argument', 'Faltan datos.');
+
+  const ref = db.collection('invitaciones').doc(invitacionId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpsError('not-found', 'La invitación ya no existe.');
+  const inv = snap.data();
+  if (inv.propietarioUid !== uid) throw new HttpsError('permission-denied', 'Solo quien invitó puede cancelarla.');
+  if (inv.estado !== 'pendiente') throw new HttpsError('failed-precondition', 'Esta invitación ya se respondió.');
+
+  await ref.update({ estado: 'cancelada' });
+  return { ok: true };
+});
+
 // =============================================================================
 // Helpers compartidos — notificaciones internas y eventos de historial
 // (sección 22 del spec: nada de esto debe vivir desconectado del historial
@@ -535,6 +558,14 @@ exports.crearPresupuesto = onCall({ region: REGION }, async (request) => {
   const totales = calcularTotales(lineas);
   const presupuestosCol = trabajoRef.collection('presupuestos');
   const existentesSnap = await presupuestosCol.get();
+  // Si ya hay uno aceptado, no se crea otro desde cero (auditoría de
+  // seguridad, octubre 2026) -- responderPresupuesto sobrescribe
+  // trabajo.presupuesto por completo al aceptar, así que un segundo
+  // presupuesto aceptado borraría en silencio cualquier incremento que ya
+  // hubiera aplicado un cambio de alcance aprobado sobre el primero.
+  if (existentesSnap.docs.some((d) => d.data().estado === 'aceptado')) {
+    throw new HttpsError('failed-precondition', 'Este trabajo ya tiene un presupuesto aceptado.');
+  }
   const numero = existentesSnap.docs.filter((d) => !d.data().presupuestoAnteriorId).length + 1;
 
   const ref = await presupuestosCol.add({
@@ -716,6 +747,11 @@ exports.crearCambioAlcance = onCall({ region: REGION }, async (request) => {
   if (trabajo.profesionalUid !== uid) {
     throw new HttpsError('permission-denied', 'Solo el profesional asignado puede solicitar un cambio de alcance.');
   }
+  // Un trabajo ya cerrado no admite nuevas solicitudes (auditoría de
+  // seguridad, octubre 2026) -- mismo criterio que responderPresupuesto.
+  if (trabajo.estado === 'terminado' || trabajo.estado === 'archivado') {
+    throw new HttpsError('failed-precondition', 'Este trabajo ya está finalizado, no se pueden solicitar cambios de alcance.');
+  }
   const importeBruto = importeAdicional == null ? null : Number(importeAdicional);
   if (importeBruto != null && (!Number.isFinite(importeBruto) || importeBruto < -1000000 || importeBruto > 1000000)) {
     throw new HttpsError('invalid-argument', 'Importe adicional inválido.');
@@ -767,7 +803,16 @@ exports.responderCambioAlcance = onCall({ region: REGION }, async (request) => {
   // comprobación de estado va en la misma transacción que la escritura,
   // para que una doble respuesta simultánea no duplique nada.
   const c = await db.runTransaction(async (tx) => {
-    const snap = await tx.get(ref);
+    const [trabajoSnap, snap] = await Promise.all([tx.get(trabajoRef), tx.get(ref)]);
+    // Mismo criterio que responderPresupuesto (auditoría de seguridad,
+    // octubre 2026): sin esto, un cambio de alcance pendiente se podía
+    // aprobar sobre un trabajo ya cerrado, incrementando `presupuesto` vía
+    // FieldValue.increment() después de que el evento de historial ya se
+    // hubiera creado con un coste fijo -- desincronizando ambos importes.
+    const estadoTrabajo = trabajoSnap.exists ? trabajoSnap.data().estado : null;
+    if (estadoTrabajo === 'terminado' || estadoTrabajo === 'archivado') {
+      throw new HttpsError('failed-precondition', 'Este trabajo ya está finalizado, no se pueden responder cambios de alcance.');
+    }
     if (!snap.exists) throw new HttpsError('not-found', 'El cambio de alcance no existe.');
     const cambio = snap.data();
     // El profesional NO puede aprobarse a sí mismo el cambio que él mismo

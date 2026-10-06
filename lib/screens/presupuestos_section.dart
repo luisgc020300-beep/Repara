@@ -8,6 +8,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -105,8 +106,12 @@ class _PresupuestoCard extends StatelessWidget {
     try {
       await PresupuestoService.responder(casaId: casaId, trabajoId: trabajoId, presupuestoId: presupuesto.id, aceptar: aceptar);
       unawaited(aceptar ? AnalyticsService.quoteAccepted() : AnalyticsService.quoteRejected());
-    } catch (e) {
-      if (context.mounted) AppError.show(context, 'No se pudo responder al presupuesto.');
+    } on FirebaseFunctionsException catch (e, st) {
+      if (context.mounted) {
+        AppError.show(context, e.message ?? 'No se pudo responder al presupuesto.', error: e, stackTrace: st);
+      }
+    } catch (e, st) {
+      if (context.mounted) AppError.show(context, 'No se pudo responder al presupuesto.', error: e, stackTrace: st);
     }
   }
 
@@ -114,8 +119,12 @@ class _PresupuestoCard extends StatelessWidget {
     try {
       await PresupuestoService.enviar(casaId: casaId, trabajoId: trabajoId, presupuestoId: presupuesto.id);
       if (context.mounted) AppError.showSuccess(context, 'Presupuesto enviado.');
-    } catch (e) {
-      if (context.mounted) AppError.show(context, 'No se pudo enviar el presupuesto.');
+    } on FirebaseFunctionsException catch (e, st) {
+      if (context.mounted) {
+        AppError.show(context, e.message ?? 'No se pudo enviar el presupuesto.', error: e, stackTrace: st);
+      }
+    } catch (e, st) {
+      if (context.mounted) AppError.show(context, 'No se pudo enviar el presupuesto.', error: e, stackTrace: st);
     }
   }
 
@@ -312,8 +321,10 @@ class _EditorPresupuestoSheetState extends State<_EditorPresupuestoSheet> {
         AppError.showSuccess(context, 'Presupuesto guardado como borrador.');
         Navigator.pop(context);
       }
-    } catch (e) {
-      if (mounted) AppError.show(context, 'No se pudo guardar el presupuesto.');
+    } on FirebaseFunctionsException catch (e, st) {
+      if (mounted) AppError.show(context, e.message ?? 'No se pudo guardar el presupuesto.', error: e, stackTrace: st);
+    } catch (e, st) {
+      if (mounted) AppError.show(context, 'No se pudo guardar el presupuesto.', error: e, stackTrace: st);
     } finally {
       if (mounted) setState(() => _guardando = false);
     }

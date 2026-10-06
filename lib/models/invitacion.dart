@@ -7,7 +7,7 @@
 // trabajo; hasta entonces no puede leer nada de esa casa.
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum EstadoInvitacion { pendiente, aceptada, rechazada }
+enum EstadoInvitacion { pendiente, aceptada, rechazada, cancelada }
 
 EstadoInvitacion estadoInvitacionFromString(String? s) => EstadoInvitacion.values.firstWhere(
       (e) => e.name == s,

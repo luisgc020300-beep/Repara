@@ -218,6 +218,25 @@ describe('pagos -- solo el propietario escribe, el profesional asignado solo lee
   it('DENY: un usuario externo no puede escribir pagos en una casa ajena', async () => {
     await assertFails(addDoc(collection(as(EXTRANO), `casas/${CASA_A}/trabajos/${TRABAJO_A1}/pagos`), { importe: 10, fecha: new Date() }));
   });
+
+  // Auditoría de seguridad, octubre 2026: antes no había ninguna validación
+  // server-side de `importe` -- una llamada directa al SDK (fuera de la UI,
+  // que sí valida) podía crear un pago negativo, a cero, o absurdamente alto.
+  it('DENY: el propietario no puede registrar un pago con importe negativo', async () => {
+    await assertFails(addDoc(collection(as(OWNER_A), `casas/${CASA_A}/trabajos/${TRABAJO_A1}/pagos`), { importe: -10, fecha: new Date() }));
+  });
+
+  it('DENY: el propietario no puede registrar un pago de importe cero', async () => {
+    await assertFails(addDoc(collection(as(OWNER_A), `casas/${CASA_A}/trabajos/${TRABAJO_A1}/pagos`), { importe: 0, fecha: new Date() }));
+  });
+
+  it('DENY: el propietario no puede registrar un pago con un importe absurdamente alto', async () => {
+    await assertFails(addDoc(collection(as(OWNER_A), `casas/${CASA_A}/trabajos/${TRABAJO_A1}/pagos`), { importe: 50000000, fecha: new Date() }));
+  });
+
+  it('DENY: el propietario no puede editar un pago para ponerle un importe negativo', async () => {
+    await assertFails(updateDoc(doc(as(OWNER_A), `casas/${CASA_A}/trabajos/${TRABAJO_A1}/pagos`, 'pago-a1'), { importe: -5 }));
+  });
 });
 
 describe('documentos -- acceso acotado al trabajo concreto del profesional', () => {

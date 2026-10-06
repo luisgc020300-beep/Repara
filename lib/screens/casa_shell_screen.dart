@@ -1,8 +1,11 @@
 // lib/screens/casa_shell_screen.dart
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models/casa.dart';
 import '../services/casa_service.dart';
+import '../services/fcm_service.dart';
 import 'contactos_tab.dart';
 import 'casa_tab.dart';
 import 'home_tab.dart';
@@ -27,6 +30,16 @@ class _CasaShellScreenState extends State<CasaShellScreen> {
   void dispose() {
     _pageController.dispose();
     super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Aquí y no en main.dart (auditoría de producto, octubre 2026): el
+    // usuario ya ha nombrado/unido su casa y está viendo la app de verdad --
+    // mejor momento para pedir el permiso de notificaciones que nada más
+    // iniciar sesión, antes de que haya visto nada.
+    unawaited(FcmService.inicializar());
   }
 
   void _onPageChanged(int i) => setState(() => _index = i);

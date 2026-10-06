@@ -85,7 +85,10 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
 
   Future<void> _guardar() async {
     final nombre = _nombreCtrl.text.trim();
-    if (nombre.isEmpty) return;
+    if (nombre.isEmpty) {
+      AppError.show(context, 'Escribe un nombre para el elemento.');
+      return;
+    }
     final intervaloMeses = int.tryParse(_intervaloCtrl.text.trim());
     setState(() => _guardando = true);
     try {

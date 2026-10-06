@@ -20,7 +20,6 @@ import 'screens/casa_gate_screen.dart';
 import 'screens/login_screen.dart';
 import 'services/analytics_service.dart';
 import 'services/casa_service.dart';
-import 'services/fcm_service.dart';
 import 'services/notificacion_router.dart';
 import 'theme/design_tokens.dart';
 import 'theme/theme_controller.dart';
@@ -98,10 +97,13 @@ void main() async {
   final themeController = await ThemeController.load();
   unawaited(_registrarRetornoSiProcede());
 
-  FirebaseAuth.instance.authStateChanges().listen((user) async {
-    if (user == null) return;
-    await CasaService.asegurarPerfilUsuario();
-    unawaited(FcmService.inicializar());
+  // FcmService.inicializar() (que pide el permiso de notificaciones) se
+  // dispara desde CasaShellScreen, no aquí -- auditoría de producto, octubre
+  // 2026: pedirlo en el mismo instante del login, antes de que el usuario
+  // haya siquiera nombrado su casa, tiene peor tasa de aceptación que
+  // pedirlo una vez ya está dentro de la app de verdad.
+  FirebaseAuth.instance.authStateChanges().listen((user) {
+    if (user != null) unawaited(CasaService.asegurarPerfilUsuario());
   });
 
   // Push tocada con la app en segundo plano, o que abre la app desde frío.

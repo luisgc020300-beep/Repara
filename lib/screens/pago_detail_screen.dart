@@ -119,8 +119,8 @@ class _PagoDetailScreenState extends State<PagoDetailScreen> {
         await PagoService.actualizar(widget.casaId, widget.trabajoId, widget.pago!.id, pago);
       }
       if (mounted) Navigator.pop(context);
-    } catch (e) {
-      if (mounted) AppError.show(context, 'No se pudo guardar el pago.');
+    } catch (e, st) {
+      if (mounted) AppError.show(context, 'No se pudo guardar el pago.', error: e, stackTrace: st);
     } finally {
       if (mounted) setState(() => _guardando = false);
     }
@@ -141,8 +141,8 @@ class _PagoDetailScreenState extends State<PagoDetailScreen> {
     try {
       await PagoService.eliminar(widget.casaId, widget.trabajoId, widget.pago!.id);
       if (mounted) Navigator.pop(context);
-    } catch (e) {
-      if (mounted) AppError.show(context, 'No se pudo eliminar el pago.');
+    } catch (e, st) {
+      if (mounted) AppError.show(context, 'No se pudo eliminar el pago.', error: e, stackTrace: st);
     }
   }
 

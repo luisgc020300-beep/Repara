@@ -52,6 +52,13 @@ class InvitacionService {
     await callable.call<Map<String, dynamic>>({'invitacionId': invitacionId, 'aceptar': aceptar});
   }
 
+  /// Para cuando el profesional invitado nunca responde -- sin esto el
+  /// propietario se queda sin ninguna vía para invitar a otra persona.
+  static Future<void> cancelar(String invitacionId) async {
+    final callable = FirebaseFunctions.instanceFor(region: _region).httpsCallable('cancelarInvitacion');
+    await callable.call<Map<String, dynamic>>({'invitacionId': invitacionId});
+  }
+
   /// La última invitación enviada para un trabajo (puede no haber ninguna).
   static Stream<Invitacion?> streamUltimaInvitacionDe(String trabajoId) {
     return _db

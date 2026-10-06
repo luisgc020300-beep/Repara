@@ -16,6 +16,12 @@ service cloud.firestore {
     // historial y las notificaciones; una escritura directa los dejaría
     // "terminados" en silencio (auditoría de seguridad, octubre 2026).
     function estadoTerminal(v) { return v == 'terminado' || v == 'archivado'; }
+    // Los pagos se escriben directo desde el cliente (ver pago_service.dart),
+    // sin pasar por una Cloud Function -- a diferencia de presupuestos/
+    // cambiosAlcance. Sin esta validación, una llamada directa al SDK (fuera
+    // de la UI, que sí valida) podía crear un pago negativo, a cero, o con
+    // un importe absurdo (auditoría de seguridad, octubre 2026).
+    function importeValido(v) { return v is number && v > 0 && v <= 1000000; }
 
     // ── users ────────────────────────────────────────────────────────────────
     match /users/{uid} {
@@ -156,7 +162,8 @@ service cloud.firestore {
         // puede crearlos, editarlos ni borrarlos.
         match /pagos/{pagoid} {
           allow read: if isAuth() && (isMember(cid) || get(/databases/$(database)/documents/casas/$(cid)/trabajos/$(tid)).data.profesionalUid == request.auth.uid);
-          allow write: if isAuth() && isMember(cid);
+          allow create, update: if isAuth() && isMember(cid) && importeValido(request.resource.data.importe);
+          allow delete: if isAuth() && isMember(cid);
         }
       }
     }
