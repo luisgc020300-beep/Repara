@@ -50,9 +50,11 @@ class TrabajoDetailScreen extends StatelessWidget {
     // Aviso, no bloqueo (decisión del CEO): que falte pago no debe impedir
     // cerrar un trabajo si el cobro llega más tarde (transferencia,
     // financiación...), pero sí se avisa para no perderlo de vista.
+    var pagadoDelTodo = false;
     if (trabajo.presupuesto != null) {
       final pagado = await PagoService.totalPagado(casa.id, trabajo.id);
-      if (pagado < trabajo.presupuesto! && context.mounted) {
+      pagadoDelTodo = pagado >= trabajo.presupuesto!;
+      if (!pagadoDelTodo && context.mounted) {
         final seguir = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
@@ -91,8 +93,42 @@ class TrabajoDetailScreen extends StatelessWidget {
       );
       await TrabajoService.actualizarEstado(casa.id, trabajo.id, EstadoTrabajo.terminado);
       if (context.mounted) AppError.showSuccess(context, 'Trabajo archivado en el historial.');
+
+      // Bucle viral en UN solo momento (auditoría de producto, octubre
+      // 2026): justo cuando el trabajo ha ido bien de verdad -- terminado Y
+      // pagado del todo, con un profesional real de Repara de por medio.
+      // Nunca en ningún otro sitio, nunca con descuentos artificiales.
+      if (pagadoDelTodo && trabajo.profesionalUid != null && context.mounted) {
+        await _ofrecerCompartir(context, trabajo);
+      }
     } catch (e) {
       if (context.mounted) AppError.show(context, 'No se pudo finalizar el trabajo.');
+    }
+  }
+
+  Future<void> _ofrecerCompartir(BuildContext context, Trabajo trabajo) async {
+    final compartir = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('¿Te ha ido bien?'),
+        content: Text(
+          '${trabajo.profesionalNombre ?? 'Tu profesional'} también puede recibir más clientes como tú a través de Repara.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Ahora no')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Compartir')),
+        ],
+      ),
+    );
+    if (compartir != true) return;
+    try {
+      await Share.share(
+        'He usado Repara para gestionar "${trabajo.titulo}"${trabajo.profesionalNombre != null ? ' con ${trabajo.profesionalNombre}' : ''} '
+        '-- presupuesto, cambios y pagos, todo en un sitio. Pruébalo tú también.',
+      );
+    } catch (e) {
+      // Decorativo -- que falle el selector de compartir no debe parecer
+      // que el trabajo no se finalizó bien.
     }
   }
 
