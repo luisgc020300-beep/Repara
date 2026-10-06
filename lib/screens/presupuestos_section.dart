@@ -5,12 +5,14 @@
 // como en la de Pro (rol profesional: crear, enviar, versionar). Los totales
 // mostrados aquí son solo para revisión visual -- los que cuentan de verdad
 // son los que calcula el servidor en Cloud Functions.
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/presupuesto.dart';
+import '../services/analytics_service.dart';
 import '../services/presupuesto_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
@@ -102,6 +104,7 @@ class _PresupuestoCard extends StatelessWidget {
   Future<void> _responder(BuildContext context, bool aceptar) async {
     try {
       await PresupuestoService.responder(casaId: casaId, trabajoId: trabajoId, presupuestoId: presupuesto.id, aceptar: aceptar);
+      unawaited(aceptar ? AnalyticsService.quoteAccepted() : AnalyticsService.quoteRejected());
     } catch (e) {
       if (context.mounted) AppError.show(context, 'No se pudo responder al presupuesto.');
     }
@@ -303,6 +306,7 @@ class _EditorPresupuestoSheetState extends State<_EditorPresupuestoSheet> {
           notas: _notasCtrl.text.trim().isEmpty ? null : _notasCtrl.text.trim(),
         );
       }
+      unawaited(AnalyticsService.quoteCreated(numLineas: lineasValidas.length));
       if (widget.presupuestoAnteriorId == null) await _guardarPlantilla(lineasValidas);
       if (mounted) {
         AppError.showSuccess(context, 'Presupuesto guardado como borrador.');

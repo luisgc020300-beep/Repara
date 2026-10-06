@@ -5,10 +5,13 @@
 // registra lo que ha pagado), solo lectura para el profesional asignado a
 // ese trabajo (se entera de todo el detalle sin poder tocarlo). Ver
 // screens/pagos_section.dart para el listado que abre esta pantalla.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../models/pago.dart';
+import '../services/analytics_service.dart';
 import '../services/pago_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
@@ -111,6 +114,7 @@ class _PagoDetailScreenState extends State<PagoDetailScreen> {
     try {
       if (widget.pago == null) {
         await PagoService.crear(widget.casaId, widget.trabajoId, pago);
+        unawaited(AnalyticsService.paymentCreated(importe: importe));
       } else {
         await PagoService.actualizar(widget.casaId, widget.trabajoId, widget.pago!.id, pago);
       }

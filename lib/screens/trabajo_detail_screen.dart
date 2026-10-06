@@ -4,6 +4,8 @@
 // ScopeGuard/cambios de alcance todavía). Al finalizar, se ofrece volcar el
 // trabajo como un evento permanente en el historial de la casa (sección 21:
 // "¿Qué quieres guardar en el historial de la vivienda?").
+import 'dart:async';
+
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
@@ -12,6 +14,7 @@ import '../models/casa.dart';
 import '../models/documento.dart';
 import '../models/invitacion.dart';
 import '../models/trabajo.dart';
+import '../services/analytics_service.dart';
 import '../services/documento_service.dart';
 import '../services/invitacion_service.dart';
 import '../services/pago_service.dart';
@@ -77,6 +80,7 @@ class TrabajoDetailScreen extends StatelessWidget {
       // marcar un trabajo como terminado por una escritura directa.
       final callable = FirebaseFunctions.instanceFor(region: 'europe-west1').httpsCallable('finalizarTrabajoPropietario');
       await callable.call<Map<String, dynamic>>({'casaId': casa.id, 'trabajoId': trabajo.id});
+      unawaited(AnalyticsService.workCompleted(pagadoDelTodo: pagadoDelTodo));
       if (context.mounted) AppError.showSuccess(context, 'Trabajo archivado en el historial.');
 
       // Bucle viral en UN solo momento (auditoría de producto, octubre
@@ -292,6 +296,7 @@ class _SeccionInvitarProfesionalState extends State<_SeccionInvitarProfesional> 
       );
       _emailCtrl.clear();
       _telefonoCtrl.clear();
+      unawaited(AnalyticsService.professionalInvited(metodo: resultado.esDirecta ? 'email' : 'codigo'));
       if (resultado.esDirecta) {
         if (mounted) AppError.showSuccess(context, 'Invitación enviada.');
       } else if (mounted) {

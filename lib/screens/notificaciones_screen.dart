@@ -2,10 +2,13 @@
 //
 // Notificaciones internas persistentes (sección 29 del spec) -- sin push
 // real todavía, se consultan dentro de la app.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../models/notificacion.dart';
+import '../services/analytics_service.dart';
 import '../services/casa_service.dart';
 import '../services/notificacion_service.dart';
 import '../services/pago_service.dart';
@@ -27,6 +30,8 @@ class NotificacionesScreen extends StatelessWidget {
     final casaId = n.casaId;
     final trabajoId = n.trabajoId;
     if (casaId == null || trabajoId == null || !context.mounted) return;
+
+    if (n.tipo == 'presupuesto_enviado') unawaited(AnalyticsService.quoteViewed());
 
     // "Te han registrado un pago" lleva directo al detalle de ESE pago, no
     // solo al trabajo -- es lo que el profesional quiere ver primero.

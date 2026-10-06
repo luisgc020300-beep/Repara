@@ -8,6 +8,8 @@
 // queda para cuando haya demanda real de pagar por ella (ver sección de
 // monetización de la auditoría) -- no se ha añadido ninguna dependencia
 // nueva solo para esto.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
@@ -16,6 +18,7 @@ import '../models/casa.dart';
 import '../models/documento.dart';
 import '../models/elemento.dart';
 import '../models/trabajo.dart';
+import '../services/analytics_service.dart';
 import '../services/documento_service.dart';
 import '../services/elemento_service.dart';
 import '../services/trabajo_service.dart';
@@ -66,6 +69,7 @@ class ExpedienteViviendaScreen extends StatelessWidget {
 
     try {
       await Share.share(buffer.toString(), subject: 'Expediente de ${casa.nombre}');
+      unawaited(AnalyticsService.householdRecordShared());
     } catch (e) {
       // El resumen ya se ve en pantalla -- que falle el selector de
       // compartir no debe parecer que algo se ha roto.

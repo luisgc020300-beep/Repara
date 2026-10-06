@@ -4,6 +4,8 @@
 // descripción y quién lo va a hacer -- el profesional es texto libre en v1
 // (ver nota en models/trabajo.dart sobre por qué no hay invitación por
 // enlace todavía).
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -11,6 +13,7 @@ import '../models/casa.dart';
 import '../models/contacto.dart';
 import '../models/habitacion.dart';
 import '../models/trabajo.dart';
+import '../services/analytics_service.dart';
 import '../services/contacto_service.dart';
 import '../services/habitacion_service.dart';
 import '../services/trabajo_service.dart';
@@ -81,6 +84,7 @@ class _NuevoTrabajoScreenState extends State<NuevoTrabajoScreen> {
         ),
         createdBy: uid,
       );
+      unawaited(AnalyticsService.workCreated(tipo: _tipo.name));
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) AppError.show(context, 'No se pudo crear el trabajo.');

@@ -1,8 +1,11 @@
 // lib/screens/login_screen.dart
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../services/analytics_service.dart';
 import '../theme/design_tokens.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -39,11 +42,13 @@ class _LoginScreenState extends State<LoginScreen> {
           email: _emailCtrl.text.trim(),
           password: _passCtrl.text,
         );
+        unawaited(AnalyticsService.authSignupCompleted());
       } else {
         await FirebaseAuth.instance.signInWithEmailAndPassword(
           email: _emailCtrl.text.trim(),
           password: _passCtrl.text,
         );
+        unawaited(AnalyticsService.authLogin());
       }
       // Cierra el contexto de autofill al confirmarse el login/registro --
       // sin esto, en Android el aviso de "guardar contraseña" del gestor

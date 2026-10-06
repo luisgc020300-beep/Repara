@@ -4,9 +4,12 @@
 // único paso, nombrar la casa. No se pide inventariar nada todavía -- el
 // valor se enseña dejando que el propietario añada su primer elemento o
 // documento ya dentro de la app, no en un formulario largo antes de entrar.
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../services/analytics_service.dart';
 import '../services/casa_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
@@ -37,6 +40,7 @@ class _OnboardingCasaScreenState extends State<OnboardingCasaScreen> {
     setState(() => _cargando = true);
     try {
       await CasaService.createCasa(nombre);
+      unawaited(AnalyticsService.homeCreated());
     } catch (e) {
       if (mounted) AppError.show(context, 'No se pudo crear la casa. Inténtalo de nuevo.');
     } finally {

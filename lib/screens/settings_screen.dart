@@ -5,11 +5,14 @@
 // (Hogar) y "Perfil profesional" (Pro) vivían como pestañas aparte,
 // compitiendo con este mismo icono -- ahora todo vive aquí, con secciones
 // que aparecen según desde dónde se abre (casa en Hogar, modoPro en Pro).
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../models/casa.dart';
 import '../models/profesional.dart';
+import '../services/analytics_service.dart';
 import '../services/casa_service.dart';
 import '../services/invitacion_service.dart';
 import '../services/profesional_service.dart';
@@ -195,7 +198,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   title: const Text('Expediente de la vivienda'),
                   subtitle: const Text('Resumen de elementos, trabajos y garantías -- para vender, asegurar o pedir financiación'),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ExpedienteViviendaScreen(casa: casa))),
+                  onTap: () {
+                    unawaited(AnalyticsService.householdRecordViewed());
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => ExpedienteViviendaScreen(casa: casa)));
+                  },
                 ),
               ),
               const SizedBox(height: 8),
@@ -317,6 +323,7 @@ class _SeccionProfesionalState extends State<_SeccionProfesional> {
     setState(() => _activando = true);
     try {
       await ProfesionalService.activarModoProfesional();
+      unawaited(AnalyticsService.setEsProfesional(true));
     } catch (e) {
       if (mounted) AppError.show(context, 'No se pudo activar el modo profesional.');
     } finally {

@@ -1,9 +1,12 @@
 // lib/screens/nuevo_elemento_screen.dart
+import 'dart:async';
+
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
 import '../models/casa.dart';
 import '../models/elemento.dart';
+import '../services/analytics_service.dart';
 import '../services/elemento_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
@@ -105,6 +108,7 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
           proximoMantenimiento: proximoMantenimiento,
         ),
       );
+      unawaited(AnalyticsService.firstElementCreated());
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) AppError.show(context, 'No se pudo guardar el elemento.');

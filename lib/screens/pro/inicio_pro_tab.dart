@@ -4,11 +4,14 @@
 // lista de funciones. En esta primera pasada el dato central son las
 // invitaciones pendientes -- es la única acción que de verdad requiere
 // atención inmediata en el flujo actual.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../models/invitacion.dart';
 import '../../models/profesional.dart';
+import '../../services/analytics_service.dart';
 import '../../services/invitacion_service.dart';
 import '../../services/profesional_service.dart';
 import '../../theme/design_tokens.dart';
@@ -98,6 +101,7 @@ class _InvitacionCardState extends State<_InvitacionCard> {
     setState(() => _respondiendo = true);
     try {
       await InvitacionService.responder(widget.invitacion.id, aceptar: aceptar);
+      if (aceptar) unawaited(AnalyticsService.professionalInvitationAccepted());
     } catch (e) {
       if (mounted) AppError.show(context, 'No se pudo responder a la invitación.');
     } finally {

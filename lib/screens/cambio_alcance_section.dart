@@ -4,6 +4,7 @@
 // usuario. El profesional solicita, el propietario aprueba o rechaza --
 // nunca al revés, y la Cloud Function responderCambioAlcance lo impone
 // aunque alguien manipule el cliente.
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -11,6 +12,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../models/cambio_alcance.dart';
 import '../screens/presupuestos_section.dart' show RolEnTrabajo;
+import '../services/analytics_service.dart';
 import '../services/cambio_alcance_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
@@ -81,6 +83,7 @@ class _CambioCard extends StatelessWidget {
   Future<void> _responder(BuildContext context, bool aprobar) async {
     try {
       await CambioAlcanceService.responder(casaId: casaId, trabajoId: trabajoId, cambioAlcanceId: cambio.id, aprobar: aprobar);
+      if (aprobar) unawaited(AnalyticsService.scopeChangeAccepted());
     } catch (e) {
       if (context.mounted) AppError.show(context, 'No se pudo responder a la solicitud.');
     }
@@ -239,6 +242,7 @@ class _FormularioCambioSheetState extends State<_FormularioCambioSheet> {
         importeAdicional: double.tryParse(_importeCtrl.text.replaceAll(',', '.')),
         fotos: urls,
       );
+      unawaited(AnalyticsService.scopeChangeCreated());
       if (mounted) {
         AppError.showSuccess(context, 'Solicitud enviada al propietario.');
         Navigator.pop(context);

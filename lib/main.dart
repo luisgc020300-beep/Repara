@@ -1,4 +1,5 @@
 // lib/main.dart
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
@@ -10,14 +11,35 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/service_locator.dart';
 import 'firebase_options.dart';
 import 'screens/casa_gate_screen.dart';
 import 'screens/login_screen.dart';
+import 'services/analytics_service.dart';
 import 'services/casa_service.dart';
 import 'theme/design_tokens.dart';
 import 'theme/theme_controller.dart';
+
+// Analítica de retorno (auditoría de producto, octubre 2026) -- sin ningún
+// dato personal, solo compara la fecha de la última apertura guardada
+// localmente con hoy. D1/D7/D30/D90 de verdad los calcula Firebase
+// Analytics solo con tener el SDK activo (recolección automática); esto es
+// un evento complementario, no la fuente de esa métrica.
+Future<void> _registrarRetornoSiProcede() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final hoy = DateTime.now().toIso8601String().substring(0, 10);
+    final ultimaApertura = prefs.getString('repara_ultima_apertura');
+    if (ultimaApertura != null && ultimaApertura != hoy) {
+      await AnalyticsService.userReturned();
+    }
+    await prefs.setString('repara_ultima_apertura', hoy);
+  } catch (e) {
+    // La analítica nunca debe impedir que la app arranque.
+  }
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -51,6 +73,7 @@ void main() async {
 
   await setupLocator();
   final themeController = await ThemeController.load();
+  unawaited(_registrarRetornoSiProcede());
 
   FirebaseAuth.instance.authStateChanges().listen((user) {
     if (user != null) CasaService.asegurarPerfilUsuario();
@@ -74,6 +97,7 @@ class ReparaApp extends StatelessWidget {
         themeMode: themeController.mode,
         theme: buildReparaLightTheme(),
         darkTheme: buildReparaDarkTheme(),
+        navigatorObservers: [AnalyticsService.observer],
         home: StreamBuilder<User?>(
           stream: FirebaseAuth.instance.authStateChanges(),
           builder: (context, snapshot) {

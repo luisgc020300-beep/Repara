@@ -4,6 +4,7 @@
 // 3-8 del spec de producto). La IA solo SUGIERE -- el propietario siempre ve
 // y puede corregir cada campo en una pantalla de revisión completa antes de
 // guardar nada (sección 61: nunca se asume información no confirmada).
+import 'dart:async';
 import 'dart:io';
 
 import 'package:cloud_functions/cloud_functions.dart';
@@ -16,6 +17,7 @@ import '../models/documento.dart';
 import '../models/elemento.dart';
 import '../models/evento.dart';
 import '../models/trabajo.dart';
+import '../services/analytics_service.dart';
 import '../services/documento_service.dart';
 import '../services/elemento_service.dart';
 import '../services/evento_service.dart';
@@ -87,6 +89,7 @@ Future<void> iniciarNuevoDocumento(
   } finally {
     if (context.mounted) Navigator.pop(context);
   }
+  unawaited(AnalyticsService.documentAiExtractionCompleted(exito: errorIA == null, confianza: sugerencia?.confianza));
 
   if (!context.mounted) return;
   if (errorIA != null) AppError.show(context, errorIA);
@@ -473,6 +476,8 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
       );
 
       final documentoId = await DocumentoService.crear(widget.casaId, documento, createdBy: uid);
+      unawaited(AnalyticsService.firstDocumentUploaded());
+      unawaited(AnalyticsService.documentConfirmed(comoBorrador: comoBorrador));
 
       if (!comoBorrador) {
         await EventoService.crear(

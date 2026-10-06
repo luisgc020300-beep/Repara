@@ -23,6 +23,8 @@ dependencies:
   firebase_crashlytics: ^5.0.0
   firebase_app_check: ^0.4.3
   firebase_core_web: ^3.4.0
+  firebase_analytics: ^12.1.0
+  firebase_messaging: ^16.0.3
 
   google_fonts: ^6.2.1
   get_it: ^8.0.2
