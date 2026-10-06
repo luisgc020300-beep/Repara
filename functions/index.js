@@ -49,6 +49,28 @@ async function verificarYRegistrarUsoIA(uid) {
   });
 }
 
+// Límite de intentos para endpoints que canjean un código de 6 caracteres
+// (joinCasa, canjearCodigoInvitacion) -- auditoría de seguridad, octubre
+// 2026. Ninguno de los dos tenía ningún límite: un atacante autenticado
+// podía scriptear intentos sin freno. 729M combinaciones hacen la fuerza
+// bruta poco práctica hoy, pero "poco práctica" no es lo mismo que
+// "protegida" -- esto cuenta TODOS los intentos (válidos o no), así que
+// adivinar a ciegas se vuelve inviable mucho antes de acercarse al límite.
+const LIMITE_INTENTOS_CODIGO = 20;
+
+async function verificarYRegistrarIntentoCodigo(uid, accion) {
+  const hoy = new Date().toISOString().slice(0, 10);
+  const ref = db.collection('intentosCodigo').doc(`${uid}_${accion}_${hoy}`);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const actual = snap.exists ? (snap.data().intentos || 0) : 0;
+    if (actual >= LIMITE_INTENTOS_CODIGO) {
+      throw new HttpsError('resource-exhausted', 'Demasiados intentos. Inténtalo de nuevo mañana.');
+    }
+    tx.set(ref, { uid, accion, fecha: hoy, intentos: actual + 1 }, { merge: true });
+  });
+}
+
 async function generarCodigoUnico() {
   for (let intento = 0; intento < 10; intento++) {
     let code = '';
@@ -106,6 +128,7 @@ exports.joinCasa = onCall({ region: REGION }, async (request) => {
   const raw = typeof request.data?.joinCode === 'string' ? request.data.joinCode : '';
   const joinCode = raw.trim().toUpperCase();
   if (!joinCode) throw new HttpsError('invalid-argument', 'Código inválido.');
+  await verificarYRegistrarIntentoCodigo(uid, 'joinCasa');
 
   const codeSnap = await db.collection('joinCodes').doc(joinCode).get();
   if (!codeSnap.exists) throw new HttpsError('not-found', 'No existe ninguna casa con ese código.');
@@ -270,6 +293,7 @@ exports.canjearCodigoInvitacion = onCall({ region: REGION }, async (request) => 
   const raw = typeof request.data?.codigo === 'string' ? request.data.codigo : '';
   const codigo = raw.trim().toUpperCase();
   if (!codigo) throw new HttpsError('invalid-argument', 'Código inválido.');
+  await verificarYRegistrarIntentoCodigo(uid, 'canjearCodigoInvitacion');
 
   const abiertaRef = db.collection('invitacionesAbiertas').doc(codigo);
 
@@ -410,8 +434,13 @@ function validarLineas(lineas) {
     const precioUnitario = Number(l.precioUnitario);
     const ivaPorcentaje = l.ivaPorcentaje == null ? 21 : Number(l.ivaPorcentaje);
     if (!descripcion) throw new HttpsError('invalid-argument', 'Cada línea necesita una descripción.');
-    if (!Number.isFinite(cantidad) || cantidad <= 0) throw new HttpsError('invalid-argument', 'Cantidad inválida en una línea.');
-    if (!Number.isFinite(precioUnitario) || precioUnitario < 0) throw new HttpsError('invalid-argument', 'Precio inválido en una línea.');
+    // Topes de cordura (auditoría de seguridad, octubre 2026): sin esto, un
+    // profesional podía escribir una cantidad o precio absurdos (p.ej.
+    // 10^15) en su propio borrador -- no roba nada ni mueve dinero real de
+    // otro, pero sí puede producir un total sin sentido mostrado al
+    // propietario.
+    if (!Number.isFinite(cantidad) || cantidad <= 0 || cantidad > 100000) throw new HttpsError('invalid-argument', 'Cantidad inválida en una línea.');
+    if (!Number.isFinite(precioUnitario) || precioUnitario < 0 || precioUnitario > 1000000) throw new HttpsError('invalid-argument', 'Precio inválido en una línea.');
     if (!Number.isFinite(ivaPorcentaje) || ivaPorcentaje < 0 || ivaPorcentaje > 100) throw new HttpsError('invalid-argument', 'IVA inválido en una línea.');
     return { descripcion, cantidad, precioUnitario, ivaPorcentaje };
   });
@@ -540,36 +569,44 @@ exports.responderPresupuesto = onCall({ region: REGION }, async (request) => {
   if (!(await esMiembroCasa(casaId, uid))) throw new HttpsError('permission-denied', 'No perteneces a esa casa.');
 
   const trabajoRef = db.collection('casas').doc(casaId).collection('trabajos').doc(trabajoId);
-  const trabajoSnap = await trabajoRef.get();
-  if (!trabajoSnap.exists) throw new HttpsError('not-found', 'El trabajo no existe.');
-  // Un trabajo ya cerrado no debe poder "reabrirse" en silencio al aceptar
-  // un presupuesto -- si no se bloquea aquí, el estado pasa a
-  // 'presupuestado', el botón de Finalizar del propietario reaparece y, al
-  // volver a pulsarlo, se duplica el evento de historial del mismo trabajo.
-  const estadoTrabajo = trabajoSnap.data().estado;
-  if (estadoTrabajo === 'terminado' || estadoTrabajo === 'archivado') {
-    throw new HttpsError('failed-precondition', 'Este trabajo ya está finalizado, no se pueden responder presupuestos.');
-  }
-
   const ref = trabajoRef.collection('presupuestos').doc(presupuestoId);
-  const snap = await ref.get();
-  if (!snap.exists) throw new HttpsError('not-found', 'El presupuesto no existe.');
-  const p = snap.data();
-  // Nunca se permite que quien creó el presupuesto sea también quien lo
-  // aprueba (sección 18 del spec: "No permitir que el profesional se
-  // autoapruebe un presupuesto").
-  if (p.creadoPorUid === uid) throw new HttpsError('permission-denied', 'No puedes aprobar tu propio presupuesto.');
-  if (p.estado !== 'enviado') throw new HttpsError('failed-precondition', 'Este presupuesto no está pendiente de respuesta.');
 
-  await ref.update({
-    estado: aceptar ? 'aceptado' : 'rechazado',
-    fechaRespuesta: FieldValue.serverTimestamp(),
-    respondidoPorUid: uid,
+  // Transacción (auditoría de seguridad, octubre 2026): sin esto, dos
+  // respuestas simultáneas al mismo presupuesto (doble toque, o dos
+  // miembros de la misma casa a la vez) podían pasar ambas la comprobación
+  // de estado antes de que ninguna hubiera escrito todavía, duplicando el
+  // evento de historial. Todas las lecturas van antes que las escrituras
+  // (regla de las transacciones de Firestore).
+  const p = await db.runTransaction(async (tx) => {
+    const [trabajoSnap, snap] = await Promise.all([tx.get(trabajoRef), tx.get(ref)]);
+    if (!trabajoSnap.exists) throw new HttpsError('not-found', 'El trabajo no existe.');
+    // Un trabajo ya cerrado no debe poder "reabrirse" en silencio al
+    // aceptar un presupuesto -- si no se bloquea aquí, el estado pasa a
+    // 'presupuestado', el botón de Finalizar del propietario reaparece y,
+    // al volver a pulsarlo, se duplica el evento de historial del mismo
+    // trabajo.
+    const estadoTrabajo = trabajoSnap.data().estado;
+    if (estadoTrabajo === 'terminado' || estadoTrabajo === 'archivado') {
+      throw new HttpsError('failed-precondition', 'Este trabajo ya está finalizado, no se pueden responder presupuestos.');
+    }
+    if (!snap.exists) throw new HttpsError('not-found', 'El presupuesto no existe.');
+    const presupuesto = snap.data();
+    // Nunca se permite que quien creó el presupuesto sea también quien lo
+    // aprueba (sección 18 del spec: "No permitir que el profesional se
+    // autoapruebe un presupuesto").
+    if (presupuesto.creadoPorUid === uid) throw new HttpsError('permission-denied', 'No puedes aprobar tu propio presupuesto.');
+    if (presupuesto.estado !== 'enviado') throw new HttpsError('failed-precondition', 'Este presupuesto no está pendiente de respuesta.');
+
+    tx.update(ref, {
+      estado: aceptar ? 'aceptado' : 'rechazado',
+      fechaRespuesta: FieldValue.serverTimestamp(),
+      respondidoPorUid: uid,
+    });
+    if (aceptar) {
+      tx.update(trabajoRef, { presupuesto: presupuesto.total, estado: 'presupuestado' });
+    }
+    return presupuesto;
   });
-
-  if (aceptar) {
-    await trabajoRef.update({ presupuesto: p.total, estado: 'presupuestado' });
-  }
 
   await crearEventoHistorial(casaId, {
     tipo: 'nota',
@@ -639,8 +676,14 @@ exports.crearCambioAlcance = onCall({ region: REGION }, async (request) => {
   if (trabajo.profesionalUid !== uid) {
     throw new HttpsError('permission-denied', 'Solo el profesional asignado puede solicitar un cambio de alcance.');
   }
-  const importe = importeAdicional == null ? null : Number(importeAdicional);
-  if (importe != null && !Number.isFinite(importe)) throw new HttpsError('invalid-argument', 'Importe adicional inválido.');
+  const importeBruto = importeAdicional == null ? null : Number(importeAdicional);
+  if (importeBruto != null && (!Number.isFinite(importeBruto) || importeBruto < -1000000 || importeBruto > 1000000)) {
+    throw new HttpsError('invalid-argument', 'Importe adicional inválido.');
+  }
+  // Redondeado ya al crearlo -- responderCambioAlcance usa
+  // FieldValue.increment() con este valor tal cual, así que debe llegar
+  // limpio a 2 decimales para no acumular deriva de coma flotante.
+  const importe = importeBruto == null ? null : redondear2(importeBruto);
 
   const ref = await trabajoRef.collection('cambiosAlcance').add({
     titulo: titulo.trim().slice(0, 120),
@@ -675,24 +718,33 @@ exports.responderCambioAlcance = onCall({ region: REGION }, async (request) => {
 
   const trabajoRef = db.collection('casas').doc(casaId).collection('trabajos').doc(trabajoId);
   const ref = trabajoRef.collection('cambiosAlcance').doc(cambioAlcanceId);
-  const snap = await ref.get();
-  if (!snap.exists) throw new HttpsError('not-found', 'El cambio de alcance no existe.');
-  const c = snap.data();
-  // El profesional NO puede aprobarse a sí mismo el cambio que él mismo
-  // solicitó (sección 20: "El profesional NO debe poder convertir
-  // unilateralmente el cambio en aprobado").
-  if (c.creadoPorUid === uid) throw new HttpsError('permission-denied', 'No puedes aprobar tu propia solicitud.');
-  if (c.estado !== 'pendiente') throw new HttpsError('failed-precondition', 'Esta solicitud ya se respondió.');
 
-  await ref.update(aprobar
-    ? { estado: 'aprobado', aprobadoPorUid: uid, aprobadoAt: FieldValue.serverTimestamp() }
-    : { estado: 'rechazado', rechazadoPorUid: uid, rechazadoAt: FieldValue.serverTimestamp() });
+  // Transacción + FieldValue.increment (auditoría de seguridad, octubre
+  // 2026): antes, dos cambios de alcance aprobados casi a la vez podían
+  // leer el mismo presupuesto de partida y uno de los dos incrementos se
+  // perdía (el último en escribir "ganaba" sin sumar el del otro).
+  // increment() es atómico en servidor, no depende de leer primero -- y la
+  // comprobación de estado va en la misma transacción que la escritura,
+  // para que una doble respuesta simultánea no duplique nada.
+  const c = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) throw new HttpsError('not-found', 'El cambio de alcance no existe.');
+    const cambio = snap.data();
+    // El profesional NO puede aprobarse a sí mismo el cambio que él mismo
+    // solicitó (sección 20: "El profesional NO debe poder convertir
+    // unilateralmente el cambio en aprobado").
+    if (cambio.creadoPorUid === uid) throw new HttpsError('permission-denied', 'No puedes aprobar tu propia solicitud.');
+    if (cambio.estado !== 'pendiente') throw new HttpsError('failed-precondition', 'Esta solicitud ya se respondió.');
 
-  if (aprobar && c.importeAdicional) {
-    const trabajoSnap = await trabajoRef.get();
-    const presupuestoActual = Number(trabajoSnap.data().presupuesto) || 0;
-    await trabajoRef.update({ presupuesto: redondear2(presupuestoActual + c.importeAdicional) });
-  }
+    tx.update(ref, aprobar
+      ? { estado: 'aprobado', aprobadoPorUid: uid, aprobadoAt: FieldValue.serverTimestamp() }
+      : { estado: 'rechazado', rechazadoPorUid: uid, rechazadoAt: FieldValue.serverTimestamp() });
+
+    if (aprobar && cambio.importeAdicional) {
+      tx.update(trabajoRef, { presupuesto: FieldValue.increment(cambio.importeAdicional) });
+    }
+    return cambio;
+  });
 
   await crearEventoHistorial(casaId, {
     tipo: 'nota',
@@ -726,6 +778,71 @@ exports.cancelarCambioAlcance = onCall({ region: REGION }, async (request) => {
 });
 
 // =============================================================================
+// FINALIZAR TRABAJO (lado propietario) -- auditoría de seguridad, octubre
+// 2026. Antes esto era una escritura directa del cliente (estado=terminado
+// + crear el evento por separado desde Flutter); las reglas de Firestore
+// ya bloquean esa escritura directa (ver match /trabajos/{tid}), así que
+// hace falta esta función para que el botón "Finalizar" del propietario
+// siga funcionando -- ahora el estado Y el evento de historial se crean
+// atómicamente en el servidor, nunca por separado desde el cliente.
+// =============================================================================
+const TIPO_EVENTO_POR_TRABAJO = {
+  averia: 'reparacion',
+  reparacion: 'reparacion',
+  mantenimiento: 'revision',
+  reforma: 'reforma',
+  instalacion: 'instalacion',
+  otro: 'nota',
+};
+
+exports.finalizarTrabajoPropietario = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+  const uid = request.auth.uid;
+  const { casaId, trabajoId } = request.data || {};
+  if (!casaId || !trabajoId) throw new HttpsError('invalid-argument', 'Faltan datos.');
+  if (!(await esMiembroCasa(casaId, uid))) throw new HttpsError('permission-denied', 'No perteneces a esa casa.');
+
+  const trabajoRef = db.collection('casas').doc(casaId).collection('trabajos').doc(trabajoId);
+  // Transacción (auditoría de seguridad, octubre 2026): sin esto, pulsar
+  // "Finalizar" dos veces seguidas muy rápido (o desde dos dispositivos)
+  // podía pasar la comprobación de estado las dos veces antes de que
+  // ninguna hubiera escrito, duplicando el evento de historial.
+  const trabajo = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(trabajoRef);
+    if (!snap.exists) throw new HttpsError('not-found', 'El trabajo no existe.');
+    const data = snap.data();
+    if (data.estado === 'terminado' || data.estado === 'archivado') {
+      throw new HttpsError('failed-precondition', 'Este trabajo ya estaba finalizado.');
+    }
+    tx.update(trabajoRef, { estado: 'terminado' });
+    return data;
+  });
+
+  await crearEventoHistorial(casaId, {
+    tipo: TIPO_EVENTO_POR_TRABAJO[trabajo.tipo] || 'nota',
+    titulo: trabajo.titulo,
+    descripcion: trabajo.descripcion || null,
+    elementoId: trabajo.elementoId || null,
+    habitacionId: trabajo.habitacionId || null,
+    trabajoId,
+    coste: trabajo.presupuesto || null,
+    profesionalNombre: trabajo.profesionalNombre || null,
+    createdBy: uid,
+  });
+
+  // Avisa al resto de la casa (si hay más de un miembro), nunca a quien
+  // acaba de finalizarlo.
+  const casaSnap = await db.collection('casas').doc(casaId).get();
+  for (const memberUid of casaSnap.data().members || []) {
+    if (memberUid === uid) continue;
+    await crearNotificacion(memberUid, 'trabajo_finalizado',
+      'Trabajo finalizado', `"${trabajo.titulo}" se ha marcado como terminado.`,
+      { casaId, trabajoId });
+  }
+  return { ok: true };
+});
+
+// =============================================================================
 // FINALIZAR TRABAJO (lado profesional) — sección 28 del spec: queda
 // registrado como finalizado por el profesional; el propietario conserva la
 // capacidad de revisar/completar el registro desde Hogar.
@@ -736,13 +853,22 @@ exports.finalizarTrabajoProfesional = onCall({ region: REGION }, async (request)
   const { casaId, trabajoId } = request.data || {};
   if (!casaId || !trabajoId) throw new HttpsError('invalid-argument', 'Faltan datos.');
 
-  const { ref: trabajoRef, data: trabajo } = await getTrabajoOThrow(casaId, trabajoId);
-  if (trabajo.profesionalUid !== uid) throw new HttpsError('permission-denied', 'No eres el profesional de este trabajo.');
-  if (trabajo.estado === 'terminado' || trabajo.estado === 'archivado') {
-    throw new HttpsError('failed-precondition', 'Este trabajo ya estaba finalizado.');
-  }
+  const trabajoRef = db.collection('casas').doc(casaId).collection('trabajos').doc(trabajoId);
+  // Transacción (auditoría de seguridad, octubre 2026): misma razón que en
+  // finalizarTrabajoPropietario -- evita duplicar el evento de historial
+  // si llega más de una llamada casi a la vez.
+  const trabajo = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(trabajoRef);
+    if (!snap.exists) throw new HttpsError('not-found', 'El trabajo no existe.');
+    const data = snap.data();
+    if (data.profesionalUid !== uid) throw new HttpsError('permission-denied', 'No eres el profesional de este trabajo.');
+    if (data.estado === 'terminado' || data.estado === 'archivado') {
+      throw new HttpsError('failed-precondition', 'Este trabajo ya estaba finalizado.');
+    }
+    tx.update(trabajoRef, { estado: 'terminado' });
+    return data;
+  });
 
-  await trabajoRef.update({ estado: 'terminado' });
   await crearEventoHistorial(casaId, {
     tipo: 'nota',
     titulo: `${trabajo.titulo} -- finalizado por el profesional`,
@@ -935,6 +1061,12 @@ exports.sugerirIntervaloMantenimiento = onCall(
     const { nombre, marca, modelo } = request.data || {};
     if (typeof nombre !== 'string' || !nombre.trim()) {
       throw new HttpsError('invalid-argument', 'Falta el nombre del elemento.');
+    }
+    // Tope de longitud (auditoría de seguridad, octubre 2026): sin esto, un
+    // texto enorme en nombre/marca/modelo infla el coste de la llamada a
+    // Anthropic sin ningún límite.
+    if (nombre.length > 200 || (marca && String(marca).length > 200) || (modelo && String(modelo).length > 200)) {
+      throw new HttpsError('invalid-argument', 'Texto demasiado largo.');
     }
     await verificarYRegistrarUsoIA(request.auth.uid);
 

@@ -9,6 +9,13 @@ service cloud.firestore {
       return request.auth.uid in
           get(/databases/$(database)/documents/casas/$(cid)).data.members;
     }
+    // "terminado"/"archivado" solo se alcanzan a través de las Cloud
+    // Functions finalizarTrabajoPropietario/finalizarTrabajoProfesional
+    // (Admin SDK, saltan estas reglas) -- nunca por una escritura directa
+    // del cliente, porque esas funciones son las que crean el evento de
+    // historial y las notificaciones; una escritura directa los dejaría
+    // "terminados" en silencio (auditoría de seguridad, octubre 2026).
+    function estadoTerminal(v) { return v == 'terminado' || v == 'archivado'; }
 
     // ── users ────────────────────────────────────────────────────────────────
     match /users/{uid} {
@@ -105,10 +112,21 @@ service cloud.firestore {
         // directamente un uid ajeno en este campo y darle acceso al trabajo
         // sin pasar por invitar/aceptar -- hallazgo de la auditoría de
         // seguridad (octubre 2026).
+        //
+        // Un miembro puede escribir cualquier otro campo, pero nunca puede
+        // hacer que "estado" PASE a ser terminado/archivado por esta vía
+        // (si ya lo era, dejarlo igual no cuenta como transición). El
+        // profesional asignado solo puede tocar "estado" -- nunca
+        // "presupuesto" directamente (eso solo lo fija responderPresupuesto/
+        // responderCambioAlcance en servidor) -- y tampoco puede llevarlo a
+        // un estado terminal por esta vía.
         allow update: if isAuth() && (
-          (isMember(cid) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['profesionalUid'])) ||
+          (isMember(cid) &&
+           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['profesionalUid']) &&
+           (!estadoTerminal(request.resource.data.estado) || resource.data.estado == request.resource.data.estado)) ||
           (resource.data.profesionalUid == request.auth.uid &&
-           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado', 'presupuesto']))
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado']) &&
+           !estadoTerminal(request.resource.data.estado))
         );
         allow delete: if isAuth() && isMember(cid);
 
@@ -157,6 +175,12 @@ service cloud.firestore {
     // Solo lo leen/escriben las Cloud Functions con Admin SDK -- el cliente
     // nunca necesita ni debe tocar su propio contador.
     match /usoIA/{id} {
+      allow read, write: if false;
+    }
+
+    // ── intentosCodigo (límite de fuerza bruta en canjeo de códigos) ────────
+    // Solo lo leen/escriben las Cloud Functions con Admin SDK.
+    match /intentosCodigo/{id} {
       allow read, write: if false;
     }
 

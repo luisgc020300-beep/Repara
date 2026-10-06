@@ -1,0 +1,13 @@
+{
+  "name": "repara-firestore-security-tests",
+  "private": true,
+  "description": "Tests de seguridad de firestore.rules contra el emulador (Firebase Emulator Suite) -- auditoría de seguridad, octubre 2026. Nunca se ejecutan contra el proyecto real.",
+  "scripts": {
+    "test": "node --test rules.test.js",
+    "test:emulator": "firebase emulators:exec --project repara-test --only firestore \"npm test\" --config ../firebase.json"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "firebase": "^11.0.0"
+  }
+}

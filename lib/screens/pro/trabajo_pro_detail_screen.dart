@@ -104,10 +104,22 @@ class TrabajoProDetailScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // "Terminado"/"Archivado" nunca son una opción aquí --
+                      // solo se alcanzan a través de "Finalizar" (auditoría
+                      // de seguridad, octubre 2026). Antes saltarse ese
+                      // botón dejaba el trabajo marcado como terminado sin
+                      // avisar al propietario ni archivar nada.
                       DropdownButtonFormField<EstadoTrabajo>(
-                        initialValue: trabajo.estado,
-                        decoration: const InputDecoration(labelText: 'Estado'),
-                        items: EstadoTrabajo.values
+                        initialValue: trabajo.estado == EstadoTrabajo.terminado || trabajo.estado == EstadoTrabajo.archivado
+                            ? null
+                            : trabajo.estado,
+                        decoration: InputDecoration(
+                          labelText: 'Estado',
+                          helperText: trabajo.estado == EstadoTrabajo.terminado || trabajo.estado == EstadoTrabajo.archivado
+                              ? 'Ya está finalizado'
+                              : null,
+                        ),
+                        items: _estadosEditables
                             .map((e) => DropdownMenuItem(value: e, child: Text(_nombreEstado(e))))
                             .toList(),
                         onChanged: (v) {
@@ -189,3 +201,5 @@ String _nombreEstado(EstadoTrabajo e) => switch (e) {
       EstadoTrabajo.terminado => 'Terminado',
       EstadoTrabajo.archivado => 'Archivado',
     };
+
+const _estadosEditables = [EstadoTrabajo.nuevo, EstadoTrabajo.presupuestado, EstadoTrabajo.enCurso];

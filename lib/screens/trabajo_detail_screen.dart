@@ -5,17 +5,14 @@
 // trabajo como un evento permanente en el historial de la casa (sección 21:
 // "¿Qué quieres guardar en el historial de la vivienda?").
 import 'package:cloud_functions/cloud_functions.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../models/casa.dart';
 import '../models/documento.dart';
-import '../models/evento.dart';
 import '../models/invitacion.dart';
 import '../models/trabajo.dart';
 import '../services/documento_service.dart';
-import '../services/evento_service.dart';
 import '../services/invitacion_service.dart';
 import '../services/pago_service.dart';
 import '../services/trabajo_service.dart';
@@ -73,25 +70,13 @@ class TrabajoDetailScreen extends StatelessWidget {
       }
     }
     if (!context.mounted) return;
-    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
     try {
-      await EventoService.crear(
-        casa.id,
-        Evento(
-          id: '',
-          tipo: _tipoEventoDeTrabajo(trabajo.tipo),
-          titulo: trabajo.titulo,
-          descripcion: trabajo.descripcion,
-          elementoId: trabajo.elementoId,
-          habitacionId: trabajo.habitacionId,
-          trabajoId: trabajo.id,
-          coste: trabajo.presupuesto,
-          profesionalNombre: trabajo.profesionalNombre,
-          fecha: DateTime.now(),
-        ),
-        createdBy: uid,
-      );
-      await TrabajoService.actualizarEstado(casa.id, trabajo.id, EstadoTrabajo.terminado);
+      // Cloud Function, no escritura directa (auditoría de seguridad,
+      // octubre 2026): estado=terminado y el evento de historial se crean
+      // atómicamente en servidor -- las reglas de Firestore ya bloquean
+      // marcar un trabajo como terminado por una escritura directa.
+      final callable = FirebaseFunctions.instanceFor(region: 'europe-west1').httpsCallable('finalizarTrabajoPropietario');
+      await callable.call<Map<String, dynamic>>({'casaId': casa.id, 'trabajoId': trabajo.id});
       if (context.mounted) AppError.showSuccess(context, 'Trabajo archivado en el historial.');
 
       // Bucle viral en UN solo momento (auditoría de producto, octubre
@@ -163,10 +148,25 @@ class TrabajoDetailScreen extends StatelessWidget {
                         Text(trabajo.descripcion!),
                         const SizedBox(height: 12),
                       ],
+                      // "Terminado"/"Archivado" nunca son una opción de este
+                      // desplegable (auditoría de seguridad, octubre 2026):
+                      // solo se alcanzan a través del botón "Finalizar", que
+                      // además archiva el evento en el historial y avisa a
+                      // los demás. Elegirlos aquí antes se saltaba todo eso
+                      // en silencio -- ahora ni siquiera aparecen, y el
+                      // servidor también lo bloquea aunque se fuerce desde
+                      // fuera de la app.
                       DropdownButtonFormField<EstadoTrabajo>(
-                        initialValue: trabajo.estado,
-                        decoration: const InputDecoration(labelText: 'Estado'),
-                        items: EstadoTrabajo.values
+                        initialValue: trabajo.estado == EstadoTrabajo.terminado || trabajo.estado == EstadoTrabajo.archivado
+                            ? null
+                            : trabajo.estado,
+                        decoration: InputDecoration(
+                          labelText: 'Estado',
+                          helperText: trabajo.estado == EstadoTrabajo.terminado || trabajo.estado == EstadoTrabajo.archivado
+                              ? 'Ya está finalizado'
+                              : null,
+                        ),
+                        items: _estadosEditables
                             .map((e) => DropdownMenuItem(value: e, child: Text(_nombreEstado(e))))
                             .toList(),
                         onChanged: (v) {
@@ -405,15 +405,6 @@ class _SeccionInvitarProfesionalState extends State<_SeccionInvitarProfesional> 
   }
 }
 
-TipoEvento _tipoEventoDeTrabajo(TipoTrabajo t) => switch (t) {
-      TipoTrabajo.averia => TipoEvento.reparacion,
-      TipoTrabajo.reparacion => TipoEvento.reparacion,
-      TipoTrabajo.mantenimiento => TipoEvento.revision,
-      TipoTrabajo.reforma => TipoEvento.reforma,
-      TipoTrabajo.instalacion => TipoEvento.instalacion,
-      TipoTrabajo.otro => TipoEvento.nota,
-    };
-
 String _nombreEstado(EstadoTrabajo e) => switch (e) {
       EstadoTrabajo.nuevo => 'Nuevo',
       EstadoTrabajo.presupuestado => 'Presupuestado',
@@ -421,3 +412,6 @@ String _nombreEstado(EstadoTrabajo e) => switch (e) {
       EstadoTrabajo.terminado => 'Terminado',
       EstadoTrabajo.archivado => 'Archivado',
     };
+
+// Nunca incluye terminado/archivado -- solo se llega ahí por "Finalizar".
+const _estadosEditables = [EstadoTrabajo.nuevo, EstadoTrabajo.presupuestado, EstadoTrabajo.enCurso];

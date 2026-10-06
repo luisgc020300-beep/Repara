@@ -48,3 +48,7 @@ app.*.map.json
 .firebase/
 firebase-debug.log
 firebase-debug.*.log
+
+# Node (Cloud Functions + tests de seguridad del emulador)
+node_modules/
+firestore-tests/firestore-debug.log
