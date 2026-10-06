@@ -17,6 +17,7 @@ import '../theme/design_tokens.dart';
 import '../theme/theme_controller.dart';
 import '../widgets/app_error.dart';
 import 'documentos_casa_screen.dart';
+import 'expediente_vivienda_screen.dart';
 import 'pro/repara_pro_shell_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -185,6 +186,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   subtitle: const Text('Facturas, presupuestos y garantías guardados'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DocumentosCasaScreen(casa: casa))),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Card(
+                child: ListTile(
+                  leading: Icon(Icons.summarize_outlined, color: context.colors.brand),
+                  title: const Text('Expediente de la vivienda'),
+                  subtitle: const Text('Resumen de elementos, trabajos y garantías -- para vender, asegurar o pedir financiación'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ExpedienteViviendaScreen(casa: casa))),
                 ),
               ),
               const SizedBox(height: 8),
