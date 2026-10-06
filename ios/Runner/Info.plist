@@ -49,5 +49,9 @@
 	<string>Repara necesita la cámara para fotografiar facturas, garantías y elementos de tu casa.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Repara necesita acceso a tus fotos para adjuntar documentos ya guardados en tu galería.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>

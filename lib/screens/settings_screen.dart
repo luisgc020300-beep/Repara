@@ -14,6 +14,7 @@ import '../models/casa.dart';
 import '../models/profesional.dart';
 import '../services/analytics_service.dart';
 import '../services/casa_service.dart';
+import '../services/fcm_service.dart';
 import '../services/invitacion_service.dart';
 import '../services/profesional_service.dart';
 import '../theme/design_tokens.dart';
@@ -51,6 +52,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
     if (confirmar != true) return;
+    await FcmService.olvidarEsteDispositivo();
     await FirebaseAuth.instance.signOut();
     // El StreamBuilder de MaterialApp ya muestra LoginScreen por debajo en
     // cuanto cambia la sesión, pero esta pantalla (y todo lo que haya encima,

@@ -9,14 +9,9 @@ import 'package:intl/intl.dart';
 
 import '../models/notificacion.dart';
 import '../services/analytics_service.dart';
-import '../services/casa_service.dart';
+import '../services/notificacion_router.dart';
 import '../services/notificacion_service.dart';
-import '../services/pago_service.dart';
-import '../services/trabajo_service.dart';
 import '../theme/design_tokens.dart';
-import 'pago_detail_screen.dart';
-import 'pro/trabajo_pro_detail_screen.dart';
-import 'trabajo_detail_screen.dart';
 
 class NotificacionesScreen extends StatelessWidget {
   const NotificacionesScreen({required this.modoPro, super.key});
@@ -27,50 +22,9 @@ class NotificacionesScreen extends StatelessWidget {
 
   Future<void> _abrirTrabajo(BuildContext context, Notificacion n) async {
     if (!n.leida) await NotificacionService.marcarLeida(n.id);
-    final casaId = n.casaId;
-    final trabajoId = n.trabajoId;
-    if (casaId == null || trabajoId == null || !context.mounted) return;
-
-    if (n.tipo == 'presupuesto_enviado') unawaited(AnalyticsService.quoteViewed());
-
-    // "Te han registrado un pago" lleva directo al detalle de ESE pago, no
-    // solo al trabajo -- es lo que el profesional quiere ver primero.
-    if (n.tipo == 'pago_registrado' && n.pagoId != null) {
-      final trabajo = await TrabajoService.streamTrabajo(casaId, trabajoId).first;
-      final pago = await PagoService.obtenerPago(casaId, trabajoId, n.pagoId!);
-      if (!context.mounted || trabajo == null || pago == null) return;
-      await Navigator.push<void>(
-        context,
-        MaterialPageRoute(
-          builder: (_) => PagoDetailScreen(
-            casaId: casaId,
-            trabajoId: trabajoId,
-            trabajoTitulo: trabajo.titulo,
-            presupuesto: trabajo.presupuesto,
-            editable: false,
-            pago: pago,
-          ),
-        ),
-      );
-      return;
-    }
-
-    if (modoPro) {
-      // El profesional no es miembro de la casa (ver firestore.rules) -- solo
-      // tiene acceso al trabajo concreto, no hace falta ni se puede leer la
-      // casa entera.
-      await Navigator.push<void>(
-        context,
-        MaterialPageRoute(builder: (_) => TrabajoProDetailScreen(casaId: casaId, trabajoId: trabajoId)),
-      );
-      return;
-    }
-    final casa = await CasaService.streamCasa(casaId).first;
     if (!context.mounted) return;
-    await Navigator.push<void>(
-      context,
-      MaterialPageRoute(builder: (_) => TrabajoDetailScreen(casa: casa, trabajoId: trabajoId)),
-    );
+    if (n.tipo == 'presupuesto_enviado') unawaited(AnalyticsService.quoteViewed());
+    await abrirDestinoNotificacion(context, tipo: n.tipo, casaId: n.casaId, trabajoId: n.trabajoId, pagoId: n.pagoId);
   }
 
   @override

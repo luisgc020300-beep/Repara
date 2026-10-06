@@ -9,6 +9,7 @@ const { defineSecret } = require('firebase-functions/params');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestore');
 const { getAuth } = require('firebase-admin/auth');
+const { getMessaging } = require('firebase-admin/messaging');
 
 initializeApp();
 const db = getFirestore();
@@ -406,6 +407,45 @@ async function crearNotificacion(uid, tipo, titulo, cuerpo, extra) {
     createdAt: FieldValue.serverTimestamp(),
     ...(extra || {}),
   });
+  await enviarPush(uid, tipo, titulo, cuerpo, extra);
+}
+
+// Push complementaria a la notificación interna (nunca la sustituye -- si
+// el usuario no tiene ningún token o falla el envío, la notificación ya
+// quedó guardada arriba). El payload de datos de FCM solo admite strings,
+// por eso se filtra extra() a solo sus valores string (casaId/trabajoId/
+// pagoId/etc, nunca algo numérico o anidado).
+async function enviarPush(uid, tipo, titulo, cuerpo, extra) {
+  const userSnap = await db.collection('users').doc(uid).get();
+  const tokens = userSnap.data()?.fcmTokens;
+  if (!Array.isArray(tokens) || tokens.length === 0) return;
+
+  const data = { tipo };
+  for (const [k, v] of Object.entries(extra || {})) {
+    if (typeof v === 'string') data[k] = v;
+  }
+
+  try {
+    const resp = await getMessaging().sendEachForMulticast({
+      tokens,
+      notification: { title: titulo, body: cuerpo },
+      data,
+    });
+    const tokensInvalidos = [];
+    resp.responses.forEach((r, i) => {
+      const code = r.error?.code || '';
+      if (!r.success && (code.includes('registration-token-not-registered') || code.includes('invalid-argument'))) {
+        tokensInvalidos.push(tokens[i]);
+      }
+    });
+    if (tokensInvalidos.length > 0) {
+      await db.collection('users').doc(uid).update({ fcmTokens: FieldValue.arrayRemove(...tokensInvalidos) });
+    }
+  } catch (e) {
+    // Un fallo de FCM nunca debe reventar la Cloud Function que llamó a
+    // crearNotificacion -- la notificación interna ya se guardó.
+    console.error('enviarPush', e);
+  }
 }
 
 async function crearEventoHistorial(casaId, evento) {

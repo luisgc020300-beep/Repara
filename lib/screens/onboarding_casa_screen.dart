@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 
 import '../services/analytics_service.dart';
 import '../services/casa_service.dart';
+import '../services/fcm_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
 
@@ -68,7 +69,10 @@ class _OnboardingCasaScreenState extends State<OnboardingCasaScreen> {
         title: const Text('Repara'),
         actions: [
           TextButton(
-            onPressed: () => FirebaseAuth.instance.signOut(),
+            onPressed: () async {
+              await FcmService.olvidarEsteDispositivo();
+              await FirebaseAuth.instance.signOut();
+            },
             child: const Text('Cerrar sesión'),
           ),
         ],

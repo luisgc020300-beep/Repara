@@ -9,6 +9,7 @@ import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -19,8 +20,30 @@ import 'screens/casa_gate_screen.dart';
 import 'screens/login_screen.dart';
 import 'services/analytics_service.dart';
 import 'services/casa_service.dart';
+import 'services/fcm_service.dart';
+import 'services/notificacion_router.dart';
 import 'theme/design_tokens.dart';
 import 'theme/theme_controller.dart';
+
+final navigatorKey = GlobalKey<NavigatorState>();
+
+// Toque en una notificación push -- misma ruta que la lista interna
+// (notificacion_router.dart), para no duplicar la lógica de navegación.
+// Usa navigatorKey.currentContext porque no hay un BuildContext propio
+// cuando la app se abre directamente desde la notificación (proceso frío).
+Future<void> _abrirDestinoPush(RemoteMessage message) async {
+  final context = navigatorKey.currentContext;
+  final data = message.data;
+  final tipo = data['tipo'] as String?;
+  if (context == null || tipo == null) return;
+  await abrirDestinoNotificacion(
+    context,
+    tipo: tipo,
+    casaId: data['casaId'] as String?,
+    trabajoId: data['trabajoId'] as String?,
+    pagoId: data['pagoId'] as String?,
+  );
+}
 
 // Analítica de retorno (auditoría de producto, octubre 2026) -- sin ningún
 // dato personal, solo compara la fecha de la última apertura guardada
@@ -75,9 +98,16 @@ void main() async {
   final themeController = await ThemeController.load();
   unawaited(_registrarRetornoSiProcede());
 
-  FirebaseAuth.instance.authStateChanges().listen((user) {
-    if (user != null) CasaService.asegurarPerfilUsuario();
+  FirebaseAuth.instance.authStateChanges().listen((user) async {
+    if (user == null) return;
+    await CasaService.asegurarPerfilUsuario();
+    unawaited(FcmService.inicializar());
   });
+
+  // Push tocada con la app en segundo plano, o que abre la app desde frío.
+  FirebaseMessaging.onMessageOpenedApp.listen(_abrirDestinoPush);
+  final mensajeInicial = await FirebaseMessaging.instance.getInitialMessage();
+  if (mensajeInicial != null) unawaited(_abrirDestinoPush(mensajeInicial));
 
   runApp(ReparaApp(themeController: themeController));
 }
@@ -92,6 +122,7 @@ class ReparaApp extends StatelessWidget {
     return AnimatedBuilder(
       animation: themeController,
       builder: (context, _) => MaterialApp(
+        navigatorKey: navigatorKey,
         debugShowCheckedModeBanner: false,
         title: 'Repara',
         themeMode: themeController.mode,
