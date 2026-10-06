@@ -106,7 +106,7 @@ class _PresupuestosProTabState extends State<PresupuestosProTab> {
                   child: Padding(
                     padding: const EdgeInsets.all(24),
                     child: Text(
-                      'Todavía no has creado ningún presupuesto.\nCréalo desde el detalle de un trabajo.',
+                      'Aquí verás, de un vistazo, el estado de TODOS tus presupuestos (esperando respuesta, aceptados, rechazados...) sin entrar trabajo por trabajo.\nCréalo desde el detalle de un trabajo, en la pestaña Trabajos.',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: context.colors.inkMuted),
                     ),

@@ -152,7 +152,7 @@ class _HomeTabState extends State<HomeTab> {
                       padding: const EdgeInsets.all(24),
                       child: Text(
                         _filtro == null
-                            ? 'La historia de tu casa empieza aquí.\nRegistra tu primer trabajo, factura o elemento.'
+                            ? 'Aquí verás lo que ya ha pasado en tu casa: trabajos terminados, facturas, revisiones.\nPara gestionar algo que tienes entre manos ahora, ve a la pestaña Trabajos.'
                             : 'Nada de este tipo todavía.',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: context.colors.inkMuted),

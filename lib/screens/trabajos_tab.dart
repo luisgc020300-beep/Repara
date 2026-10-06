@@ -32,7 +32,7 @@ class TrabajosTab extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: Text(
-                  'No has registrado ningún trabajo todavía.\nUna avería, una reparación o una reforma -- lo que sea, queda aquí.',
+                  'Aquí gestionas lo que tienes en marcha ahora: una avería, un presupuesto, un pago.\nCuando lo termines, pasará solo al historial de Inicio.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: context.colors.inkMuted),
                 ),

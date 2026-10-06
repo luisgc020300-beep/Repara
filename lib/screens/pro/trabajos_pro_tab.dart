@@ -38,7 +38,7 @@ class _TrabajosProTabState extends State<TrabajosProTab> {
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: Text(
-                  'Todavía no tienes trabajos asignados.\nAparecerán aquí cuando aceptes una invitación.',
+                  'Aquí gestionas cada trabajo entero (presupuesto, cambios, pagos, documentos) en cuanto aceptes una invitación.\nPara ver solo el estado de tus presupuestos de todos los trabajos a la vez, ve a la pestaña Presupuestos.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: context.colors.inkMuted),
                 ),
