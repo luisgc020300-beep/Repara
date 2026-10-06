@@ -53,6 +53,7 @@ class PagosSection extends StatelessWidget {
                           trabajoTitulo: trabajoTitulo,
                           presupuesto: presupuesto,
                           editable: true,
+                          conceptoSugerido: 'Pago ${pagos.length + 1}',
                         ),
                       ),
                     ),

@@ -21,6 +21,7 @@ class PagoDetailScreen extends StatefulWidget {
     required this.presupuesto,
     required this.editable,
     this.pago,
+    this.conceptoSugerido,
     super.key,
   });
 
@@ -35,6 +36,12 @@ class PagoDetailScreen extends StatefulWidget {
   /// null = se está creando un pago nuevo.
   final Pago? pago;
 
+  /// Autosugerencia de concepto ("Pago 2") al crear uno nuevo -- menos
+  /// tecleo repetido, siempre editable antes de guardar (auditoría de
+  /// producto, octubre 2026). Se ignora si ya se está editando un pago
+  /// existente con su propio concepto.
+  final String? conceptoSugerido;
+
   @override
   State<PagoDetailScreen> createState() => _PagoDetailScreenState();
 }
@@ -42,7 +49,7 @@ class PagoDetailScreen extends StatefulWidget {
 class _PagoDetailScreenState extends State<PagoDetailScreen> {
   late DateTime _fecha = widget.pago?.fecha ?? DateTime.now();
   late final _importeCtrl = TextEditingController(text: widget.pago == null ? '' : _formato(widget.pago!.importe));
-  late final _conceptoCtrl = TextEditingController(text: widget.pago?.concepto ?? '');
+  late final _conceptoCtrl = TextEditingController(text: widget.pago?.concepto ?? widget.conceptoSugerido ?? '');
   late final _descripcionCtrl = TextEditingController(text: widget.pago?.descripcion ?? '');
   late MetodoPago? _metodo = widget.pago?.metodo;
   bool _guardando = false;

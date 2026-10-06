@@ -5,12 +5,22 @@
 // como en la de Pro (rol profesional: crear, enviar, versionar). Los totales
 // mostrados aquí son solo para revisión visual -- los que cuentan de verdad
 // son los que calcula el servidor en Cloud Functions.
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/presupuesto.dart';
 import '../services/presupuesto_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
+
+// Plantilla de presupuesto (auditoría de producto, octubre 2026): recuerda
+// en este dispositivo las líneas del último presupuesto creado desde cero
+// por este profesional, para no volver a teclear lo mismo en cada trabajo
+// parecido. Local, no por Firestore -- evita abrir una vía de lectura
+// entre casas distintas solo para esto.
+const _claveUltimaPlantilla = 'repara_ultima_plantilla_presupuesto';
 
 enum RolEnTrabajo { propietario, profesional }
 
@@ -187,6 +197,56 @@ class _EditorPresupuestoSheetState extends State<_EditorPresupuestoSheet> {
   final _notasCtrl = TextEditingController();
   final List<_LineaEnEdicion> _lineas = [_LineaEnEdicion()];
   bool _guardando = false;
+  bool _desdePlantilla = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Solo tiene sentido ofrecer la plantilla en un presupuesto desde cero
+    // -- una nueva versión ya parte de las líneas del anterior.
+    if (widget.presupuestoAnteriorId == null) _cargarPlantilla();
+  }
+
+  Future<void> _cargarPlantilla() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final json = prefs.getString(_claveUltimaPlantilla);
+      if (json == null || !mounted) return;
+      final lineas = (jsonDecode(json) as List).cast<Map<String, dynamic>>();
+      if (lineas.isEmpty) return;
+      setState(() {
+        _lineas
+          ..clear()
+          ..addAll(lineas.map((l) => _LineaEnEdicion()
+            ..descripcionCtrl.text = l['descripcion'] as String? ?? ''
+            ..cantidadCtrl.text = l['cantidad'] as String? ?? '1'
+            ..precioCtrl.text = l['precio'] as String? ?? ''
+            ..ivaCtrl.text = l['iva'] as String? ?? '21'));
+        _desdePlantilla = true;
+      });
+    } catch (e) {
+      // Plantilla local corrupta o ausente -- se sigue con una línea vacía,
+      // nunca bloquea la creación de un presupuesto por esto.
+    }
+  }
+
+  Future<void> _guardarPlantilla(List<_LineaEnEdicion> lineas) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final json = jsonEncode(lineas
+          .map((l) => {
+                'descripcion': l.descripcionCtrl.text.trim(),
+                'cantidad': l.cantidadCtrl.text.trim(),
+                'precio': l.precioCtrl.text.trim(),
+                'iva': l.ivaCtrl.text.trim(),
+              })
+          .toList());
+      await prefs.setString(_claveUltimaPlantilla, json);
+    } catch (e) {
+      // Guardar la plantilla es una comodidad, no algo crítico -- un fallo
+      // aquí nunca debe impedir que el presupuesto ya guardado se vea bien.
+    }
+  }
 
   @override
   void dispose() {
@@ -243,6 +303,7 @@ class _EditorPresupuestoSheetState extends State<_EditorPresupuestoSheet> {
           notas: _notasCtrl.text.trim().isEmpty ? null : _notasCtrl.text.trim(),
         );
       }
+      if (widget.presupuestoAnteriorId == null) await _guardarPlantilla(lineasValidas);
       if (mounted) {
         AppError.showSuccess(context, 'Presupuesto guardado como borrador.');
         Navigator.pop(context);
@@ -264,6 +325,21 @@ class _EditorPresupuestoSheetState extends State<_EditorPresupuestoSheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text('Nuevo presupuesto', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+            if (_desdePlantilla) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Icon(Icons.history_outlined, size: 14, color: context.colors.inkMuted),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      'Rellenado con las líneas de tu último presupuesto -- edítalas o bórralas libremente.',
+                      style: TextStyle(fontSize: 11.5, color: context.colors.inkMuted),
+                    ),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 12),
             ..._lineas.asMap().entries.map((entry) {
               final i = entry.key;
