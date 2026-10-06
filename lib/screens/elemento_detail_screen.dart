@@ -19,6 +19,7 @@ import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
 import 'nuevo_documento_flow.dart';
 import 'nuevo_evento_sheet.dart';
+import 'trabajo_detail_screen.dart';
 
 class ElementoDetailScreen extends StatelessWidget {
   const ElementoDetailScreen({required this.casa, required this.elementoId, super.key});
@@ -176,9 +177,21 @@ class ElementoDetailScreen extends StatelessWidget {
                         .map((e) => Card(
                               margin: const EdgeInsets.only(bottom: 8),
                               child: ListTile(
+                                // Breadcrumb tocable al trabajo de origen, si lo
+                                // tiene (auditoría de producto, octubre 2026) --
+                                // no hace falta enlazar a este mismo elemento.
+                                onTap: e.trabajoId != null
+                                    ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => TrabajoDetailScreen(casa: casa, trabajoId: e.trabajoId!)))
+                                    : null,
                                 title: Text(e.titulo, style: const TextStyle(fontWeight: FontWeight.w600)),
                                 subtitle: Text(DateFormat('d MMM yyyy', 'es_ES').format(e.fecha)),
-                                trailing: e.coste != null ? Text('${e.coste!.toStringAsFixed(0)} €') : null,
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (e.coste != null) Text('${e.coste!.toStringAsFixed(0)} €'),
+                                    if (e.trabajoId != null) Icon(Icons.chevron_right, color: context.colors.inkMuted, size: 18),
+                                  ],
+                                ),
                               ),
                             ))
                         .toList(),

@@ -11,16 +11,24 @@ import '../theme/design_tokens.dart';
 import 'elemento_detail_screen.dart';
 
 class RevisionesPendientesScreen extends StatelessWidget {
-  const RevisionesPendientesScreen({required this.casa, required this.elementos, super.key});
+  const RevisionesPendientesScreen({required this.casa, required this.elementos, this.titulo = 'Revisiones pendientes', super.key});
 
   final Casa casa;
   final List<Elemento> elementos;
+  final String titulo;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Revisiones pendientes')),
-      body: ListView.separated(
+      appBar: AppBar(title: Text(titulo)),
+      body: elementos.isEmpty
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text('Ningún elemento tiene un calendario de mantenimiento configurado todavía.', style: TextStyle(color: context.colors.inkMuted)),
+              ),
+            )
+          : ListView.separated(
         padding: const EdgeInsets.all(16),
         itemCount: elementos.length,
         separatorBuilder: (context, i) => const SizedBox(height: 8),

@@ -13,7 +13,9 @@ import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
 import '../widgets/boton_ajustes.dart';
 import 'elemento_detail_screen.dart';
+import 'garantias_proximas_screen.dart';
 import 'nuevo_elemento_screen.dart';
+import 'revisiones_pendientes_screen.dart';
 
 class CasaTab extends StatelessWidget {
   const CasaTab({required this.casa, super.key});
@@ -52,6 +54,36 @@ class CasaTab extends StatelessWidget {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        final elementos = await ElementoService.conGarantia(casa.id);
+                        if (context.mounted) {
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => GarantiasProximasScreen(casa: casa, elementos: elementos, titulo: 'Todas las garantías')));
+                        }
+                      },
+                      icon: const Icon(Icons.shield_outlined, size: 18),
+                      label: const Text('Garantías'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        final elementos = await ElementoService.conMantenimientoConfigurado(casa.id);
+                        if (context.mounted) {
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => RevisionesPendientesScreen(casa: casa, elementos: elementos, titulo: 'Todo el mantenimiento')));
+                        }
+                      },
+                      icon: const Icon(Icons.build_circle_outlined, size: 18),
+                      label: const Text('Mantenimiento'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
               if (habitaciones.isEmpty)
                 Card(
                   child: Padding(

@@ -5,17 +5,39 @@
 // ningún elemento o trabajo concreto, para que nunca queden invisibles.
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/casa.dart';
 import '../models/documento.dart';
 import '../services/documento_service.dart';
 import '../theme/design_tokens.dart';
+import '../widgets/app_error.dart';
+import 'elemento_detail_screen.dart';
 import 'nuevo_documento_flow.dart';
+import 'trabajo_detail_screen.dart';
 
 class DocumentosCasaScreen extends StatelessWidget {
   const DocumentosCasaScreen({required this.casa, super.key});
 
   final Casa casa;
+
+  // Breadcrumb tocable al elemento/trabajo de origen (auditoría de
+  // producto, octubre 2026) -- si no tiene ninguno de los dos, se abre el
+  // propio archivo en vez de no hacer nada al tocarlo.
+  Future<void> _abrir(BuildContext context, Documento d) async {
+    if (d.elementoId != null) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => ElementoDetailScreen(casa: casa, elementoId: d.elementoId!)));
+      return;
+    }
+    if (d.trabajoId != null) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => TrabajoDetailScreen(casa: casa, trabajoId: d.trabajoId!)));
+      return;
+    }
+    final uri = Uri.tryParse(d.url);
+    if (uri == null || !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (context.mounted) AppError.show(context, 'No se pudo abrir el documento.');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -57,13 +79,20 @@ class DocumentosCasaScreen extends StatelessWidget {
               return Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ListTile(
+                  onTap: () => _abrir(context, d),
                   leading: Icon(_iconoTipo(d.tipo)),
                   title: Text(d.proveedor ?? d.nombreArchivo),
                   subtitle: Text([
                     if (d.fecha != null) DateFormat('d MMM yyyy', 'es_ES').format(d.fecha!),
                     if (d.estadoIA == EstadoIA.pendiente) 'Borrador',
                   ].join(' · ')),
-                  trailing: d.importe != null ? Text('${d.importe!.toStringAsFixed(0)} €') : null,
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (d.importe != null) Text('${d.importe!.toStringAsFixed(0)} €'),
+                      Icon(Icons.chevron_right, color: context.colors.inkMuted, size: 18),
+                    ],
+                  ),
                 ),
               );
             },

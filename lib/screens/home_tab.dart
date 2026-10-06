@@ -15,9 +15,11 @@ import '../services/evento_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/boton_ajustes.dart';
 import '../widgets/boton_notificaciones.dart';
+import 'elemento_detail_screen.dart';
 import 'garantias_proximas_screen.dart';
 import 'menu_anadir.dart';
 import 'revisiones_pendientes_screen.dart';
+import 'trabajo_detail_screen.dart';
 
 class HomeTab extends StatefulWidget {
   const HomeTab({required this.casa, super.key});
@@ -161,7 +163,7 @@ class _HomeTabState extends State<HomeTab> {
                 return ListView.builder(
                   padding: const EdgeInsets.all(16),
                   itemCount: eventos.length,
-                  itemBuilder: (context, i) => _EventoTile(evento: eventos[i]),
+                  itemBuilder: (context, i) => _EventoTile(casa: widget.casa, evento: eventos[i]),
                 );
               },
             ),
@@ -173,8 +175,9 @@ class _HomeTabState extends State<HomeTab> {
 }
 
 class _EventoTile extends StatelessWidget {
-  const _EventoTile({required this.evento});
+  const _EventoTile({required this.casa, required this.evento});
 
+  final Casa casa;
   final Evento evento;
 
   IconData get _icono => switch (evento.tipo) {
@@ -186,11 +189,24 @@ class _EventoTile extends StatelessWidget {
         TipoEvento.nota => Icons.push_pin_outlined,
       };
 
+  // Breadcrumb tocable al elemento/trabajo de origen (auditoría de
+  // producto, octubre 2026): antes un evento del historial no llevaba a
+  // ningún sitio al tocarlo, ni mostraba de dónde venía.
+  void _abrir(BuildContext context) {
+    if (evento.elementoId != null) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => ElementoDetailScreen(casa: casa, elementoId: evento.elementoId!)));
+    } else if (evento.trabajoId != null) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => TrabajoDetailScreen(casa: casa, trabajoId: evento.trabajoId!)));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final navegable = evento.elementoId != null || evento.trabajoId != null;
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
+        onTap: navegable ? () => _abrir(context) : null,
         leading: CircleAvatar(
           backgroundColor: context.colors.brand.withValues(alpha: 0.1),
           child: Icon(_icono, color: context.colors.brand, size: 20),
@@ -202,7 +218,13 @@ class _EventoTile extends StatelessWidget {
             if (evento.profesionalNombre != null) evento.profesionalNombre!,
           ].join(' · '),
         ),
-        trailing: evento.coste != null ? Text('${evento.coste!.toStringAsFixed(0)} €') : null,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (evento.coste != null) Text('${evento.coste!.toStringAsFixed(0)} €'),
+            if (navegable) Icon(Icons.chevron_right, color: context.colors.inkMuted, size: 18),
+          ],
+        ),
       ),
     );
   }

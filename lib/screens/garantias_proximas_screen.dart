@@ -12,16 +12,24 @@ import '../theme/design_tokens.dart';
 import 'elemento_detail_screen.dart';
 
 class GarantiasProximasScreen extends StatelessWidget {
-  const GarantiasProximasScreen({required this.casa, required this.elementos, super.key});
+  const GarantiasProximasScreen({required this.casa, required this.elementos, this.titulo = 'Garantías a punto de terminar', super.key});
 
   final Casa casa;
   final List<Elemento> elementos;
+  final String titulo;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Garantías a punto de terminar')),
-      body: ListView.separated(
+      appBar: AppBar(title: Text(titulo)),
+      body: elementos.isEmpty
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text('Ningún elemento tiene una garantía guardada todavía.', style: TextStyle(color: context.colors.inkMuted)),
+              ),
+            )
+          : ListView.separated(
         padding: const EdgeInsets.all(16),
         itemCount: elementos.length,
         separatorBuilder: (context, i) => const SizedBox(height: 8),
