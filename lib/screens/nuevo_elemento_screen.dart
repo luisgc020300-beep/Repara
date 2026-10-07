@@ -12,24 +12,30 @@ import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
 
 class NuevoElementoScreen extends StatefulWidget {
-  const NuevoElementoScreen({required this.casa, required this.habitacionId, super.key});
+  const NuevoElementoScreen({required this.casa, required this.habitacionId, this.existente, super.key});
 
   final Casa casa;
   final String habitacionId;
+
+  /// Si no es null, la pantalla edita este elemento en vez de crear uno
+  /// nuevo (auditoría de producto, octubre 2026: antes, una vez creado, un
+  /// error de tecleo en marca/coste/garantía/profesional no se podía
+  /// corregir nunca -- solo borrar el elemento entero y empezar de cero).
+  final Elemento? existente;
 
   @override
   State<NuevoElementoScreen> createState() => _NuevoElementoScreenState();
 }
 
 class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
-  final _nombreCtrl = TextEditingController();
-  final _marcaCtrl = TextEditingController();
-  final _modeloCtrl = TextEditingController();
-  final _costeCtrl = TextEditingController();
-  final _profesionalCtrl = TextEditingController();
-  final _intervaloCtrl = TextEditingController();
-  DateTime? _fechaInstalacion;
-  DateTime? _garantiaHasta;
+  late final _nombreCtrl = TextEditingController(text: widget.existente?.nombre ?? '');
+  late final _marcaCtrl = TextEditingController(text: widget.existente?.marca ?? '');
+  late final _modeloCtrl = TextEditingController(text: widget.existente?.modelo ?? '');
+  late final _costeCtrl = TextEditingController(text: widget.existente?.coste?.toString() ?? '');
+  late final _profesionalCtrl = TextEditingController(text: widget.existente?.profesionalNombre ?? '');
+  late final _intervaloCtrl = TextEditingController(text: widget.existente?.intervaloMantenimientoMeses?.toString() ?? '');
+  late DateTime? _fechaInstalacion = widget.existente?.fechaInstalacion;
+  late DateTime? _garantiaHasta = widget.existente?.garantiaHasta;
   bool _guardando = false;
   bool _sugiriendo = false;
 
@@ -92,26 +98,36 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
     final intervaloMeses = int.tryParse(_intervaloCtrl.text.trim());
     setState(() => _guardando = true);
     try {
-      final base = _fechaInstalacion ?? DateTime.now();
-      final proximoMantenimiento =
-          intervaloMeses == null ? null : DateTime(base.year, base.month + intervaloMeses, base.day);
-      await ElementoService.crear(
-        widget.casa.id,
-        Elemento(
-          id: '',
-          nombre: nombre,
-          habitacionId: widget.habitacionId,
-          marca: _marcaCtrl.text.trim().isEmpty ? null : _marcaCtrl.text.trim(),
-          modelo: _modeloCtrl.text.trim().isEmpty ? null : _modeloCtrl.text.trim(),
-          fechaInstalacion: _fechaInstalacion,
-          coste: double.tryParse(_costeCtrl.text.replaceAll(',', '.')),
-          profesionalNombre: _profesionalCtrl.text.trim().isEmpty ? null : _profesionalCtrl.text.trim(),
-          garantiaHasta: _garantiaHasta,
-          intervaloMantenimientoMeses: intervaloMeses,
-          proximoMantenimiento: proximoMantenimiento,
-        ),
+      // Si el intervalo no ha cambiado, conserva la próxima revisión tal
+      // cual estaba guardada -- pudo ajustarse a mano o avanzar al marcar
+      // una revisión como hecha, y no debe recalcularse desde cero solo
+      // porque se ha corregido un typo en otro campo (p.ej. la marca).
+      DateTime? proximoMantenimiento;
+      if (widget.existente != null && intervaloMeses == widget.existente!.intervaloMantenimientoMeses) {
+        proximoMantenimiento = widget.existente!.proximoMantenimiento;
+      } else {
+        final base = _fechaInstalacion ?? DateTime.now();
+        proximoMantenimiento = intervaloMeses == null ? null : DateTime(base.year, base.month + intervaloMeses, base.day);
+      }
+      final elemento = Elemento(
+        id: widget.existente?.id ?? '',
+        nombre: nombre,
+        habitacionId: widget.habitacionId,
+        marca: _marcaCtrl.text.trim().isEmpty ? null : _marcaCtrl.text.trim(),
+        modelo: _modeloCtrl.text.trim().isEmpty ? null : _modeloCtrl.text.trim(),
+        fechaInstalacion: _fechaInstalacion,
+        coste: double.tryParse(_costeCtrl.text.replaceAll(',', '.')),
+        profesionalNombre: _profesionalCtrl.text.trim().isEmpty ? null : _profesionalCtrl.text.trim(),
+        garantiaHasta: _garantiaHasta,
+        intervaloMantenimientoMeses: intervaloMeses,
+        proximoMantenimiento: proximoMantenimiento,
       );
-      unawaited(AnalyticsService.firstElementCreated());
+      if (widget.existente != null) {
+        await ElementoService.actualizar(widget.casa.id, widget.existente!.id, elemento);
+      } else {
+        await ElementoService.crear(widget.casa.id, elemento);
+        unawaited(AnalyticsService.firstElementCreated());
+      }
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) AppError.show(context, 'No se pudo guardar el elemento.');
@@ -139,8 +155,9 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final editando = widget.existente != null;
     return Scaffold(
-      appBar: AppBar(title: const Text('Nuevo elemento')),
+      appBar: AppBar(title: Text(editando ? 'Editar elemento' : 'Nuevo elemento')),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
@@ -218,7 +235,7 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
             onPressed: _guardando ? null : _guardar,
             child: _guardando
                 ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Text('Guardar elemento'),
+                : Text(editando ? 'Guardar cambios' : 'Guardar elemento'),
           ),
         ],
       ),

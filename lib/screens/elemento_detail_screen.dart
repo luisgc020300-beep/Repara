@@ -19,6 +19,7 @@ import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
 import '../widgets/ios_list.dart';
 import 'nuevo_documento_flow.dart';
+import 'nuevo_elemento_screen.dart';
 import 'nuevo_evento_sheet.dart';
 import 'trabajo_detail_screen.dart';
 
@@ -119,6 +120,14 @@ class ElementoDetailScreen extends StatelessWidget {
           appBar: AppBar(
             title: Text(elemento.nombre),
             actions: [
+              IconButton(
+                icon: const Icon(Icons.edit_outlined),
+                tooltip: 'Editar ficha',
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => NuevoElementoScreen(casa: casa, habitacionId: elemento.habitacionId!, existente: elemento)),
+                ),
+              ),
               IconButton(
                 icon: const Icon(Icons.delete_outline),
                 onPressed: () async {

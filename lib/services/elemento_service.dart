@@ -29,8 +29,26 @@ class ElementoService {
     return ref.id;
   }
 
+  /// A diferencia de [crear] (que usa toMap(), omitiendo las claves nulas --
+  /// perfecto para un documento nuevo), aquí hay que escribir explícitamente
+  /// null en cada campo editable para que vaciar un campo en el formulario
+  /// (p.ej. borrar un typo en "Marca") de verdad lo borre en Firestore --
+  /// `.update()` nunca toca una clave que no se le pase (auditoría de
+  /// producto, octubre 2026). `fotoUrl` queda fuera a propósito: ningún
+  /// formulario lo edita todavía, así que nunca debe tocarse aquí.
   static Future<void> actualizar(String casaId, String elementoId, Elemento elemento) async {
-    await _col(casaId).doc(elementoId).update(elemento.toMap());
+    await _col(casaId).doc(elementoId).update({
+      'nombre': elemento.nombre,
+      'habitacionId': elemento.habitacionId,
+      'marca': elemento.marca,
+      'modelo': elemento.modelo,
+      'fechaInstalacion': elemento.fechaInstalacion != null ? Timestamp.fromDate(elemento.fechaInstalacion!) : null,
+      'coste': elemento.coste,
+      'profesionalNombre': elemento.profesionalNombre,
+      'garantiaHasta': elemento.garantiaHasta != null ? Timestamp.fromDate(elemento.garantiaHasta!) : null,
+      'intervaloMantenimientoMeses': elemento.intervaloMantenimientoMeses,
+      'proximoMantenimiento': elemento.proximoMantenimiento != null ? Timestamp.fromDate(elemento.proximoMantenimiento!) : null,
+    });
   }
 
   static Future<void> eliminar(String casaId, String elementoId) async {
