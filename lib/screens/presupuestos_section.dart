@@ -332,10 +332,18 @@ class _EditorPresupuestoSheetState extends State<_EditorPresupuestoSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(left: 20, right: 20, top: 20, bottom: 20 + MediaQuery.of(context).viewInsets.bottom),
-      child: SingleChildScrollView(
-        child: Column(
+    // GestureDetector para poder cerrar el teclado tocando en cualquier hueco
+    // vacío de la hoja (auditoría de producto, octubre 2026): el teclado
+    // numérico de Cant./Precio/IVA no siempre trae un botón visible para
+    // cerrarlo, y sin esto se quedaba tapando el botón de guardar sin forma
+    // de quitarlo salvo cerrando la hoja entera.
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Padding(
+        padding: EdgeInsets.only(left: 20, right: 20, top: 20, bottom: 20 + MediaQuery.of(context).viewInsets.bottom),
+        child: SingleChildScrollView(
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -366,11 +374,19 @@ class _EditorPresupuestoSheetState extends State<_EditorPresupuestoSheet> {
                   children: [
                     Row(
                       children: [
-                        Expanded(child: TextField(controller: l.descripcionCtrl, decoration: const InputDecoration(labelText: 'Descripción'))),
+                        Expanded(
+                          child: TextField(
+                            controller: l.descripcionCtrl,
+                            minLines: 1,
+                            maxLines: 3,
+                            decoration: const InputDecoration(labelText: 'Descripción'),
+                          ),
+                        ),
                         if (_lineas.length > 1)
                           IconButton(icon: const Icon(Icons.close, size: 18), onPressed: () => setState(() => _lineas.removeAt(i))),
                       ],
                     ),
+                    const SizedBox(height: 8),
                     Row(
                       children: [
                         Expanded(
@@ -429,6 +445,7 @@ class _EditorPresupuestoSheetState extends State<_EditorPresupuestoSheet> {
             ),
           ],
         ),
+      ),
       ),
     );
   }
