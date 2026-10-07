@@ -5,15 +5,24 @@
 // (Hogar) y "Perfil profesional" (Pro) vivían como pestañas aparte,
 // compitiendo con este mismo icono -- ahora todo vive aquí, con secciones
 // que aparecen según desde dónde se abre (casa en Hogar, modoPro en Pro).
+//
+// Estilo "lista agrupada" de iOS (a petición del CEO, octubre 2026): secciones
+// con cabecera en mayúsculas, filas dentro de una única tarjeta redondeada
+// con separadores finos e indentados, icono en una insignia de color y
+// chevron a la derecha -- en vez de una Card suelta por fila.
 import 'dart:async';
 
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/casa.dart';
 import '../models/profesional.dart';
 import '../services/analytics_service.dart';
 import '../services/casa_service.dart';
+import '../services/cuenta_service.dart';
 import '../services/fcm_service.dart';
 import '../services/invitacion_service.dart';
 import '../services/profesional_service.dart';
@@ -23,6 +32,13 @@ import '../widgets/app_error.dart';
 import 'documentos_casa_screen.dart';
 import 'expediente_vivienda_screen.dart';
 import 'pro/repara_pro_shell_screen.dart';
+
+// URL única con dos secciones (#privacidad / #terminos) -- más fácil de
+// mantener que dos páginas separadas mientras la app es de un único
+// desarrollador. OJO: compartir el enlace desde el menú de la propia página
+// antes de publicar la app en las tiendas, o nadie fuera de esta cuenta
+// podrá abrirlo.
+const _urlLegal = 'https://claude.ai/artifact/G771r2pFWuiAFRXxHA69rC';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({this.casa, this.modoPro = false, super.key});
@@ -40,6 +56,8 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  bool _eliminandoCuenta = false;
+
   Future<void> _confirmarCerrarSesion() async {
     final confirmar = await showDialog<bool>(
       context: context,
@@ -62,6 +80,58 @@ class _SettingsScreenState extends State<SettingsScreen> {
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
+  Future<void> _confirmarEliminarCuenta() async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('¿Eliminar tu cuenta?'),
+        content: const Text(
+          'Se borra tu perfil y, si eres el único miembro de tu vivienda, también la vivienda entera con su '
+          'historial, documentos y fotos. Si la compartes con alguien más, solo se elimina tu vinculación a ella. '
+          'Esta acción no se puede deshacer.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: context.colors.error),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Eliminar cuenta'),
+          ),
+        ],
+      ),
+    );
+    if (confirmar != true || !mounted) return;
+
+    setState(() => _eliminandoCuenta = true);
+    try {
+      await CuentaService.eliminarCuenta();
+      await FirebaseAuth.instance.signOut();
+      if (!mounted) return;
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } on FirebaseFunctionsException catch (e, st) {
+      if (e.code != 'failed-precondition') {
+        await FirebaseCrashlytics.instance.recordError(e, st);
+      }
+      if (mounted) AppError.show(context, e.message ?? 'No se pudo eliminar la cuenta.');
+    } catch (e, st) {
+      await FirebaseCrashlytics.instance.recordError(e, st);
+      if (mounted) AppError.show(context, 'No se pudo eliminar la cuenta. Inténtalo de nuevo.');
+    } finally {
+      if (mounted) setState(() => _eliminandoCuenta = false);
+    }
+  }
+
+  Future<void> _abrirLegal(String ancla) async {
+    final uri = Uri.parse('$_urlLegal#$ancla');
+    try {
+      final abierto = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!abierto && mounted) AppError.show(context, 'No se pudo abrir el enlace.');
+    } catch (e, st) {
+      await FirebaseCrashlytics.instance.recordError(e, st);
+      if (mounted) AppError.show(context, 'No se pudo abrir el enlace.');
+    }
+  }
+
   void _volverAModoPropietario() {
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
@@ -82,7 +152,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (nombre == null || nombre.isEmpty || nombre == casa.nombre) return;
     try {
       await CasaService.renombrarCasa(casa.id, nombre);
-    } catch (e) {
+    } catch (e, st) {
+      await FirebaseCrashlytics.instance.recordError(e, st);
       if (mounted) AppError.show(context, 'No se pudo renombrar la casa.');
     }
   }
@@ -114,7 +185,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'Vinculado a "${resultado.trabajoTitulo}" en ${resultado.casaNombre}. Acéptalo desde Inicio Pro.',
         );
       }
-    } catch (e) {
+    } catch (e, st) {
+      await FirebaseCrashlytics.instance.recordError(e, st);
       if (mounted) AppError.show(context, 'Ese código no es válido o ya se ha usado.');
     }
   }
@@ -135,15 +207,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (valor == null) return;
     try {
       await guardar(valor);
-    } catch (e) {
+    } catch (e, st) {
+      await FirebaseCrashlytics.instance.recordError(e, st);
       if (mounted) AppError.show(context, 'No se pudo guardar.');
     }
   }
-
-  Widget _seccion(BuildContext context, String titulo) => Padding(
-        padding: const EdgeInsets.only(bottom: 8, top: 24),
-        child: Text(titulo, style: TextStyle(fontSize: 11, letterSpacing: 1.2, color: context.colors.inkMuted)),
-      );
 
   @override
   Widget build(BuildContext context) {
@@ -153,161 +221,206 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: AnimatedBuilder(
         animation: ThemeController.instance,
         builder: (context, _) => ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           children: [
-            Text('Apariencia', style: TextStyle(fontSize: 11, letterSpacing: 1.2, color: context.colors.inkMuted)),
-            const SizedBox(height: 8),
-            Card(
-              child: RadioGroup<ThemeMode>(
-                groupValue: ThemeController.instance.mode,
-                onChanged: (m) => ThemeController.instance.setMode(m!),
-                child: const Column(
-                  children: [
-                    RadioListTile<ThemeMode>(value: ThemeMode.light, title: Text('Claro'), secondary: Icon(Icons.light_mode_outlined)),
-                    Divider(height: 1),
-                    RadioListTile<ThemeMode>(value: ThemeMode.dark, title: Text('Oscuro'), secondary: Icon(Icons.dark_mode_outlined)),
-                    Divider(height: 1),
-                    RadioListTile<ThemeMode>(value: ThemeMode.system, title: Text('Igual que el sistema'), secondary: Icon(Icons.smartphone_outlined)),
-                  ],
+            _IosSection(
+              header: 'Apariencia',
+              rows: [
+                _IosRow(
+                  icon: Icons.light_mode_outlined,
+                  iconColor: Colors.orange,
+                  title: 'Claro',
+                  trailing: _check(context, ThemeController.instance.mode == ThemeMode.light),
+                  onTap: () => ThemeController.instance.setMode(ThemeMode.light),
                 ),
-              ),
+                _IosRow(
+                  icon: Icons.dark_mode_outlined,
+                  iconColor: Colors.indigo,
+                  title: 'Oscuro',
+                  trailing: _check(context, ThemeController.instance.mode == ThemeMode.dark),
+                  onTap: () => ThemeController.instance.setMode(ThemeMode.dark),
+                ),
+                _IosRow(
+                  icon: Icons.smartphone_outlined,
+                  iconColor: Colors.blueGrey,
+                  title: 'Igual que el sistema',
+                  trailing: _check(context, ThemeController.instance.mode == ThemeMode.system),
+                  onTap: () => ThemeController.instance.setMode(ThemeMode.system),
+                ),
+              ],
             ),
 
             if (casa != null) ...[
-              _seccion(context, 'Tu casa'),
-              Card(
-                child: ListTile(
-                  leading: Icon(Icons.house_outlined, color: context.colors.brand),
-                  title: Text(casa.nombre),
-                  subtitle: const Text('Toca para cambiar el nombre'),
-                  onTap: () => _renombrarCasa(casa),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Card(
-                child: ListTile(
-                  leading: Icon(Icons.folder_open_outlined, color: context.colors.brand),
-                  title: const Text('Documentos'),
-                  subtitle: const Text('Facturas, presupuestos y garantías guardados'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DocumentosCasaScreen(casa: casa))),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Card(
-                child: ListTile(
-                  leading: Icon(Icons.summarize_outlined, color: context.colors.brand),
-                  title: const Text('Expediente de la vivienda'),
-                  subtitle: const Text('Resumen de elementos, trabajos y garantías -- para vender, asegurar o pedir financiación'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    unawaited(AnalyticsService.householdRecordViewed());
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => ExpedienteViviendaScreen(casa: casa)));
-                  },
-                ),
-              ),
-              const SizedBox(height: 8),
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.group_outlined),
-                  title: const Text('Miembros de esta casa'),
-                  subtitle: Text(casa.memberProfiles.values.map((m) => m.displayName).join(', ')),
-                ),
-              ),
-              if (casa.joinCode != null) ...[
-                const SizedBox(height: 8),
-                Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.key_outlined),
-                    title: const Text('Código para invitar a alguien'),
-                    subtitle: Text(casa.joinCode!, style: const TextStyle(fontWeight: FontWeight.w700, letterSpacing: 1)),
+              _IosSection(
+                header: 'Tu casa',
+                rows: [
+                  _IosRow(
+                    icon: Icons.house_outlined,
+                    iconColor: context.colors.brand,
+                    title: casa.nombre,
+                    subtitle: 'Toca para cambiar el nombre',
+                    onTap: () => _renombrarCasa(casa),
                   ),
-                ),
-              ],
-              const SizedBox(height: 8),
+                  _IosRow(
+                    icon: Icons.folder_open_outlined,
+                    iconColor: Colors.blue,
+                    title: 'Documentos',
+                    subtitle: 'Facturas, presupuestos y garantías guardados',
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DocumentosCasaScreen(casa: casa))),
+                  ),
+                  _IosRow(
+                    icon: Icons.summarize_outlined,
+                    iconColor: Colors.orange,
+                    title: 'Expediente de la vivienda',
+                    subtitle: 'Para vender, asegurar o pedir financiación',
+                    onTap: () {
+                      unawaited(AnalyticsService.householdRecordViewed());
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => ExpedienteViviendaScreen(casa: casa)));
+                    },
+                  ),
+                  _IosRow(
+                    icon: Icons.group_outlined,
+                    iconColor: Colors.teal,
+                    title: 'Miembros de esta casa',
+                    subtitle: casa.memberProfiles.values.map((m) => m.displayName).join(', '),
+                  ),
+                  if (casa.joinCode != null)
+                    _IosRow(
+                      icon: Icons.key_outlined,
+                      iconColor: Colors.purple,
+                      title: 'Código para invitar a alguien',
+                      subtitle: casa.joinCode!,
+                    ),
+                ],
+              ),
               _SeccionProfesional(),
-              const SizedBox(height: 8),
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.confirmation_number_outlined),
-                  title: const Text('¿Tienes un código de invitación?'),
-                  subtitle: const Text('Un cliente te lo habrá pasado para un trabajo suyo'),
-                  onTap: _canjearCodigoTrabajo,
-                ),
+              _IosSection(
+                rows: [
+                  _IosRow(
+                    icon: Icons.confirmation_number_outlined,
+                    iconColor: Colors.brown,
+                    title: '¿Tienes un código de invitación?',
+                    subtitle: 'Un cliente te lo habrá pasado para un trabajo suyo',
+                    onTap: _canjearCodigoTrabajo,
+                  ),
+                ],
               ),
             ],
 
             if (widget.modoPro) ...[
-              _seccion(context, 'Tu perfil profesional'),
               StreamBuilder<Profesional?>(
                 stream: ProfesionalService.streamPerfilPropio(),
                 builder: (context, snapshot) {
                   final perfil = snapshot.data;
-                  return Column(
-                    children: [
-                      Card(
-                        child: ListTile(
-                          leading: Icon(Icons.badge_outlined, color: context.colors.brand),
-                          title: Text(perfil?.nombreComercial?.isNotEmpty == true ? perfil!.nombreComercial! : 'Nombre comercial'),
-                          subtitle: const Text('Toca para editar'),
-                          onTap: () => _editarCampoProfesional(
-                            'Nombre comercial',
-                            perfil?.nombreComercial,
-                            (v) => ProfesionalService.actualizarPerfil(nombreComercial: v),
-                          ),
+                  return _IosSection(
+                    header: 'Tu perfil profesional',
+                    rows: [
+                      _IosRow(
+                        icon: Icons.badge_outlined,
+                        iconColor: Colors.blue,
+                        title: perfil?.nombreComercial?.isNotEmpty == true ? perfil!.nombreComercial! : 'Nombre comercial',
+                        subtitle: 'Toca para editar',
+                        onTap: () => _editarCampoProfesional(
+                          'Nombre comercial',
+                          perfil?.nombreComercial,
+                          (v) => ProfesionalService.actualizarPerfil(nombreComercial: v),
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Card(
-                        child: ListTile(
-                          leading: const Icon(Icons.category_outlined),
-                          title: Text(perfil?.especialidad?.isNotEmpty == true ? perfil!.especialidad! : 'Especialidad'),
-                          subtitle: const Text('Toca para editar'),
-                          onTap: () => _editarCampoProfesional(
-                            'Especialidad',
-                            perfil?.especialidad,
-                            (v) => ProfesionalService.actualizarPerfil(especialidad: v),
-                          ),
+                      _IosRow(
+                        icon: Icons.category_outlined,
+                        iconColor: Colors.purple,
+                        title: perfil?.especialidad?.isNotEmpty == true ? perfil!.especialidad! : 'Especialidad',
+                        subtitle: 'Toca para editar',
+                        onTap: () => _editarCampoProfesional(
+                          'Especialidad',
+                          perfil?.especialidad,
+                          (v) => ProfesionalService.actualizarPerfil(especialidad: v),
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Card(
-                        child: ListTile(
-                          leading: const Icon(Icons.phone_outlined),
-                          title: Text(perfil?.telefono?.isNotEmpty == true ? perfil!.telefono! : 'Teléfono de contacto'),
-                          subtitle: const Text('Toca para editar'),
-                          onTap: () => _editarCampoProfesional(
-                            'Teléfono',
-                            perfil?.telefono,
-                            (v) => ProfesionalService.actualizarPerfil(telefono: v),
-                          ),
+                      _IosRow(
+                        icon: Icons.phone_outlined,
+                        iconColor: Colors.green,
+                        title: perfil?.telefono?.isNotEmpty == true ? perfil!.telefono! : 'Teléfono de contacto',
+                        subtitle: 'Toca para editar',
+                        onTap: () => _editarCampoProfesional(
+                          'Teléfono',
+                          perfil?.telefono,
+                          (v) => ProfesionalService.actualizarPerfil(telefono: v),
                         ),
                       ),
                     ],
                   );
                 },
               ),
-              const SizedBox(height: 16),
-              OutlinedButton.icon(
-                onPressed: _volverAModoPropietario,
-                icon: const Icon(Icons.home_outlined),
-                label: const Text('Volver a modo propietario'),
+              _IosSection(
+                rows: [
+                  _IosRow(
+                    icon: Icons.home_outlined,
+                    iconColor: context.colors.brand,
+                    title: 'Volver a modo propietario',
+                    onTap: _volverAModoPropietario,
+                  ),
+                ],
               ),
             ],
 
-            const SizedBox(height: 24),
-            Card(
-              child: ListTile(
-                leading: Icon(Icons.logout_outlined, color: context.colors.error),
-                title: Text('Cerrar sesión', style: TextStyle(color: context.colors.error, fontWeight: FontWeight.w600)),
-                onTap: _confirmarCerrarSesion,
-              ),
+            _IosSection(
+              header: 'Legal',
+              rows: [
+                _IosRow(
+                  icon: Icons.privacy_tip_outlined,
+                  iconColor: Colors.blueGrey,
+                  title: 'Política de privacidad',
+                  onTap: () => _abrirLegal('privacidad'),
+                ),
+                _IosRow(
+                  icon: Icons.description_outlined,
+                  iconColor: Colors.blueGrey,
+                  title: 'Términos de servicio',
+                  onTap: () => _abrirLegal('terminos'),
+                ),
+              ],
+            ),
+
+            _IosSection(
+              rows: [
+                _IosRow(
+                  icon: Icons.logout_outlined,
+                  iconColor: context.colors.error,
+                  title: 'Cerrar sesión',
+                  titleColor: context.colors.error,
+                  showChevron: false,
+                  onTap: _confirmarCerrarSesion,
+                ),
+              ],
+            ),
+            _IosSection(
+              rows: [
+                _IosRow(
+                  icon: Icons.delete_outline,
+                  iconColor: context.colors.error,
+                  title: 'Eliminar cuenta',
+                  titleColor: context.colors.error,
+                  showChevron: false,
+                  trailing: _eliminandoCuenta
+                      ? SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: context.colors.error),
+                        )
+                      : null,
+                  onTap: _eliminandoCuenta ? null : _confirmarEliminarCuenta,
+                ),
+              ],
             ),
           ],
         ),
       ),
     );
   }
+
+  Widget? _check(BuildContext context, bool seleccionado) =>
+      seleccionado ? Icon(Icons.check, color: context.colors.brand, size: 20) : null;
 }
 
 /// Autoservicio de rol (sección 5 del spec: una persona puede tener varios
@@ -326,7 +439,8 @@ class _SeccionProfesionalState extends State<_SeccionProfesional> {
     try {
       await ProfesionalService.activarModoProfesional();
       unawaited(AnalyticsService.setEsProfesional(true));
-    } catch (e) {
+    } catch (e, st) {
+      await FirebaseCrashlytics.instance.recordError(e, st);
       if (mounted) AppError.show(context, 'No se pudo activar el modo profesional.');
     } finally {
       if (mounted) setState(() => _activando = false);
@@ -340,27 +454,152 @@ class _SeccionProfesionalState extends State<_SeccionProfesional> {
       builder: (context, snapshot) {
         final esProfesional = snapshot.data ?? false;
         if (!esProfesional) {
-          return Card(
-            child: ListTile(
-              leading: Icon(Icons.engineering_outlined, color: context.colors.brand),
-              title: const Text('¿Trabajas como profesional?'),
-              subtitle: const Text('Activa el modo profesional para gestionar trabajos que te inviten'),
-              trailing: _activando
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                  : TextButton(onPressed: _activar, child: const Text('Activar')),
-            ),
+          return _IosSection(
+            rows: [
+              _IosRow(
+                icon: Icons.engineering_outlined,
+                iconColor: context.colors.brand,
+                title: '¿Trabajas como profesional?',
+                subtitle: 'Activa el modo profesional para gestionar trabajos que te inviten',
+                showChevron: false,
+                trailing: _activando
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : TextButton(onPressed: _activar, child: const Text('Activar')),
+              ),
+            ],
           );
         }
-        return Card(
-          child: ListTile(
-            leading: Icon(Icons.engineering_outlined, color: context.colors.brand),
-            title: const Text('Modo profesional'),
-            subtitle: const Text('Ver tus trabajos, clientes y presupuestos'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReparaProShellScreen())),
-          ),
+        return _IosSection(
+          rows: [
+            _IosRow(
+              icon: Icons.engineering_outlined,
+              iconColor: context.colors.brand,
+              title: 'Modo profesional',
+              subtitle: 'Ver tus trabajos, clientes y presupuestos',
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReparaProShellScreen())),
+            ),
+          ],
         );
       },
+    );
+  }
+}
+
+/// Sección estilo iOS: cabecera opcional en mayúsculas + una única tarjeta
+/// redondeada con las filas separadas por un divisor fino e indentado
+/// (alineado tras el icono), en vez de una Card suelta por fila.
+class _IosSection extends StatelessWidget {
+  const _IosSection({this.header, required this.rows});
+
+  final String? header;
+  final List<_IosRow> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (header != null)
+            Padding(
+              padding: const EdgeInsets.only(left: 6, bottom: 6),
+              child: Text(
+                header!.toUpperCase(),
+                style: TextStyle(fontSize: 12, letterSpacing: 0.6, fontWeight: FontWeight.w600, color: context.colors.inkMuted),
+              ),
+            ),
+          Card(
+            margin: EdgeInsets.zero,
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: [
+                for (var i = 0; i < rows.length; i++) ...[
+                  if (i > 0) Divider(height: 1, indent: 56, color: context.colors.inkMuted.withValues(alpha: 0.14)),
+                  rows[i],
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _IosRow extends StatelessWidget {
+  const _IosRow({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    this.subtitle,
+    this.trailing,
+    this.onTap,
+    this.titleColor,
+    this.showChevron = true,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String? subtitle;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+  final Color? titleColor;
+
+  /// false en filas de acción (cerrar sesión, eliminar cuenta, activar) que
+  /// no navegan a ningún sitio -- el chevron de iOS solo aparece cuando
+  /// tocar la fila SÍ te lleva a otra pantalla.
+  final bool showChevron;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          child: Row(
+            children: [
+              Container(
+                width: 29,
+                height: 29,
+                decoration: BoxDecoration(color: iconColor, borderRadius: BorderRadius.circular(7)),
+                child: Icon(icon, color: Colors.white, size: 17),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(fontSize: 15.5, color: titleColor ?? context.colors.ink),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle!,
+                        style: TextStyle(fontSize: 12, color: context.colors.inkMuted),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (trailing != null)
+                trailing!
+              else if (onTap != null && showChevron)
+                Icon(Icons.chevron_right, color: context.colors.inkMuted, size: 20),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

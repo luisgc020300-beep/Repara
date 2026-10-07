@@ -10,6 +10,7 @@ const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestore');
 const { getAuth } = require('firebase-admin/auth');
 const { getMessaging } = require('firebase-admin/messaging');
+const { getStorage } = require('firebase-admin/storage');
 
 initializeApp();
 const db = getFirestore();
@@ -412,6 +413,74 @@ exports.cancelarInvitacion = onCall({ region: REGION }, async (request) => {
   if (inv.estado !== 'pendiente') throw new HttpsError('failed-precondition', 'Esta invitación ya se respondió.');
 
   await ref.update({ estado: 'cancelada' });
+  return { ok: true };
+});
+
+// -----------------------------------------------------------------------------
+// 3e. ELIMINAR CUENTA -- derecho de supresión (RGPD) + requisito de Apple
+// (guideline 5.1.1(v)) y Google Play: si se puede crear cuenta desde la
+// app, también hay que poder borrarla desde la app.
+//
+// Si el usuario es propietario único (único miembro) de una casa, se borra
+// esa casa entera -- documento, subcolecciones (trabajos, presupuestos,
+// cambiosAlcance, pagos, documentos, habitaciones, elementos, contactos,
+// eventos) y los archivos de Storage bajo casas/{casaId}/. Si el usuario es
+// propietario de una casa con OTROS miembros, se bloquea la eliminación en
+// vez de borrar en silencio los datos de esos otros miembros -- todavía no
+// hay un flujo de "transferir propiedad" o "expulsar miembro" en la app, y
+// construirlo no es parte de este cambio.
+// -----------------------------------------------------------------------------
+exports.eliminarCuenta = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+  const uid = request.auth.uid;
+
+  const userRef = db.collection('users').doc(uid);
+  const userSnap = await userRef.get();
+  const casaIds = userSnap.exists ? (userSnap.data().casaIds || []) : [];
+
+  for (const casaId of casaIds) {
+    const casaRef = db.collection('casas').doc(casaId);
+    const casaSnap = await casaRef.get();
+    if (!casaSnap.exists) continue;
+    const casa = casaSnap.data();
+    const members = casa.members || [];
+
+    if (casa.ownerUid === uid) {
+      if (members.length > 1) {
+        throw new HttpsError(
+          'failed-precondition',
+          `No puedes eliminar tu cuenta mientras seas propietario de "${casa.nombre}" y tenga otros miembros. Sal de esa casa o contacta con soporte primero.`,
+        );
+      }
+      await db.recursiveDelete(casaRef);
+      if (casa.joinCode) await db.collection('joinCodes').doc(casa.joinCode).delete().catch(() => {});
+      try {
+        await getStorage().bucket().deleteFiles({ prefix: `casas/${casaId}/` });
+      } catch (e) {
+        // Los documentos/fotos huérfanos en Storage no bloquean el borrado
+        // de la cuenta -- es limpieza, no el derecho de supresión en sí.
+        console.error('eliminarCuenta: fallo al borrar Storage de', casaId, e);
+      }
+    } else {
+      await casaRef.update({
+        members: FieldValue.arrayRemove(uid),
+        [`memberProfiles.${uid}`]: FieldValue.delete(),
+      });
+    }
+  }
+
+  await db.collection('profesionales').doc(uid).delete().catch(() => {});
+
+  const notifsSnap = await db.collection('notificaciones').where('uid', '==', uid).get();
+  if (!notifsSnap.empty) {
+    const batch = db.batch();
+    notifsSnap.docs.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+  }
+
+  await userRef.delete().catch(() => {});
+  await getAuth().deleteUser(uid);
+
   return { ok: true };
 });
 
