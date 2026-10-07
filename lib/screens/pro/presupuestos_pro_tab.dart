@@ -14,6 +14,7 @@ import '../../services/presupuesto_service.dart';
 import '../../services/profesional_service.dart';
 import '../../theme/design_tokens.dart';
 import '../../widgets/boton_ajustes.dart';
+import '../../widgets/ios_list.dart';
 import 'trabajo_pro_detail_screen.dart';
 
 class PresupuestosProTab extends StatefulWidget {
@@ -116,20 +117,21 @@ class _PresupuestosProTabState extends State<PresupuestosProTab> {
                   padding: const EdgeInsets.all(16),
                   children: [
                     for (final estado in _ordenGrupos)
-                      if (grupos[estado]!.isNotEmpty) ...[
-                        _CabeceraGrupo(estado: estado, cantidad: grupos[estado]!.length),
-                        const SizedBox(height: 8),
-                        ...grupos[estado]!.map((item) => _PresupuestoTile(
-                              item: item,
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => TrabajoProDetailScreen(casaId: item.trabajo.casaId, trabajoId: item.trabajo.trabajoId),
-                                ),
-                              ),
-                            )),
-                        const SizedBox(height: 16),
-                      ],
+                      if (grupos[estado]!.isNotEmpty)
+                        IosSection(
+                          header: '${_nombreGrupo(estado)} (${grupos[estado]!.length})',
+                          rows: grupos[estado]!
+                              .map((item) => _PresupuestoTile(
+                                    item: item,
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => TrabajoProDetailScreen(casaId: item.trabajo.casaId, trabajoId: item.trabajo.trabajoId),
+                                      ),
+                                    ),
+                                  ))
+                              .toList(),
+                        ),
                   ],
                 ),
     );
@@ -148,30 +150,29 @@ const _ordenGrupos = [
 
 DateTime _fechaOrden(Presupuesto p) => p.fechaRespuesta ?? p.fechaEnvio ?? p.fechaCreacion ?? DateTime(2000);
 
-class _CabeceraGrupo extends StatelessWidget {
-  const _CabeceraGrupo({required this.estado, required this.cantidad});
-
-  final EstadoPresupuesto estado;
-  final int cantidad;
-
-  @override
-  Widget build(BuildContext context) {
-    final (texto, color, icono) = switch (estado) {
-      EstadoPresupuesto.enviado => ('Esperando respuesta', context.colors.brand, Icons.hourglass_top_outlined),
-      EstadoPresupuesto.borrador => ('Borradores sin enviar', context.colors.inkMuted, Icons.edit_note_outlined),
-      EstadoPresupuesto.aceptado => ('Aceptados', context.colors.success, Icons.check_circle_outline),
-      EstadoPresupuesto.rechazado => ('Rechazados', context.colors.error, Icons.cancel_outlined),
-      EstadoPresupuesto.cancelado => ('Cancelados', context.colors.inkMuted, Icons.block_outlined),
+String _nombreGrupo(EstadoPresupuesto e) => switch (e) {
+      EstadoPresupuesto.enviado => 'Esperando respuesta',
+      EstadoPresupuesto.borrador => 'Borradores sin enviar',
+      EstadoPresupuesto.aceptado => 'Aceptados',
+      EstadoPresupuesto.rechazado => 'Rechazados',
+      EstadoPresupuesto.cancelado => 'Cancelados',
     };
-    return Row(
-      children: [
-        Icon(icono, size: 18, color: color),
-        const SizedBox(width: 8),
-        Text('$texto ($cantidad)', style: TextStyle(fontWeight: FontWeight.w700, color: color)),
-      ],
-    );
-  }
-}
+
+Color _colorGrupo(BuildContext context, EstadoPresupuesto e) => switch (e) {
+      EstadoPresupuesto.enviado => context.colors.brand,
+      EstadoPresupuesto.borrador => context.colors.inkMuted,
+      EstadoPresupuesto.aceptado => context.colors.success,
+      EstadoPresupuesto.rechazado => context.colors.error,
+      EstadoPresupuesto.cancelado => context.colors.inkMuted,
+    };
+
+IconData _iconoGrupo(EstadoPresupuesto e) => switch (e) {
+      EstadoPresupuesto.enviado => Icons.hourglass_top_outlined,
+      EstadoPresupuesto.borrador => Icons.edit_note_outlined,
+      EstadoPresupuesto.aceptado => Icons.check_circle_outline,
+      EstadoPresupuesto.rechazado => Icons.cancel_outlined,
+      EstadoPresupuesto.cancelado => Icons.block_outlined,
+    };
 
 class _PresupuestoTile extends StatelessWidget {
   const _PresupuestoTile({required this.item, required this.onTap});
@@ -182,15 +183,13 @@ class _PresupuestoTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = item.presupuesto;
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        onTap: onTap,
-        leading: const Icon(Icons.request_quote_outlined),
-        title: Text(item.trabajo.trabajoTitulo),
-        subtitle: Text('${item.trabajo.casaNombre} · Presupuesto nº${p.numero}${p.version > 1 ? ' (v${p.version})' : ''}'),
-        trailing: Text('${p.total.toStringAsFixed(2)} €', style: const TextStyle(fontWeight: FontWeight.w700)),
-      ),
+    return IosRow(
+      icon: _iconoGrupo(p.estado),
+      iconColor: _colorGrupo(context, p.estado),
+      title: item.trabajo.trabajoTitulo,
+      subtitle: '${item.trabajo.casaNombre} · Presupuesto nº${p.numero}${p.version > 1 ? ' (v${p.version})' : ''}',
+      trailing: Text('${p.total.toStringAsFixed(2)} €', style: const TextStyle(fontWeight: FontWeight.w700)),
+      onTap: onTap,
     );
   }
 }

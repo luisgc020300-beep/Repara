@@ -19,24 +19,31 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/contacto.dart';
 import '../models/evento.dart';
 import '../services/evento_service.dart';
+import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
+import '../widgets/ios_list.dart';
 import 'nuevo_contacto_sheet.dart';
 
 Future<void> mostrarAccionesContacto(BuildContext context, {required String casaId, required Contacto contacto}) {
   return showModalBottomSheet<void>(
     context: context,
-    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
     builder: (ctx) => SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-            child: Row(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(color: ctx.colors.inkMuted.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(2)),
+            ),
+            Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: Theme.of(ctx).colorScheme.primary.withValues(alpha: 0.1),
-                  child: Icon(contacto.tipo == TipoContacto.empresa ? Icons.store_outlined : Icons.person_outline),
+                  backgroundColor: ctx.colors.brand.withValues(alpha: 0.1),
+                  child: Icon(contacto.tipo == TipoContacto.empresa ? Icons.store_outlined : Icons.person_outline, color: ctx.colors.brand),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -50,44 +57,56 @@ Future<void> mostrarAccionesContacto(BuildContext context, {required String casa
                 ),
               ],
             ),
-          ),
-          ListTile(
-            leading: Icon(Icons.call_outlined, color: Theme.of(ctx).colorScheme.primary),
-            title: const Text('Llamar'),
-            onTap: () async {
-              Navigator.pop(ctx);
-              await launchUrl(Uri(scheme: 'tel', path: contacto.telefono));
-            },
-          ),
-          ListTile(
-            leading: Icon(Icons.chat_outlined, color: Theme.of(ctx).colorScheme.primary),
-            title: const Text('Abrir chat de WhatsApp'),
-            subtitle: const Text('Sin foto, solo para escribir'),
-            onTap: () async {
-              Navigator.pop(ctx);
-              final numero = contacto.telefono.replaceAll(RegExp(r'[^0-9]'), '');
-              await launchUrl(Uri.parse('https://wa.me/$numero'), mode: LaunchMode.externalApplication);
-            },
-          ),
-          ListTile(
-            leading: Icon(Icons.camera_alt_outlined, color: Theme.of(ctx).colorScheme.primary),
-            title: const Text('Reportar un problema con foto'),
-            subtitle: const Text('Foto + descripción, listo para enviar por WhatsApp'),
-            onTap: () {
-              Navigator.pop(ctx);
-              _iniciarReporte(context, casaId: casaId, contacto: contacto);
-            },
-          ),
-          const Divider(height: 1),
-          ListTile(
-            leading: const Icon(Icons.edit_outlined),
-            title: const Text('Editar contacto'),
-            onTap: () {
-              Navigator.pop(ctx);
-              mostrarNuevoContactoSheet(context, casaId: casaId, existente: contacto);
-            },
-          ),
-        ],
+            const SizedBox(height: 16),
+            IosSection(
+              rows: [
+                IosRow(
+                  icon: Icons.call_outlined,
+                  iconColor: ctx.colors.brand,
+                  title: 'Llamar',
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    await launchUrl(Uri(scheme: 'tel', path: contacto.telefono));
+                  },
+                ),
+                IosRow(
+                  icon: Icons.chat_outlined,
+                  iconColor: Colors.green,
+                  title: 'Abrir chat de WhatsApp',
+                  subtitle: 'Sin foto, solo para escribir',
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    final numero = contacto.telefono.replaceAll(RegExp(r'[^0-9]'), '');
+                    await launchUrl(Uri.parse('https://wa.me/$numero'), mode: LaunchMode.externalApplication);
+                  },
+                ),
+                IosRow(
+                  icon: Icons.camera_alt_outlined,
+                  iconColor: Colors.orange,
+                  title: 'Reportar un problema con foto',
+                  subtitle: 'Foto + descripción, listo para enviar por WhatsApp',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _iniciarReporte(context, casaId: casaId, contacto: contacto);
+                  },
+                ),
+              ],
+            ),
+            IosSection(
+              rows: [
+                IosRow(
+                  icon: Icons.edit_outlined,
+                  iconColor: ctx.colors.inkMuted,
+                  title: 'Editar contacto',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    mostrarNuevoContactoSheet(context, casaId: casaId, existente: contacto);
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     ),
   );
@@ -98,26 +117,35 @@ Future<void> _iniciarReporte(BuildContext context, {required String casaId, requ
   final foto = await showModalBottomSheet<XFile?>(
     context: context,
     builder: (ctx) => SafeArea(
-      child: Wrap(children: [
-        ListTile(
-          leading: const Icon(Icons.photo_camera_outlined),
-          title: const Text('Hacer una foto'),
-          onTap: () async {
-            final navigator = Navigator.of(ctx);
-            final imagen = await picker.pickImage(source: ImageSource.camera, imageQuality: 85);
-            navigator.pop(imagen);
-          },
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: IosSection(
+          rows: [
+            IosRow(
+              icon: Icons.photo_camera_outlined,
+              iconColor: Colors.blue,
+              title: 'Hacer una foto',
+              onTap: () async {
+                final navigator = Navigator.of(ctx);
+                final imagen = await picker.pickImage(source: ImageSource.camera, imageQuality: 85);
+                if (!ctx.mounted) return;
+                navigator.pop(imagen);
+              },
+            ),
+            IosRow(
+              icon: Icons.photo_library_outlined,
+              iconColor: Colors.purple,
+              title: 'Elegir de la galería',
+              onTap: () async {
+                final navigator = Navigator.of(ctx);
+                final imagen = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+                if (!ctx.mounted) return;
+                navigator.pop(imagen);
+              },
+            ),
+          ],
         ),
-        ListTile(
-          leading: const Icon(Icons.photo_library_outlined),
-          title: const Text('Elegir de la galería'),
-          onTap: () async {
-            final navigator = Navigator.of(ctx);
-            final imagen = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
-            navigator.pop(imagen);
-          },
-        ),
-      ]),
+      ),
     ),
   );
   if (foto == null || !context.mounted) return;

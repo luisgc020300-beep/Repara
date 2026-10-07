@@ -23,6 +23,7 @@ import '../services/documento_service.dart';
 import '../services/elemento_service.dart';
 import '../services/trabajo_service.dart';
 import '../theme/design_tokens.dart';
+import '../widgets/ios_list.dart';
 
 class ExpedienteViviendaScreen extends StatelessWidget {
   const ExpedienteViviendaScreen({required this.casa, super.key});
@@ -118,28 +119,34 @@ class ExpedienteViviendaScreen extends StatelessWidget {
                   const Expanded(child: SizedBox()),
                 ],
               ),
-              const SizedBox(height: 24),
-              if (elementos.isNotEmpty) ...[
-                _seccion(context, 'Elementos'),
-                ...elementos.map((e) => _FilaResumen(
-                      titulo: e.nombre,
-                      subtitulo: [
-                        if (e.marca != null) '${e.marca} ${e.modelo ?? ''}'.trim(),
-                        if (e.garantiaHasta != null) 'garantía hasta ${DateFormat('MM/yyyy').format(e.garantiaHasta!)}',
-                      ].where((s) => s.isNotEmpty).join(' · '),
-                      valor: e.coste != null ? '${e.coste!.toStringAsFixed(0)} €' : null,
-                    )),
-                const SizedBox(height: 16),
-              ],
-              if (finalizados.isNotEmpty) ...[
-                _seccion(context, 'Trabajos realizados'),
-                ...finalizados.map((t) => _FilaResumen(
-                      titulo: t.titulo,
-                      subtitulo: t.profesionalNombre ?? '',
-                      valor: t.presupuesto != null ? '${t.presupuesto!.toStringAsFixed(0)} €' : null,
-                    )),
-                const SizedBox(height: 16),
-              ],
+              const SizedBox(height: 8),
+              if (elementos.isNotEmpty)
+                IosSection(
+                  header: 'Elementos',
+                  rows: elementos
+                      .map((e) => _filaResumen(
+                            context,
+                            titulo: e.nombre,
+                            subtitulo: [
+                              if (e.marca != null) '${e.marca} ${e.modelo ?? ''}'.trim(),
+                              if (e.garantiaHasta != null) 'garantía hasta ${DateFormat('MM/yyyy').format(e.garantiaHasta!)}',
+                            ].where((s) => s.isNotEmpty).join(' · '),
+                            valor: e.coste != null ? '${e.coste!.toStringAsFixed(0)} €' : null,
+                          ))
+                      .toList(),
+                ),
+              if (finalizados.isNotEmpty)
+                IosSection(
+                  header: 'Trabajos realizados',
+                  rows: finalizados
+                      .map((t) => _filaResumen(
+                            context,
+                            titulo: t.titulo,
+                            subtitulo: t.profesionalNombre ?? '',
+                            valor: t.presupuesto != null ? '${t.presupuesto!.toStringAsFixed(0)} €' : null,
+                          ))
+                      .toList(),
+                ),
               if (elementos.isEmpty && finalizados.isEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 24),
@@ -158,9 +165,13 @@ class ExpedienteViviendaScreen extends StatelessWidget {
     );
   }
 
-  Widget _seccion(BuildContext context, String titulo) => Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: Text(titulo, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+  Widget _filaResumen(BuildContext context, {required String titulo, required String subtitulo, String? valor}) => IosRow(
+        icon: Icons.description_outlined,
+        iconColor: context.colors.brand,
+        title: titulo,
+        subtitle: subtitulo,
+        dense: true,
+        trailing: valor != null ? Text(valor, style: const TextStyle(fontWeight: FontWeight.w700)) : null,
       );
 }
 
@@ -182,27 +193,6 @@ class _Estadistica extends StatelessWidget {
             Text(etiqueta, textAlign: TextAlign.center, style: TextStyle(fontSize: 10.5, color: context.colors.inkMuted)),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _FilaResumen extends StatelessWidget {
-  const _FilaResumen({required this.titulo, required this.subtitulo, this.valor});
-
-  final String titulo;
-  final String subtitulo;
-  final String? valor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 6),
-      child: ListTile(
-        dense: true,
-        title: Text(titulo, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: subtitulo.isNotEmpty ? Text(subtitulo) : null,
-        trailing: valor != null ? Text(valor!, style: const TextStyle(fontWeight: FontWeight.w700)) : null,
       ),
     );
   }

@@ -18,6 +18,7 @@ import '../../theme/design_tokens.dart';
 import '../../widgets/app_error.dart';
 import '../../widgets/boton_ajustes.dart';
 import '../../widgets/boton_notificaciones.dart';
+import '../../widgets/ios_list.dart';
 
 const _mensajeInvitarCliente = 'Llevo el mantenimiento de tus trabajos con Repara -- así queda todo el historial, '
     'presupuestos y fotos organizados en un solo sitio, no perdido entre WhatsApps. '
@@ -50,34 +51,34 @@ class InicioProTab extends StatelessWidget {
               return Column(children: invitaciones.map((i) => _InvitacionCard(invitacion: i)).toList());
             },
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 4),
           StreamBuilder<List<TrabajoProRef>>(
             stream: ProfesionalService.streamTrabajosProRefs(),
             builder: (context, snapshot) {
               final trabajos = snapshot.data ?? const <TrabajoProRef>[];
               final totalCasas = trabajos.map((t) => t.casaId).toSet().length;
-              return Card(
-                child: ListTile(
-                  leading: Icon(Icons.build_outlined, color: context.colors.brand),
-                  title: Text('${trabajos.length} trabajo${trabajos.length == 1 ? '' : 's'} activo${trabajos.length == 1 ? '' : 's'}'),
-                  subtitle: Text(
-                    totalCasas == 0
+              return IosSection(
+                rows: [
+                  IosRow(
+                    icon: Icons.build_outlined,
+                    iconColor: context.colors.brand,
+                    title: '${trabajos.length} trabajo${trabajos.length == 1 ? '' : 's'} activo${trabajos.length == 1 ? '' : 's'}',
+                    subtitle: totalCasas == 0
                         ? 'Revisa la pestaña Trabajos para ver el detalle'
                         : 'Repartidos en $totalCasas casa${totalCasas == 1 ? '' : 's'} distinta${totalCasas == 1 ? '' : 's'}',
+                    showChevron: false,
                   ),
-                ),
+                  IosRow(
+                    icon: Icons.person_add_alt_outlined,
+                    iconColor: Colors.purple,
+                    title: 'Invita a un cliente a Repara',
+                    subtitle: 'Para que puedas mandarle presupuestos y avisos desde aquí',
+                    trailing: Icon(Icons.share_outlined, size: 18, color: context.colors.inkMuted),
+                    onTap: () => Share.share(_mensajeInvitarCliente),
+                  ),
+                ],
               );
             },
-          ),
-          const SizedBox(height: 8),
-          Card(
-            child: ListTile(
-              leading: Icon(Icons.person_add_alt_outlined, color: context.colors.brand),
-              title: const Text('Invita a un cliente a Repara'),
-              subtitle: const Text('Para que puedas mandarle presupuestos y avisos desde aquí'),
-              trailing: const Icon(Icons.share_outlined, size: 18),
-              onTap: () => Share.share(_mensajeInvitarCliente),
-            ),
           ),
         ],
       ),

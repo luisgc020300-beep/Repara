@@ -12,6 +12,7 @@ import '../services/habitacion_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
 import '../widgets/boton_ajustes.dart';
+import '../widgets/ios_list.dart';
 import 'elemento_detail_screen.dart';
 import 'garantias_proximas_screen.dart';
 import 'nuevo_elemento_screen.dart';
@@ -58,36 +59,32 @@ class CasaTab extends StatelessWidget {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () async {
-                        final elementos = await ElementoService.conGarantia(casa.id);
-                        if (context.mounted) {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => GarantiasProximasScreen(casa: casa, elementos: elementos, titulo: 'Todas las garantías')));
-                        }
-                      },
-                      icon: const Icon(Icons.shield_outlined, size: 18),
-                      label: const Text('Garantías'),
-                    ),
+              IosSection(
+                rows: [
+                  IosRow(
+                    icon: Icons.shield_outlined,
+                    iconColor: context.colors.warning,
+                    title: 'Garantías',
+                    onTap: () async {
+                      final elementos = await ElementoService.conGarantia(casa.id);
+                      if (context.mounted) {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => GarantiasProximasScreen(casa: casa, elementos: elementos, titulo: 'Todas las garantías')));
+                      }
+                    },
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () async {
-                        final elementos = await ElementoService.conMantenimientoConfigurado(casa.id);
-                        if (context.mounted) {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => RevisionesPendientesScreen(casa: casa, elementos: elementos, titulo: 'Todo el mantenimiento')));
-                        }
-                      },
-                      icon: const Icon(Icons.build_circle_outlined, size: 18),
-                      label: const Text('Mantenimiento'),
-                    ),
+                  IosRow(
+                    icon: Icons.build_circle_outlined,
+                    iconColor: context.colors.brand,
+                    title: 'Mantenimiento',
+                    onTap: () async {
+                      final elementos = await ElementoService.conMantenimientoConfigurado(casa.id);
+                      if (context.mounted) {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => RevisionesPendientesScreen(casa: casa, elementos: elementos, titulo: 'Todo el mantenimiento')));
+                      }
+                    },
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
               if (habitaciones.isEmpty)
                 Card(
                   child: Padding(
@@ -131,9 +128,11 @@ class _HabitacionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
+      clipBehavior: Clip.antiAlias,
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
+          leading: Icon(Icons.meeting_room_outlined, color: context.colors.brand),
           title: Text(habitacion.nombre, style: const TextStyle(fontWeight: FontWeight.w700)),
           childrenPadding: const EdgeInsets.only(bottom: 8),
           children: [
@@ -143,18 +142,22 @@ class _HabitacionCard extends StatelessWidget {
                 final elementos = snapshot.data ?? [];
                 return Column(
                   children: [
-                    ...elementos.map((e) => ListTile(
-                          leading: const Icon(Icons.category_outlined),
-                          title: Text(e.nombre),
-                          subtitle: e.marca != null ? Text('${e.marca} ${e.modelo ?? ''}'.trim()) : null,
-                          trailing: e.garantiaProximaAVencer
-                              ? Icon(Icons.shield_outlined, color: context.colors.warning, size: 20)
-                              : null,
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => ElementoDetailScreen(casa: casa, elementoId: e.id)),
-                          ),
-                        )),
+                    for (var i = 0; i < elementos.length; i++) ...[
+                      if (i > 0) Divider(height: 1, indent: 56, color: context.colors.inkMuted.withValues(alpha: 0.14)),
+                      IosRow(
+                        icon: Icons.category_outlined,
+                        iconColor: Colors.blueGrey,
+                        title: elementos[i].nombre,
+                        subtitle: elementos[i].marca != null ? '${elementos[i].marca} ${elementos[i].modelo ?? ''}'.trim() : null,
+                        trailing: elementos[i].garantiaProximaAVencer
+                            ? Icon(Icons.shield_outlined, color: context.colors.warning, size: 20)
+                            : null,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => ElementoDetailScreen(casa: casa, elementoId: elementos[i].id)),
+                        ),
+                      ),
+                    ],
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Align(

@@ -12,6 +12,7 @@ import '../services/analytics_service.dart';
 import '../services/notificacion_router.dart';
 import '../services/notificacion_service.dart';
 import '../theme/design_tokens.dart';
+import '../widgets/ios_list.dart';
 
 class NotificacionesScreen extends StatelessWidget {
   const NotificacionesScreen({required this.modoPro, super.key});
@@ -38,23 +39,33 @@ class NotificacionesScreen extends StatelessWidget {
           if (notificaciones.isEmpty) {
             return Center(child: Text('No tienes notificaciones todavía.', style: TextStyle(color: context.colors.inkMuted)));
           }
-          return ListView.builder(
+          return ListView(
             padding: const EdgeInsets.all(16),
-            itemCount: notificaciones.length,
-            itemBuilder: (context, i) {
-              final n = notificaciones[i];
-              return Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                color: n.leida ? null : context.colors.brand.withValues(alpha: 0.06),
-                child: ListTile(
-                  leading: Icon(_iconoTipo(n.tipo), color: n.leida ? context.colors.inkMuted : context.colors.brand),
-                  title: Text(n.titulo, style: TextStyle(fontWeight: n.leida ? FontWeight.w500 : FontWeight.w700)),
-                  subtitle: Text(n.cuerpo),
-                  trailing: n.createdAt != null ? Text(DateFormat('d MMM', 'es_ES').format(n.createdAt!)) : null,
-                  onTap: () => _abrirTrabajo(context, n),
-                ),
-              );
-            },
+            children: [
+              IosSection(
+                rows: notificaciones
+                    .map((n) => IosRow(
+                          icon: _iconoTipo(n.tipo),
+                          iconColor: n.leida ? context.colors.inkMuted : context.colors.brand,
+                          title: n.titulo,
+                          titleColor: n.leida ? null : context.colors.ink,
+                          subtitle: n.cuerpo,
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (!n.leida) ...[
+                                Container(width: 7, height: 7, decoration: BoxDecoration(color: context.colors.brand, shape: BoxShape.circle)),
+                                const SizedBox(width: 6),
+                              ],
+                              if (n.createdAt != null)
+                                Text(DateFormat('d MMM', 'es_ES').format(n.createdAt!), style: TextStyle(color: context.colors.inkMuted, fontSize: 12)),
+                            ],
+                          ),
+                          onTap: () => _abrirTrabajo(context, n),
+                        ))
+                    .toList(),
+              ),
+            ],
           );
         },
       ),

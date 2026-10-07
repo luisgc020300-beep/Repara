@@ -29,6 +29,7 @@ import '../services/profesional_service.dart';
 import '../theme/design_tokens.dart';
 import '../theme/theme_controller.dart';
 import '../widgets/app_error.dart';
+import '../widgets/ios_list.dart';
 import 'documentos_casa_screen.dart';
 import 'expediente_vivienda_screen.dart';
 import 'pro/repara_pro_shell_screen.dart';
@@ -223,24 +224,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
         builder: (context, _) => ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           children: [
-            _IosSection(
+            IosSection(
               header: 'Apariencia',
               rows: [
-                _IosRow(
+                IosRow(
                   icon: Icons.light_mode_outlined,
                   iconColor: Colors.orange,
                   title: 'Claro',
                   trailing: _check(context, ThemeController.instance.mode == ThemeMode.light),
                   onTap: () => ThemeController.instance.setMode(ThemeMode.light),
                 ),
-                _IosRow(
+                IosRow(
                   icon: Icons.dark_mode_outlined,
                   iconColor: Colors.indigo,
                   title: 'Oscuro',
                   trailing: _check(context, ThemeController.instance.mode == ThemeMode.dark),
                   onTap: () => ThemeController.instance.setMode(ThemeMode.dark),
                 ),
-                _IosRow(
+                IosRow(
                   icon: Icons.smartphone_outlined,
                   iconColor: Colors.blueGrey,
                   title: 'Igual que el sistema',
@@ -251,24 +252,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
 
             if (casa != null) ...[
-              _IosSection(
+              IosSection(
                 header: 'Tu casa',
                 rows: [
-                  _IosRow(
+                  IosRow(
                     icon: Icons.house_outlined,
                     iconColor: context.colors.brand,
                     title: casa.nombre,
                     subtitle: 'Toca para cambiar el nombre',
                     onTap: () => _renombrarCasa(casa),
                   ),
-                  _IosRow(
+                  IosRow(
                     icon: Icons.folder_open_outlined,
                     iconColor: Colors.blue,
                     title: 'Documentos',
                     subtitle: 'Facturas, presupuestos y garantías guardados',
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DocumentosCasaScreen(casa: casa))),
                   ),
-                  _IosRow(
+                  IosRow(
                     icon: Icons.summarize_outlined,
                     iconColor: Colors.orange,
                     title: 'Expediente de la vivienda',
@@ -278,14 +279,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Navigator.push(context, MaterialPageRoute(builder: (_) => ExpedienteViviendaScreen(casa: casa)));
                     },
                   ),
-                  _IosRow(
+                  IosRow(
                     icon: Icons.group_outlined,
                     iconColor: Colors.teal,
                     title: 'Miembros de esta casa',
                     subtitle: casa.memberProfiles.values.map((m) => m.displayName).join(', '),
                   ),
                   if (casa.joinCode != null)
-                    _IosRow(
+                    IosRow(
                       icon: Icons.key_outlined,
                       iconColor: Colors.purple,
                       title: 'Código para invitar a alguien',
@@ -294,9 +295,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
               _SeccionProfesional(),
-              _IosSection(
+              IosSection(
                 rows: [
-                  _IosRow(
+                  IosRow(
                     icon: Icons.confirmation_number_outlined,
                     iconColor: Colors.brown,
                     title: '¿Tienes un código de invitación?',
@@ -312,10 +313,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 stream: ProfesionalService.streamPerfilPropio(),
                 builder: (context, snapshot) {
                   final perfil = snapshot.data;
-                  return _IosSection(
+                  return IosSection(
                     header: 'Tu perfil profesional',
                     rows: [
-                      _IosRow(
+                      IosRow(
                         icon: Icons.badge_outlined,
                         iconColor: Colors.blue,
                         title: perfil?.nombreComercial?.isNotEmpty == true ? perfil!.nombreComercial! : 'Nombre comercial',
@@ -326,7 +327,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           (v) => ProfesionalService.actualizarPerfil(nombreComercial: v),
                         ),
                       ),
-                      _IosRow(
+                      IosRow(
                         icon: Icons.category_outlined,
                         iconColor: Colors.purple,
                         title: perfil?.especialidad?.isNotEmpty == true ? perfil!.especialidad! : 'Especialidad',
@@ -337,7 +338,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           (v) => ProfesionalService.actualizarPerfil(especialidad: v),
                         ),
                       ),
-                      _IosRow(
+                      IosRow(
                         icon: Icons.phone_outlined,
                         iconColor: Colors.green,
                         title: perfil?.telefono?.isNotEmpty == true ? perfil!.telefono! : 'Teléfono de contacto',
@@ -352,9 +353,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   );
                 },
               ),
-              _IosSection(
+              IosSection(
                 rows: [
-                  _IosRow(
+                  IosRow(
                     icon: Icons.home_outlined,
                     iconColor: context.colors.brand,
                     title: 'Volver a modo propietario',
@@ -364,16 +365,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ],
 
-            _IosSection(
+            IosSection(
               header: 'Legal',
               rows: [
-                _IosRow(
+                IosRow(
                   icon: Icons.privacy_tip_outlined,
                   iconColor: Colors.blueGrey,
                   title: 'Política de privacidad',
                   onTap: () => _abrirLegal('privacidad'),
                 ),
-                _IosRow(
+                IosRow(
                   icon: Icons.description_outlined,
                   iconColor: Colors.blueGrey,
                   title: 'Términos de servicio',
@@ -382,9 +383,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
 
-            _IosSection(
+            IosSection(
               rows: [
-                _IosRow(
+                IosRow(
                   icon: Icons.logout_outlined,
                   iconColor: context.colors.error,
                   title: 'Cerrar sesión',
@@ -394,9 +395,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ],
             ),
-            _IosSection(
+            IosSection(
               rows: [
-                _IosRow(
+                IosRow(
                   icon: Icons.delete_outline,
                   iconColor: context.colors.error,
                   title: 'Eliminar cuenta',
@@ -454,9 +455,9 @@ class _SeccionProfesionalState extends State<_SeccionProfesional> {
       builder: (context, snapshot) {
         final esProfesional = snapshot.data ?? false;
         if (!esProfesional) {
-          return _IosSection(
+          return IosSection(
             rows: [
-              _IosRow(
+              IosRow(
                 icon: Icons.engineering_outlined,
                 iconColor: context.colors.brand,
                 title: '¿Trabajas como profesional?',
@@ -469,9 +470,9 @@ class _SeccionProfesionalState extends State<_SeccionProfesional> {
             ],
           );
         }
-        return _IosSection(
+        return IosSection(
           rows: [
-            _IosRow(
+            IosRow(
               icon: Icons.engineering_outlined,
               iconColor: context.colors.brand,
               title: 'Modo profesional',
@@ -485,121 +486,3 @@ class _SeccionProfesionalState extends State<_SeccionProfesional> {
   }
 }
 
-/// Sección estilo iOS: cabecera opcional en mayúsculas + una única tarjeta
-/// redondeada con las filas separadas por un divisor fino e indentado
-/// (alineado tras el icono), en vez de una Card suelta por fila.
-class _IosSection extends StatelessWidget {
-  const _IosSection({this.header, required this.rows});
-
-  final String? header;
-  final List<_IosRow> rows;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (header != null)
-            Padding(
-              padding: const EdgeInsets.only(left: 6, bottom: 6),
-              child: Text(
-                header!.toUpperCase(),
-                style: TextStyle(fontSize: 12, letterSpacing: 0.6, fontWeight: FontWeight.w600, color: context.colors.inkMuted),
-              ),
-            ),
-          Card(
-            margin: EdgeInsets.zero,
-            clipBehavior: Clip.antiAlias,
-            child: Column(
-              children: [
-                for (var i = 0; i < rows.length; i++) ...[
-                  if (i > 0) Divider(height: 1, indent: 56, color: context.colors.inkMuted.withValues(alpha: 0.14)),
-                  rows[i],
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _IosRow extends StatelessWidget {
-  const _IosRow({
-    required this.icon,
-    required this.iconColor,
-    required this.title,
-    this.subtitle,
-    this.trailing,
-    this.onTap,
-    this.titleColor,
-    this.showChevron = true,
-  });
-
-  final IconData icon;
-  final Color iconColor;
-  final String title;
-  final String? subtitle;
-  final Widget? trailing;
-  final VoidCallback? onTap;
-  final Color? titleColor;
-
-  /// false en filas de acción (cerrar sesión, eliminar cuenta, activar) que
-  /// no navegan a ningún sitio -- el chevron de iOS solo aparece cuando
-  /// tocar la fila SÍ te lleva a otra pantalla.
-  final bool showChevron;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-          child: Row(
-            children: [
-              Container(
-                width: 29,
-                height: 29,
-                decoration: BoxDecoration(color: iconColor, borderRadius: BorderRadius.circular(7)),
-                child: Icon(icon, color: Colors.white, size: 17),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(fontSize: 15.5, color: titleColor ?? context.colors.ink),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (subtitle != null) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle!,
-                        style: TextStyle(fontSize: 12, color: context.colors.inkMuted),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              if (trailing != null)
-                trailing!
-              else if (onTap != null && showChevron)
-                Icon(Icons.chevron_right, color: context.colors.inkMuted, size: 20),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}

@@ -6,6 +6,7 @@ import '../models/trabajo.dart';
 import '../services/trabajo_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/boton_ajustes.dart';
+import '../widgets/ios_list.dart';
 import 'nuevo_trabajo_screen.dart';
 import 'trabajo_detail_screen.dart';
 
@@ -39,24 +40,24 @@ class TrabajosTab extends StatelessWidget {
               ),
             );
           }
-          return ListView.builder(
+          return ListView(
             padding: const EdgeInsets.all(16),
-            itemCount: trabajos.length,
-            itemBuilder: (context, i) {
-              final t = trabajos[i];
-              return Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: ListTile(
-                  title: Text(t.titulo, style: const TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: Text(_nombreEstado(t.estado)),
-                  trailing: _EstadoBadge(estado: t.estado),
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => TrabajoDetailScreen(casa: casa, trabajoId: t.id)),
-                  ),
-                ),
-              );
-            },
+            children: [
+              IosSection(
+                rows: trabajos
+                    .map((t) => IosRow(
+                          icon: Icons.build_outlined,
+                          iconColor: _colorEstado(context, t.estado),
+                          title: t.titulo,
+                          subtitle: _nombreEstado(t.estado),
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => TrabajoDetailScreen(casa: casa, trabajoId: t.id)),
+                          ),
+                        ))
+                    .toList(),
+              ),
+            ],
           );
         },
       ),
@@ -64,28 +65,13 @@ class TrabajosTab extends StatelessWidget {
   }
 }
 
-class _EstadoBadge extends StatelessWidget {
-  const _EstadoBadge({required this.estado});
-
-  final EstadoTrabajo estado;
-
-  Color _color(BuildContext context) => switch (estado) {
-        EstadoTrabajo.nuevo => context.colors.inkMuted,
-        EstadoTrabajo.presupuestado => context.colors.warning,
-        EstadoTrabajo.enCurso => context.colors.brand,
-        EstadoTrabajo.terminado => context.colors.success,
-        EstadoTrabajo.archivado => context.colors.inkMuted,
-      };
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(color: _color(context).withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
-      child: Text(_nombreEstado(estado), style: TextStyle(color: _color(context), fontSize: 11, fontWeight: FontWeight.w700)),
-    );
-  }
-}
+Color _colorEstado(BuildContext context, EstadoTrabajo estado) => switch (estado) {
+      EstadoTrabajo.nuevo => context.colors.inkMuted,
+      EstadoTrabajo.presupuestado => context.colors.warning,
+      EstadoTrabajo.enCurso => context.colors.brand,
+      EstadoTrabajo.terminado => context.colors.success,
+      EstadoTrabajo.archivado => context.colors.inkMuted,
+    };
 
 String _nombreEstado(EstadoTrabajo e) => switch (e) {
       EstadoTrabajo.nuevo => 'Nuevo',

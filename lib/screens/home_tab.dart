@@ -15,6 +15,7 @@ import '../services/evento_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/boton_ajustes.dart';
 import '../widgets/boton_notificaciones.dart';
+import '../widgets/ios_list.dart';
 import 'elemento_detail_screen.dart';
 import 'garantias_proximas_screen.dart';
 import 'menu_anadir.dart';
@@ -160,10 +161,11 @@ class _HomeTabState extends State<HomeTab> {
                     ),
                   );
                 }
-                return ListView.builder(
+                return ListView(
                   padding: const EdgeInsets.all(16),
-                  itemCount: eventos.length,
-                  itemBuilder: (context, i) => _EventoTile(casa: widget.casa, evento: eventos[i]),
+                  children: [
+                    IosSection(rows: eventos.map((e) => _EventoTile(casa: widget.casa, evento: e)).toList()),
+                  ],
                 );
               },
             ),
@@ -203,29 +205,28 @@ class _EventoTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final navegable = evento.elementoId != null || evento.trabajoId != null;
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        onTap: navegable ? () => _abrir(context) : null,
-        leading: CircleAvatar(
-          backgroundColor: context.colors.brand.withValues(alpha: 0.1),
-          child: Icon(_icono, color: context.colors.brand, size: 20),
-        ),
-        title: Text(evento.titulo, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text(
-          [
-            DateFormat('d MMM yyyy', 'es_ES').format(evento.fecha),
-            if (evento.profesionalNombre != null) evento.profesionalNombre!,
-          ].join(' · '),
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (evento.coste != null) Text('${evento.coste!.toStringAsFixed(0)} €'),
-            if (navegable) Icon(Icons.chevron_right, color: context.colors.inkMuted, size: 18),
-          ],
-        ),
-      ),
+    return IosRow(
+      icon: _icono,
+      iconColor: context.colors.brand,
+      title: evento.titulo,
+      subtitle: [
+        DateFormat('d MMM yyyy', 'es_ES').format(evento.fecha),
+        if (evento.profesionalNombre != null) evento.profesionalNombre!,
+      ].join(' · '),
+      showChevron: navegable,
+      trailing: evento.coste != null
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('${evento.coste!.toStringAsFixed(0)} €'),
+                if (navegable) ...[
+                  const SizedBox(width: 6),
+                  Icon(Icons.chevron_right, color: context.colors.inkMuted, size: 20),
+                ],
+              ],
+            )
+          : null,
+      onTap: navegable ? () => _abrir(context) : null,
     );
   }
 }

@@ -12,6 +12,7 @@ import '../models/documento.dart';
 import '../services/documento_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
+import '../widgets/ios_list.dart';
 import 'elemento_detail_screen.dart';
 import 'nuevo_documento_flow.dart';
 import 'trabajo_detail_screen.dart';
@@ -71,31 +72,34 @@ class DocumentosCasaScreen extends StatelessWidget {
               ),
             );
           }
-          return ListView.builder(
+          return ListView(
             padding: const EdgeInsets.all(16),
-            itemCount: documentos.length,
-            itemBuilder: (context, i) {
-              final d = documentos[i];
-              return Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: ListTile(
-                  onTap: () => _abrir(context, d),
-                  leading: Icon(_iconoTipo(d.tipo)),
-                  title: Text(d.proveedor ?? d.nombreArchivo),
-                  subtitle: Text([
-                    if (d.fecha != null) DateFormat('d MMM yyyy', 'es_ES').format(d.fecha!),
-                    if (d.estadoIA == EstadoIA.pendiente) 'Borrador',
-                  ].join(' · ')),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (d.importe != null) Text('${d.importe!.toStringAsFixed(0)} €'),
-                      Icon(Icons.chevron_right, color: context.colors.inkMuted, size: 18),
-                    ],
-                  ),
-                ),
-              );
-            },
+            children: [
+              IosSection(
+                rows: documentos
+                    .map((d) => IosRow(
+                          icon: _iconoTipo(d.tipo),
+                          iconColor: Colors.blue,
+                          title: d.proveedor ?? d.nombreArchivo,
+                          subtitle: [
+                            if (d.fecha != null) DateFormat('d MMM yyyy', 'es_ES').format(d.fecha!),
+                            if (d.estadoIA == EstadoIA.pendiente) 'Borrador',
+                          ].join(' · '),
+                          trailing: d.importe != null
+                              ? Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text('${d.importe!.toStringAsFixed(0)} €'),
+                                    const SizedBox(width: 6),
+                                    Icon(Icons.chevron_right, color: context.colors.inkMuted, size: 20),
+                                  ],
+                                )
+                              : null,
+                          onTap: () => _abrir(context, d),
+                        ))
+                    .toList(),
+              ),
+            ],
           );
         },
       ),

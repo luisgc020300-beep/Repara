@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import '../models/casa.dart';
 import '../models/elemento.dart';
 import '../theme/design_tokens.dart';
+import '../widgets/ios_list.dart';
 import 'elemento_detail_screen.dart';
 
 class RevisionesPendientesScreen extends StatelessWidget {
@@ -28,33 +29,29 @@ class RevisionesPendientesScreen extends StatelessWidget {
                 child: Text('Ningún elemento tiene un calendario de mantenimiento configurado todavía.', style: TextStyle(color: context.colors.inkMuted)),
               ),
             )
-          : ListView.separated(
-        padding: const EdgeInsets.all(16),
-        itemCount: elementos.length,
-        separatorBuilder: (context, i) => const SizedBox(height: 8),
-        itemBuilder: (context, i) {
-          final e = elementos[i];
-          final dias = e.proximoMantenimiento!.difference(DateTime.now()).inDays;
-          final atrasada = dias < 0;
-          return Card(
-            child: ListTile(
-              leading: Icon(Icons.build_circle_outlined, color: atrasada ? context.colors.error : context.colors.brand),
-              title: Text(e.nombre, style: const TextStyle(fontWeight: FontWeight.w600)),
-              subtitle: Text(
-                atrasada
-                    ? 'Revisión atrasada desde el ${DateFormat('d MMMM yyyy', 'es_ES').format(e.proximoMantenimiento!)}'
-                    : 'Próxima revisión: ${DateFormat('d MMMM yyyy', 'es_ES').format(e.proximoMantenimiento!)}',
-                style: TextStyle(color: atrasada ? context.colors.error : context.colors.inkMuted),
-              ),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => ElementoDetailScreen(casa: casa, elementoId: e.id)),
-              ),
+          : ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                IosSection(
+                  rows: elementos.map((e) {
+                    final dias = e.proximoMantenimiento!.difference(DateTime.now()).inDays;
+                    final atrasada = dias < 0;
+                    return IosRow(
+                      icon: Icons.build_circle_outlined,
+                      iconColor: atrasada ? context.colors.error : context.colors.brand,
+                      title: e.nombre,
+                      subtitle: atrasada
+                          ? 'Revisión atrasada desde el ${DateFormat('d MMMM yyyy', 'es_ES').format(e.proximoMantenimiento!)}'
+                          : 'Próxima revisión: ${DateFormat('d MMMM yyyy', 'es_ES').format(e.proximoMantenimiento!)}',
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => ElementoDetailScreen(casa: casa, elementoId: e.id)),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
             ),
-          );
-        },
-      ),
     );
   }
 }

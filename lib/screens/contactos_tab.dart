@@ -9,6 +9,7 @@ import '../models/contacto.dart';
 import '../services/contacto_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/boton_ajustes.dart';
+import '../widgets/ios_list.dart';
 import 'contacto_acciones.dart';
 import 'nuevo_contacto_sheet.dart';
 
@@ -49,25 +50,21 @@ class ContactosTab extends StatelessWidget {
               ),
             );
           }
-          return ListView.builder(
+          return ListView(
             padding: const EdgeInsets.all(16),
-            itemCount: contactos.length,
-            itemBuilder: (context, i) {
-              final c = contactos[i];
-              return Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: context.colors.brand.withValues(alpha: 0.1),
-                    child: Icon(c.tipo == TipoContacto.empresa ? Icons.store_outlined : Icons.person_outline, color: context.colors.brand),
-                  ),
-                  title: Text(c.nombre, style: const TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: Text(c.especialidad ?? c.telefono),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => mostrarAccionesContacto(context, casaId: casa.id, contacto: c),
-                ),
-              );
-            },
+            children: [
+              IosSection(
+                rows: contactos
+                    .map((c) => IosRow(
+                          icon: c.tipo == TipoContacto.empresa ? Icons.store_outlined : Icons.person_outline,
+                          iconColor: context.colors.brand,
+                          title: c.nombre,
+                          subtitle: c.especialidad ?? c.telefono,
+                          onTap: () => mostrarAccionesContacto(context, casaId: casa.id, contacto: c),
+                        ))
+                    .toList(),
+              ),
+            ],
           );
         },
       ),

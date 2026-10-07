@@ -17,6 +17,7 @@ import '../services/elemento_service.dart';
 import '../services/evento_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
+import '../widgets/ios_list.dart';
 import 'nuevo_documento_flow.dart';
 import 'nuevo_evento_sheet.dart';
 import 'trabajo_detail_screen.dart';
@@ -172,27 +173,32 @@ class ElementoDetailScreen extends StatelessWidget {
                   if (eventos.isEmpty) {
                     return Text('Sin eventos todavía.', style: TextStyle(color: context.colors.inkMuted));
                   }
-                  return Column(
-                    children: eventos
-                        .map((e) => Card(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              child: ListTile(
-                                // Breadcrumb tocable al trabajo de origen, si lo
-                                // tiene (auditoría de producto, octubre 2026) --
-                                // no hace falta enlazar a este mismo elemento.
-                                onTap: e.trabajoId != null
-                                    ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => TrabajoDetailScreen(casa: casa, trabajoId: e.trabajoId!)))
-                                    : null,
-                                title: Text(e.titulo, style: const TextStyle(fontWeight: FontWeight.w600)),
-                                subtitle: Text(DateFormat('d MMM yyyy', 'es_ES').format(e.fecha)),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (e.coste != null) Text('${e.coste!.toStringAsFixed(0)} €'),
-                                    if (e.trabajoId != null) Icon(Icons.chevron_right, color: context.colors.inkMuted, size: 18),
-                                  ],
-                                ),
-                              ),
+                  return IosSection(
+                    rows: eventos
+                        .map((e) => IosRow(
+                              icon: Icons.fact_check_outlined,
+                              iconColor: context.colors.brand,
+                              title: e.titulo,
+                              subtitle: DateFormat('d MMM yyyy', 'es_ES').format(e.fecha),
+                              showChevron: e.trabajoId != null,
+                              trailing: e.coste != null
+                                  ? Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text('${e.coste!.toStringAsFixed(0)} €'),
+                                        if (e.trabajoId != null) ...[
+                                          const SizedBox(width: 6),
+                                          Icon(Icons.chevron_right, color: context.colors.inkMuted, size: 20),
+                                        ],
+                                      ],
+                                    )
+                                  : null,
+                              // Breadcrumb tocable al trabajo de origen, si lo
+                              // tiene (auditoría de producto, octubre 2026) --
+                              // no hace falta enlazar a este mismo elemento.
+                              onTap: e.trabajoId != null
+                                  ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => TrabajoDetailScreen(casa: casa, trabajoId: e.trabajoId!)))
+                                  : null,
                             ))
                         .toList(),
                   );
@@ -222,9 +228,7 @@ class ElementoDetailScreen extends StatelessWidget {
                   if (documentos.isEmpty) {
                     return Text('Sin documentos todavía.', style: TextStyle(color: context.colors.inkMuted));
                   }
-                  return Column(
-                    children: documentos.map((d) => _DocumentoTile(documento: d)).toList(),
-                  );
+                  return IosSection(rows: documentos.map((d) => _DocumentoTile(documento: d)).toList());
                 },
               ),
             ],
@@ -243,69 +247,30 @@ class _FichaCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (elemento.marca != null)
-              _Fila(label: 'Marca / modelo', valor: '${elemento.marca} ${elemento.modelo ?? ''}'.trim()),
-            if (elemento.fechaInstalacion != null)
-              _Fila(label: 'Instalado', valor: DateFormat('d MMMM yyyy', 'es_ES').format(elemento.fechaInstalacion!)),
-            if (elemento.coste != null) _Fila(label: 'Coste', valor: '${elemento.coste!.toStringAsFixed(0)} €'),
-            if (elemento.profesionalNombre != null) _Fila(label: 'Profesional', valor: elemento.profesionalNombre!),
-            if (elemento.garantiaHasta != null)
-              _Fila(
-                label: 'Garantía hasta',
-                valor: DateFormat('d MMMM yyyy', 'es_ES').format(elemento.garantiaHasta!),
-                destacado: elemento.garantiaProximaAVencer,
-              ),
-            _Fila(
-              label: 'Próxima revisión',
-              valor: elemento.proximoMantenimiento != null
-                  ? DateFormat('d MMMM yyyy', 'es_ES').format(elemento.proximoMantenimiento!)
-                  : 'Sin configurar',
-              destacado: elemento.revisionPendiente,
-              onTap: onEditarMantenimiento,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _Fila extends StatelessWidget {
-  const _Fila({required this.label, required this.valor, this.destacado = false, this.onTap});
-
-  final String label;
-  final String valor;
-  final bool destacado;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final fila = Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          SizedBox(width: 140, child: Text(label, style: TextStyle(color: context.colors.inkMuted))),
-          Expanded(
-            child: Text(
-              valor,
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: destacado ? context.colors.warning : context.colors.ink,
-              ),
-            ),
+    return IosSection(
+      rows: [
+        if (elemento.marca != null)
+          IosValueRow(label: 'Marca / modelo', value: '${elemento.marca} ${elemento.modelo ?? ''}'.trim()),
+        if (elemento.fechaInstalacion != null)
+          IosValueRow(label: 'Instalado', value: DateFormat('d MMMM yyyy', 'es_ES').format(elemento.fechaInstalacion!)),
+        if (elemento.coste != null) IosValueRow(label: 'Coste', value: '${elemento.coste!.toStringAsFixed(0)} €'),
+        if (elemento.profesionalNombre != null) IosValueRow(label: 'Profesional', value: elemento.profesionalNombre!),
+        if (elemento.garantiaHasta != null)
+          IosValueRow(
+            label: 'Garantía hasta',
+            value: DateFormat('d MMMM yyyy', 'es_ES').format(elemento.garantiaHasta!),
+            destacado: elemento.garantiaProximaAVencer,
           ),
-          if (onTap != null) Icon(Icons.edit_outlined, size: 16, color: context.colors.inkMuted),
-        ],
-      ),
+        IosValueRow(
+          label: 'Próxima revisión',
+          value: elemento.proximoMantenimiento != null
+              ? DateFormat('d MMMM yyyy', 'es_ES').format(elemento.proximoMantenimiento!)
+              : 'Sin configurar',
+          destacado: elemento.revisionPendiente,
+          onTap: onEditarMantenimiento,
+        ),
+      ],
     );
-    if (onTap == null) return fila;
-    return InkWell(onTap: onTap, borderRadius: BorderRadius.circular(8), child: fila);
   }
 }
 
@@ -325,14 +290,13 @@ class _DocumentoTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: Icon(_icono),
-        title: Text(documento.proveedor ?? documento.nombreArchivo),
-        subtitle: documento.fecha != null ? Text(DateFormat('d MMM yyyy', 'es_ES').format(documento.fecha!)) : null,
-        trailing: documento.importe != null ? Text('${documento.importe!.toStringAsFixed(0)} €') : null,
-      ),
+    return IosRow(
+      icon: _icono,
+      iconColor: Colors.blue,
+      title: documento.proveedor ?? documento.nombreArchivo,
+      subtitle: documento.fecha != null ? DateFormat('d MMM yyyy', 'es_ES').format(documento.fecha!) : null,
+      trailing: documento.importe != null ? Text('${documento.importe!.toStringAsFixed(0)} €') : null,
+      showChevron: false,
     );
   }
 }

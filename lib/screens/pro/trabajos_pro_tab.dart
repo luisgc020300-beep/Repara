@@ -11,6 +11,7 @@ import '../../models/profesional.dart';
 import '../../services/profesional_service.dart';
 import '../../theme/design_tokens.dart';
 import '../../widgets/boton_ajustes.dart';
+import '../../widgets/ios_list.dart';
 import 'trabajo_pro_detail_screen.dart';
 
 enum _VistaTrabajosPro { porTrabajo, porCliente }
@@ -89,24 +90,24 @@ class _ListaPorTrabajo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView.builder(
+    return ListView(
       padding: const EdgeInsets.all(16),
-      itemCount: trabajos.length,
-      itemBuilder: (context, i) {
-        final t = trabajos[i];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          child: ListTile(
-            leading: const Icon(Icons.build_outlined),
-            title: Text(t.trabajoTitulo),
-            subtitle: Text(t.casaNombre),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => TrabajoProDetailScreen(casaId: t.casaId, trabajoId: t.trabajoId)),
-            ),
-          ),
-        );
-      },
+      children: [
+        IosSection(
+          rows: trabajos
+              .map((t) => IosRow(
+                    icon: Icons.build_outlined,
+                    iconColor: context.colors.brand,
+                    title: t.trabajoTitulo,
+                    subtitle: t.casaNombre,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => TrabajoProDetailScreen(casaId: t.casaId, trabajoId: t.trabajoId)),
+                    ),
+                  ))
+              .toList(),
+        ),
+      ],
     );
   }
 }
@@ -130,23 +131,28 @@ class _ListaPorCliente extends StatelessWidget {
         final entry = casas[i];
         final trabajosDeEstaCasa = entry.value;
         return Card(
-          margin: const EdgeInsets.only(bottom: 8),
+          margin: const EdgeInsets.only(bottom: 12),
+          clipBehavior: Clip.antiAlias,
           child: Theme(
             data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
             child: ExpansionTile(
               leading: Icon(Icons.house_outlined, color: context.colors.brand),
               title: Text(trabajosDeEstaCasa.first.casaNombre),
               subtitle: Text('${trabajosDeEstaCasa.length} trabajo${trabajosDeEstaCasa.length == 1 ? '' : 's'}'),
-              children: trabajosDeEstaCasa
-                  .map((t) => ListTile(
-                        leading: const Icon(Icons.build_outlined),
-                        title: Text(t.trabajoTitulo),
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => TrabajoProDetailScreen(casaId: t.casaId, trabajoId: t.trabajoId)),
-                        ),
-                      ))
-                  .toList(),
+              children: [
+                for (var i = 0; i < trabajosDeEstaCasa.length; i++) ...[
+                  Divider(height: 1, indent: 56, color: context.colors.inkMuted.withValues(alpha: 0.14)),
+                  IosRow(
+                    icon: Icons.build_outlined,
+                    iconColor: context.colors.brand,
+                    title: trabajosDeEstaCasa[i].trabajoTitulo,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => TrabajoProDetailScreen(casaId: trabajosDeEstaCasa[i].casaId, trabajoId: trabajosDeEstaCasa[i].trabajoId)),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
         );

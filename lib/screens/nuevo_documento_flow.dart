@@ -24,6 +24,7 @@ import '../services/evento_service.dart';
 import '../services/trabajo_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
+import '../widgets/ios_list.dart';
 
 Future<void> iniciarNuevoDocumento(
   BuildContext context, {
@@ -119,49 +120,71 @@ Future<List<PaginaDocumento>?> _elegirPaginas(BuildContext context) async {
   return showModalBottomSheet<List<PaginaDocumento>>(
     context: context,
     builder: (ctx) => SafeArea(
-      child: Wrap(children: [
-        ListTile(
-          leading: const Icon(Icons.photo_camera_outlined),
-          title: const Text('Hacer una foto'),
-          onTap: () async {
-            final navigator = Navigator.of(ctx);
-            final foto = await picker.pickImage(
-              source: ImageSource.camera,
-              imageQuality: 85,
-              maxWidth: 1600,
-              maxHeight: 1600,
-            );
-            if (foto == null) return navigator.pop(null);
-            navigator.pop([_paginaDesdeXFile(foto)]);
-          },
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(color: ctx.colors.inkMuted.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(2)),
+            ),
+            IosSection(
+              rows: [
+                IosRow(
+                  icon: Icons.photo_camera_outlined,
+                  iconColor: Colors.blue,
+                  title: 'Hacer una foto',
+                  onTap: () async {
+                    final navigator = Navigator.of(ctx);
+                    final foto = await picker.pickImage(
+                      source: ImageSource.camera,
+                      imageQuality: 85,
+                      maxWidth: 1600,
+                      maxHeight: 1600,
+                    );
+                    if (!ctx.mounted) return;
+                    if (foto == null) return navigator.pop(null);
+                    navigator.pop([_paginaDesdeXFile(foto)]);
+                  },
+                ),
+                IosRow(
+                  icon: Icons.photo_library_outlined,
+                  iconColor: Colors.purple,
+                  title: 'Elegir de la galería',
+                  subtitle: 'Puedes seleccionar varias fotos si el documento tiene varias páginas',
+                  onTap: () async {
+                    final navigator = Navigator.of(ctx);
+                    final fotos = await picker.pickMultiImage(imageQuality: 85, maxWidth: 1600, maxHeight: 1600);
+                    if (!ctx.mounted) return;
+                    if (fotos.isEmpty) return navigator.pop(null);
+                    navigator.pop(fotos.map(_paginaDesdeXFile).toList());
+                  },
+                ),
+                IosRow(
+                  icon: Icons.upload_file_outlined,
+                  iconColor: ctx.colors.brand,
+                  title: 'Subir archivo (PDF o imagen)',
+                  onTap: () async {
+                    final navigator = Navigator.of(ctx);
+                    final resultado = await FilePicker.platform.pickFiles(
+                      allowMultiple: true,
+                      type: FileType.custom,
+                      allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+                    );
+                    if (!ctx.mounted) return;
+                    final paths = resultado?.files.where((f) => f.path != null).map((f) => f.path!).toList() ?? [];
+                    if (paths.isEmpty) return navigator.pop(null);
+                    navigator.pop(paths.map(_paginaDesdeRuta).toList());
+                  },
+                ),
+              ],
+            ),
+          ],
         ),
-        ListTile(
-          leading: const Icon(Icons.photo_library_outlined),
-          title: const Text('Elegir de la galería'),
-          subtitle: const Text('Puedes seleccionar varias fotos si el documento tiene varias páginas'),
-          onTap: () async {
-            final navigator = Navigator.of(ctx);
-            final fotos = await picker.pickMultiImage(imageQuality: 85, maxWidth: 1600, maxHeight: 1600);
-            if (fotos.isEmpty) return navigator.pop(null);
-            navigator.pop(fotos.map(_paginaDesdeXFile).toList());
-          },
-        ),
-        ListTile(
-          leading: const Icon(Icons.upload_file_outlined),
-          title: const Text('Subir archivo (PDF o imagen)'),
-          onTap: () async {
-            final navigator = Navigator.of(ctx);
-            final resultado = await FilePicker.platform.pickFiles(
-              allowMultiple: true,
-              type: FileType.custom,
-              allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
-            );
-            final paths = resultado?.files.where((f) => f.path != null).map((f) => f.path!).toList() ?? [];
-            if (paths.isEmpty) return navigator.pop(null);
-            navigator.pop(paths.map(_paginaDesdeRuta).toList());
-          },
-        ),
-      ]),
+      ),
     ),
   );
 }
