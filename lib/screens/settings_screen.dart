@@ -444,6 +444,7 @@ class _SeccionSeguridadState extends State<_SeccionSeguridad> {
   bool _cargando = true;
   bool _biometriaDisponible = false;
   bool _activado = false;
+  bool _documentosProtegidos = false;
   LockTimeout _timeout = LockTimeout.fiveMinutes;
 
   @override
@@ -457,11 +458,13 @@ class _SeccionSeguridadState extends State<_SeccionSeguridad> {
     final disponible = await biometria.isAvailable();
     final activado = await SecurityPreferencesService.instance.isBiometricLockEnabled();
     final timeout = await SecurityPreferencesService.instance.getLockTimeout();
+    final documentosProtegidos = await SecurityPreferencesService.instance.isDocumentProtectionEnabled();
     if (!mounted) return;
     setState(() {
       _biometriaDisponible = disponible;
       _activado = activado;
       _timeout = timeout;
+      _documentosProtegidos = documentosProtegidos;
       _cargando = false;
     });
   }
@@ -470,6 +473,11 @@ class _SeccionSeguridadState extends State<_SeccionSeguridad> {
     setState(() => _activado = valor);
     await SecurityPreferencesService.instance.setBiometricLockEnabled(valor);
     await AppLockController.instance.refrescarAjustes();
+  }
+
+  Future<void> _cambiarDocumentosProtegidos(bool valor) async {
+    setState(() => _documentosProtegidos = valor);
+    await SecurityPreferencesService.instance.setDocumentProtectionEnabled(valor);
   }
 
   Future<void> _elegirTimeout() async {
@@ -524,6 +532,19 @@ class _SeccionSeguridadState extends State<_SeccionSeguridad> {
             subtitle: _timeout.etiqueta,
             onTap: _elegirTimeout,
           ),
+        IosRow(
+          icon: Icons.folder_shared_outlined,
+          iconColor: Colors.deepOrange,
+          title: 'Proteger documentos sensibles',
+          subtitle: _biometriaDisponible
+              ? 'Pide Face ID/huella antes de abrir una factura o garantía'
+              : 'No disponible en este dispositivo',
+          showChevron: false,
+          trailing: Switch(
+            value: _documentosProtegidos && _biometriaDisponible,
+            onChanged: _biometriaDisponible ? _cambiarDocumentosProtegidos : null,
+          ),
+        ),
       ],
     );
   }

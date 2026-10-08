@@ -7,9 +7,12 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../core/service_locator.dart';
 import '../models/casa.dart';
 import '../models/documento.dart';
 import '../services/documento_service.dart';
+import '../services/security/biometric_service.dart';
+import '../services/security/security_preferences_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
 import '../widgets/ios_list.dart';
@@ -34,6 +37,15 @@ class DocumentosCasaScreen extends StatelessWidget {
       Navigator.push(context, MaterialPageRoute(builder: (_) => TrabajoDetailScreen(casa: casa, trabajoId: d.trabajoId!)));
       return;
     }
+    // Abrir el archivo en sí (factura, garantía...) es el contenido sensible
+    // -- a diferencia de navegar al elemento/trabajo de origen, que solo
+    // enseña metadatos (sección 6 de la misión de seguridad local).
+    if (await SecurityPreferencesService.instance.isDocumentProtectionEnabled()) {
+      final verificado = await sl<BiometricService>().authenticate('Verifica tu identidad para abrir este documento') ==
+          BiometricAuthResult.success;
+      if (!verificado) return;
+    }
+    if (!context.mounted) return;
     final uri = Uri.tryParse(d.url);
     if (uri == null || !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (context.mounted) AppError.show(context, 'No se pudo abrir el documento.');
