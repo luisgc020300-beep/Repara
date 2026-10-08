@@ -421,7 +421,11 @@ class _EditorPresupuestoSheetState extends State<_EditorPresupuestoSheet> {
                           ),
                         ),
                         if (_lineas.length > 1)
-                          IconButton(icon: const Icon(Icons.close, size: 18), onPressed: () => setState(() => _lineas.removeAt(i))),
+                          IconButton(
+                            icon: const Icon(Icons.close, size: 18),
+                            tooltip: 'Quitar línea',
+                            onPressed: () => setState(() => _lineas.removeAt(i)),
+                          ),
                       ],
                     ),
                     const SizedBox(height: 8),

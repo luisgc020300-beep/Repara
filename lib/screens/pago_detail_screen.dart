@@ -154,7 +154,7 @@ class _PagoDetailScreenState extends State<PagoDetailScreen> {
         title: Text(widget.pago == null ? 'Nuevo pago' : 'Detalle del pago'),
         actions: [
           if (widget.editable && widget.pago != null)
-            IconButton(icon: const Icon(Icons.delete_outline), onPressed: _eliminar),
+            IconButton(icon: const Icon(Icons.delete_outline), tooltip: 'Eliminar pago', onPressed: _eliminar),
         ],
       ),
       body: ListView(

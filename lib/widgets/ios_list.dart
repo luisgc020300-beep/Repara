@@ -124,6 +124,7 @@ class IosRow extends StatelessWidget {
     this.titleColor,
     this.showChevron = true,
     this.dense = false,
+    this.selected,
     super.key,
   });
 
@@ -144,9 +145,16 @@ class IosRow extends StatelessWidget {
   /// cada fila no necesita tanto aire -- p.ej. el expediente de la vivienda.
   final bool dense;
 
+  /// Para filas de una lista de opciones (p.ej. Claro/Oscuro/Sistema en
+  /// Apariencia) que marcan la elegida con un check visual -- sin esto, un
+  /// lector de pantalla no tiene forma de saber cuál está seleccionada,
+  /// solo ve tres filas idénticas (auditoría de accesibilidad, octubre 2026).
+  /// null en filas que no son parte de un grupo de opciones.
+  final bool? selected;
+
   @override
   Widget build(BuildContext context) {
-    return Material(
+    final fila = Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
@@ -193,5 +201,6 @@ class IosRow extends StatelessWidget {
         ),
       ),
     );
+    return selected == null ? fila : Semantics(selected: selected, child: fila);
   }
 }

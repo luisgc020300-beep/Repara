@@ -130,6 +130,7 @@ class ElementoDetailScreen extends StatelessWidget {
               ),
               IconButton(
                 icon: const Icon(Icons.delete_outline),
+                tooltip: 'Eliminar elemento',
                 onPressed: () async {
                   final confirmar = await showDialog<bool>(
                     context: context,

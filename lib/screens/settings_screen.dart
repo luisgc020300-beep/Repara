@@ -268,6 +268,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   iconColor: Colors.orange,
                   title: 'Claro',
                   trailing: _check(context, ThemeController.instance.mode == ThemeMode.light),
+                  selected: ThemeController.instance.mode == ThemeMode.light,
                   onTap: () => ThemeController.instance.setMode(ThemeMode.light),
                 ),
                 IosRow(
@@ -275,6 +276,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   iconColor: Colors.indigo,
                   title: 'Oscuro',
                   trailing: _check(context, ThemeController.instance.mode == ThemeMode.dark),
+                  selected: ThemeController.instance.mode == ThemeMode.dark,
                   onTap: () => ThemeController.instance.setMode(ThemeMode.dark),
                 ),
                 IosRow(
@@ -282,6 +284,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   iconColor: Colors.blueGrey,
                   title: 'Igual que el sistema',
                   trailing: _check(context, ThemeController.instance.mode == ThemeMode.system),
+                  selected: ThemeController.instance.mode == ThemeMode.system,
                   onTap: () => ThemeController.instance.setMode(ThemeMode.system),
                 ),
               ],
@@ -547,6 +550,7 @@ class _SeccionSeguridadState extends State<_SeccionSeguridad> {
               ListTile(
                 title: Text(opcion.etiqueta),
                 trailing: opcion == _timeout ? Icon(Icons.check, color: context.colors.brand) : null,
+                selected: opcion == _timeout,
                 onTap: () => Navigator.pop(ctx, opcion),
               ),
           ],

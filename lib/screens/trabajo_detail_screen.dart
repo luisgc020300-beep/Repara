@@ -496,6 +496,7 @@ class _SeccionInvitarProfesionalState extends State<_SeccionInvitarProfesional> 
                       ),
                       IconButton(
                         icon: const Icon(Icons.share_outlined, size: 20),
+                        tooltip: 'Compartir código',
                         onPressed: () => _compartirCodigo(_ultimoCodigoGenerado!),
                       ),
                     ],
