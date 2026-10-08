@@ -10,8 +10,10 @@ import 'package:intl/intl.dart';
 import '../models/casa.dart';
 import '../models/elemento.dart';
 import '../models/evento.dart';
+import '../models/pago.dart';
 import '../services/elemento_service.dart';
 import '../services/evento_service.dart';
+import '../services/pago_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/boton_ajustes.dart';
 import '../widgets/boton_notificaciones.dart';
@@ -204,14 +206,36 @@ class _EventoTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Solo para el evento que de verdad cierra el trabajo (nunca para
+    // presupuesto aceptado/cambio de alcance, que también llevan coste):
+    // comprobación en vivo de lo pagado, para no perder de vista un cobro
+    // pendiente una vez el trabajo ya aparece como "finalizado" en el
+    // historial (auditoría de producto, octubre 2026) -- antes la única
+    // advertencia era el diálogo al pulsar "Finalizar", y desaparecía para
+    // siempre en cuanto se cerraba.
+    if (evento.esFinalizacion && evento.trabajoId != null && evento.coste != null) {
+      return StreamBuilder<List<Pago>>(
+        stream: PagoService.streamPagos(casa.id, evento.trabajoId!),
+        builder: (context, snapshot) {
+          final pagado = (snapshot.data ?? const <Pago>[]).fold<double>(0, (acc, p) => acc + p.importe);
+          final pendiente = evento.coste! - pagado;
+          return _fila(context, pendiente: pendiente > 0.01 ? pendiente : null);
+        },
+      );
+    }
+    return _fila(context);
+  }
+
+  Widget _fila(BuildContext context, {double? pendiente}) {
     final navegable = evento.elementoId != null || evento.trabajoId != null;
     return IosRow(
       icon: _icono,
-      iconColor: context.colors.brand,
+      iconColor: pendiente != null ? context.colors.warning : context.colors.brand,
       title: evento.titulo,
       subtitle: [
         DateFormat('d MMM yyyy', 'es_ES').format(evento.fecha),
         if (evento.profesionalNombre != null) evento.profesionalNombre!,
+        if (pendiente != null) 'Pendiente de cobrar ${pendiente.toStringAsFixed(0)} €',
       ].join(' · '),
       showChevron: navegable,
       trailing: evento.coste != null

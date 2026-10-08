@@ -29,6 +29,7 @@ class Evento {
     this.documentoIds = const [],
     required this.fecha,
     this.createdBy,
+    this.esFinalizacion = false,
   });
 
   final String id;
@@ -43,6 +44,12 @@ class Evento {
   final List<String> documentoIds;
   final DateTime fecha;
   final String? createdBy;
+
+  /// true solo en el evento que de verdad cierra un trabajo (lo pone
+  /// finalizarTrabajoPropietario, nunca el cliente) -- otros eventos
+  /// también llevan trabajoId/coste (presupuesto aceptado, cambio de
+  /// alcance aprobado...) pero no representan el cierre del trabajo.
+  final bool esFinalizacion;
 
   factory Evento.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? {};
@@ -59,6 +66,7 @@ class Evento {
       documentoIds: List<String>.from(data['documentoIds'] as List? ?? []),
       fecha: (data['fecha'] as Timestamp?)?.toDate() ?? DateTime.now(),
       createdBy: data['createdBy'] as String?,
+      esFinalizacion: data['esFinalizacion'] as bool? ?? false,
     );
   }
 

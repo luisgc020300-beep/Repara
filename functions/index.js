@@ -989,6 +989,13 @@ exports.finalizarTrabajoPropietario = onCall({ region: REGION }, async (request)
     coste: trabajo.presupuesto || null,
     profesionalNombre: trabajo.profesionalNombre || null,
     createdBy: uid,
+    // Marca este evento (y solo este) como el cierre real de un trabajo --
+    // auditoría de producto, octubre 2026: sin esto, el historial no podía
+    // distinguir "el trabajo se finalizó aquí" de otros eventos que también
+    // llevan trabajoId/coste (presupuesto aceptado, cambio de alcance
+    // aprobado...), así que la UI no sabía sobre cuál comprobar si quedaba
+    // dinero pendiente de cobrar.
+    esFinalizacion: true,
   });
 
   // Avisa al resto de la casa (si hay más de un miembro), nunca a quien
