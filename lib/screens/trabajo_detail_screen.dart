@@ -45,8 +45,16 @@ class TrabajoDetailScreen extends StatelessWidget {
         ],
       ),
     );
-    if (confirmar != true) return;
+    if (confirmar != true || !context.mounted) return;
+    await _confirmarFinalizacion(context, trabajo);
+  }
 
+  /// Compartido entre "Finalizar" (el propietario cierra directamente) y
+  /// "Confirmar" (el propietario da por buena la finalización que dice
+  /// haber hecho el profesional) -- en ambos casos el resultado final es
+  /// el mismo, lo único que cambia es si hubo o no un paso previo del
+  /// profesional (modelo de dos pasos, auditoría de producto, octubre 2026).
+  Future<void> _confirmarFinalizacion(BuildContext context, Trabajo trabajo) async {
     // Aviso, no bloqueo (decisión del CEO): que falte pago no debe impedir
     // cerrar un trabajo si el cobro llega más tarde (transferencia,
     // financiación...), pero sí se avisa para no perderlo de vista.
@@ -95,6 +103,29 @@ class TrabajoDetailScreen extends StatelessWidget {
     }
   }
 
+  /// El propietario dice que, en realidad, todavía no está terminado --
+  /// devuelve el trabajo a como estaba antes de que el profesional lo
+  /// marcara, y le avisa para que siga con él.
+  Future<void> _rechazarFinalizacion(BuildContext context, Trabajo trabajo) async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('¿Todavía no está terminado?'),
+        content: const Text('Se avisará al profesional para que lo siga revisando.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Todavía no')),
+        ],
+      ),
+    );
+    if (confirmar != true || !context.mounted) return;
+    try {
+      await TrabajoService.rechazarFinalizacionProfesional(casa.id, trabajo.id);
+    } catch (e, st) {
+      if (context.mounted) AppError.show(context, 'No se pudo actualizar el trabajo.', error: e, stackTrace: st);
+    }
+  }
+
   Future<void> _ofrecerCompartir(BuildContext context, Trabajo trabajo) async {
     final compartir = await showDialog<bool>(
       context: context,
@@ -132,7 +163,7 @@ class TrabajoDetailScreen extends StatelessWidget {
         }
         return Scaffold(
           appBar: AppBar(title: Text(trabajo.titulo)),
-          floatingActionButton: trabajo.estado == EstadoTrabajo.terminado || trabajo.estado == EstadoTrabajo.archivado
+          floatingActionButton: _estadoControlado(trabajo.estado)
               ? null
               : FloatingActionButton.extended(
                   onPressed: () => _finalizar(context, trabajo),
@@ -142,6 +173,50 @@ class TrabajoDetailScreen extends StatelessWidget {
           body: ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              if (trabajo.estado == EstadoTrabajo.pendienteConfirmacion) ...[
+                Card(
+                  color: context.colors.warning.withValues(alpha: 0.12),
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.hourglass_top_outlined, color: context.colors.warning),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'El profesional dice que ha terminado este trabajo. ¿Lo confirmas?',
+                                style: TextStyle(color: context.colors.ink, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () => _rechazarFinalizacion(context, trabajo),
+                                child: const Text('Todavía no'),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: FilledButton(
+                                onPressed: () => _confirmarFinalizacion(context, trabajo),
+                                child: const Text('Confirmar'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -152,23 +227,24 @@ class TrabajoDetailScreen extends StatelessWidget {
                         Text(trabajo.descripcion!),
                         const SizedBox(height: 12),
                       ],
-                      // "Terminado"/"Archivado" nunca son una opción de este
-                      // desplegable (auditoría de seguridad, octubre 2026):
-                      // solo se alcanzan a través del botón "Finalizar", que
-                      // además archiva el evento en el historial y avisa a
-                      // los demás. Elegirlos aquí antes se saltaba todo eso
-                      // en silencio -- ahora ni siquiera aparecen, y el
-                      // servidor también lo bloquea aunque se fuerce desde
-                      // fuera de la app.
+                      // "Terminado"/"Archivado"/"PendienteConfirmacion" nunca
+                      // son una opción de este desplegable (auditoría de
+                      // seguridad, octubre 2026): "Finalizar" (y, en el modelo
+                      // de dos pasos, "Confirmar"/"Todavía no") son las únicas
+                      // vías, porque además archivan el evento en el
+                      // historial y avisan a los demás. Elegirlos aquí antes
+                      // se saltaba todo eso en silencio -- ahora ni siquiera
+                      // aparecen, y el servidor también lo bloquea aunque se
+                      // fuerce desde fuera de la app.
                       DropdownButtonFormField<EstadoTrabajo>(
-                        initialValue: trabajo.estado == EstadoTrabajo.terminado || trabajo.estado == EstadoTrabajo.archivado
-                            ? null
-                            : trabajo.estado,
+                        initialValue: _estadoControlado(trabajo.estado) ? null : trabajo.estado,
                         decoration: InputDecoration(
                           labelText: 'Estado',
-                          helperText: trabajo.estado == EstadoTrabajo.terminado || trabajo.estado == EstadoTrabajo.archivado
-                              ? 'Ya está finalizado'
-                              : null,
+                          helperText: switch (trabajo.estado) {
+                            EstadoTrabajo.terminado || EstadoTrabajo.archivado => 'Ya está finalizado',
+                            EstadoTrabajo.pendienteConfirmacion => 'Esperando tu confirmación',
+                            _ => null,
+                          },
                         ),
                         items: _estadosEditables
                             .map((e) => DropdownMenuItem(value: e, child: Text(_nombreEstado(e))))
@@ -448,13 +524,19 @@ class _SeccionInvitarProfesionalState extends State<_SeccionInvitarProfesional> 
   }
 }
 
+// terminado/archivado/pendienteConfirmacion nunca son editables por esta vía
+// directa -- "Finalizar"/"Confirmar"/"Todavía no" son las únicas puertas
+// (modelo de dos pasos, auditoría de producto, octubre 2026).
+bool _estadoControlado(EstadoTrabajo e) =>
+    e == EstadoTrabajo.terminado || e == EstadoTrabajo.archivado || e == EstadoTrabajo.pendienteConfirmacion;
+
 String _nombreEstado(EstadoTrabajo e) => switch (e) {
       EstadoTrabajo.nuevo => 'Nuevo',
       EstadoTrabajo.presupuestado => 'Presupuestado',
       EstadoTrabajo.enCurso => 'En curso',
+      EstadoTrabajo.pendienteConfirmacion => 'Pendiente de confirmación',
       EstadoTrabajo.terminado => 'Terminado',
       EstadoTrabajo.archivado => 'Archivado',
     };
 
-// Nunca incluye terminado/archivado -- solo se llega ahí por "Finalizar".
 const _estadosEditables = [EstadoTrabajo.nuevo, EstadoTrabajo.presupuestado, EstadoTrabajo.enCurso];

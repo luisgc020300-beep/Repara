@@ -1,10 +1,12 @@
 // lib/services/trabajo_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 import '../models/trabajo.dart';
 
 class TrabajoService {
   static final _db = FirebaseFirestore.instance;
+  static const _region = 'europe-west1';
 
   static CollectionReference<Map<String, dynamic>> _col(String casaId) =>
       _db.collection('casas').doc(casaId).collection('trabajos');
@@ -33,5 +35,21 @@ class TrabajoService {
 
   static Future<void> eliminar(String casaId, String trabajoId) async {
     await _col(casaId).doc(trabajoId).delete();
+  }
+
+  /// El profesional dice que ha terminado -- no cierra el trabajo todavía,
+  /// solo lo deja pendiente de que el propietario lo confirme o lo rechace
+  /// (modelo de dos pasos, auditoría de producto, octubre 2026).
+  static Future<void> marcarFinalizadoProfesional(String casaId, String trabajoId) async {
+    final callable = FirebaseFunctions.instanceFor(region: _region).httpsCallable('marcarTrabajoFinalizadoProfesional');
+    await callable.call<Map<String, dynamic>>({'casaId': casaId, 'trabajoId': trabajoId});
+  }
+
+  /// El propietario dice que todavía no está terminado -- devuelve el
+  /// trabajo al estado en que estaba antes de que el profesional lo
+  /// marcara, y avisa al profesional.
+  static Future<void> rechazarFinalizacionProfesional(String casaId, String trabajoId) async {
+    final callable = FirebaseFunctions.instanceFor(region: _region).httpsCallable('rechazarFinalizacionProfesional');
+    await callable.call<Map<String, dynamic>>({'casaId': casaId, 'trabajoId': trabajoId});
   }
 }

@@ -69,6 +69,7 @@ Color _colorEstado(BuildContext context, EstadoTrabajo estado) => switch (estado
       EstadoTrabajo.nuevo => context.colors.inkMuted,
       EstadoTrabajo.presupuestado => context.colors.warning,
       EstadoTrabajo.enCurso => context.colors.brand,
+      EstadoTrabajo.pendienteConfirmacion => context.colors.warning,
       EstadoTrabajo.terminado => context.colors.success,
       EstadoTrabajo.archivado => context.colors.inkMuted,
     };
@@ -77,6 +78,7 @@ String _nombreEstado(EstadoTrabajo e) => switch (e) {
       EstadoTrabajo.nuevo => 'Nuevo',
       EstadoTrabajo.presupuestado => 'Presupuestado',
       EstadoTrabajo.enCurso => 'En curso',
+      EstadoTrabajo.pendienteConfirmacion => 'Pendiente de confirmación',
       EstadoTrabajo.terminado => 'Terminado',
       EstadoTrabajo.archivado => 'Archivado',
     };

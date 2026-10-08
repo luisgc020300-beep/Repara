@@ -818,8 +818,11 @@ exports.crearCambioAlcance = onCall({ region: REGION }, async (request) => {
   }
   // Un trabajo ya cerrado no admite nuevas solicitudes (auditoría de
   // seguridad, octubre 2026) -- mismo criterio que responderPresupuesto.
-  if (trabajo.estado === 'terminado' || trabajo.estado === 'archivado') {
-    throw new HttpsError('failed-precondition', 'Este trabajo ya está finalizado, no se pueden solicitar cambios de alcance.');
+  // Tampoco mientras está pendiente de confirmación (modelo de dos pasos):
+  // no tiene sentido pedir más alcance sobre algo que el propio profesional
+  // acaba de decir que ha terminado.
+  if (trabajo.estado === 'terminado' || trabajo.estado === 'archivado' || trabajo.estado === 'pendienteConfirmacion') {
+    throw new HttpsError('failed-precondition', 'Este trabajo ya está finalizado o pendiente de confirmación, no se pueden solicitar cambios de alcance.');
   }
   const importeBruto = importeAdicional == null ? null : Number(importeAdicional);
   if (importeBruto != null && (!Number.isFinite(importeBruto) || importeBruto < -1000000 || importeBruto > 1000000)) {
@@ -968,7 +971,11 @@ exports.finalizarTrabajoPropietario = onCall({ region: REGION }, async (request)
     if (data.estado === 'terminado' || data.estado === 'archivado') {
       throw new HttpsError('failed-precondition', 'Este trabajo ya estaba finalizado.');
     }
-    tx.update(trabajoRef, { estado: 'terminado' });
+    // Confirma tanto si el propietario lo cierra directamente como si está
+    // confirmando que el profesional de verdad ha terminado (modelo de dos
+    // pasos) -- en ambos casos el resultado es el mismo: terminado de
+    // verdad, con su evento de historial.
+    tx.update(trabajoRef, { estado: 'terminado', estadoPrevioAPendiente: FieldValue.delete() });
     return data;
   });
 
@@ -997,45 +1004,72 @@ exports.finalizarTrabajoPropietario = onCall({ region: REGION }, async (request)
 });
 
 // =============================================================================
-// FINALIZAR TRABAJO (lado profesional) — sección 28 del spec: queda
-// registrado como finalizado por el profesional; el propietario conserva la
-// capacidad de revisar/completar el registro desde Hogar.
+// FINALIZAR TRABAJO (lado profesional) -- modelo de DOS PASOS (auditoría de
+// producto, octubre 2026): antes, el profesional podía cerrar el trabajo
+// exactamente igual que el propietario, sin que este último tuviera que
+// estar de acuerdo en que de verdad estaba terminado -- y una vez cerrado,
+// no había forma de reabrirlo. Ahora, "marcar como finalizado" del
+// profesional solo deja el trabajo pendiente de confirmación; el
+// propietario es quien de verdad lo cierra (finalizarTrabajoPropietario,
+// que ya acepta este estado como punto de partida) o lo rechaza
+// (rechazarFinalizacionProfesional), devolviéndolo a como estaba.
 // =============================================================================
-exports.finalizarTrabajoProfesional = onCall({ region: REGION }, async (request) => {
+const _ESTADOS_PREVIOS_VALIDOS = ['nuevo', 'presupuestado', 'enCurso'];
+
+exports.marcarTrabajoFinalizadoProfesional = onCall({ region: REGION }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
   const uid = request.auth.uid;
   const { casaId, trabajoId } = request.data || {};
   if (!casaId || !trabajoId) throw new HttpsError('invalid-argument', 'Faltan datos.');
 
   const trabajoRef = db.collection('casas').doc(casaId).collection('trabajos').doc(trabajoId);
-  // Transacción (auditoría de seguridad, octubre 2026): misma razón que en
-  // finalizarTrabajoPropietario -- evita duplicar el evento de historial
-  // si llega más de una llamada casi a la vez.
   const trabajo = await db.runTransaction(async (tx) => {
     const snap = await tx.get(trabajoRef);
     if (!snap.exists) throw new HttpsError('not-found', 'El trabajo no existe.');
     const data = snap.data();
     if (data.profesionalUid !== uid) throw new HttpsError('permission-denied', 'No eres el profesional de este trabajo.');
-    if (data.estado === 'terminado' || data.estado === 'archivado') {
-      throw new HttpsError('failed-precondition', 'Este trabajo ya estaba finalizado.');
+    if (!_ESTADOS_PREVIOS_VALIDOS.includes(data.estado)) {
+      throw new HttpsError('failed-precondition', 'Este trabajo ya está pendiente de confirmación o finalizado.');
     }
-    tx.update(trabajoRef, { estado: 'terminado' });
+    tx.update(trabajoRef, { estado: 'pendienteConfirmacion', estadoPrevioAPendiente: data.estado });
     return data;
-  });
-
-  await crearEventoHistorial(casaId, {
-    tipo: 'nota',
-    titulo: `${trabajo.titulo} -- finalizado por el profesional`,
-    trabajoId,
-    coste: trabajo.presupuesto || null,
-    profesionalNombre: trabajo.profesionalNombre || null,
-    createdBy: uid,
   });
 
   const casaSnap = await db.collection('casas').doc(casaId).get();
   for (const memberUid of casaSnap.data().members || []) {
-    await crearNotificacion(memberUid, 'trabajo_finalizado',
-      'Trabajo finalizado', `El profesional ha marcado "${trabajo.titulo}" como finalizado.`,
+    await crearNotificacion(memberUid, 'trabajo_pendiente_confirmacion',
+      'Pendiente de confirmar', `El profesional dice que ha terminado "${trabajo.titulo}". Confirma si está completo.`,
+      { casaId, trabajoId });
+  }
+  return { ok: true };
+});
+
+exports.rechazarFinalizacionProfesional = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+  const uid = request.auth.uid;
+  const { casaId, trabajoId } = request.data || {};
+  if (!casaId || !trabajoId) throw new HttpsError('invalid-argument', 'Faltan datos.');
+  if (!(await esMiembroCasa(casaId, uid))) throw new HttpsError('permission-denied', 'No perteneces a esa casa.');
+
+  const trabajoRef = db.collection('casas').doc(casaId).collection('trabajos').doc(trabajoId);
+  const trabajo = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(trabajoRef);
+    if (!snap.exists) throw new HttpsError('not-found', 'El trabajo no existe.');
+    const data = snap.data();
+    if (data.estado !== 'pendienteConfirmacion') {
+      throw new HttpsError('failed-precondition', 'Este trabajo no está pendiente de confirmación.');
+    }
+    // Nunca se confía ciegamente en estadoPrevioAPendiente -- un valor fuera
+    // de esta lista (manipulado o corrupto) no debe poder colar un estado
+    // controlado (p.ej. "terminado") por esta vía.
+    const vuelveA = _ESTADOS_PREVIOS_VALIDOS.includes(data.estadoPrevioAPendiente) ? data.estadoPrevioAPendiente : 'enCurso';
+    tx.update(trabajoRef, { estado: vuelveA, estadoPrevioAPendiente: FieldValue.delete() });
+    return data;
+  });
+
+  if (trabajo.profesionalUid) {
+    await crearNotificacion(trabajo.profesionalUid, 'trabajo_finalizacion_rechazada',
+      'Todavía no está terminado', `El propietario no ha confirmado que "${trabajo.titulo}" esté terminado. Revísalo.`,
       { casaId, trabajoId });
   }
   return { ok: true };

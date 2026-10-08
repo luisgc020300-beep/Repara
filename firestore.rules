@@ -9,13 +9,19 @@ service cloud.firestore {
       return request.auth.uid in
           get(/databases/$(database)/documents/casas/$(cid)).data.members;
     }
-    // "terminado"/"archivado" solo se alcanzan a través de las Cloud
-    // Functions finalizarTrabajoPropietario/finalizarTrabajoProfesional
-    // (Admin SDK, saltan estas reglas) -- nunca por una escritura directa
-    // del cliente, porque esas funciones son las que crean el evento de
-    // historial y las notificaciones; una escritura directa los dejaría
-    // "terminados" en silencio (auditoría de seguridad, octubre 2026).
-    function estadoTerminal(v) { return v == 'terminado' || v == 'archivado'; }
+    // "terminado"/"archivado"/"pendienteConfirmacion" solo se alcanzan (y
+    // solo se abandonan) a través de las Cloud Functions
+    // finalizarTrabajoPropietario/marcarTrabajoFinalizadoProfesional/
+    // rechazarFinalizacionProfesional (Admin SDK, saltan estas reglas) --
+    // nunca por una escritura directa del cliente, porque esas funciones son
+    // las que crean el evento de historial y las notificaciones; una
+    // escritura directa los dejaría "terminados" (o "pendientes") en
+    // silencio (auditoría de seguridad, octubre 2026). Modelo de dos pasos:
+    // pendienteConfirmacion tampoco es editable directamente en ninguna
+    // dirección, para que ni el profesional pueda fingir que el propietario
+    // ya confirmó, ni el propietario pueda saltarse rechazarFinalizacion
+    // para "deshacer" la confirmación pendiente sin avisar al profesional.
+    function estadoControlado(v) { return v == 'terminado' || v == 'archivado' || v == 'pendienteConfirmacion'; }
     // Los pagos se escriben directo desde el cliente (ver pago_service.dart),
     // sin pasar por una Cloud Function -- a diferencia de presupuestos/
     // cambiosAlcance. Sin esta validación, una llamada directa al SDK (fuera
@@ -120,19 +126,26 @@ service cloud.firestore {
         // seguridad (octubre 2026).
         //
         // Un miembro puede escribir cualquier otro campo, pero nunca puede
-        // hacer que "estado" PASE a ser terminado/archivado por esta vía
-        // (si ya lo era, dejarlo igual no cuenta como transición). El
-        // profesional asignado solo puede tocar "estado" -- nunca
-        // "presupuesto" directamente (eso solo lo fija responderPresupuesto/
-        // responderCambioAlcance en servidor) -- y tampoco puede llevarlo a
-        // un estado terminal por esta vía.
+        // hacer que "estado" entre NI salga de un estado controlado por esta
+        // vía (si ya estaba ahí y se queda igual, no cuenta como transición
+        // -- permite editar otros campos sin tocar estado). El profesional
+        // asignado solo puede tocar "estado" -- nunca "presupuesto"
+        // directamente (eso solo lo fija responderPresupuesto/
+        // responderCambioAlcance en servidor) -- y tampoco puede entrar ni
+        // salir de un estado controlado por esta vía. "estadoPrevioAPendiente"
+        // tampoco es escribible por el cliente -- es lo que usa
+        // rechazarFinalizacionProfesional para saber a dónde volver, y
+        // manipularlo podría colar una transición a un estado controlado
+        // sin pasar por esa función.
         allow update: if isAuth() && (
           (isMember(cid) &&
-           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['profesionalUid']) &&
-           (!estadoTerminal(request.resource.data.estado) || resource.data.estado == request.resource.data.estado)) ||
+           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['profesionalUid', 'estadoPrevioAPendiente']) &&
+           (resource.data.estado == request.resource.data.estado ||
+            (!estadoControlado(resource.data.estado) && !estadoControlado(request.resource.data.estado)))) ||
           (resource.data.profesionalUid == request.auth.uid &&
            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado']) &&
-           !estadoTerminal(request.resource.data.estado))
+           (resource.data.estado == request.resource.data.estado ||
+            (!estadoControlado(resource.data.estado) && !estadoControlado(request.resource.data.estado))))
         );
         allow delete: if isAuth() && isMember(cid);
 

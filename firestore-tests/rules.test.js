@@ -170,6 +170,29 @@ describe('trabajos -- acceso del propietario y del profesional asignado', () => 
   it('DENY: un profesional ajeno (sin asignar) no puede tocar el trabajo de otro profesional', async () => {
     await assertFails(updateDoc(doc(as(PRO_AJENO), `casas/${CASA_A}/trabajos`, TRABAJO_A1), { estado: 'enCurso' }));
   });
+
+  // Modelo de dos pasos (auditoría de producto, octubre 2026): el profesional
+  // no puede fingir que el propietario ya confirmó, y el propietario no
+  // puede "deshacer" una confirmación pendiente sin pasar por
+  // rechazarFinalizacionProfesional (que es quien avisa al profesional).
+  it('DENY: el profesional no puede escribir "pendienteConfirmacion" directamente', async () => {
+    await assertFails(updateDoc(doc(as(PRO), `casas/${CASA_A}/trabajos`, TRABAJO_A1), { estado: 'pendienteConfirmacion' }));
+  });
+
+  it('DENY: el propietario tampoco puede escribir "pendienteConfirmacion" directamente', async () => {
+    await assertFails(updateDoc(doc(as(OWNER_A), `casas/${CASA_A}/trabajos`, TRABAJO_A1), { estado: 'pendienteConfirmacion' }));
+  });
+
+  it('DENY: el propietario no puede sacar un trabajo de "pendienteConfirmacion" con una escritura directa', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `casas/${CASA_A}/trabajos`, TRABAJO_A1), { estado: 'pendienteConfirmacion' }, { merge: true });
+    });
+    await assertFails(updateDoc(doc(as(OWNER_A), `casas/${CASA_A}/trabajos`, TRABAJO_A1), { estado: 'enCurso' }));
+  });
+
+  it('DENY: el propietario no puede escribir "estadoPrevioAPendiente" directamente', async () => {
+    await assertFails(updateDoc(doc(as(OWNER_A), `casas/${CASA_A}/trabajos`, TRABAJO_A1), { estadoPrevioAPendiente: 'enCurso' }));
+  });
 });
 
 describe('presupuestos y cambios de alcance -- siempre de solo lectura para el cliente', () => {

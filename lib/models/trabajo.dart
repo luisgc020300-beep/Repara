@@ -17,7 +17,12 @@ TipoTrabajo tipoTrabajoFromString(String? s) => TipoTrabajo.values.firstWhere(
       orElse: () => TipoTrabajo.otro,
     );
 
-enum EstadoTrabajo { nuevo, presupuestado, enCurso, terminado, archivado }
+// pendienteConfirmacion: el profesional dice que ha terminado, pero el
+// propietario todavía no lo ha confirmado ni rechazado -- modelo de dos
+// pasos (auditoría de producto, octubre 2026) en vez de que cualquiera de
+// las dos partes pueda cerrar el trabajo unilateralmente sin que la otra
+// esté de acuerdo.
+enum EstadoTrabajo { nuevo, presupuestado, enCurso, pendienteConfirmacion, terminado, archivado }
 
 EstadoTrabajo estadoTrabajoFromString(String? s) => EstadoTrabajo.values.firstWhere(
       (t) => t.name == s,

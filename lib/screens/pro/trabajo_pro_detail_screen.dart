@@ -4,7 +4,6 @@
 // El profesional gestiona estado, presupuestos formales, cambios de alcance
 // y documentos -- pero solo de ESTE trabajo, nunca del resto de la casa (ver
 // firestore.rules: el acceso está condicionado a profesionalUid == su uid).
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/documento.dart';
@@ -30,11 +29,11 @@ class TrabajoProDetailScreen extends StatelessWidget {
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Finalizar trabajo'),
-        content: const Text('Se marcará como terminado. El propietario podrá revisarlo desde su historial.'),
+        title: const Text('Marcar como finalizado'),
+        content: const Text('Se le pedirá al propietario que confirme que el trabajo está terminado -- todavía no se cierra hasta que lo haga.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Finalizar')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Marcar como finalizado')),
         ],
       ),
     );
@@ -65,11 +64,10 @@ class TrabajoProDetailScreen extends StatelessWidget {
     }
     if (!context.mounted) return;
     try {
-      final callable = FirebaseFunctions.instanceFor(region: 'europe-west1').httpsCallable('finalizarTrabajoProfesional');
-      await callable.call<Map<String, dynamic>>({'casaId': casaId, 'trabajoId': trabajoId});
-      if (context.mounted) AppError.showSuccess(context, 'Trabajo marcado como finalizado.');
+      await TrabajoService.marcarFinalizadoProfesional(casaId, trabajoId);
+      if (context.mounted) AppError.showSuccess(context, 'Esperando a que el propietario lo confirme.');
     } catch (e, st) {
-      if (context.mounted) AppError.show(context, 'No se pudo finalizar el trabajo.', error: e, stackTrace: st);
+      if (context.mounted) AppError.show(context, 'No se pudo marcar el trabajo como finalizado.', error: e, stackTrace: st);
     }
   }
 
@@ -84,7 +82,7 @@ class TrabajoProDetailScreen extends StatelessWidget {
         }
         return Scaffold(
           appBar: AppBar(title: Text(trabajo.titulo)),
-          floatingActionButton: trabajo.estado == EstadoTrabajo.terminado || trabajo.estado == EstadoTrabajo.archivado
+          floatingActionButton: _estadoControlado(trabajo.estado)
               ? null
               : FloatingActionButton.extended(
                   onPressed: () => _finalizar(context, trabajo),
@@ -94,6 +92,27 @@ class TrabajoProDetailScreen extends StatelessWidget {
           body: ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              if (trabajo.estado == EstadoTrabajo.pendienteConfirmacion) ...[
+                Card(
+                  color: context.colors.warning.withValues(alpha: 0.12),
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      children: [
+                        Icon(Icons.hourglass_top_outlined, color: context.colors.warning),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Esperando a que el propietario confirme que está terminado.',
+                            style: TextStyle(color: context.colors.ink, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
               if (trabajo.descripcion != null) ...[
                 Text(trabajo.descripcion!),
                 const SizedBox(height: 16),
@@ -104,20 +123,21 @@ class TrabajoProDetailScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // "Terminado"/"Archivado" nunca son una opción aquí --
-                      // solo se alcanzan a través de "Finalizar" (auditoría
-                      // de seguridad, octubre 2026). Antes saltarse ese
-                      // botón dejaba el trabajo marcado como terminado sin
-                      // avisar al propietario ni archivar nada.
+                      // "Terminado"/"Archivado"/"PendienteConfirmacion" nunca
+                      // son una opción aquí -- solo se alcanzan a través de
+                      // "Finalizar" (auditoría de seguridad, octubre 2026).
+                      // Antes saltarse ese botón dejaba el trabajo marcado
+                      // como terminado sin avisar al propietario ni
+                      // archivar nada.
                       DropdownButtonFormField<EstadoTrabajo>(
-                        initialValue: trabajo.estado == EstadoTrabajo.terminado || trabajo.estado == EstadoTrabajo.archivado
-                            ? null
-                            : trabajo.estado,
+                        initialValue: _estadoControlado(trabajo.estado) ? null : trabajo.estado,
                         decoration: InputDecoration(
                           labelText: 'Estado',
-                          helperText: trabajo.estado == EstadoTrabajo.terminado || trabajo.estado == EstadoTrabajo.archivado
-                              ? 'Ya está finalizado'
-                              : null,
+                          helperText: switch (trabajo.estado) {
+                            EstadoTrabajo.terminado || EstadoTrabajo.archivado => 'Ya está finalizado',
+                            EstadoTrabajo.pendienteConfirmacion => 'Esperando confirmación del propietario',
+                            _ => null,
+                          },
                         ),
                         items: _estadosEditables
                             .map((e) => DropdownMenuItem(value: e, child: Text(_nombreEstado(e))))
@@ -199,10 +219,14 @@ class TrabajoProDetailScreen extends StatelessWidget {
   }
 }
 
+bool _estadoControlado(EstadoTrabajo e) =>
+    e == EstadoTrabajo.terminado || e == EstadoTrabajo.archivado || e == EstadoTrabajo.pendienteConfirmacion;
+
 String _nombreEstado(EstadoTrabajo e) => switch (e) {
       EstadoTrabajo.nuevo => 'Nuevo',
       EstadoTrabajo.presupuestado => 'Presupuestado',
       EstadoTrabajo.enCurso => 'En curso',
+      EstadoTrabajo.pendienteConfirmacion => 'Pendiente de confirmación',
       EstadoTrabajo.terminado => 'Terminado',
       EstadoTrabajo.archivado => 'Archivado',
     };
