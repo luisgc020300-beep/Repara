@@ -103,8 +103,8 @@ class _InvitacionCardState extends State<_InvitacionCard> {
     try {
       await InvitacionService.responder(widget.invitacion.id, aceptar: aceptar);
       if (aceptar) unawaited(AnalyticsService.professionalInvitationAccepted());
-    } catch (e) {
-      if (mounted) AppError.show(context, 'No se pudo responder a la invitación.');
+    } catch (e, st) {
+      if (mounted) AppError.show(context, 'No se pudo responder a la invitación.', error: e, stackTrace: st);
     } finally {
       if (mounted) setState(() => _respondiendo = false);
     }

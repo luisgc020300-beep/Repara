@@ -78,8 +78,8 @@ class ElementoDetailScreen extends StatelessWidget {
         intervaloMeses: int.tryParse(intervaloCtrl.text.trim()),
         proximoMantenimiento: proxima,
       );
-    } catch (e) {
-      if (context.mounted) AppError.show(context, 'No se pudo guardar la revisión periódica.');
+    } catch (e, st) {
+      if (context.mounted) AppError.show(context, 'No se pudo guardar la revisión periódica.', error: e, stackTrace: st);
     }
   }
 
@@ -102,8 +102,8 @@ class ElementoDetailScreen extends StatelessWidget {
       );
       await ElementoService.marcarRevisionHecha(casa.id, elemento.id, intervalo);
       if (context.mounted) AppError.showSuccess(context, 'Revisión registrada. Próxima en $intervalo meses.');
-    } catch (e) {
-      if (context.mounted) AppError.show(context, 'No se pudo registrar la revisión.');
+    } catch (e, st) {
+      if (context.mounted) AppError.show(context, 'No se pudo registrar la revisión.', error: e, stackTrace: st);
     }
   }
 

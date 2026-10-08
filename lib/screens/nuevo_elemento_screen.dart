@@ -129,8 +129,8 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
         unawaited(AnalyticsService.firstElementCreated());
       }
       if (mounted) Navigator.pop(context);
-    } catch (e) {
-      if (mounted) AppError.show(context, 'No se pudo guardar el elemento.');
+    } catch (e, st) {
+      if (mounted) AppError.show(context, 'No se pudo guardar el elemento.', error: e, stackTrace: st);
     } finally {
       if (mounted) setState(() => _guardando = false);
     }

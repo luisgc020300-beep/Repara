@@ -528,8 +528,8 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
         AppError.showSuccess(context, comoBorrador ? 'Guardado como borrador.' : 'Documento archivado en el historial.');
         Navigator.pop(context);
       }
-    } catch (e) {
-      if (mounted) AppError.show(context, 'No se pudo guardar el documento. Inténtalo de nuevo.');
+    } catch (e, st) {
+      if (mounted) AppError.show(context, 'No se pudo guardar el documento. Inténtalo de nuevo.', error: e, stackTrace: st);
     } finally {
       if (mounted) setState(() => _guardando = false);
     }

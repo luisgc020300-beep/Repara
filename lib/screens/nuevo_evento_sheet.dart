@@ -79,8 +79,8 @@ class _NuevoEventoFormState extends State<_NuevoEventoForm> {
         createdBy: uid,
       );
       if (mounted) Navigator.pop(context);
-    } catch (e) {
-      if (mounted) AppError.show(context, 'No se pudo guardar el evento.');
+    } catch (e, st) {
+      if (mounted) AppError.show(context, 'No se pudo guardar el evento.', error: e, stackTrace: st);
     } finally {
       if (mounted) setState(() => _guardando = false);
     }

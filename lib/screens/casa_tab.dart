@@ -43,8 +43,8 @@ class CasaTab extends StatelessWidget {
     }
     try {
       await HabitacionService.crear(casa.id, nombre, orden: orden);
-    } catch (e) {
-      if (context.mounted) AppError.show(context, 'No se pudo crear la habitación.');
+    } catch (e, st) {
+      if (context.mounted) AppError.show(context, 'No se pudo crear la habitación.', error: e, stackTrace: st);
     }
   }
 

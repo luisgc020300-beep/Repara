@@ -58,8 +58,8 @@ class _NuevoContactoFormState extends State<_NuevoContactoForm> {
         await ContactoService.crear(widget.casaId, contacto);
       }
       if (mounted) Navigator.pop(context);
-    } catch (e) {
-      if (mounted) AppError.show(context, 'No se pudo guardar el contacto.');
+    } catch (e, st) {
+      if (mounted) AppError.show(context, 'No se pudo guardar el contacto.', error: e, stackTrace: st);
     } finally {
       if (mounted) setState(() => _guardando = false);
     }
