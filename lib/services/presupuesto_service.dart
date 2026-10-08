@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
 import '../models/presupuesto.dart';
+import 'stream_error_logging.dart';
 
 class PresupuestoService {
   static final _db = FirebaseFirestore.instance;
@@ -12,8 +13,11 @@ class PresupuestoService {
       _db.collection('casas').doc(casaId).collection('trabajos').doc(trabajoId).collection('presupuestos');
 
   static Stream<List<Presupuesto>> streamPresupuestos(String casaId, String trabajoId) {
-    return _col(casaId, trabajoId).orderBy('fechaCreacion', descending: true).snapshots().map(
-        (s) => s.docs.map(Presupuesto.fromDoc).toList());
+    return _col(casaId, trabajoId)
+        .orderBy('fechaCreacion', descending: true)
+        .snapshots()
+        .map((s) => s.docs.map(Presupuesto.fromDoc).toList())
+        .conRegistroDeErrores();
   }
 
   /// Todas las escrituras pasan por Cloud Functions -- ver

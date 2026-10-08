@@ -6,6 +6,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
 import '../models/cambio_alcance.dart';
+import 'stream_error_logging.dart';
 
 class CambioAlcanceService {
   static final _db = FirebaseFirestore.instance;
@@ -23,8 +24,11 @@ class CambioAlcanceService {
   }
 
   static Stream<List<CambioAlcance>> streamCambios(String casaId, String trabajoId) {
-    return _col(casaId, trabajoId).orderBy('createdAt', descending: true).snapshots().map(
-        (s) => s.docs.map(CambioAlcance.fromDoc).toList());
+    return _col(casaId, trabajoId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((s) => s.docs.map(CambioAlcance.fromDoc).toList())
+        .conRegistroDeErrores();
   }
 
   static Future<void> crear({

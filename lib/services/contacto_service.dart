@@ -2,6 +2,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/contacto.dart';
+import 'stream_error_logging.dart';
 
 class ContactoService {
   static final _db = FirebaseFirestore.instance;
@@ -10,7 +11,11 @@ class ContactoService {
       _db.collection('casas').doc(casaId).collection('contactos');
 
   static Stream<List<Contacto>> streamContactos(String casaId) {
-    return _col(casaId).orderBy('nombre').snapshots().map((s) => s.docs.map(Contacto.fromDoc).toList());
+    return _col(casaId)
+        .orderBy('nombre')
+        .snapshots()
+        .map((s) => s.docs.map(Contacto.fromDoc).toList())
+        .conRegistroDeErrores();
   }
 
   static Future<void> crear(String casaId, Contacto contacto) async {

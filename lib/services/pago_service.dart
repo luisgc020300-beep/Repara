@@ -8,6 +8,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/pago.dart';
+import 'stream_error_logging.dart';
 
 class PagoService {
   static final _db = FirebaseFirestore.instance;
@@ -16,8 +17,11 @@ class PagoService {
       _db.collection('casas').doc(casaId).collection('trabajos').doc(trabajoId).collection('pagos');
 
   static Stream<List<Pago>> streamPagos(String casaId, String trabajoId) {
-    return _col(casaId, trabajoId).orderBy('fecha', descending: true).snapshots().map(
-        (s) => s.docs.map(Pago.fromDoc).toList());
+    return _col(casaId, trabajoId)
+        .orderBy('fecha', descending: true)
+        .snapshots()
+        .map((s) => s.docs.map(Pago.fromDoc).toList())
+        .conRegistroDeErrores();
   }
 
   static Future<void> crear(String casaId, String trabajoId, Pago pago) async {

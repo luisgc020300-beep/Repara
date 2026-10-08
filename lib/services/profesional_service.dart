@@ -4,6 +4,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/profesional.dart';
+import 'stream_error_logging.dart';
 
 class ProfesionalService {
   static final _db = FirebaseFirestore.instance;
@@ -18,14 +19,23 @@ class ProfesionalService {
   static Stream<bool> streamEsProfesional() {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return Stream.value(false);
-    return _db.collection('users').doc(uid).snapshots().map((d) => d.data()?['esProfesional'] as bool? ?? false);
+    return _db
+        .collection('users')
+        .doc(uid)
+        .snapshots()
+        .map((d) => d.data()?['esProfesional'] as bool? ?? false)
+        .conRegistroDeErrores();
   }
 
   static Stream<Profesional?> streamPerfilPropio() {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return Stream.value(null);
-    return _db.collection('profesionales').doc(uid).snapshots().map(
-        (d) => d.exists ? Profesional.fromDoc(d) : null);
+    return _db
+        .collection('profesionales')
+        .doc(uid)
+        .snapshots()
+        .map((d) => d.exists ? Profesional.fromDoc(d) : null)
+        .conRegistroDeErrores();
   }
 
   static Future<void> actualizarPerfil({String? nombreComercial, String? especialidad, String? telefono}) async {
@@ -47,6 +57,6 @@ class ProfesionalService {
     return _db.collection('users').doc(uid).snapshots().map((d) {
       final lista = (d.data()?['trabajosProRefs'] as List?) ?? [];
       return lista.map((e) => TrabajoProRef.fromMap(Map<String, dynamic>.from(e as Map))).toList();
-    });
+    }).conRegistroDeErrores();
   }
 }

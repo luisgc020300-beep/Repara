@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/notificacion.dart';
+import 'stream_error_logging.dart';
 
 class NotificacionService {
   static final _db = FirebaseFirestore.instance;
@@ -16,7 +17,8 @@ class NotificacionService {
         .orderBy('createdAt', descending: true)
         .limit(50)
         .snapshots()
-        .map((s) => s.docs.map(Notificacion.fromDoc).toList());
+        .map((s) => s.docs.map(Notificacion.fromDoc).toList())
+        .conRegistroDeErrores();
   }
 
   static Future<void> marcarLeida(String notificacionId) async {

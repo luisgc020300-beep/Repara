@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
 import '../models/elemento.dart';
+import 'stream_error_logging.dart';
 
 class ElementoService {
   static final _db = FirebaseFirestore.instance;
@@ -14,11 +15,15 @@ class ElementoService {
   static Stream<List<Elemento>> streamElementos(String casaId, {String? habitacionId}) {
     Query<Map<String, dynamic>> q = _col(casaId);
     if (habitacionId != null) q = q.where('habitacionId', isEqualTo: habitacionId);
-    return q.snapshots().map((s) => s.docs.map(Elemento.fromDoc).toList());
+    return q.snapshots().map((s) => s.docs.map(Elemento.fromDoc).toList()).conRegistroDeErrores();
   }
 
   static Stream<Elemento?> streamElemento(String casaId, String elementoId) {
-    return _col(casaId).doc(elementoId).snapshots().map((d) => d.exists ? Elemento.fromDoc(d) : null);
+    return _col(casaId)
+        .doc(elementoId)
+        .snapshots()
+        .map((d) => d.exists ? Elemento.fromDoc(d) : null)
+        .conRegistroDeErrores();
   }
 
   static Future<String> crear(String casaId, Elemento elemento) async {

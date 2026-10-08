@@ -7,6 +7,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
 import '../models/documento.dart';
+import 'stream_error_logging.dart';
 
 class SugerenciaIA {
   const SugerenciaIA({
@@ -90,14 +91,17 @@ class DocumentoService {
     Query<Map<String, dynamic>> q = _col(casaId).orderBy('createdAt', descending: true);
     if (elementoId != null) q = q.where('elementoId', isEqualTo: elementoId);
     if (trabajoId != null) q = q.where('trabajoId', isEqualTo: trabajoId);
-    return q.snapshots().map((s) => s.docs.map(Documento.fromDoc).toList());
+    return q.snapshots().map((s) => s.docs.map(Documento.fromDoc).toList()).conRegistroDeErrores();
   }
 
   /// Todos los documentos de la casa -- incluye los borradores sin elemento
   /// ni trabajo asociado (sección 2 del spec: "sección de documentos").
   static Stream<List<Documento>> streamTodos(String casaId) {
-    return _col(casaId).orderBy('createdAt', descending: true).snapshots().map(
-        (s) => s.docs.map(Documento.fromDoc).toList());
+    return _col(casaId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((s) => s.docs.map(Documento.fromDoc).toList())
+        .conRegistroDeErrores();
   }
 
   /// [trabajoId] cambia la carpeta de destino en Storage -- un profesional

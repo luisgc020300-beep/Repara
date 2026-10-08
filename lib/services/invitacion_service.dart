@@ -4,6 +4,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/invitacion.dart';
+import 'stream_error_logging.dart';
 
 /// Resultado de invitarProfesional: 'directa' si ya existía una cuenta
 /// profesional con ese email (invitación normal); 'abierta' si no existía
@@ -67,7 +68,8 @@ class InvitacionService {
         .orderBy('createdAt', descending: true)
         .limit(1)
         .snapshots()
-        .map((s) => s.docs.isEmpty ? null : Invitacion.fromDoc(s.docs.first));
+        .map((s) => s.docs.isEmpty ? null : Invitacion.fromDoc(s.docs.first))
+        .conRegistroDeErrores();
   }
 
   /// Invitaciones pendientes de respuesta para el profesional actual.
@@ -79,6 +81,7 @@ class InvitacionService {
         .where('profesionalUid', isEqualTo: uid)
         .where('estado', isEqualTo: 'pendiente')
         .snapshots()
-        .map((s) => s.docs.map(Invitacion.fromDoc).toList());
+        .map((s) => s.docs.map(Invitacion.fromDoc).toList())
+        .conRegistroDeErrores();
   }
 }

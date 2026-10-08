@@ -4,6 +4,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/casa.dart';
+import 'stream_error_logging.dart';
 
 class CasaService {
   static final _db = FirebaseFirestore.instance;
@@ -12,12 +13,22 @@ class CasaService {
   static Stream<String?> streamActiveCasaId() {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return Stream.value(null);
-    return _db.collection('users').doc(uid).snapshots().map(
-        (doc) => doc.data()?['activeCasaId'] as String?);
+    return _db
+        .collection('users')
+        .doc(uid)
+        .snapshots()
+        .map((doc) => doc.data()?['activeCasaId'] as String?)
+        .conRegistroDeErrores();
   }
 
   static Stream<Casa> streamCasa(String casaId) {
-    return _db.collection('casas').doc(casaId).snapshots().where((d) => d.exists).map(Casa.fromDoc);
+    return _db
+        .collection('casas')
+        .doc(casaId)
+        .snapshots()
+        .where((d) => d.exists)
+        .map(Casa.fromDoc)
+        .conRegistroDeErrores();
   }
 
   static Future<({String casaId, String joinCode})> createCasa(String nombre) async {

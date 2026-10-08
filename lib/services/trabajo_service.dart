@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
 import '../models/trabajo.dart';
+import 'stream_error_logging.dart';
 
 class TrabajoService {
   static final _db = FirebaseFirestore.instance;
@@ -12,12 +13,19 @@ class TrabajoService {
       _db.collection('casas').doc(casaId).collection('trabajos');
 
   static Stream<List<Trabajo>> streamTrabajos(String casaId) {
-    return _col(casaId).orderBy('createdAt', descending: true).snapshots().map(
-        (s) => s.docs.map(Trabajo.fromDoc).toList());
+    return _col(casaId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((s) => s.docs.map(Trabajo.fromDoc).toList())
+        .conRegistroDeErrores();
   }
 
   static Stream<Trabajo?> streamTrabajo(String casaId, String trabajoId) {
-    return _col(casaId).doc(trabajoId).snapshots().map((d) => d.exists ? Trabajo.fromDoc(d) : null);
+    return _col(casaId)
+        .doc(trabajoId)
+        .snapshots()
+        .map((d) => d.exists ? Trabajo.fromDoc(d) : null)
+        .conRegistroDeErrores();
   }
 
   static Future<String> crear(String casaId, Trabajo trabajo, {required String createdBy}) async {

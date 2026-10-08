@@ -2,6 +2,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/evento.dart';
+import 'stream_error_logging.dart';
 
 class EventoService {
   static final _db = FirebaseFirestore.instance;
@@ -14,7 +15,7 @@ class EventoService {
   static Stream<List<Evento>> streamHistorial(String casaId, {String? elementoId}) {
     Query<Map<String, dynamic>> q = _col(casaId).orderBy('fecha', descending: true);
     if (elementoId != null) q = q.where('elementoId', isEqualTo: elementoId);
-    return q.snapshots().map((s) => s.docs.map(Evento.fromDoc).toList());
+    return q.snapshots().map((s) => s.docs.map(Evento.fromDoc).toList()).conRegistroDeErrores();
   }
 
   static Future<String> crear(String casaId, Evento evento, {required String createdBy}) async {
