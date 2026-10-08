@@ -62,6 +62,38 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _eliminandoCuenta = false;
+  bool _cerrandoTodo = false;
+
+  Future<void> _confirmarCerrarSesionEnTodosLosDispositivos() async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('¿Cerrar sesión en todos los dispositivos?'),
+        content: const Text(
+          'Este dispositivo se cierra al momento. Los demás seguirán abiertos hasta una hora más mientras se '
+          'renueva su sesión automáticamente -- no es instantáneo en ellos.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Cerrar en todos')),
+        ],
+      ),
+    );
+    if (confirmar != true || !mounted) return;
+    setState(() => _cerrandoTodo = true);
+    try {
+      await CuentaService.cerrarSesionesEnTodosLosDispositivos();
+      await FcmService.olvidarEsteDispositivo();
+      await FirebaseAuth.instance.signOut();
+      if (!mounted) return;
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } catch (e, st) {
+      await FirebaseCrashlytics.instance.recordError(e, st);
+      if (mounted) AppError.show(context, 'No se pudo cerrar la sesión en todos los dispositivos.');
+    } finally {
+      if (mounted) setState(() => _cerrandoTodo = false);
+    }
+  }
 
   Future<void> _confirmarCerrarSesion() async {
     final confirmar = await showDialog<bool>(
@@ -398,6 +430,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   titleColor: context.colors.error,
                   showChevron: false,
                   onTap: _confirmarCerrarSesion,
+                ),
+                IosRow(
+                  icon: Icons.devices_outlined,
+                  iconColor: context.colors.error,
+                  title: 'Cerrar sesión en todos los dispositivos',
+                  titleColor: context.colors.error,
+                  showChevron: false,
+                  trailing: _cerrandoTodo
+                      ? SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: context.colors.error),
+                        )
+                      : null,
+                  onTap: _cerrandoTodo ? null : _confirmarCerrarSesionEnTodosLosDispositivos,
                 ),
               ],
             ),

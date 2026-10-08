@@ -484,6 +484,21 @@ exports.eliminarCuenta = onCall({ region: REGION }, async (request) => {
   return { ok: true };
 });
 
+// Fase H de la misión de seguridad local (octubre 2026): "cerrar sesión en
+// todos los dispositivos". revokeRefreshTokens invalida los refresh tokens
+// emitidos hasta ahora -- el dispositivo que llama a esto debe hacer también
+// signOut() local de inmediato (no espera a esto), pero OTROS dispositivos
+// con sesión abierta no se desconectan al instante: siguen funcionando con
+// su ID token actual hasta que caduque (hasta 1 hora) y entonces el SDK de
+// Firebase Auth, al intentar renovarlo, descubre la revocación y cierra
+// sesión solo. No hay forma de forzar el cierre instantáneo sin un backend
+// que verifique cada ID token con checkRevoked:true, que esta app no tiene.
+exports.cerrarSesionesEnTodosLosDispositivos = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+  await getAuth().revokeRefreshTokens(request.auth.uid);
+  return { ok: true };
+});
+
 // =============================================================================
 // Helpers compartidos — notificaciones internas y eventos de historial
 // (sección 22 del spec: nada de esto debe vivir desconectado del historial

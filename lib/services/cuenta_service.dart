@@ -21,4 +21,14 @@ class CuentaService {
     // no de Firebase, así que la Cloud Function no los toca.
     await SecurityPreferencesService.instance.limpiarTodo();
   }
+
+  /// Invalida los refresh tokens de la cuenta (Fase H de la misión de
+  /// seguridad local). El propio dispositivo que llama a esto debe hacer
+  /// signOut() local justo después -- esto NO lo hace por sí solo, y otros
+  /// dispositivos con sesión abierta no se desconectan al instante (ver
+  /// comentario de cerrarSesionesEnTodosLosDispositivos en functions/index.js).
+  static Future<void> cerrarSesionesEnTodosLosDispositivos() async {
+    final callable = FirebaseFunctions.instanceFor(region: _region).httpsCallable('cerrarSesionesEnTodosLosDispositivos');
+    await callable.call<Map<String, dynamic>>();
+  }
 }
