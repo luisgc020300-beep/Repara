@@ -445,6 +445,7 @@ class _SeccionSeguridadState extends State<_SeccionSeguridad> {
   bool _biometriaDisponible = false;
   bool _activado = false;
   bool _documentosProtegidos = false;
+  bool _proProtegido = false;
   LockTimeout _timeout = LockTimeout.fiveMinutes;
 
   @override
@@ -459,12 +460,14 @@ class _SeccionSeguridadState extends State<_SeccionSeguridad> {
     final activado = await SecurityPreferencesService.instance.isBiometricLockEnabled();
     final timeout = await SecurityPreferencesService.instance.getLockTimeout();
     final documentosProtegidos = await SecurityPreferencesService.instance.isDocumentProtectionEnabled();
+    final proProtegido = await SecurityPreferencesService.instance.isProGateEnabled();
     if (!mounted) return;
     setState(() {
       _biometriaDisponible = disponible;
       _activado = activado;
       _timeout = timeout;
       _documentosProtegidos = documentosProtegidos;
+      _proProtegido = proProtegido;
       _cargando = false;
     });
   }
@@ -473,6 +476,11 @@ class _SeccionSeguridadState extends State<_SeccionSeguridad> {
     setState(() => _activado = valor);
     await SecurityPreferencesService.instance.setBiometricLockEnabled(valor);
     await AppLockController.instance.refrescarAjustes();
+  }
+
+  Future<void> _cambiarProProtegido(bool valor) async {
+    setState(() => _proProtegido = valor);
+    await SecurityPreferencesService.instance.setProGateEnabled(valor);
   }
 
   Future<void> _cambiarDocumentosProtegidos(bool valor) async {
@@ -545,6 +553,19 @@ class _SeccionSeguridadState extends State<_SeccionSeguridad> {
             onChanged: _biometriaDisponible ? _cambiarDocumentosProtegidos : null,
           ),
         ),
+        IosRow(
+          icon: Icons.engineering_outlined,
+          iconColor: Colors.indigo,
+          title: 'Proteger el acceso a Repara Pro',
+          subtitle: _biometriaDisponible
+              ? 'Pide Face ID/huella antes de entrar en modo profesional'
+              : 'No disponible en este dispositivo',
+          showChevron: false,
+          trailing: Switch(
+            value: _proProtegido && _biometriaDisponible,
+            onChanged: _biometriaDisponible ? _cambiarProProtegido : null,
+          ),
+        ),
       ],
     );
   }
@@ -560,6 +581,17 @@ class _SeccionProfesional extends StatefulWidget {
 
 class _SeccionProfesionalState extends State<_SeccionProfesional> {
   bool _activando = false;
+
+  Future<void> _entrarEnModoPro() async {
+    if (await SecurityPreferencesService.instance.isProGateEnabled()) {
+      final verificado =
+          await sl<BiometricService>().authenticate('Verifica tu identidad para entrar en Repara Pro') ==
+              BiometricAuthResult.success;
+      if (!verificado) return;
+    }
+    if (!mounted) return;
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const ReparaProShellScreen()));
+  }
 
   Future<void> _activar() async {
     setState(() => _activando = true);
@@ -603,7 +635,7 @@ class _SeccionProfesionalState extends State<_SeccionProfesional> {
               iconColor: context.colors.brand,
               title: 'Modo profesional',
               subtitle: 'Ver tus trabajos, clientes y presupuestos',
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReparaProShellScreen())),
+              onTap: _entrarEnModoPro,
             ),
           ],
         );
