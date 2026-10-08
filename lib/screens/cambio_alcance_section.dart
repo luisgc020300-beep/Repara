@@ -84,7 +84,7 @@ class CambiosAlcanceSection extends StatelessWidget {
   }
 }
 
-class _CambioCard extends StatelessWidget {
+class _CambioCard extends StatefulWidget {
   const _CambioCard({
     required this.casaId,
     required this.trabajoId,
@@ -99,7 +99,18 @@ class _CambioCard extends StatelessWidget {
   final RolEnTrabajo rol;
   final bool trabajoCerrado;
 
-  Color _color(BuildContext context) => switch (cambio.estado) {
+  @override
+  State<_CambioCard> createState() => _CambioCardState();
+}
+
+class _CambioCardState extends State<_CambioCard> {
+  // Mismo motivo que _PresupuestoCardState en presupuestos_section.dart: el
+  // servidor ya bloquea una segunda respuesta (transacción con comprobación
+  // de estado), pero sin este guard un doble toque en una conexión lenta
+  // enseñaba un error confuso por una acción que ya se había completado.
+  bool _procesando = false;
+
+  Color _color(BuildContext context) => switch (widget.cambio.estado) {
         EstadoCambioAlcance.pendiente => context.colors.warning,
         EstadoCambioAlcance.aprobado => context.colors.success,
         EstadoCambioAlcance.rechazado => context.colors.error,
@@ -107,8 +118,10 @@ class _CambioCard extends StatelessWidget {
       };
 
   Future<void> _responder(BuildContext context, bool aprobar) async {
+    setState(() => _procesando = true);
     try {
-      await CambioAlcanceService.responder(casaId: casaId, trabajoId: trabajoId, cambioAlcanceId: cambio.id, aprobar: aprobar);
+      await CambioAlcanceService.responder(
+          casaId: widget.casaId, trabajoId: widget.trabajoId, cambioAlcanceId: widget.cambio.id, aprobar: aprobar);
       if (aprobar) unawaited(AnalyticsService.scopeChangeAccepted());
     } on FirebaseFunctionsException catch (e, st) {
       if (context.mounted) {
@@ -116,11 +129,14 @@ class _CambioCard extends StatelessWidget {
       }
     } catch (e, st) {
       if (context.mounted) AppError.show(context, 'No se pudo responder a la solicitud.', error: e, stackTrace: st);
+    } finally {
+      if (mounted) setState(() => _procesando = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final cambio = widget.cambio;
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: Padding(
@@ -165,13 +181,25 @@ class _CambioCard extends StatelessWidget {
                 ),
               ),
             ],
-            if (cambio.estado == EstadoCambioAlcance.pendiente && rol == RolEnTrabajo.propietario && !trabajoCerrado) ...[
+            if (cambio.estado == EstadoCambioAlcance.pendiente && widget.rol == RolEnTrabajo.propietario && !widget.trabajoCerrado) ...[
               const SizedBox(height: 10),
               Row(
                 children: [
-                  Expanded(child: OutlinedButton(onPressed: () => _responder(context, false), child: const Text('Rechazar'))),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _procesando ? null : () => _responder(context, false),
+                      child: const Text('Rechazar'),
+                    ),
+                  ),
                   const SizedBox(width: 8),
-                  Expanded(child: FilledButton(onPressed: () => _responder(context, true), child: const Text('Aprobar'))),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: _procesando ? null : () => _responder(context, true),
+                      child: _procesando
+                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Text('Aprobar'),
+                    ),
+                  ),
                 ],
               ),
             ],

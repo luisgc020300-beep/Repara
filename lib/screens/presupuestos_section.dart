@@ -86,7 +86,7 @@ class PresupuestosSection extends StatelessWidget {
   }
 }
 
-class _PresupuestoCard extends StatelessWidget {
+class _PresupuestoCard extends StatefulWidget {
   const _PresupuestoCard({required this.casaId, required this.trabajoId, required this.presupuesto, required this.rol});
 
   final String casaId;
@@ -94,7 +94,20 @@ class _PresupuestoCard extends StatelessWidget {
   final Presupuesto presupuesto;
   final RolEnTrabajo rol;
 
-  Color _colorEstado(BuildContext context) => switch (presupuesto.estado) {
+  @override
+  State<_PresupuestoCard> createState() => _PresupuestoCardState();
+}
+
+class _PresupuestoCardState extends State<_PresupuestoCard> {
+  // Sin esto, un doble toque en una conexión lenta podía disparar dos
+  // llamadas a responderPresupuesto/enviarPresupuesto antes de que el
+  // StreamBuilder de arriba repintara con el nuevo estado y ocultara estos
+  // botones -- el servidor ya lo bloquea (transacción con comprobación de
+  // estado), pero la segunda llamada le enseñaba al usuario un error
+  // confuso por una acción que en realidad ya se había completado bien.
+  bool _procesando = false;
+
+  Color _colorEstado(BuildContext context) => switch (widget.presupuesto.estado) {
         EstadoPresupuesto.borrador => context.colors.inkMuted,
         EstadoPresupuesto.enviado => context.colors.warning,
         EstadoPresupuesto.aceptado => context.colors.success,
@@ -103,8 +116,10 @@ class _PresupuestoCard extends StatelessWidget {
       };
 
   Future<void> _responder(BuildContext context, bool aceptar) async {
+    setState(() => _procesando = true);
     try {
-      await PresupuestoService.responder(casaId: casaId, trabajoId: trabajoId, presupuestoId: presupuesto.id, aceptar: aceptar);
+      await PresupuestoService.responder(
+          casaId: widget.casaId, trabajoId: widget.trabajoId, presupuestoId: widget.presupuesto.id, aceptar: aceptar);
       unawaited(aceptar ? AnalyticsService.quoteAccepted() : AnalyticsService.quoteRejected());
     } on FirebaseFunctionsException catch (e, st) {
       if (context.mounted) {
@@ -112,12 +127,15 @@ class _PresupuestoCard extends StatelessWidget {
       }
     } catch (e, st) {
       if (context.mounted) AppError.show(context, 'No se pudo responder al presupuesto.', error: e, stackTrace: st);
+    } finally {
+      if (mounted) setState(() => _procesando = false);
     }
   }
 
   Future<void> _enviar(BuildContext context) async {
+    setState(() => _procesando = true);
     try {
-      await PresupuestoService.enviar(casaId: casaId, trabajoId: trabajoId, presupuestoId: presupuesto.id);
+      await PresupuestoService.enviar(casaId: widget.casaId, trabajoId: widget.trabajoId, presupuestoId: widget.presupuesto.id);
       if (context.mounted) AppError.showSuccess(context, 'Presupuesto enviado.');
     } on FirebaseFunctionsException catch (e, st) {
       if (context.mounted) {
@@ -125,11 +143,14 @@ class _PresupuestoCard extends StatelessWidget {
       }
     } catch (e, st) {
       if (context.mounted) AppError.show(context, 'No se pudo enviar el presupuesto.', error: e, stackTrace: st);
+    } finally {
+      if (mounted) setState(() => _procesando = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final presupuesto = widget.presupuesto;
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: Padding(
@@ -166,17 +187,34 @@ class _PresupuestoCard extends StatelessWidget {
                 Text('${presupuesto.total.toStringAsFixed(2)} €', style: const TextStyle(fontWeight: FontWeight.w700)),
               ],
             ),
-            if (presupuesto.estado == EstadoPresupuesto.borrador && rol == RolEnTrabajo.profesional) ...[
+            if (presupuesto.estado == EstadoPresupuesto.borrador && widget.rol == RolEnTrabajo.profesional) ...[
               const SizedBox(height: 10),
-              FilledButton(onPressed: () => _enviar(context), child: const Text('Enviar al propietario')),
+              FilledButton(
+                onPressed: _procesando ? null : () => _enviar(context),
+                child: _procesando
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text('Enviar al propietario'),
+              ),
             ],
-            if (presupuesto.estado == EstadoPresupuesto.enviado && rol == RolEnTrabajo.propietario) ...[
+            if (presupuesto.estado == EstadoPresupuesto.enviado && widget.rol == RolEnTrabajo.propietario) ...[
               const SizedBox(height: 10),
               Row(
                 children: [
-                  Expanded(child: OutlinedButton(onPressed: () => _responder(context, false), child: const Text('Rechazar'))),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _procesando ? null : () => _responder(context, false),
+                      child: const Text('Rechazar'),
+                    ),
+                  ),
                   const SizedBox(width: 8),
-                  Expanded(child: FilledButton(onPressed: () => _responder(context, true), child: const Text('Aceptar'))),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: _procesando ? null : () => _responder(context, true),
+                      child: _procesando
+                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Text('Aceptar'),
+                    ),
+                  ),
                 ],
               ),
             ],
