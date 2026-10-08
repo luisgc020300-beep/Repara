@@ -10,6 +10,7 @@
 // nueva solo para esto.
 import 'dart:async';
 
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
@@ -23,6 +24,7 @@ import '../services/documento_service.dart';
 import '../services/elemento_service.dart';
 import '../services/trabajo_service.dart';
 import '../theme/design_tokens.dart';
+import '../widgets/app_error.dart';
 import '../widgets/ios_list.dart';
 
 class ExpedienteViviendaScreen extends StatelessWidget {
@@ -69,11 +71,22 @@ class ExpedienteViviendaScreen extends StatelessWidget {
       ..writeln('Generado con Repara.');
 
     try {
+      // A diferencia del "compartir" decorativo de otras pantallas (invitar
+      // a un amigo, donde que falle es indiferente), aquí el botón ES la
+      // función principal de esta pantalla -- si falla, el usuario no tiene
+      // otra forma de sacar el expediente del teléfono, así que un catch
+      // silencioso lo dejaba sin saber que no había pasado nada (auditoría
+      // de producto, octubre 2026: "le he dado al botón y no hace nada").
+      // ShareResultStatus.unavailable NO se trata como fallo -- según la
+      // propia documentación del paquete significa que la plataforma SÍ
+      // compartió el contenido, solo que no se puede saber qué eligió el
+      // usuario; tratarlo como error habría disparado un aviso falso en
+      // cada el uso normal donde esa información no está disponible.
       await Share.share(buffer.toString(), subject: 'Expediente de ${casa.nombre}');
       unawaited(AnalyticsService.householdRecordShared());
-    } catch (e) {
-      // El resumen ya se ve en pantalla -- que falle el selector de
-      // compartir no debe parecer que algo se ha roto.
+    } catch (e, st) {
+      await FirebaseCrashlytics.instance.recordError(e, st);
+      if (context.mounted) AppError.show(context, 'No se pudo abrir el selector para compartir.');
     }
   }
 
