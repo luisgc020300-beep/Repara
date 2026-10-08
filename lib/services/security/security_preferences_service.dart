@@ -20,13 +20,14 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 /// normal (abrir y cerrar la app varias veces seguidas revisando algo), ni
 /// tan laxo como para dejar la app desbloqueada toda una tarde.
 enum LockTimeout {
-  immediate(Duration.zero),
-  oneMinute(Duration(minutes: 1)),
-  fiveMinutes(Duration(minutes: 5)),
-  fifteenMinutes(Duration(minutes: 15));
+  immediate(Duration.zero, 'Inmediatamente'),
+  oneMinute(Duration(minutes: 1), '1 minuto'),
+  fiveMinutes(Duration(minutes: 5), '5 minutos'),
+  fifteenMinutes(Duration(minutes: 15), '15 minutos');
 
-  const LockTimeout(this.duration);
+  const LockTimeout(this.duration, this.etiqueta);
   final Duration duration;
+  final String etiqueta;
 }
 
 class SecurityPreferencesService {

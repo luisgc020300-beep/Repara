@@ -24,8 +24,12 @@ import '../services/analytics_service.dart';
 import '../services/casa_service.dart';
 import '../services/cuenta_service.dart';
 import '../services/fcm_service.dart';
+import '../core/service_locator.dart';
 import '../services/invitacion_service.dart';
 import '../services/profesional_service.dart';
+import '../services/security/app_lock_controller.dart';
+import '../services/security/biometric_service.dart';
+import '../services/security/security_preferences_service.dart';
 import '../theme/design_tokens.dart';
 import '../theme/theme_controller.dart';
 import '../widgets/app_error.dart';
@@ -251,6 +255,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
 
+            const _SeccionSeguridad(),
+
             if (casa != null) ...[
               IosSection(
                 header: 'Tu casa',
@@ -422,6 +428,105 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget? _check(BuildContext context, bool seleccionado) =>
       seleccionado ? Icon(Icons.check, color: context.colors.brand, size: 20) : null;
+}
+
+/// Ajustes de seguridad local (Fase D de la misión de endurecimiento,
+/// octubre 2026). Puramente local: nunca sustituye a Firebase Auth/reglas,
+/// solo decide si AppLockController pide biometría (ver app_lock_controller.dart).
+class _SeccionSeguridad extends StatefulWidget {
+  const _SeccionSeguridad();
+
+  @override
+  State<_SeccionSeguridad> createState() => _SeccionSeguridadState();
+}
+
+class _SeccionSeguridadState extends State<_SeccionSeguridad> {
+  bool _cargando = true;
+  bool _biometriaDisponible = false;
+  bool _activado = false;
+  LockTimeout _timeout = LockTimeout.fiveMinutes;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargar();
+  }
+
+  Future<void> _cargar() async {
+    final biometria = sl<BiometricService>();
+    final disponible = await biometria.isAvailable();
+    final activado = await SecurityPreferencesService.instance.isBiometricLockEnabled();
+    final timeout = await SecurityPreferencesService.instance.getLockTimeout();
+    if (!mounted) return;
+    setState(() {
+      _biometriaDisponible = disponible;
+      _activado = activado;
+      _timeout = timeout;
+      _cargando = false;
+    });
+  }
+
+  Future<void> _cambiarActivado(bool valor) async {
+    setState(() => _activado = valor);
+    await SecurityPreferencesService.instance.setBiometricLockEnabled(valor);
+    await AppLockController.instance.refrescarAjustes();
+  }
+
+  Future<void> _elegirTimeout() async {
+    final elegido = await showDialog<LockTimeout>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Bloquear tras'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final opcion in LockTimeout.values)
+              ListTile(
+                title: Text(opcion.etiqueta),
+                trailing: opcion == _timeout ? Icon(Icons.check, color: context.colors.brand) : null,
+                onTap: () => Navigator.pop(ctx, opcion),
+              ),
+          ],
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar'))],
+      ),
+    );
+    if (elegido == null || elegido == _timeout) return;
+    setState(() => _timeout = elegido);
+    await SecurityPreferencesService.instance.setLockTimeout(elegido);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_cargando) return const SizedBox.shrink();
+    return IosSection(
+      header: 'Seguridad',
+      footer: !_biometriaDisponible
+          ? 'Este dispositivo no tiene biometría configurada (Face ID, huella) o la app no tiene permiso para usarla.'
+          : null,
+      rows: [
+        IosRow(
+          icon: Icons.fingerprint,
+          iconColor: context.colors.brand,
+          title: 'Bloqueo biométrico',
+          subtitle: _biometriaDisponible ? 'Pide Face ID/huella al volver a abrir Repara' : 'No disponible en este dispositivo',
+          showChevron: false,
+          trailing: Switch(
+            value: _activado && _biometriaDisponible,
+            onChanged: _biometriaDisponible ? _cambiarActivado : null,
+          ),
+        ),
+        if (_activado && _biometriaDisponible)
+          IosRow(
+            icon: Icons.timer_outlined,
+            iconColor: Colors.blueGrey,
+            title: 'Bloquear tras',
+            subtitle: _timeout.etiqueta,
+            onTap: _elegirTimeout,
+          ),
+      ],
+    );
+  }
 }
 
 /// Autoservicio de rol (sección 5 del spec: una persona puede tener varios

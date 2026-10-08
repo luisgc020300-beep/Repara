@@ -18,9 +18,11 @@ import 'core/service_locator.dart';
 import 'firebase_options.dart';
 import 'screens/casa_gate_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/security/app_lock_screen.dart';
 import 'services/analytics_service.dart';
 import 'services/casa_service.dart';
 import 'services/notificacion_router.dart';
+import 'services/security/app_lock_controller.dart';
 import 'theme/design_tokens.dart';
 import 'theme/theme_controller.dart';
 
@@ -131,6 +133,7 @@ class ReparaApp extends StatelessWidget {
         theme: buildReparaLightTheme(),
         darkTheme: buildReparaDarkTheme(),
         navigatorObservers: [AnalyticsService.observer],
+        builder: (context, child) => _LockGate(child: child!),
         home: StreamBuilder<User?>(
           stream: FirebaseAuth.instance.authStateChanges(),
           builder: (context, snapshot) {
@@ -142,6 +145,42 @@ class ReparaApp extends StatelessWidget {
           },
         ),
       ),
+    );
+  }
+}
+
+/// Tapa toda la app (el Navigator entero, pase lo que pase dentro) con
+/// AppLockScreen cuando el bloqueo biométrico está activo y hay una sesión
+/// real -- nunca sobre LoginScreen, porque ahí no hay nada sensible que
+/// proteger y el propio login ya exige credenciales.
+///
+/// Envuelve `child` en vez de sustituirlo por otro árbol de widgets para no
+/// destruir el Navigator de MaterialApp (y con él, toda la pila de
+/// pantallas) cada vez que se bloquea/desbloquea.
+class _LockGate extends StatelessWidget {
+  const _LockGate({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        final haySesion = snapshot.data != null;
+        return AnimatedBuilder(
+          animation: AppLockController.instance,
+          builder: (context, _) {
+            final bloqueado = haySesion && AppLockController.instance.isLocked;
+            return Stack(
+              children: [
+                child,
+                if (bloqueado) const Positioned.fill(child: AppLockScreen()),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }
