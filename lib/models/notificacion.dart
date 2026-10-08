@@ -20,6 +20,13 @@ const _tiposParaProfesional = {
   'cambio_alcance_aprobado',
   'cambio_alcance_rechazado',
   'pago_registrado',
+  // Modelo de dos pasos para finalizar un trabajo (octubre 2026): el
+  // propietario rechazando la finalización del profesional es, igual que
+  // los de arriba, un aviso PARA el profesional -- sin esto se filtraba de
+  // su lista de notificaciones en modo Pro, y una push de este tipo le
+  // habría llevado a la pantalla del propietario (a la que no tiene acceso)
+  // en vez de a la suya (hallazgo de auditoría, misión de seguridad).
+  'trabajo_finalizacion_rechazada',
 };
 
 bool tipoEsParaProfesional(String tipo) => _tiposParaProfesional.contains(tipo);

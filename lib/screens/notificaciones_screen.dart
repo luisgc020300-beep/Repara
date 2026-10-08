@@ -77,6 +77,8 @@ IconData _iconoTipo(String tipo) => switch (tipo) {
       'presupuesto_enviado' || 'presupuesto_aceptado' || 'presupuesto_rechazado' => Icons.request_quote_outlined,
       'cambio_alcance_solicitado' || 'cambio_alcance_aprobado' || 'cambio_alcance_rechazado' => Icons.rule_outlined,
       'trabajo_finalizado' => Icons.check_circle_outline,
+      'trabajo_pendiente_confirmacion' => Icons.hourglass_top_outlined,
+      'trabajo_finalizacion_rechazada' => Icons.undo_outlined,
       'pago_registrado' => Icons.payments_outlined,
       _ => Icons.notifications_outlined,
     };
