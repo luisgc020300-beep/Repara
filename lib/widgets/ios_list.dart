@@ -85,8 +85,16 @@ class IosValueRow extends StatelessWidget {
           child: Row(
             children: [
               Text(label, style: TextStyle(fontSize: 15, color: context.colors.ink)),
-              const Spacer(),
-              Flexible(
+              // Expanded (no Spacer + Flexible): con los dos a la vez, el
+              // espacio libre se repartía al 50% entre ambos, y el texto del
+              // valor -- al ser más corto que esa mitad -- quedaba pegado a
+              // la izquierda de SU propia caja en vez de al borde derecho
+              // real de la fila. Se notaba más cuanto más corta era la
+              // etiqueta (p.ej. "Coste") porque dejaba más hueco de sobra
+              // (CEO, octubre 2026: "120 € está más a la izquierda que el
+              // resto"). Expanded fuerza al valor a ocupar TODO el espacio
+              // restante, así textAlign.right sí alinea contra el borde real.
+              Expanded(
                 child: Text(
                   value,
                   textAlign: TextAlign.right,
