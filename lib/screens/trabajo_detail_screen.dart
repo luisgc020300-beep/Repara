@@ -232,27 +232,42 @@ class TrabajoDetailScreen extends StatelessWidget {
                       // seguridad, octubre 2026): "Finalizar" (y, en el modelo
                       // de dos pasos, "Confirmar"/"Todavía no") son las únicas
                       // vías, porque además archivan el evento en el
-                      // historial y avisan a los demás. Elegirlos aquí antes
-                      // se saltaba todo eso en silencio -- ahora ni siquiera
-                      // aparecen, y el servidor también lo bloquea aunque se
-                      // fuerce desde fuera de la app.
-                      DropdownButtonFormField<EstadoTrabajo>(
-                        initialValue: _estadoControlado(trabajo.estado) ? null : trabajo.estado,
-                        decoration: InputDecoration(
-                          labelText: 'Estado',
-                          helperText: switch (trabajo.estado) {
-                            EstadoTrabajo.terminado || EstadoTrabajo.archivado => 'Ya está finalizado',
-                            EstadoTrabajo.pendienteConfirmacion => 'Esperando tu confirmación',
-                            _ => null,
+                      // historial y avisan a los demás. El servidor ya lo
+                      // bloquea aunque se fuerce desde fuera de la app, pero
+                      // antes el desplegable seguía mostrando las opciones
+                      // como tocables -- se podía elegir "En curso" sobre un
+                      // trabajo ya terminado (el servidor lo rechazaba en
+                      // silencio) y, si entretanto el estado local optimista
+                      // hacía reaparecer el botón "Finalizar", volver a
+                      // finalizarlo creaba un segundo evento en el historial.
+                      // Ahora, si ya está en un estado controlado, el campo
+                      // se deshabilita del todo en vez de solo vaciar el
+                      // valor seleccionado (auditoría de producto, octubre
+                      // 2026).
+                      if (_estadoControlado(trabajo.estado))
+                        TextFormField(
+                          key: ValueKey(trabajo.estado),
+                          initialValue: _nombreEstado(trabajo.estado),
+                          enabled: false,
+                          decoration: InputDecoration(
+                            labelText: 'Estado',
+                            helperText: switch (trabajo.estado) {
+                              EstadoTrabajo.pendienteConfirmacion => 'Esperando tu confirmación',
+                              _ => 'Ya está finalizado',
+                            },
+                          ),
+                        )
+                      else
+                        DropdownButtonFormField<EstadoTrabajo>(
+                          initialValue: trabajo.estado,
+                          decoration: const InputDecoration(labelText: 'Estado'),
+                          items: _estadosEditables
+                              .map((e) => DropdownMenuItem(value: e, child: Text(_nombreEstado(e))))
+                              .toList(),
+                          onChanged: (v) {
+                            if (v != null) TrabajoService.actualizarEstado(casa.id, trabajo.id, v);
                           },
                         ),
-                        items: _estadosEditables
-                            .map((e) => DropdownMenuItem(value: e, child: Text(_nombreEstado(e))))
-                            .toList(),
-                        onChanged: (v) {
-                          if (v != null) TrabajoService.actualizarEstado(casa.id, trabajo.id, v);
-                        },
-                      ),
                       if (trabajo.profesionalNombre != null) ...[
                         const SizedBox(height: 8),
                         Text('Profesional: ${trabajo.profesionalNombre}${trabajo.profesionalContacto != null ? ' · ${trabajo.profesionalContacto}' : ''}'),

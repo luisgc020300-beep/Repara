@@ -126,26 +126,39 @@ class TrabajoProDetailScreen extends StatelessWidget {
                       // "Terminado"/"Archivado"/"PendienteConfirmacion" nunca
                       // son una opción aquí -- solo se alcanzan a través de
                       // "Finalizar" (auditoría de seguridad, octubre 2026).
-                      // Antes saltarse ese botón dejaba el trabajo marcado
-                      // como terminado sin avisar al propietario ni
-                      // archivar nada.
-                      DropdownButtonFormField<EstadoTrabajo>(
-                        initialValue: _estadoControlado(trabajo.estado) ? null : trabajo.estado,
-                        decoration: InputDecoration(
-                          labelText: 'Estado',
-                          helperText: switch (trabajo.estado) {
-                            EstadoTrabajo.terminado || EstadoTrabajo.archivado => 'Ya está finalizado',
-                            EstadoTrabajo.pendienteConfirmacion => 'Esperando confirmación del propietario',
-                            _ => null,
+                      // El servidor ya lo bloquea aunque se fuerce desde fuera
+                      // de la app, pero antes el desplegable seguía
+                      // mostrando las opciones como tocables en un trabajo ya
+                      // cerrado -- el servidor lo rechazaba en silencio, pero
+                      // si el estado local optimista hacía reaparecer el
+                      // botón "Finalizar", volver a tocarlo duplicaba el
+                      // evento en el historial (auditoría de producto,
+                      // octubre 2026). Ahora, si ya está en un estado
+                      // controlado, el campo se deshabilita del todo.
+                      if (_estadoControlado(trabajo.estado))
+                        TextFormField(
+                          key: ValueKey(trabajo.estado),
+                          initialValue: _nombreEstado(trabajo.estado),
+                          enabled: false,
+                          decoration: InputDecoration(
+                            labelText: 'Estado',
+                            helperText: switch (trabajo.estado) {
+                              EstadoTrabajo.pendienteConfirmacion => 'Esperando confirmación del propietario',
+                              _ => 'Ya está finalizado',
+                            },
+                          ),
+                        )
+                      else
+                        DropdownButtonFormField<EstadoTrabajo>(
+                          initialValue: trabajo.estado,
+                          decoration: const InputDecoration(labelText: 'Estado'),
+                          items: _estadosEditables
+                              .map((e) => DropdownMenuItem(value: e, child: Text(_nombreEstado(e))))
+                              .toList(),
+                          onChanged: (v) {
+                            if (v != null) TrabajoService.actualizarEstado(casaId, trabajoId, v);
                           },
                         ),
-                        items: _estadosEditables
-                            .map((e) => DropdownMenuItem(value: e, child: Text(_nombreEstado(e))))
-                            .toList(),
-                        onChanged: (v) {
-                          if (v != null) TrabajoService.actualizarEstado(casaId, trabajoId, v);
-                        },
-                      ),
                       if (trabajo.presupuesto != null) ...[
                         const SizedBox(height: 8),
                         Text('Presupuesto acordado: ${trabajo.presupuesto!.toStringAsFixed(2)} €', style: const TextStyle(fontWeight: FontWeight.w600)),
