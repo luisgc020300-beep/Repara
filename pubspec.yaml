@@ -35,6 +35,15 @@ dependencies:
   url_launcher: ^6.3.1
   share_plus: ^10.1.4
 
+  # Seguridad local (misión de endurecimiento pre-lanzamiento, octubre 2026):
+  # bloqueo biométrico de la app, nunca sustituto de Firebase Auth/reglas.
+  local_auth: ^2.3.0
+  # Import directo para LocalAuthException/LocalAuthExceptionCode -- es el
+  # paquete de tipos compartido de local_auth, no una dependencia transitiva
+  # cualquiera.
+  local_auth_platform_interface: ^1.1.0
+  flutter_secure_storage: ^9.2.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
