@@ -3,6 +3,9 @@
     <uses-permission android:name="android.permission.CAMERA"/>
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
+    <!-- Bloqueo biométrico (local_auth) -- obligatorio en Android, sin esto
+         authenticate() falla antes incluso de llegar al diálogo nativo. -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
     <application
         android:label="repara"
         android:name="${applicationName}"
