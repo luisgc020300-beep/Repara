@@ -1,34 +1,21 @@
 // lib/services/security/security_preferences_service.dart
 //
 // Ajustes de seguridad local (misión de seguridad local, octubre 2026):
-// bloqueo biométrico, tiempo de bloqueo, protección de documentos
-// sensibles y verificación al entrar en REPARA Pro.
+// protección de documentos sensibles y verificación al entrar en REPARA Pro.
+// El bloqueo general de la app al abrirla (con su propio timeout) se quitó
+// -- el launcher del móvil ya ofrece "requerir Face ID" por app, así que
+// duplicarlo dentro de Repara no aportaba nada.
 //
 // Se guardan con flutter_secure_storage (Keychain en iOS, Keystore/
 // EncryptedSharedPreferences en Android) y NUNCA con SharedPreferences --
 // son ajustes que controlan una cerradura de seguridad local, y un
 // dispositivo rooteado/jailbreak no debería poder desactivarlos solo con
-// editar un archivo de preferencias en claro (sección 8 de la misión).
+// editar un archivo de preferencias en claro.
 //
 // Esto nunca concede permisos de negocio: solo decide si la UI pide
 // biometría antes de dejar continuar. Los permisos reales siguen estando
 // en Firebase Auth / Firestore / Storage / Cloud Functions.
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-
-/// Opciones de "bloquear después de" (sección 5 de la misión). 5 minutos
-/// por defecto -- ni tan agresivo como para resultar molesto en el uso
-/// normal (abrir y cerrar la app varias veces seguidas revisando algo), ni
-/// tan laxo como para dejar la app desbloqueada toda una tarde.
-enum LockTimeout {
-  immediate(Duration.zero, 'Inmediatamente'),
-  oneMinute(Duration(minutes: 1), '1 minuto'),
-  fiveMinutes(Duration(minutes: 5), '5 minutos'),
-  fifteenMinutes(Duration(minutes: 15), '15 minutos');
-
-  const LockTimeout(this.duration, this.etiqueta);
-  final Duration duration;
-  final String etiqueta;
-}
 
 class SecurityPreferencesService {
   SecurityPreferencesService._();
@@ -38,22 +25,8 @@ class SecurityPreferencesService {
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
   );
 
-  static const _kBiometricLockEnabled = 'security_biometric_lock_enabled';
-  static const _kLockTimeout = 'security_lock_timeout';
   static const _kDocumentProtectionEnabled = 'security_document_protection_enabled';
   static const _kProGateEnabled = 'security_pro_gate_enabled';
-
-  Future<bool> isBiometricLockEnabled() async => (await _storage.read(key: _kBiometricLockEnabled)) == 'true';
-
-  Future<void> setBiometricLockEnabled(bool valor) =>
-      _storage.write(key: _kBiometricLockEnabled, value: valor.toString());
-
-  Future<LockTimeout> getLockTimeout() async {
-    final guardado = await _storage.read(key: _kLockTimeout);
-    return LockTimeout.values.firstWhere((t) => t.name == guardado, orElse: () => LockTimeout.fiveMinutes);
-  }
-
-  Future<void> setLockTimeout(LockTimeout valor) => _storage.write(key: _kLockTimeout, value: valor.name);
 
   Future<bool> isDocumentProtectionEnabled() async =>
       (await _storage.read(key: _kDocumentProtectionEnabled)) == 'true';
@@ -69,8 +42,6 @@ class SecurityPreferencesService {
   /// estado limpio, igual que FcmService.olvidarEsteDispositivo() ya hace
   /// con el token de notificaciones.
   Future<void> limpiarTodo() async {
-    await _storage.delete(key: _kBiometricLockEnabled);
-    await _storage.delete(key: _kLockTimeout);
     await _storage.delete(key: _kDocumentProtectionEnabled);
     await _storage.delete(key: _kProGateEnabled);
   }

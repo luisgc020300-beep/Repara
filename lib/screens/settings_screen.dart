@@ -27,7 +27,6 @@ import '../services/fcm_service.dart';
 import '../core/service_locator.dart';
 import '../services/invitacion_service.dart';
 import '../services/profesional_service.dart';
-import '../services/security/app_lock_controller.dart';
 import '../services/security/biometric_service.dart';
 import '../services/security/security_preferences_service.dart';
 import '../theme/design_tokens.dart';
@@ -480,9 +479,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       seleccionado ? Icon(Icons.check, color: context.colors.brand, size: 20) : null;
 }
 
-/// Ajustes de seguridad local (Fase D de la misión de endurecimiento,
-/// octubre 2026). Puramente local: nunca sustituye a Firebase Auth/reglas,
-/// solo decide si AppLockController pide biometría (ver app_lock_controller.dart).
+/// Ajustes de seguridad local (misión de endurecimiento, octubre 2026).
+/// Puramente local: nunca sustituye a Firebase Auth/reglas. El bloqueo
+/// general de la app al abrirla se quitó (octubre 2026, a petición del CEO:
+/// el propio launcher del móvil ya ofrece "requerir Face ID" por app) --
+/// solo quedan los dos gates puntuales, documentos y acceso a Pro.
 class _SeccionSeguridad extends StatefulWidget {
   const _SeccionSeguridad();
 
@@ -493,10 +494,8 @@ class _SeccionSeguridad extends StatefulWidget {
 class _SeccionSeguridadState extends State<_SeccionSeguridad> {
   bool _cargando = true;
   bool _biometriaDisponible = false;
-  bool _activado = false;
   bool _documentosProtegidos = false;
   bool _proProtegido = false;
-  LockTimeout _timeout = LockTimeout.fiveMinutes;
 
   @override
   void initState() {
@@ -507,25 +506,15 @@ class _SeccionSeguridadState extends State<_SeccionSeguridad> {
   Future<void> _cargar() async {
     final biometria = sl<BiometricService>();
     final disponible = await biometria.isAvailable();
-    final activado = await SecurityPreferencesService.instance.isBiometricLockEnabled();
-    final timeout = await SecurityPreferencesService.instance.getLockTimeout();
     final documentosProtegidos = await SecurityPreferencesService.instance.isDocumentProtectionEnabled();
     final proProtegido = await SecurityPreferencesService.instance.isProGateEnabled();
     if (!mounted) return;
     setState(() {
       _biometriaDisponible = disponible;
-      _activado = activado;
-      _timeout = timeout;
       _documentosProtegidos = documentosProtegidos;
       _proProtegido = proProtegido;
       _cargando = false;
     });
-  }
-
-  Future<void> _cambiarActivado(bool valor) async {
-    setState(() => _activado = valor);
-    await SecurityPreferencesService.instance.setBiometricLockEnabled(valor);
-    await AppLockController.instance.refrescarAjustes();
   }
 
   Future<void> _cambiarProProtegido(bool valor) async {
@@ -538,31 +527,6 @@ class _SeccionSeguridadState extends State<_SeccionSeguridad> {
     await SecurityPreferencesService.instance.setDocumentProtectionEnabled(valor);
   }
 
-  Future<void> _elegirTimeout() async {
-    final elegido = await showDialog<LockTimeout>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Bloquear tras'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (final opcion in LockTimeout.values)
-              ListTile(
-                title: Text(opcion.etiqueta),
-                trailing: opcion == _timeout ? Icon(Icons.check, color: context.colors.brand) : null,
-                selected: opcion == _timeout,
-                onTap: () => Navigator.pop(ctx, opcion),
-              ),
-          ],
-        ),
-        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar'))],
-      ),
-    );
-    if (elegido == null || elegido == _timeout) return;
-    setState(() => _timeout = elegido);
-    await SecurityPreferencesService.instance.setLockTimeout(elegido);
-  }
-
   @override
   Widget build(BuildContext context) {
     if (_cargando) return const SizedBox.shrink();
@@ -572,25 +536,6 @@ class _SeccionSeguridadState extends State<_SeccionSeguridad> {
           ? 'Este dispositivo no tiene biometría configurada (Face ID, huella) o la app no tiene permiso para usarla.'
           : null,
       rows: [
-        IosRow(
-          icon: Icons.fingerprint,
-          iconColor: context.colors.brand,
-          title: 'Bloqueo biométrico',
-          subtitle: _biometriaDisponible ? 'Pide Face ID/huella al volver a abrir Repara' : 'No disponible en este dispositivo',
-          showChevron: false,
-          trailing: Switch(
-            value: _activado && _biometriaDisponible,
-            onChanged: _biometriaDisponible ? _cambiarActivado : null,
-          ),
-        ),
-        if (_activado && _biometriaDisponible)
-          IosRow(
-            icon: Icons.timer_outlined,
-            iconColor: Colors.blueGrey,
-            title: 'Bloquear tras',
-            subtitle: _timeout.etiqueta,
-            onTap: _elegirTimeout,
-          ),
         IosRow(
           icon: Icons.folder_shared_outlined,
           iconColor: Colors.deepOrange,

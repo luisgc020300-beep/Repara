@@ -5,7 +5,6 @@
 // notificaciones, es explícitamente posterior al MVP).
 import 'package:get_it/get_it.dart';
 
-import '../services/security/app_lock_controller.dart';
 import '../services/security/biometric_service.dart';
 import 'casa_context.dart';
 
@@ -17,12 +16,11 @@ Future<void> setupLocator() async {
   // BiometricService SIEMPRE se resuelve vía sl<BiometricService>(), nunca
   // instanciando LocalAuthBiometricService() directamente en una pantalla
   // -- es lo que permite a los tests sustituirlo por un
-  // FakeBiometricService sin tocar hardware real (sección 32 de la misión
-  // de seguridad local). AppLockController.instance no necesita pasar por
-  // aquí porque nada lo testea en aislamiento sin también testear
-  // BiometricService.
+  // FakeBiometricService sin tocar hardware real. Se usa para los gates
+  // puntuales de documentos sensibles y de entrar en Repara Pro (el
+  // bloqueo general de la app al abrirla se quitó -- el launcher del
+  // móvil ya ofrece "requerir Face ID" por app, octubre 2026).
   if (!sl.isRegistered<BiometricService>()) {
     sl.registerLazySingleton<BiometricService>(() => LocalAuthBiometricService());
   }
-  await AppLockController.instance.init();
 }
