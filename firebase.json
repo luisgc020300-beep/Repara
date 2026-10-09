@@ -4,7 +4,7 @@
       "android": {
         "default": {
           "projectId": "repara-hogar-app",
-          "appId": "1:199074592333:android:94a0d761e267706b084e04",
+          "appId": "1:199074592333:android:cf2a32c7d1aa5162084e04",
           "fileOutput": "android/app/google-services.json"
         }
       },
@@ -12,7 +12,7 @@
         "lib/firebase_options.dart": {
           "projectId": "repara-hogar-app",
           "configurations": {
-            "android": "1:199074592333:android:94a0d761e267706b084e04",
+            "android": "1:199074592333:android:cf2a32c7d1aa5162084e04",
             "ios": "1:199074592333:ios:820acabe170e2fbd084e04"
           }
         }

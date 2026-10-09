@@ -51,7 +51,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyCk78ygZpaBFF4tnQPBKW-XU33PACuYMxo',
-    appId: '1:199074592333:android:94a0d761e267706b084e04',
+    appId: '1:199074592333:android:cf2a32c7d1aa5162084e04',
     messagingSenderId: '199074592333',
     projectId: 'repara-hogar-app',
     storageBucket: 'repara-hogar-app.firebasestorage.app',
