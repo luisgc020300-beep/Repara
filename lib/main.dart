@@ -90,7 +90,12 @@ void main() async {
       FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
       return true;
     };
-    await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(!kDebugMode);
+    // TEMPORAL -- activado también en debug para diagnosticar el cierre al
+    // entrar en modo Pro (octubre 2026): Crashlytics nunca había recibido
+    // ni un solo evento porque todas las pruebas hasta ahora eran con
+    // flutter build apk --debug, que lo desactiva. Volver a `!kDebugMode`
+    // en cuanto quede identificado el crash real.
+    await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(true);
   }
 
   await setupLocator();
