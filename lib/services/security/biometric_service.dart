@@ -49,7 +49,14 @@ class LocalAuthBiometricService implements BiometricService {
     try {
       final exito = await _auth.authenticate(
         localizedReason: reason,
-        options: const AuthenticationOptions(biometricOnly: false, stickyAuth: true),
+        // biometricOnly: true -- con `false`, el propio sistema operativo
+        // puede ofrecer el PIN/patrón del dispositivo como alternativa
+        // dentro del mismo diálogo, que es justo lo que no se quería aquí
+        // (CEO, octubre 2026: "pide el código del móvil, Face ID sería más
+        // rápido"). Si la biometría falla/no está disponible, el fallback ya
+        // es la pantalla de bloqueo ofreciendo cerrar sesión (ver Caso 4),
+        // no el PIN del sistema.
+        options: const AuthenticationOptions(biometricOnly: true, stickyAuth: true),
       );
       // Según la documentación del propio paquete: `false` es un reto
       // fallido sin más efectos (p.ej. huella no reconocida una vez) --
