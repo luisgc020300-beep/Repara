@@ -14,10 +14,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../models/casa.dart';
+import '../models/contacto.dart';
 import '../models/elemento.dart';
 import '../models/habitacion.dart';
 import '../models/registro.dart';
 import '../services/analytics_service.dart';
+import '../services/contacto_service.dart';
 import '../services/elemento_service.dart';
 import '../services/habitacion_service.dart';
 import '../theme/design_tokens.dart';
@@ -48,6 +50,7 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
   late final _modeloCtrl = TextEditingController(text: widget.existente?.modelo ?? '');
   late final _costeCtrl = TextEditingController(text: widget.existente?.coste?.toString() ?? '');
   late final _profesionalCtrl = TextEditingController(text: widget.existente?.profesionalNombre ?? '');
+  final _profesionalFocusNode = FocusNode();
   late final _intervaloCtrl = TextEditingController(text: widget.existente?.intervaloMantenimientoMeses?.toString() ?? '');
   late DateTime? _fechaInstalacion = widget.existente?.fechaInstalacion;
   late DateTime? _garantiaHasta = widget.existente?.garantiaHasta;
@@ -57,6 +60,20 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
   bool _guardando = false;
   bool _sugiriendo = false;
 
+  // Para que al tocar "Profesional" salgan por defecto los contactos ya
+  // guardados de esta casa, en vez de obligar a teclear el nombre entero
+  // cada vez (CEO, octubre 2026).
+  List<Contacto> _contactos = const [];
+  StreamSubscription<List<Contacto>>? _contactosSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _contactosSub = ContactoService.streamContactos(widget.casa.id).listen((c) {
+      if (mounted) setState(() => _contactos = c);
+    });
+  }
+
   @override
   void dispose() {
     _nombreCtrl.dispose();
@@ -64,7 +81,9 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
     _modeloCtrl.dispose();
     _costeCtrl.dispose();
     _profesionalCtrl.dispose();
+    _profesionalFocusNode.dispose();
     _intervaloCtrl.dispose();
+    _contactosSub?.cancel();
     super.dispose();
   }
 
@@ -280,7 +299,46 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: TextField(controller: _profesionalCtrl, decoration: const InputDecoration(labelText: 'Profesional (opcional)')),
+                child: RawAutocomplete<Contacto>(
+                  textEditingController: _profesionalCtrl,
+                  focusNode: _profesionalFocusNode,
+                  displayStringForOption: (c) => c.nombre,
+                  // Vacío (campo recién tocado) -> todos los contactos
+                  // guardados, no solo los que coinciden con lo tecleado.
+                  optionsBuilder: (value) => value.text.isEmpty
+                      ? _contactos
+                      : _contactos.where((c) => c.nombre.toLowerCase().contains(value.text.toLowerCase())),
+                  onSelected: (c) => _profesionalCtrl.text = c.nombre,
+                  fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) => TextField(
+                    controller: controller,
+                    focusNode: focusNode,
+                    decoration: const InputDecoration(labelText: 'Profesional (opcional)'),
+                  ),
+                  optionsViewBuilder: (context, onSelected, options) => Align(
+                    alignment: Alignment.topLeft,
+                    child: Material(
+                      elevation: 4,
+                      borderRadius: BorderRadius.circular(10),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 220, minWidth: 220),
+                        child: ListView.builder(
+                          padding: EdgeInsets.zero,
+                          shrinkWrap: true,
+                          itemCount: options.length,
+                          itemBuilder: (context, i) {
+                            final c = options.elementAt(i);
+                            return ListTile(
+                              dense: true,
+                              title: Text(c.nombre),
+                              subtitle: c.especialidad != null ? Text(c.especialidad!) : null,
+                              onTap: () => onSelected(c),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),

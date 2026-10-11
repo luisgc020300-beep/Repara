@@ -55,126 +55,7 @@ class _HomeTabState extends State<HomeTab> {
       ),
       body: Column(
         children: [
-          FutureBuilder<List<Elemento>>(
-            future: ElementoService.conGarantiaProximaAVencer(widget.casa.id),
-            builder: (context, snapshot) {
-              final elementos = snapshot.data ?? [];
-              if (elementos.isEmpty) return const SizedBox.shrink();
-              return Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: Card(
-                  color: context.colors.warning.withValues(alpha: 0.12),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(16),
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => GarantiasProximasScreen(casa: widget.casa, elementos: elementos)),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(14),
-                      child: Row(
-                        children: [
-                          Icon(Icons.shield_outlined, color: context.colors.warning),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              elementos.length == 1
-                                  ? 'La garantía de "${elementos.first.nombre}" termina pronto.'
-                                  : '${elementos.length} garantías están a punto de terminar.',
-                              style: TextStyle(color: context.colors.ink, fontWeight: FontWeight.w600),
-                            ),
-                          ),
-                          Icon(Icons.chevron_right, color: context.colors.inkMuted),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-          FutureBuilder<List<Elemento>>(
-            future: ElementoService.conRevisionPendiente(widget.casa.id),
-            builder: (context, snapshot) {
-              final elementos = snapshot.data ?? [];
-              if (elementos.isEmpty) return const SizedBox.shrink();
-              return Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: Card(
-                  color: context.colors.brand.withValues(alpha: 0.10),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(16),
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => RevisionesPendientesScreen(casa: widget.casa, elementos: elementos)),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(14),
-                      child: Row(
-                        children: [
-                          Icon(Icons.build_circle_outlined, color: context.colors.brand),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              elementos.length == 1
-                                  ? 'Toca revisar "${elementos.first.nombre}".'
-                                  : '${elementos.length} elementos tienen una revisión pendiente.',
-                              style: TextStyle(color: context.colors.ink, fontWeight: FontWeight.w600),
-                            ),
-                          ),
-                          Icon(Icons.chevron_right, color: context.colors.inkMuted),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-          StreamBuilder<List<Map<String, dynamic>>>(
-            stream: RegistroService.streamPendientes(widget.casa.id),
-            builder: (context, snapshot) {
-              final pendientes = snapshot.data ?? const [];
-              if (pendientes.isEmpty) return const SizedBox.shrink();
-              return Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: Card(
-                  clipBehavior: Clip.antiAlias,
-                  child: Theme(
-                    data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                    child: ExpansionTile(
-                      leading: Icon(Icons.hourglass_top_outlined, color: context.colors.brand),
-                      title: Text(
-                        pendientes.length == 1 ? '1 registro en curso con un profesional' : '${pendientes.length} registros en curso con un profesional',
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      children: [
-                        for (final p in pendientes) ...[
-                          Divider(height: 1, indent: 56, color: context.colors.inkMuted.withValues(alpha: 0.14)),
-                          IosRow(
-                            icon: Icons.build_outlined,
-                            iconColor: context.colors.brand,
-                            title: p['registroTitulo'] as String? ?? '',
-                            subtitle: p['elementoNombre'] as String? ?? '',
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => RegistroDetailScreen(
-                                  casa: widget.casa,
-                                  elementoId: p['elementoId'] as String? ?? '',
-                                  registroId: p['registroId'] as String? ?? '',
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
+          _AvisosCard(casa: widget.casa),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
             child: TextField(
@@ -259,6 +140,165 @@ class _HomeTabState extends State<HomeTab> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Las tres señales de "esto necesita tu atención" (garantías, revisiones,
+/// registros en curso con un profesional) vivían como tres tarjetas
+/// apiladas y empujaban la lista fuera de la pantalla en cuanto había más
+/// de una activa a la vez (feedback del CEO, octubre 2026). Ahora son una
+/// sola tarjeta plegada por defecto -- una línea si no hay nada que ver,
+/// una línea con el recuento si lo hay, y el detalle de cada una solo al
+/// tocarla.
+class _AvisosCard extends StatelessWidget {
+  const _AvisosCard({required this.casa});
+
+  final Casa casa;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<List<Elemento>>>(
+      future: Future.wait([
+        ElementoService.conGarantiaProximaAVencer(casa.id),
+        ElementoService.conRevisionPendiente(casa.id),
+      ]),
+      builder: (context, snapshot) {
+        final garantias = snapshot.data?[0] ?? const <Elemento>[];
+        final revisiones = snapshot.data?[1] ?? const <Elemento>[];
+        return StreamBuilder<List<Map<String, dynamic>>>(
+          stream: RegistroService.streamPendientes(casa.id),
+          builder: (context, pendSnapshot) {
+            final pendientes = pendSnapshot.data ?? const [];
+            final numAvisos = (garantias.isNotEmpty ? 1 : 0) + (revisiones.isNotEmpty ? 1 : 0) + (pendientes.isNotEmpty ? 1 : 0);
+            if (numAvisos == 0) return const SizedBox.shrink();
+
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Card(
+                clipBehavior: Clip.antiAlias,
+                child: Theme(
+                  data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                  child: ExpansionTile(
+                    leading: Icon(Icons.notifications_active_outlined, color: context.colors.warning),
+                    title: Text(
+                      numAvisos == 1 ? 'Tienes 1 aviso' : 'Tienes $numAvisos avisos',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    children: [
+                      if (garantias.isNotEmpty)
+                        _filaAviso(
+                          context,
+                          icon: Icons.shield_outlined,
+                          iconColor: context.colors.warning,
+                          texto: garantias.length == 1
+                              ? 'La garantía de "${garantias.first.nombre}" termina pronto.'
+                              : '${garantias.length} garantías están a punto de terminar.',
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => GarantiasProximasScreen(casa: casa, elementos: garantias)),
+                          ),
+                        ),
+                      if (revisiones.isNotEmpty)
+                        _filaAviso(
+                          context,
+                          icon: Icons.build_circle_outlined,
+                          iconColor: context.colors.brand,
+                          texto: revisiones.length == 1
+                              ? 'Toca revisar "${revisiones.first.nombre}".'
+                              : '${revisiones.length} elementos tienen una revisión pendiente.',
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => RevisionesPendientesScreen(casa: casa, elementos: revisiones)),
+                          ),
+                        ),
+                      if (pendientes.isNotEmpty)
+                        _filaAviso(
+                          context,
+                          icon: Icons.hourglass_top_outlined,
+                          iconColor: context.colors.brand,
+                          texto: pendientes.length == 1
+                              ? '1 registro en curso con un profesional.'
+                              : '${pendientes.length} registros en curso con un profesional.',
+                          // Con más de un pendiente no hay un único registro al
+                          // que navegar -- se despliega la lista en vez de
+                          // saltar directo, igual que hacía el banner suelto.
+                          children: pendientes.length == 1
+                              ? null
+                              : pendientes
+                                  .map((p) => IosRow(
+                                        icon: Icons.build_outlined,
+                                        iconColor: context.colors.brand,
+                                        title: p['registroTitulo'] as String? ?? '',
+                                        subtitle: p['elementoNombre'] as String? ?? '',
+                                        onTap: () => Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => RegistroDetailScreen(
+                                              casa: casa,
+                                              elementoId: p['elementoId'] as String? ?? '',
+                                              registroId: p['registroId'] as String? ?? '',
+                                            ),
+                                          ),
+                                        ),
+                                      ))
+                                  .toList(),
+                          onTap: pendientes.length == 1
+                              ? () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => RegistroDetailScreen(
+                                        casa: casa,
+                                        elementoId: pendientes.first['elementoId'] as String? ?? '',
+                                        registroId: pendientes.first['registroId'] as String? ?? '',
+                                      ),
+                                    ),
+                                  )
+                              : null,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _filaAviso(
+    BuildContext context, {
+    required IconData icon,
+    required Color iconColor,
+    required String texto,
+    VoidCallback? onTap,
+    List<Widget>? children,
+  }) {
+    final divisor = Divider(height: 1, indent: 56, color: context.colors.inkMuted.withValues(alpha: 0.14));
+    if (children != null) {
+      // Sub-lista desplegable dentro de la propia fila (p.ej. varios
+      // registros en curso) -- mismo ExpansionTile anidado que ya usaba el
+      // banner de pendientes suelto.
+      return Column(
+        children: [
+          divisor,
+          Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              leading: Icon(icon, color: iconColor),
+              title: Text(texto),
+              children: children,
+            ),
+          ),
+        ],
+      );
+    }
+    return Column(
+      children: [
+        divisor,
+        IosRow(icon: icon, iconColor: iconColor, title: texto, onTap: onTap),
+      ],
     );
   }
 }
