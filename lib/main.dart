@@ -39,7 +39,8 @@ Future<void> _abrirDestinoPush(RemoteMessage message) async {
     context,
     tipo: tipo,
     casaId: data['casaId'] as String?,
-    trabajoId: data['trabajoId'] as String?,
+    elementoId: data['elementoId'] as String?,
+    registroId: data['registroId'] as String?,
     pagoId: data['pagoId'] as String?,
   );
 }

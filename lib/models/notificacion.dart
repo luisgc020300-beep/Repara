@@ -20,7 +20,7 @@ const _tiposParaProfesional = {
   'cambio_alcance_aprobado',
   'cambio_alcance_rechazado',
   'pago_registrado',
-  // Modelo de dos pasos para finalizar un trabajo (octubre 2026): el
+  // Modelo de dos pasos para finalizar un registro (octubre 2026): el
   // propietario rechazando la finalización del profesional es, igual que
   // los de arriba, un aviso PARA el profesional -- sin esto se filtraba de
   // su lista de notificaciones en modo Pro, y una push de este tipo le
@@ -39,7 +39,8 @@ class Notificacion {
     required this.cuerpo,
     required this.leida,
     this.casaId,
-    this.trabajoId,
+    this.elementoId,
+    this.registroId,
     this.presupuestoId,
     this.cambioAlcanceId,
     this.pagoId,
@@ -52,7 +53,8 @@ class Notificacion {
   final String cuerpo;
   final bool leida;
   final String? casaId;
-  final String? trabajoId;
+  final String? elementoId;
+  final String? registroId;
   final String? presupuestoId;
   final String? cambioAlcanceId;
   final String? pagoId;
@@ -69,7 +71,8 @@ class Notificacion {
       cuerpo: data['cuerpo'] as String? ?? '',
       leida: data['leida'] as bool? ?? false,
       casaId: data['casaId'] as String?,
-      trabajoId: data['trabajoId'] as String?,
+      elementoId: data['elementoId'] as String?,
+      registroId: data['registroId'] as String?,
       presupuestoId: data['presupuestoId'] as String?,
       cambioAlcanceId: data['cambioAlcanceId'] as String?,
       pagoId: data['pagoId'] as String?,

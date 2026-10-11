@@ -15,7 +15,7 @@ import '../../services/profesional_service.dart';
 import '../../theme/design_tokens.dart';
 import '../../widgets/boton_ajustes.dart';
 import '../../widgets/ios_list.dart';
-import 'trabajo_pro_detail_screen.dart';
+import 'registro_pro_detail_screen.dart';
 
 class PresupuestosProTab extends StatefulWidget {
   const PresupuestosProTab({super.key});
@@ -27,28 +27,28 @@ class PresupuestosProTab extends StatefulWidget {
 class _PresupuestoConTrabajo {
   const _PresupuestoConTrabajo({required this.presupuesto, required this.trabajo});
   final Presupuesto presupuesto;
-  final TrabajoProRef trabajo;
+  final RegistroProRef trabajo;
 }
 
 class _PresupuestosProTabState extends State<PresupuestosProTab> {
-  StreamSubscription<List<TrabajoProRef>>? _trabajosSub;
+  StreamSubscription<List<RegistroProRef>>? _trabajosSub;
   final Map<String, StreamSubscription<List<Presupuesto>>> _presupuestoSubs = {};
-  final Map<String, TrabajoProRef> _trabajosPorId = {};
+  final Map<String, RegistroProRef> _trabajosPorId = {};
   final Map<String, List<Presupuesto>> _presupuestosPorTrabajo = {};
   bool _cargando = true;
 
   @override
   void initState() {
     super.initState();
-    _trabajosSub = ProfesionalService.streamTrabajosProRefs().listen(_onTrabajos);
+    _trabajosSub = ProfesionalService.streamRegistrosProRefs().listen(_onTrabajos);
   }
 
   // Cada trabajo tiene su propia subcolección de presupuestos -- no existe
   // una consulta única "todos mis presupuestos" (el profesional no es
   // miembro de ninguna casa, ver firestore.rules), así que se escucha un
-  // stream de presupuestos por cada trabajo asignado y se combinan aquí.
-  void _onTrabajos(List<TrabajoProRef> trabajos) {
-    final idsActuales = trabajos.map((t) => t.trabajoId).toSet();
+  // stream de presupuestos por cada registro asignado y se combinan aquí.
+  void _onTrabajos(List<RegistroProRef> trabajos) {
+    final idsActuales = trabajos.map((t) => t.registroId).toSet();
     for (final id in _presupuestoSubs.keys.toList()) {
       if (!idsActuales.contains(id)) {
         _presupuestoSubs.remove(id)?.cancel();
@@ -57,11 +57,11 @@ class _PresupuestosProTabState extends State<PresupuestosProTab> {
       }
     }
     for (final t in trabajos) {
-      _trabajosPorId[t.trabajoId] = t;
-      _presupuestoSubs.putIfAbsent(t.trabajoId, () {
-        return PresupuestoService.streamPresupuestos(t.casaId, t.trabajoId).listen((lista) {
+      _trabajosPorId[t.registroId] = t;
+      _presupuestoSubs.putIfAbsent(t.registroId, () {
+        return PresupuestoService.streamPresupuestos(t.casaId, t.elementoId, t.registroId).listen((lista) {
           if (!mounted) return;
-          setState(() => _presupuestosPorTrabajo[t.trabajoId] = lista);
+          setState(() => _presupuestosPorTrabajo[t.registroId] = lista);
         });
       });
     }
@@ -80,8 +80,8 @@ class _PresupuestosProTabState extends State<PresupuestosProTab> {
   @override
   Widget build(BuildContext context) {
     final todos = <_PresupuestoConTrabajo>[];
-    _presupuestosPorTrabajo.forEach((trabajoId, lista) {
-      final trabajo = _trabajosPorId[trabajoId];
+    _presupuestosPorTrabajo.forEach((registroId, lista) {
+      final trabajo = _trabajosPorId[registroId];
       if (trabajo == null) return;
       for (final p in lista) {
         todos.add(_PresupuestoConTrabajo(presupuesto: p, trabajo: trabajo));
@@ -126,7 +126,8 @@ class _PresupuestosProTabState extends State<PresupuestosProTab> {
                                     onTap: () => Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (_) => TrabajoProDetailScreen(casaId: item.trabajo.casaId, trabajoId: item.trabajo.trabajoId),
+                                        builder: (_) => RegistroProDetailScreen(
+                                            casaId: item.trabajo.casaId, elementoId: item.trabajo.elementoId, registroId: item.trabajo.registroId),
                                       ),
                                     ),
                                   ))
@@ -186,7 +187,7 @@ class _PresupuestoTile extends StatelessWidget {
     return IosRow(
       icon: _iconoGrupo(p.estado),
       iconColor: _colorGrupo(context, p.estado),
-      title: item.trabajo.trabajoTitulo,
+      title: item.trabajo.registroTitulo,
       subtitle: '${item.trabajo.casaNombre} · Presupuesto nº${p.numero}${p.version > 1 ? ' (v${p.version})' : ''}',
       trailing: Text('${p.total.toStringAsFixed(2)} €', style: const TextStyle(fontWeight: FontWeight.w700)),
       onTap: onTap,

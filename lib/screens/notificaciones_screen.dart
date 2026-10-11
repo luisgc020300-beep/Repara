@@ -25,7 +25,7 @@ class NotificacionesScreen extends StatelessWidget {
     if (!n.leida) await NotificacionService.marcarLeida(n.id);
     if (!context.mounted) return;
     if (n.tipo == 'presupuesto_enviado') unawaited(AnalyticsService.quoteViewed());
-    await abrirDestinoNotificacion(context, tipo: n.tipo, casaId: n.casaId, trabajoId: n.trabajoId, pagoId: n.pagoId);
+    await abrirDestinoNotificacion(context, tipo: n.tipo, casaId: n.casaId, elementoId: n.elementoId, registroId: n.registroId, pagoId: n.pagoId);
   }
 
   @override

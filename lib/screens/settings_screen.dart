@@ -218,7 +218,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (mounted) {
         AppError.showSuccess(
           context,
-          'Vinculado a "${resultado.trabajoTitulo}" en ${resultado.casaNombre}. Acéptalo desde Inicio Pro.',
+          'Vinculado a "${resultado.registroTitulo}" en ${resultado.casaNombre}. Acéptalo desde Inicio Pro.',
         );
       }
     } catch (e, st) {

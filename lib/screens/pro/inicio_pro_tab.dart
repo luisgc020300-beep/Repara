@@ -52,10 +52,10 @@ class InicioProTab extends StatelessWidget {
             },
           ),
           const SizedBox(height: 4),
-          StreamBuilder<List<TrabajoProRef>>(
-            stream: ProfesionalService.streamTrabajosProRefs(),
+          StreamBuilder<List<RegistroProRef>>(
+            stream: ProfesionalService.streamRegistrosProRefs(),
             builder: (context, snapshot) {
-              final trabajos = snapshot.data ?? const <TrabajoProRef>[];
+              final trabajos = snapshot.data ?? const <RegistroProRef>[];
               final totalCasas = trabajos.map((t) => t.casaId).toSet().length;
               return IosSection(
                 rows: [
@@ -119,7 +119,7 @@ class _InvitacionCardState extends State<_InvitacionCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(widget.invitacion.trabajoTitulo, style: const TextStyle(fontWeight: FontWeight.w700)),
+            Text(widget.invitacion.registroTitulo, style: const TextStyle(fontWeight: FontWeight.w700)),
             const SizedBox(height: 4),
             Text('en ${widget.invitacion.casaNombre}', style: TextStyle(color: context.colors.inkMuted)),
             const SizedBox(height: 10),

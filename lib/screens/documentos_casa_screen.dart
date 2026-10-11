@@ -2,7 +2,7 @@
 //
 // "La sección de documentos" (sección 2 del spec) a nivel de casa completa
 // -- incluye los guardados como borrador y los que no están ligados a
-// ningún elemento o trabajo concreto, para que nunca queden invisibles.
+// ningún elemento o registro concreto, para que nunca queden invisibles.
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -18,27 +18,27 @@ import '../widgets/app_error.dart';
 import '../widgets/ios_list.dart';
 import 'elemento_detail_screen.dart';
 import 'nuevo_documento_flow.dart';
-import 'trabajo_detail_screen.dart';
+import 'registro_detail_screen.dart';
 
 class DocumentosCasaScreen extends StatelessWidget {
   const DocumentosCasaScreen({required this.casa, super.key});
 
   final Casa casa;
 
-  // Breadcrumb tocable al elemento/trabajo de origen (auditoría de
+  // Breadcrumb tocable al elemento/registro de origen (auditoría de
   // producto, octubre 2026) -- si no tiene ninguno de los dos, se abre el
   // propio archivo en vez de no hacer nada al tocarlo.
   Future<void> _abrir(BuildContext context, Documento d) async {
+    if (d.registroId != null && d.elementoId != null) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => RegistroDetailScreen(casa: casa, elementoId: d.elementoId!, registroId: d.registroId!)));
+      return;
+    }
     if (d.elementoId != null) {
       Navigator.push(context, MaterialPageRoute(builder: (_) => ElementoDetailScreen(casa: casa, elementoId: d.elementoId!)));
       return;
     }
-    if (d.trabajoId != null) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => TrabajoDetailScreen(casa: casa, trabajoId: d.trabajoId!)));
-      return;
-    }
     // Abrir el archivo en sí (factura, garantía...) es el contenido sensible
-    // -- a diferencia de navegar al elemento/trabajo de origen, que solo
+    // -- a diferencia de navegar al elemento/registro de origen, que solo
     // enseña metadatos (sección 6 de la misión de seguridad local).
     if (await SecurityPreferencesService.instance.isDocumentProtectionEnabled()) {
       final verificado = await sl<BiometricService>().authenticate('Verifica tu identidad para abrir este documento') ==

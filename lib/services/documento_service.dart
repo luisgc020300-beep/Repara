@@ -25,7 +25,6 @@ class SugerenciaIA {
     this.garantiaTexto,
     this.observaciones,
     this.elementoSugerido,
-    this.trabajoSugerido,
     this.confianza,
   });
 
@@ -43,7 +42,6 @@ class SugerenciaIA {
   final String? garantiaTexto;
   final String? observaciones;
   final String? elementoSugerido;
-  final String? trabajoSugerido;
   final String? confianza;
 
   factory SugerenciaIA.fromMap(Map<String, dynamic> map) {
@@ -63,7 +61,6 @@ class SugerenciaIA {
       garantiaTexto: map['garantiaTexto'] as String?,
       observaciones: map['observaciones'] as String?,
       elementoSugerido: map['elementoSugerido'] as String?,
-      trabajoSugerido: map['trabajoSugerido'] as String?,
       confianza: map['confianza'] as String?,
     );
   }
@@ -86,16 +83,16 @@ class DocumentoService {
   static Stream<List<Documento>> streamDocumentos(
     String casaId, {
     String? elementoId,
-    String? trabajoId,
+    String? registroId,
   }) {
     Query<Map<String, dynamic>> q = _col(casaId).orderBy('createdAt', descending: true);
     if (elementoId != null) q = q.where('elementoId', isEqualTo: elementoId);
-    if (trabajoId != null) q = q.where('trabajoId', isEqualTo: trabajoId);
+    if (registroId != null) q = q.where('registroId', isEqualTo: registroId);
     return q.snapshots().map((s) => s.docs.map(Documento.fromDoc).toList()).conRegistroDeErrores();
   }
 
   /// Todos los documentos de la casa -- incluye los borradores sin elemento
-  /// ni trabajo asociado (sección 2 del spec: "sección de documentos").
+  /// ni registro asociado (sección 2 del spec: "sección de documentos").
   static Stream<List<Documento>> streamTodos(String casaId) {
     return _col(casaId)
         .orderBy('createdAt', descending: true)
@@ -104,14 +101,20 @@ class DocumentoService {
         .conRegistroDeErrores();
   }
 
-  /// [trabajoId] cambia la carpeta de destino en Storage -- un profesional
-  /// no miembro de la casa solo tiene permiso de escritura (storage.rules)
-  /// bajo la carpeta de SU trabajo concreto, nunca en la carpeta general de
-  /// documentos de la casa. Sin esto, aunque Firestore permitiera crear el
-  /// registro del documento, la subida del archivo en sí fallaría por
-  /// permisos de Storage.
-  static Future<String> subirArchivo(String casaId, File archivo, String nombreArchivo, {String? trabajoId}) async {
-    final carpeta = trabajoId != null ? 'porTrabajo/$trabajoId' : 'generales';
+  /// [elementoId]/[registroId] cambian la carpeta de destino en Storage --
+  /// un profesional no miembro de la casa solo tiene permiso de escritura
+  /// (storage.rules) bajo la carpeta de SU registro concreto, nunca en la
+  /// carpeta general de documentos de la casa. Sin esto, aunque Firestore
+  /// permitiera crear el registro del documento, la subida del archivo en
+  /// sí fallaría por permisos de Storage.
+  static Future<String> subirArchivo(
+    String casaId,
+    File archivo,
+    String nombreArchivo, {
+    String? elementoId,
+    String? registroId,
+  }) async {
+    final carpeta = (elementoId != null && registroId != null) ? 'porRegistro/$elementoId/$registroId' : 'generales';
     final ref = FirebaseStorage.instance
         .ref()
         .child('casas/$casaId/documentos/$carpeta/${DateTime.now().millisecondsSinceEpoch}_$nombreArchivo');
@@ -126,7 +129,6 @@ class DocumentoService {
   static Future<SugerenciaIA?> clasificarConIA(
     List<PaginaDocumento> paginas, {
     List<String> elementosDisponibles = const [],
-    List<String> trabajosDisponibles = const [],
   }) async {
     final paginasCodificadas = await Future.wait(paginas.map((p) async {
       final bytes = await p.archivo.readAsBytes();
@@ -136,7 +138,6 @@ class DocumentoService {
     final result = await callable.call<Map<String, dynamic>>({
       'paginas': paginasCodificadas,
       'elementosDisponibles': elementosDisponibles,
-      'trabajosDisponibles': trabajosDisponibles,
     });
     final sugerencia = result.data['sugerencia'] as Map<String, dynamic>?;
     if (sugerencia == null) return null;

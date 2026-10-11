@@ -10,15 +10,12 @@
 // acciones distintas en vez de una: abrir el chat con texto ya escrito, o
 // compartir foto+texto por el selector nativo (donde WhatsApp es una opción
 // más, junto a SMS/email/etc.).
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/contacto.dart';
-import '../models/evento.dart';
-import '../services/evento_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
 import '../widgets/ios_list.dart';
@@ -170,28 +167,5 @@ Future<void> _iniciarReporte(BuildContext context, {required String casaId, requ
     await Share.shareXFiles([XFile(foto.path)], text: descripcion);
   } catch (e) {
     if (context.mounted) AppError.show(context, 'No se pudo abrir el selector para compartir.');
-    return;
-  }
-
-  // El aviso queda registrado en la casa aunque el envío en sí ocurra fuera
-  // de Repara (WhatsApp/SMS) -- sin esto, "avisar al fontanero" desaparece
-  // de la memoria de la vivienda en el momento en que sales de la app.
-  final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
-  try {
-    await EventoService.crear(
-      casaId,
-      Evento(
-        id: '',
-        tipo: TipoEvento.nota,
-        titulo: 'Aviso enviado a ${contacto.nombre}',
-        descripcion: descripcion,
-        profesionalNombre: contacto.nombre,
-        fecha: DateTime.now(),
-      ),
-      createdBy: uid,
-    );
-  } catch (e) {
-    // El aviso ya se compartió -- que falle el registro en el historial no
-    // debe parecer un fallo del envío en sí.
   }
 }

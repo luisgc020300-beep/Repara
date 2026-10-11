@@ -33,26 +33,33 @@ class Profesional {
   }
 }
 
-/// Un trabajo aceptado por un profesional -- copia ligera guardada en
-/// users/{uid}.trabajosProRefs, suficiente para listar "Trabajos"/"Clientes"
-/// sin que el profesional necesite permiso de lectura sobre la casa entera.
-class TrabajoProRef {
-  const TrabajoProRef({
+/// Un registro aceptado por un profesional -- copia ligera guardada en
+/// users/{uid}.registrosProRefs, suficiente para listar "Trabajos"/"Clientes"
+/// sin que el profesional necesite permiso de lectura sobre la casa entera
+/// ni sobre el elemento padre (ver Registro.elementoNombre).
+class RegistroProRef {
+  const RegistroProRef({
     required this.casaId,
-    required this.trabajoId,
-    required this.trabajoTitulo,
+    required this.elementoId,
+    required this.elementoNombre,
+    required this.registroId,
+    required this.registroTitulo,
     required this.casaNombre,
   });
 
   final String casaId;
-  final String trabajoId;
-  final String trabajoTitulo;
+  final String elementoId;
+  final String elementoNombre;
+  final String registroId;
+  final String registroTitulo;
   final String casaNombre;
 
-  factory TrabajoProRef.fromMap(Map<String, dynamic> map) => TrabajoProRef(
+  factory RegistroProRef.fromMap(Map<String, dynamic> map) => RegistroProRef(
         casaId: map['casaId'] as String? ?? '',
-        trabajoId: map['trabajoId'] as String? ?? '',
-        trabajoTitulo: map['trabajoTitulo'] as String? ?? '',
+        elementoId: map['elementoId'] as String? ?? '',
+        elementoNombre: map['elementoNombre'] as String? ?? '',
+        registroId: map['registroId'] as String? ?? '',
+        registroTitulo: map['registroTitulo'] as String? ?? '',
         casaNombre: map['casaNombre'] as String? ?? '',
       );
 }

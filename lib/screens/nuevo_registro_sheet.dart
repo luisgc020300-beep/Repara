@@ -1,43 +1,46 @@
-// lib/screens/nuevo_evento_sheet.dart
+// lib/screens/nuevo_registro_sheet.dart
 //
-// Hoja para registrar un evento en la historia de la casa (sección 14 del
-// spec: "Crear trabajo" simplificado a un evento de historial directo,
-// sin el flujo completo de trabajo/profesional cuando no hace falta --
-// p.ej. anotar "revisión de la caldera" no necesita presupuesto ni estado).
+// Hoja para añadir un registro simple (sin profesional) a un elemento que
+// ya existe -- p.ej. "cambio de depuradora" sobre la Piscina, o anotar una
+// revisión hecha a mano. El flujo completo con presupuesto/profesional
+// nunca se crea aquí: eso siempre empieza desde el propio registro ya
+// creado (ver registro_detail_screen.dart). Un registro nunca vive sin
+// elemento (octubre 2026, fusión Elemento/Trabajo/Evento) -- a diferencia
+// del antiguo NuevoEventoSheet, aquí elementoId es obligatorio.
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-import '../models/evento.dart';
-import '../services/evento_service.dart';
+import '../models/registro.dart';
+import '../services/registro_service.dart';
 import '../widgets/app_error.dart';
 
-Future<void> mostrarNuevoEventoSheet(
+Future<void> mostrarNuevoRegistroSheet(
   BuildContext context, {
   required String casaId,
-  String? elementoId,
-  String? habitacionId,
+  required String elementoId,
+  required String elementoNombre,
 }) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-    builder: (ctx) => _NuevoEventoForm(casaId: casaId, elementoId: elementoId, habitacionId: habitacionId),
+    builder: (ctx) => _NuevoRegistroForm(casaId: casaId, elementoId: elementoId, elementoNombre: elementoNombre),
   );
 }
 
-class _NuevoEventoForm extends StatefulWidget {
-  const _NuevoEventoForm({required this.casaId, this.elementoId, this.habitacionId});
+class _NuevoRegistroForm extends StatefulWidget {
+  const _NuevoRegistroForm({required this.casaId, required this.elementoId, required this.elementoNombre});
 
   final String casaId;
-  final String? elementoId;
-  final String? habitacionId;
+  final String elementoId;
+  final String elementoNombre;
 
   @override
-  State<_NuevoEventoForm> createState() => _NuevoEventoFormState();
+  State<_NuevoRegistroForm> createState() => _NuevoRegistroFormState();
 }
 
-class _NuevoEventoFormState extends State<_NuevoEventoForm> {
-  TipoEvento _tipo = TipoEvento.reparacion;
+class _NuevoRegistroFormState extends State<_NuevoRegistroForm> {
+  TipoRegistro _tipo = TipoRegistro.reparacion;
   final _tituloCtrl = TextEditingController();
   final _descripcionCtrl = TextEditingController();
   final _costeCtrl = TextEditingController();
@@ -57,21 +60,23 @@ class _NuevoEventoFormState extends State<_NuevoEventoForm> {
   Future<void> _guardar() async {
     final titulo = _tituloCtrl.text.trim();
     if (titulo.isEmpty) {
-      AppError.show(context, 'Escribe un título para el evento.');
+      AppError.show(context, 'Escribe un título para el registro.');
       return;
     }
     setState(() => _guardando = true);
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
     try {
-      await EventoService.crear(
+      await RegistroService.crear(
         widget.casaId,
-        Evento(
+        widget.elementoId,
+        Registro(
           id: '',
+          elementoNombre: widget.elementoNombre,
           tipo: _tipo,
+          esConProfesional: false,
           titulo: titulo,
+          estado: EstadoRegistro.terminado,
           descripcion: _descripcionCtrl.text.trim().isEmpty ? null : _descripcionCtrl.text.trim(),
-          elementoId: widget.elementoId,
-          habitacionId: widget.habitacionId,
           coste: double.tryParse(_costeCtrl.text.replaceAll(',', '.')),
           profesionalNombre: _profesionalCtrl.text.trim().isEmpty ? null : _profesionalCtrl.text.trim(),
           fecha: _fecha,
@@ -80,7 +85,7 @@ class _NuevoEventoFormState extends State<_NuevoEventoForm> {
       );
       if (mounted) Navigator.pop(context);
     } catch (e, st) {
-      if (mounted) AppError.show(context, 'No se pudo guardar el evento.', error: e, stackTrace: st);
+      if (mounted) AppError.show(context, 'No se pudo guardar el registro.', error: e, stackTrace: st);
     } finally {
       if (mounted) setState(() => _guardando = false);
     }
@@ -98,13 +103,13 @@ class _NuevoEventoFormState extends State<_NuevoEventoForm> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Registrar en el historial', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+            Text('Añadir registro', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
             const SizedBox(height: 16),
             Wrap(
               spacing: 8,
-              children: TipoEvento.values.map((t) {
+              children: TipoRegistro.values.map((t) {
                 return ChoiceChip(
-                  label: Text(_nombreTipo(t)),
+                  label: Text(nombreTipoRegistro(t)),
                   selected: _tipo == t,
                   onSelected: (_) => setState(() => _tipo = t),
                 );
@@ -165,12 +170,3 @@ class _NuevoEventoFormState extends State<_NuevoEventoForm> {
     );
   }
 }
-
-String _nombreTipo(TipoEvento t) => switch (t) {
-      TipoEvento.instalacion => 'Instalación',
-      TipoEvento.revision => 'Revisión',
-      TipoEvento.reparacion => 'Reparación',
-      TipoEvento.sustitucion => 'Sustitución',
-      TipoEvento.reforma => 'Reforma',
-      TipoEvento.nota => 'Nota',
-    };

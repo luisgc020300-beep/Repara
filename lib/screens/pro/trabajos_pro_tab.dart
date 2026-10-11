@@ -12,7 +12,7 @@ import '../../services/profesional_service.dart';
 import '../../theme/design_tokens.dart';
 import '../../widgets/boton_ajustes.dart';
 import '../../widgets/ios_list.dart';
-import 'trabajo_pro_detail_screen.dart';
+import 'registro_pro_detail_screen.dart';
 
 enum _VistaTrabajosPro { porTrabajo, porCliente }
 
@@ -30,8 +30,8 @@ class _TrabajosProTabState extends State<TrabajosProTab> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Trabajos'), actions: const [BotonAjustes(modoPro: true)]),
-      body: StreamBuilder<List<TrabajoProRef>>(
-        stream: ProfesionalService.streamTrabajosProRefs(),
+      body: StreamBuilder<List<RegistroProRef>>(
+        stream: ProfesionalService.streamRegistrosProRefs(),
         builder: (context, snapshot) {
           final trabajos = snapshot.data ?? [];
           if (trabajos.isEmpty) {
@@ -86,7 +86,7 @@ class _TrabajosProTabState extends State<TrabajosProTab> {
 class _ListaPorTrabajo extends StatelessWidget {
   const _ListaPorTrabajo({required this.trabajos});
 
-  final List<TrabajoProRef> trabajos;
+  final List<RegistroProRef> trabajos;
 
   @override
   Widget build(BuildContext context) {
@@ -98,11 +98,11 @@ class _ListaPorTrabajo extends StatelessWidget {
               .map((t) => IosRow(
                     icon: Icons.build_outlined,
                     iconColor: context.colors.brand,
-                    title: t.trabajoTitulo,
+                    title: t.registroTitulo,
                     subtitle: t.casaNombre,
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => TrabajoProDetailScreen(casaId: t.casaId, trabajoId: t.trabajoId)),
+                      MaterialPageRoute(builder: (_) => RegistroProDetailScreen(casaId: t.casaId, elementoId: t.elementoId, registroId: t.registroId)),
                     ),
                   ))
               .toList(),
@@ -115,11 +115,11 @@ class _ListaPorTrabajo extends StatelessWidget {
 class _ListaPorCliente extends StatelessWidget {
   const _ListaPorCliente({required this.trabajos});
 
-  final List<TrabajoProRef> trabajos;
+  final List<RegistroProRef> trabajos;
 
   @override
   Widget build(BuildContext context) {
-    final porCasa = <String, List<TrabajoProRef>>{};
+    final porCasa = <String, List<RegistroProRef>>{};
     for (final t in trabajos) {
       porCasa.putIfAbsent(t.casaId, () => []).add(t);
     }
@@ -145,10 +145,14 @@ class _ListaPorCliente extends StatelessWidget {
                   IosRow(
                     icon: Icons.build_outlined,
                     iconColor: context.colors.brand,
-                    title: trabajosDeEstaCasa[i].trabajoTitulo,
+                    title: trabajosDeEstaCasa[i].registroTitulo,
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => TrabajoProDetailScreen(casaId: trabajosDeEstaCasa[i].casaId, trabajoId: trabajosDeEstaCasa[i].trabajoId)),
+                      MaterialPageRoute(
+                          builder: (_) => RegistroProDetailScreen(
+                              casaId: trabajosDeEstaCasa[i].casaId,
+                              elementoId: trabajosDeEstaCasa[i].elementoId,
+                              registroId: trabajosDeEstaCasa[i].registroId)),
                     ),
                   ),
                 ],

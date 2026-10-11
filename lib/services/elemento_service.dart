@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
 import '../models/elemento.dart';
+import '../models/registro.dart';
 import 'stream_error_logging.dart';
 
 class ElementoService {
@@ -58,6 +59,33 @@ class ElementoService {
 
   static Future<void> eliminar(String casaId, String elementoId) async {
     await _col(casaId).doc(elementoId).delete();
+  }
+
+  /// Único flujo de creación de la app (octubre 2026, fusión Elemento/
+  /// Trabajo/Evento): un elemento nunca nace solo, siempre con su registro
+  /// fundacional -- "compré una freidora" tanto como "me cambiaron la
+  /// depuradora de la piscina" se crean exactamente igual. En un batch (no
+  /// hace falta una transacción: no hay ninguna condición de carrera entre
+  /// crear el elemento y su primer registro) para que nunca quede un
+  /// elemento huérfano sin ningún registro si algo falla a medias.
+  static Future<({String elementoId, String registroId})> crearConRegistroFundacional({
+    required String casaId,
+    required Elemento elemento,
+    required Registro registroFundacional,
+    required String createdBy,
+  }) async {
+    final elementoRef = _col(casaId).doc();
+    final registroRef = elementoRef.collection('registros').doc();
+    final batch = _db.batch();
+    batch.set(elementoRef, {...elemento.toMap(), 'createdAt': FieldValue.serverTimestamp()});
+    batch.set(registroRef, {
+      ...registroFundacional.toMap(),
+      'elementoNombre': elemento.nombre,
+      'casaId': casaId,
+      'createdBy': createdBy,
+    });
+    await batch.commit();
+    return (elementoId: elementoRef.id, registroId: registroRef.id);
   }
 
   /// Elementos con garantía a menos de 30 días -- usado en el dashboard de

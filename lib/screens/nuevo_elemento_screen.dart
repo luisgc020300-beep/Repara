@@ -1,26 +1,41 @@
 // lib/screens/nuevo_elemento_screen.dart
+//
+// Único flujo de creación de la app (octubre 2026, fusión Elemento/Trabajo/
+// Evento): un elemento nunca nace solo, siempre con su registro fundacional
+// -- "compré una freidora" tanto como "me cambiaron la depuradora de la
+// piscina" se crean exactamente igual, con el mismo formulario. El tipo de
+// registro + "¿lo hace un profesional?" deciden, para ESTE primer registro,
+// si hace falta algo más que título/fecha/coste -- el flujo completo con
+// presupuesto/invitación se hace después, desde el propio registro.
 import 'dart:async';
 
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../models/casa.dart';
 import '../models/elemento.dart';
+import '../models/habitacion.dart';
+import '../models/registro.dart';
 import '../services/analytics_service.dart';
 import '../services/elemento_service.dart';
+import '../services/habitacion_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
 
 class NuevoElementoScreen extends StatefulWidget {
-  const NuevoElementoScreen({required this.casa, required this.habitacionId, this.existente, super.key});
+  const NuevoElementoScreen({required this.casa, this.habitacionIdInicial, this.existente, super.key});
 
   final Casa casa;
-  final String habitacionId;
+
+  /// Preselecciona la ubicación cuando se abre desde dentro de una
+  /// habitación concreta (Casa tab) -- sigue siendo editable en el propio
+  /// formulario, nunca un valor fijo.
+  final String? habitacionIdInicial;
 
   /// Si no es null, la pantalla edita este elemento en vez de crear uno
-  /// nuevo (auditoría de producto, octubre 2026: antes, una vez creado, un
-  /// error de tecleo en marca/coste/garantía/profesional no se podía
-  /// corregir nunca -- solo borrar el elemento entero y empezar de cero).
+  /// nuevo -- solo los campos del elemento en sí, no su registro fundacional
+  /// (eso se edita desde el propio registro).
   final Elemento? existente;
 
   @override
@@ -36,6 +51,9 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
   late final _intervaloCtrl = TextEditingController(text: widget.existente?.intervaloMantenimientoMeses?.toString() ?? '');
   late DateTime? _fechaInstalacion = widget.existente?.fechaInstalacion;
   late DateTime? _garantiaHasta = widget.existente?.garantiaHasta;
+  late String? _habitacionId = widget.existente?.habitacionId ?? widget.habitacionIdInicial;
+  TipoRegistro _tipo = TipoRegistro.compra;
+  bool _esConProfesional = false;
   bool _guardando = false;
   bool _sugiriendo = false;
 
@@ -98,34 +116,74 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
     final intervaloMeses = int.tryParse(_intervaloCtrl.text.trim());
     setState(() => _guardando = true);
     try {
-      // Si el intervalo no ha cambiado, conserva la próxima revisión tal
-      // cual estaba guardada -- pudo ajustarse a mano o avanzar al marcar
-      // una revisión como hecha, y no debe recalcularse desde cero solo
-      // porque se ha corregido un typo en otro campo (p.ej. la marca).
-      DateTime? proximoMantenimiento;
-      if (widget.existente != null && intervaloMeses == widget.existente!.intervaloMantenimientoMeses) {
-        proximoMantenimiento = widget.existente!.proximoMantenimiento;
+      final coste = double.tryParse(_costeCtrl.text.replaceAll(',', '.'));
+      final profesional = _profesionalCtrl.text.trim().isEmpty ? null : _profesionalCtrl.text.trim();
+
+      if (widget.existente != null) {
+        // Si el intervalo no ha cambiado, conserva la próxima revisión tal
+        // cual estaba guardada -- pudo ajustarse a mano o avanzar al marcar
+        // una revisión como hecha, y no debe recalcularse desde cero solo
+        // porque se ha corregido un typo en otro campo (p.ej. la marca).
+        DateTime? proximoMantenimiento;
+        if (intervaloMeses == widget.existente!.intervaloMantenimientoMeses) {
+          proximoMantenimiento = widget.existente!.proximoMantenimiento;
+        } else {
+          final base = _fechaInstalacion ?? DateTime.now();
+          proximoMantenimiento = intervaloMeses == null ? null : DateTime(base.year, base.month + intervaloMeses, base.day);
+        }
+        await ElementoService.actualizar(
+          widget.casa.id,
+          widget.existente!.id,
+          Elemento(
+            id: widget.existente!.id,
+            nombre: nombre,
+            habitacionId: _habitacionId,
+            marca: _marcaCtrl.text.trim().isEmpty ? null : _marcaCtrl.text.trim(),
+            modelo: _modeloCtrl.text.trim().isEmpty ? null : _modeloCtrl.text.trim(),
+            fechaInstalacion: _fechaInstalacion,
+            coste: coste,
+            profesionalNombre: profesional,
+            garantiaHasta: _garantiaHasta,
+            intervaloMantenimientoMeses: intervaloMeses,
+            proximoMantenimiento: proximoMantenimiento,
+          ),
+        );
       } else {
         final base = _fechaInstalacion ?? DateTime.now();
-        proximoMantenimiento = intervaloMeses == null ? null : DateTime(base.year, base.month + intervaloMeses, base.day);
-      }
-      final elemento = Elemento(
-        id: widget.existente?.id ?? '',
-        nombre: nombre,
-        habitacionId: widget.habitacionId,
-        marca: _marcaCtrl.text.trim().isEmpty ? null : _marcaCtrl.text.trim(),
-        modelo: _modeloCtrl.text.trim().isEmpty ? null : _modeloCtrl.text.trim(),
-        fechaInstalacion: _fechaInstalacion,
-        coste: double.tryParse(_costeCtrl.text.replaceAll(',', '.')),
-        profesionalNombre: _profesionalCtrl.text.trim().isEmpty ? null : _profesionalCtrl.text.trim(),
-        garantiaHasta: _garantiaHasta,
-        intervaloMantenimientoMeses: intervaloMeses,
-        proximoMantenimiento: proximoMantenimiento,
-      );
-      if (widget.existente != null) {
-        await ElementoService.actualizar(widget.casa.id, widget.existente!.id, elemento);
-      } else {
-        await ElementoService.crear(widget.casa.id, elemento);
+        final proximoMantenimiento =
+            intervaloMeses == null ? null : DateTime(base.year, base.month + intervaloMeses, base.day);
+        final elemento = Elemento(
+          id: '',
+          nombre: nombre,
+          habitacionId: _habitacionId,
+          marca: _marcaCtrl.text.trim().isEmpty ? null : _marcaCtrl.text.trim(),
+          modelo: _modeloCtrl.text.trim().isEmpty ? null : _modeloCtrl.text.trim(),
+          fechaInstalacion: _fechaInstalacion,
+          coste: coste,
+          profesionalNombre: profesional,
+          garantiaHasta: _garantiaHasta,
+          intervaloMantenimientoMeses: intervaloMeses,
+          proximoMantenimiento: proximoMantenimiento,
+        );
+        final registro = Registro(
+          id: '',
+          elementoNombre: nombre,
+          tipo: _tipo,
+          esConProfesional: _esConProfesional,
+          titulo: '${nombreTipoRegistro(_tipo)} de $nombre',
+          estado: _esConProfesional ? EstadoRegistro.nuevo : EstadoRegistro.terminado,
+          fecha: base,
+          garantiaHasta: _garantiaHasta,
+          coste: coste,
+          profesionalNombre: profesional,
+        );
+        final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+        await ElementoService.crearConRegistroFundacional(
+          casaId: widget.casa.id,
+          elemento: elemento,
+          registroFundacional: registro,
+          createdBy: uid,
+        );
         unawaited(AnalyticsService.firstElementCreated());
       }
       if (mounted) Navigator.pop(context);
@@ -161,7 +219,47 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
+          if (!editando) ...[
+            Text('Tipo', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700, color: context.colors.brand)),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: TipoRegistro.values
+                  .map((t) => ChoiceChip(
+                        label: Text(nombreTipoRegistro(t)),
+                        selected: _tipo == t,
+                        onSelected: (_) => setState(() => _tipo = t),
+                      ))
+                  .toList(),
+            ),
+            const SizedBox(height: 12),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('¿Lo hace un profesional?'),
+              subtitle: const Text('Activa presupuesto, pagos e invitación de profesional'),
+              value: _esConProfesional,
+              onChanged: (v) => setState(() => _esConProfesional = v),
+            ),
+            const Divider(height: 32),
+          ],
           TextField(controller: _nombreCtrl, decoration: const InputDecoration(labelText: 'Nombre (p.ej. Aire acondicionado)')),
+          const SizedBox(height: 12),
+          StreamBuilder<List<Habitacion>>(
+            stream: HabitacionService.streamHabitaciones(widget.casa.id),
+            builder: (context, snapshot) {
+              final habitaciones = snapshot.data ?? [];
+              return DropdownButtonFormField<String?>(
+                initialValue: _habitacionId,
+                decoration: const InputDecoration(labelText: 'Ubicación'),
+                items: [
+                  const DropdownMenuItem(value: null, child: Text('Sin ubicación concreta')),
+                  ...habitaciones.map((h) => DropdownMenuItem(value: h.id, child: Text(h.nombre))),
+                ],
+                onChanged: (v) => setState(() => _habitacionId = v),
+              );
+            },
+          ),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -182,7 +280,7 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: TextField(controller: _profesionalCtrl, decoration: const InputDecoration(labelText: 'Instalado por')),
+                child: TextField(controller: _profesionalCtrl, decoration: const InputDecoration(labelText: 'Profesional (opcional)')),
               ),
             ],
           ),
@@ -191,7 +289,7 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
             onPressed: () => _elegirFecha(esGarantia: false),
             icon: const Icon(Icons.calendar_today_outlined, size: 18),
             label: Text(_fechaInstalacion == null
-                ? 'Fecha de instalación'
+                ? 'Fecha'
                 : '${_fechaInstalacion!.day}/${_fechaInstalacion!.month}/${_fechaInstalacion!.year}'),
           ),
           const SizedBox(height: 8),
@@ -199,7 +297,7 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
             onPressed: () => _elegirFecha(esGarantia: true),
             icon: const Icon(Icons.shield_outlined, size: 18),
             label: Text(_garantiaHasta == null
-                ? 'Garantía hasta'
+                ? 'Garantía hasta (opcional)'
                 : '${_garantiaHasta!.day}/${_garantiaHasta!.month}/${_garantiaHasta!.year}'),
           ),
           const SizedBox(height: 20),

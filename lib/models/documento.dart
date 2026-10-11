@@ -1,7 +1,8 @@
 // lib/models/documento.dart
 //
 // Un documento nunca es solo "factura.pdf" (sección 22 del spec): siempre
-// puede colgar de una casa, un elemento, un evento o un trabajo. El estado
+// puede colgar de una casa, un elemento o un registro concreto de ese
+// elemento. El estado
 // de IA distingue "hemos clasificado esto automáticamente y falta que el
 // propietario lo confirme" de "el propietario ya lo confirmó" -- nunca se da
 // por buena una clasificación de la IA sin paso de confirmación explícito.
@@ -46,8 +47,7 @@ class Documento {
     this.observaciones,
     this.archivosAdicionales = const [],
     this.elementoId,
-    this.eventoId,
-    this.trabajoId,
+    this.registroId,
     this.habitacionId,
     this.estadoIA = EstadoIA.manual,
     this.creadoPorIA = false,
@@ -75,8 +75,7 @@ class Documento {
   // primera página es [url]/[nombreArchivo], el resto son estas URLs.
   final List<String> archivosAdicionales;
   final String? elementoId;
-  final String? eventoId;
-  final String? trabajoId;
+  final String? registroId;
   final String? habitacionId;
   final EstadoIA estadoIA;
   final bool creadoPorIA;
@@ -104,8 +103,7 @@ class Documento {
       observaciones: data['observaciones'] as String?,
       archivosAdicionales: List<String>.from(data['archivosAdicionales'] as List? ?? []),
       elementoId: data['elementoId'] as String?,
-      eventoId: data['eventoId'] as String?,
-      trabajoId: data['trabajoId'] as String?,
+      registroId: data['registroId'] as String?,
       habitacionId: data['habitacionId'] as String?,
       estadoIA: estadoIAFromString(data['estadoIA'] as String?),
       creadoPorIA: data['creadoPorIA'] as bool? ?? false,
@@ -132,8 +130,7 @@ class Documento {
         if (observaciones != null) 'observaciones': observaciones,
         'archivosAdicionales': archivosAdicionales,
         if (elementoId != null) 'elementoId': elementoId,
-        if (eventoId != null) 'eventoId': eventoId,
-        if (trabajoId != null) 'trabajoId': trabajoId,
+        if (registroId != null) 'registroId': registroId,
         if (habitacionId != null) 'habitacionId': habitacionId,
         'estadoIA': estadoIA.name,
         'creadoPorIA': creadoPorIA,

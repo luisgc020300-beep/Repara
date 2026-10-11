@@ -1,7 +1,7 @@
 // lib/screens/presupuestos_section.dart
 //
 // Sección de presupuestos formales (secciones 15-18 del spec), reutilizada
-// tanto en la ficha de trabajo de Hogar (rol propietario: aceptar/rechazar)
+// tanto en la ficha de registro de Hogar (rol propietario: aceptar/rechazar)
 // como en la de Pro (rol profesional: crear, enviar, versionar). Los totales
 // mostrados aquí son solo para revisión visual -- los que cuentan de verdad
 // son los que calcula el servidor en Cloud Functions.
@@ -28,16 +28,17 @@ const _claveUltimaPlantilla = 'repara_ultima_plantilla_presupuesto';
 enum RolEnTrabajo { propietario, profesional }
 
 class PresupuestosSection extends StatelessWidget {
-  const PresupuestosSection({required this.casaId, required this.trabajoId, required this.rol, super.key});
+  const PresupuestosSection({required this.casaId, required this.elementoId, required this.registroId, required this.rol, super.key});
 
   final String casaId;
-  final String trabajoId;
+  final String elementoId;
+  final String registroId;
   final RolEnTrabajo rol;
 
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<Presupuesto>>(
-      stream: PresupuestoService.streamPresupuestos(casaId, trabajoId),
+      stream: PresupuestoService.streamPresupuestos(casaId, elementoId, registroId),
       builder: (context, snapshot) {
         final presupuestos = snapshot.data ?? [];
         final ultimo = presupuestos.isEmpty ? null : presupuestos.first;
@@ -65,7 +66,7 @@ class PresupuestosSection extends StatelessWidget {
             if (presupuestos.isEmpty)
               Text('Sin presupuestos todavía.', style: TextStyle(color: context.colors.inkMuted))
             else
-              ...presupuestos.map((p) => _PresupuestoCard(casaId: casaId, trabajoId: trabajoId, presupuesto: p, rol: rol)),
+              ...presupuestos.map((p) => _PresupuestoCard(casaId: casaId, elementoId: elementoId, registroId: registroId, presupuesto: p, rol: rol)),
           ],
         );
       },
@@ -79,7 +80,8 @@ class PresupuestosSection extends StatelessWidget {
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (_) => _EditorPresupuestoSheet(
         casaId: casaId,
-        trabajoId: trabajoId,
+        elementoId: elementoId,
+        registroId: registroId,
         presupuestoAnteriorId: presupuestoAnteriorId,
       ),
     );
@@ -87,10 +89,11 @@ class PresupuestosSection extends StatelessWidget {
 }
 
 class _PresupuestoCard extends StatefulWidget {
-  const _PresupuestoCard({required this.casaId, required this.trabajoId, required this.presupuesto, required this.rol});
+  const _PresupuestoCard({required this.casaId, required this.elementoId, required this.registroId, required this.presupuesto, required this.rol});
 
   final String casaId;
-  final String trabajoId;
+  final String elementoId;
+  final String registroId;
   final Presupuesto presupuesto;
   final RolEnTrabajo rol;
 
@@ -119,7 +122,7 @@ class _PresupuestoCardState extends State<_PresupuestoCard> {
     setState(() => _procesando = true);
     try {
       await PresupuestoService.responder(
-          casaId: widget.casaId, trabajoId: widget.trabajoId, presupuestoId: widget.presupuesto.id, aceptar: aceptar);
+          casaId: widget.casaId, elementoId: widget.elementoId, registroId: widget.registroId, presupuestoId: widget.presupuesto.id, aceptar: aceptar);
       unawaited(aceptar ? AnalyticsService.quoteAccepted() : AnalyticsService.quoteRejected());
     } on FirebaseFunctionsException catch (e, st) {
       if (context.mounted) {
@@ -135,7 +138,7 @@ class _PresupuestoCardState extends State<_PresupuestoCard> {
   Future<void> _enviar(BuildContext context) async {
     setState(() => _procesando = true);
     try {
-      await PresupuestoService.enviar(casaId: widget.casaId, trabajoId: widget.trabajoId, presupuestoId: widget.presupuesto.id);
+      await PresupuestoService.enviar(casaId: widget.casaId, elementoId: widget.elementoId, registroId: widget.registroId, presupuestoId: widget.presupuesto.id);
       if (context.mounted) AppError.showSuccess(context, 'Presupuesto enviado.');
     } on FirebaseFunctionsException catch (e, st) {
       if (context.mounted) {
@@ -226,10 +229,11 @@ class _PresupuestoCardState extends State<_PresupuestoCard> {
 }
 
 class _EditorPresupuestoSheet extends StatefulWidget {
-  const _EditorPresupuestoSheet({required this.casaId, required this.trabajoId, this.presupuestoAnteriorId});
+  const _EditorPresupuestoSheet({required this.casaId, required this.elementoId, required this.registroId, this.presupuestoAnteriorId});
 
   final String casaId;
-  final String trabajoId;
+  final String elementoId;
+  final String registroId;
   final String? presupuestoAnteriorId;
 
   @override
@@ -334,7 +338,8 @@ class _EditorPresupuestoSheetState extends State<_EditorPresupuestoSheet> {
       if (widget.presupuestoAnteriorId != null) {
         await PresupuestoService.crearNuevaVersion(
           casaId: widget.casaId,
-          trabajoId: widget.trabajoId,
+          elementoId: widget.elementoId,
+          registroId: widget.registroId,
           presupuestoAnteriorId: widget.presupuestoAnteriorId!,
           lineas: lineas
               .map((l) => LineaPresupuesto(
@@ -345,7 +350,8 @@ class _EditorPresupuestoSheetState extends State<_EditorPresupuestoSheet> {
       } else {
         await PresupuestoService.crear(
           casaId: widget.casaId,
-          trabajoId: widget.trabajoId,
+          elementoId: widget.elementoId,
+          registroId: widget.registroId,
           lineas: lineas
               .map((l) => LineaPresupuesto(
                   descripcion: l.descripcion, cantidad: l.cantidad, precioUnitario: l.precioUnitario, ivaPorcentaje: l.ivaPorcentaje))

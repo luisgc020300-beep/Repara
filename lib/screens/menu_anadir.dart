@@ -1,17 +1,18 @@
 // lib/screens/menu_anadir.dart
 //
-// Menú compartido del botón "+" (sección 9 del spec): registrar un evento a
+// Menú compartido del botón "+" (sección 9 del spec): añadir un elemento a
 // mano o escanear un documento con IA. Usado desde Inicio e Historial.
 // Hoja de acción estilo iOS: tirador arriba, opciones agrupadas, "Cancelar"
 // aparte -- mismo patrón que el resto de la app (CEO, octubre 2026).
 import 'package:flutter/material.dart';
 
+import '../models/casa.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/ios_list.dart';
 import 'nuevo_documento_flow.dart';
-import 'nuevo_evento_sheet.dart';
+import 'nuevo_elemento_screen.dart';
 
-Future<void> mostrarMenuAnadir(BuildContext context, {required String casaId}) {
+Future<void> mostrarMenuAnadir(BuildContext context, {required Casa casa}) {
   return showModalBottomSheet<void>(
     context: context,
     builder: (ctx) => SafeArea(
@@ -35,16 +36,16 @@ Future<void> mostrarMenuAnadir(BuildContext context, {required String casaId}) {
                   subtitle: 'La IA rellena los datos por ti',
                   onTap: () {
                     Navigator.pop(ctx);
-                    iniciarNuevoDocumento(context, casaId: casaId);
+                    iniciarNuevoDocumento(context, casaId: casa.id);
                   },
                 ),
                 IosRow(
-                  icon: Icons.edit_note_outlined,
+                  icon: Icons.add_circle_outline,
                   iconColor: ctx.colors.brand,
-                  title: 'Registrar evento a mano',
+                  title: 'Añadir elemento a mano',
                   onTap: () {
                     Navigator.pop(ctx);
-                    mostrarNuevoEventoSheet(context, casaId: casaId);
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => NuevoElementoScreen(casa: casa)));
                   },
                 ),
               ],

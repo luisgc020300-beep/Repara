@@ -21,14 +21,16 @@ class InvitacionService {
 
   static Future<ResultadoInvitacion> invitarProfesional({
     required String casaId,
-    required String trabajoId,
+    required String elementoId,
+    required String registroId,
     String? emailProfesional,
     String? telefonoProfesional,
   }) async {
     final callable = FirebaseFunctions.instanceFor(region: _region).httpsCallable('invitarProfesional');
     final result = await callable.call<Map<String, dynamic>>({
       'casaId': casaId,
-      'trabajoId': trabajoId,
+      'elementoId': elementoId,
+      'registroId': registroId,
       'emailProfesional': ?emailProfesional,
       'telefonoProfesional': ?telefonoProfesional,
     });
@@ -39,12 +41,12 @@ class InvitacionService {
   /// Lo llama quien recibe un código de invitación (sección "idea 1" del
   /// bucle viral): no necesita tener cuenta profesional activada de
   /// antemano, esta función la activa si hace falta.
-  static Future<({String casaNombre, String trabajoTitulo})> canjearCodigo(String codigo) async {
+  static Future<({String casaNombre, String registroTitulo})> canjearCodigo(String codigo) async {
     final callable = FirebaseFunctions.instanceFor(region: _region).httpsCallable('canjearCodigoInvitacion');
     final result = await callable.call<Map<String, dynamic>>({'codigo': codigo});
     return (
       casaNombre: result.data['casaNombre'] as String? ?? '',
-      trabajoTitulo: result.data['trabajoTitulo'] as String? ?? '',
+      registroTitulo: result.data['registroTitulo'] as String? ?? '',
     );
   }
 
@@ -60,11 +62,11 @@ class InvitacionService {
     await callable.call<Map<String, dynamic>>({'invitacionId': invitacionId});
   }
 
-  /// La última invitación enviada para un trabajo (puede no haber ninguna).
-  static Stream<Invitacion?> streamUltimaInvitacionDe(String trabajoId) {
+  /// La última invitación enviada para un registro (puede no haber ninguna).
+  static Stream<Invitacion?> streamUltimaInvitacionDe(String registroId) {
     return _db
         .collection('invitaciones')
-        .where('trabajoId', isEqualTo: trabajoId)
+        .where('registroId', isEqualTo: registroId)
         .orderBy('createdAt', descending: true)
         .limit(1)
         .snapshots()

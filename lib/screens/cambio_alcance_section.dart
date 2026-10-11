@@ -1,6 +1,6 @@
 // lib/screens/cambio_alcance_section.dart
 //
-// ScopeGuard (secciones 19-21 del spec): "Cambios del trabajo" de cara al
+// ScopeGuard (secciones 19-21 del spec): "Cambios del registro" de cara al
 // usuario. El profesional solicita, el propietario aprueba o rechaza --
 // nunca al revés, y la Cloud Function responderCambioAlcance lo impone
 // aunque alguien manipule el cliente.
@@ -21,26 +21,29 @@ import '../widgets/app_error.dart';
 class CambiosAlcanceSection extends StatelessWidget {
   const CambiosAlcanceSection({
     required this.casaId,
-    required this.trabajoId,
+    required this.elementoId,
+    required this.registroId,
     required this.rol,
-    this.trabajoCerrado = false,
+    this.registroCerrado = false,
     super.key,
   });
 
   final String casaId;
-  final String trabajoId;
+  final String elementoId;
+  final String registroId;
   final RolEnTrabajo rol;
 
-  /// true si el trabajo ya está terminado/archivado (auditoría de producto,
-  /// octubre 2026): un trabajo cerrado no admite nuevas solicitudes ni
-  /// respuestas a las pendientes -- la Cloud Function ya lo bloquea, esto
-  /// solo evita mostrar un botón que terminaría en un error evitable.
-  final bool trabajoCerrado;
+  /// true si el registro ya está terminado/archivado (auditoría de
+  /// producto, octubre 2026): un registro cerrado no admite nuevas
+  /// solicitudes ni respuestas a las pendientes -- la Cloud Function ya lo
+  /// bloquea, esto solo evita mostrar un botón que terminaría en un error
+  /// evitable.
+  final bool registroCerrado;
 
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<CambioAlcance>>(
-      stream: CambioAlcanceService.streamCambios(casaId, trabajoId),
+      stream: CambioAlcanceService.streamCambios(casaId, elementoId, registroId),
       builder: (context, snapshot) {
         final cambios = snapshot.data ?? [];
         return Column(
@@ -49,8 +52,8 @@ class CambiosAlcanceSection extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Cambios del trabajo', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-                if (rol == RolEnTrabajo.profesional && !trabajoCerrado)
+                Text('Cambios del registro', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                if (rol == RolEnTrabajo.profesional && !registroCerrado)
                   TextButton.icon(
                     onPressed: () => _abrirFormulario(context),
                     icon: const Icon(Icons.add, size: 18),
@@ -63,10 +66,11 @@ class CambiosAlcanceSection extends StatelessWidget {
             else
               ...cambios.map((c) => _CambioCard(
                     casaId: casaId,
-                    trabajoId: trabajoId,
+                    elementoId: elementoId,
+                    registroId: registroId,
                     cambio: c,
                     rol: rol,
-                    trabajoCerrado: trabajoCerrado,
+                    registroCerrado: registroCerrado,
                   )),
           ],
         );
@@ -79,7 +83,7 @@ class CambiosAlcanceSection extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => _FormularioCambioSheet(casaId: casaId, trabajoId: trabajoId),
+      builder: (_) => _FormularioCambioSheet(casaId: casaId, elementoId: elementoId, registroId: registroId),
     );
   }
 }
@@ -87,17 +91,19 @@ class CambiosAlcanceSection extends StatelessWidget {
 class _CambioCard extends StatefulWidget {
   const _CambioCard({
     required this.casaId,
-    required this.trabajoId,
+    required this.elementoId,
+    required this.registroId,
     required this.cambio,
     required this.rol,
-    this.trabajoCerrado = false,
+    this.registroCerrado = false,
   });
 
   final String casaId;
-  final String trabajoId;
+  final String elementoId;
+  final String registroId;
   final CambioAlcance cambio;
   final RolEnTrabajo rol;
-  final bool trabajoCerrado;
+  final bool registroCerrado;
 
   @override
   State<_CambioCard> createState() => _CambioCardState();
@@ -121,7 +127,7 @@ class _CambioCardState extends State<_CambioCard> {
     setState(() => _procesando = true);
     try {
       await CambioAlcanceService.responder(
-          casaId: widget.casaId, trabajoId: widget.trabajoId, cambioAlcanceId: widget.cambio.id, aprobar: aprobar);
+          casaId: widget.casaId, elementoId: widget.elementoId, registroId: widget.registroId, cambioAlcanceId: widget.cambio.id, aprobar: aprobar);
       if (aprobar) unawaited(AnalyticsService.scopeChangeAccepted());
     } on FirebaseFunctionsException catch (e, st) {
       if (context.mounted) {
@@ -181,7 +187,7 @@ class _CambioCardState extends State<_CambioCard> {
                 ),
               ),
             ],
-            if (cambio.estado == EstadoCambioAlcance.pendiente && widget.rol == RolEnTrabajo.propietario && !widget.trabajoCerrado) ...[
+            if (cambio.estado == EstadoCambioAlcance.pendiente && widget.rol == RolEnTrabajo.propietario && !widget.registroCerrado) ...[
               const SizedBox(height: 10),
               Row(
                 children: [
@@ -225,10 +231,11 @@ class _LineaFoto {
 }
 
 class _FormularioCambioSheet extends StatefulWidget {
-  const _FormularioCambioSheet({required this.casaId, required this.trabajoId});
+  const _FormularioCambioSheet({required this.casaId, required this.elementoId, required this.registroId});
 
   final String casaId;
-  final String trabajoId;
+  final String elementoId;
+  final String registroId;
 
   @override
   State<_FormularioCambioSheet> createState() => _FormularioCambioSheetState();
@@ -294,11 +301,13 @@ class _FormularioCambioSheetState extends State<_FormularioCambioSheet> {
     try {
       final urls = <String>[];
       for (final f in _fotos) {
-        urls.add(await CambioAlcanceService.subirFoto(widget.casaId, f.archivo, f.archivo.path.split(Platform.pathSeparator).last));
+        urls.add(await CambioAlcanceService.subirFoto(
+            widget.casaId, widget.elementoId, widget.registroId, f.archivo, f.archivo.path.split(Platform.pathSeparator).last));
       }
       await CambioAlcanceService.crear(
         casaId: widget.casaId,
-        trabajoId: widget.trabajoId,
+        elementoId: widget.elementoId,
+        registroId: widget.registroId,
         titulo: titulo,
         descripcion: _descripcionCtrl.text.trim().isEmpty ? null : _descripcionCtrl.text.trim(),
         motivo: _motivoCtrl.text.trim().isEmpty ? null : _motivoCtrl.text.trim(),
@@ -328,7 +337,7 @@ class _FormularioCambioSheetState extends State<_FormularioCambioSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Solicitar cambio del trabajo', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+            Text('Solicitar cambio del registro', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
             const SizedBox(height: 12),
             TextField(controller: _tituloCtrl, decoration: const InputDecoration(labelText: 'Título (p.ej. Sustituir válvula adicional)')),
             const SizedBox(height: 12),

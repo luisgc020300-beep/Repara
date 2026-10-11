@@ -1,13 +1,13 @@
 // lib/widgets/progreso_pago.dart
 //
-// Barra de progreso de cuánto se ha pagado de un trabajo frente a su
+// Barra de progreso de cuánto se ha pagado de un registro frente a su
 // presupuesto -- compartida entre la vista de propietario y la de
 // profesional. El total pagado es la suma en vivo de la subcolección de
 // pagos (ver widgets/pagos_section.dart, que es donde se editan uno a
 // uno); esta barra es solo un resumen visual, nunca editable aquí. El
-// precio de referencia es [Trabajo.presupuesto], da igual si viene de un
+// precio de referencia es [Registro.presupuesto], da igual si viene de un
 // presupuesto formal aceptado en la app o de lo que el propietario
-// escribió a mano al crear el trabajo.
+// escribió a mano al crear el registro.
 import 'package:flutter/material.dart';
 
 import '../models/pago.dart';
@@ -15,10 +15,11 @@ import '../services/pago_service.dart';
 import '../theme/design_tokens.dart';
 
 class ProgresoPago extends StatelessWidget {
-  const ProgresoPago({required this.casaId, required this.trabajoId, required this.presupuesto, super.key});
+  const ProgresoPago({required this.casaId, required this.elementoId, required this.registroId, required this.presupuesto, super.key});
 
   final String casaId;
-  final String trabajoId;
+  final String elementoId;
+  final String registroId;
   final double presupuesto;
 
   static String _formato(double v) => v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(2);
@@ -26,7 +27,7 @@ class ProgresoPago extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<Pago>>(
-      stream: PagoService.streamPagos(casaId, trabajoId),
+      stream: PagoService.streamPagos(casaId, elementoId, registroId),
       builder: (context, snapshot) {
         final pagos = snapshot.data ?? [];
         final totalPagado = pagos.fold<double>(0, (acc, p) => acc + p.importe);

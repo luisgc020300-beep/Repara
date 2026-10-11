@@ -15,13 +15,11 @@ import 'package:image_picker/image_picker.dart';
 
 import '../models/documento.dart';
 import '../models/elemento.dart';
-import '../models/evento.dart';
-import '../models/trabajo.dart';
+import '../models/registro.dart';
 import '../services/analytics_service.dart';
 import '../services/documento_service.dart';
 import '../services/elemento_service.dart';
-import '../services/evento_service.dart';
-import '../services/trabajo_service.dart';
+import '../services/registro_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
 import '../widgets/ios_list.dart';
@@ -30,7 +28,7 @@ Future<void> iniciarNuevoDocumento(
   BuildContext context, {
   required String casaId,
   String? elementoId,
-  String? trabajoId,
+  String? registroId,
   String? habitacionId,
 }) async {
   final paginas = await _elegirPaginas(context);
@@ -42,16 +40,14 @@ Future<void> iniciarNuevoDocumento(
   );
   if (confirmadas == null || confirmadas.isEmpty || !context.mounted) return;
 
-  // Un profesional invitado a un trabajo concreto no tiene permiso para
-  // listar TODOS los elementos/trabajos de la casa (solo el suyo) -- en ese
-  // caso se sigue sin listas de sugerencia en vez de reventar el flujo.
+  // Un profesional invitado a un registro concreto no tiene permiso para
+  // listar TODOS los elementos de la casa (solo lee su propio registro) --
+  // en ese caso se sigue sin lista de sugerencias en vez de reventar el flujo.
   List<Elemento> elementos = const [];
-  List<Trabajo> trabajos = const [];
   try {
     elementos = await ElementoService.streamElementos(casaId).first;
-    trabajos = await TrabajoService.streamTrabajos(casaId).first;
   } catch (e) {
-    // sin acceso a las listas completas -- se continúa sin sugerencias.
+    // sin acceso al listado completo -- se continúa sin sugerencias.
   }
   if (!context.mounted) return;
 
@@ -77,7 +73,6 @@ Future<void> iniciarNuevoDocumento(
     sugerencia = await DocumentoService.clasificarConIA(
       confirmadas,
       elementosDisponibles: elementos.map((e) => e.nombre).toList(),
-      trabajosDisponibles: trabajos.map((t) => t.titulo).toList(),
     ).timeout(const Duration(seconds: 30));
   } on FirebaseFunctionsException catch (e) {
     // 'resource-exhausted' es el límite diario de IA -- su mensaje ya es
@@ -103,9 +98,8 @@ Future<void> iniciarNuevoDocumento(
         paginas: confirmadas,
         sugerencia: sugerencia,
         elementos: elementos,
-        trabajos: trabajos,
         elementoIdInicial: elementoId,
-        trabajoIdInicial: trabajoId,
+        registroIdInicial: registroId,
         habitacionIdInicial: habitacionId,
       ),
     ),
@@ -325,9 +319,8 @@ class _RevisionDocumentoScreen extends StatefulWidget {
     required this.paginas,
     required this.sugerencia,
     required this.elementos,
-    required this.trabajos,
     this.elementoIdInicial,
-    this.trabajoIdInicial,
+    this.registroIdInicial,
     this.habitacionIdInicial,
   });
 
@@ -335,9 +328,8 @@ class _RevisionDocumentoScreen extends StatefulWidget {
   final List<PaginaDocumento> paginas;
   final SugerenciaIA? sugerencia;
   final List<Elemento> elementos;
-  final List<Trabajo> trabajos;
   final String? elementoIdInicial;
-  final String? trabajoIdInicial;
+  final String? registroIdInicial;
   final String? habitacionIdInicial;
 
   @override
@@ -346,7 +338,7 @@ class _RevisionDocumentoScreen extends StatefulWidget {
 
 class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
   late TipoDocumento _tipo = widget.sugerencia?.tipo ?? TipoDocumento.otro;
-  late TipoEvento _tipoEvento = _tipoEventoPorDefecto(widget.sugerencia?.tipo);
+  late TipoRegistro _tipoRegistro = _tipoRegistroPorDefecto(widget.sugerencia?.tipo);
   late final _proveedorCtrl = TextEditingController(text: widget.sugerencia?.proveedor ?? '');
   late final _nifCtrl = TextEditingController(text: widget.sugerencia?.nifCif ?? '');
   late final _numeroCtrl = TextEditingController(text: widget.sugerencia?.numeroReferencia ?? '');
@@ -359,7 +351,7 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
   late DateTime? _fecha = widget.sugerencia?.fecha;
   late DateTime? _fechaVencimiento = widget.sugerencia?.fechaVencimiento;
   late String? _elementoId = widget.elementoIdInicial ?? _buscarIdPorNombre(widget.elementos, widget.sugerencia?.elementoSugerido);
-  late String? _trabajoId = widget.trabajoIdInicial ?? _buscarIdPorNombre(widget.trabajos, widget.sugerencia?.trabajoSugerido);
+  late final String? _registroId = widget.registroIdInicial;
   bool _guardando = false;
 
   // Auto-crear elemento (auditoría de producto, octubre 2026): si la IA
@@ -373,20 +365,26 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
 
   static String _formatoImporte(double? v) => v == null ? '' : v.toStringAsFixed(2);
 
-  static String? _buscarIdPorNombre(List<dynamic> lista, String? nombre) {
+  static String? _buscarIdPorNombre(List<Elemento> lista, String? nombre) {
     if (nombre == null) return null;
     for (final item in lista) {
-      final n = item is Elemento ? item.nombre : (item as Trabajo).titulo;
-      final id = item is Elemento ? item.id : (item as Trabajo).id;
-      if (n.toLowerCase() == nombre.toLowerCase()) return id;
+      if (item.nombre.toLowerCase() == nombre.toLowerCase()) return item.id;
     }
     return null;
   }
 
-  static TipoEvento _tipoEventoPorDefecto(TipoDocumento? t) => switch (t) {
-        TipoDocumento.factura || TipoDocumento.presupuesto => TipoEvento.reparacion,
-        _ => TipoEvento.nota,
+  static TipoRegistro _tipoRegistroPorDefecto(TipoDocumento? t) => switch (t) {
+        TipoDocumento.factura || TipoDocumento.presupuesto => TipoRegistro.reparacion,
+        _ => TipoRegistro.nota,
       };
+
+  String _nombreElementoParaRegistro() {
+    if (_crearElementoNuevo) return _nuevoElementoNombreCtrl.text.trim();
+    for (final e in widget.elementos) {
+      if (e.id == _elementoId) return e.nombre;
+    }
+    return '';
+  }
 
   @override
   void dispose() {
@@ -470,9 +468,40 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
 
       final urls = <String>[];
       for (final p in widget.paginas) {
-        urls.add(await DocumentoService.subirArchivo(widget.casaId, p.archivo, p.nombre, trabajoId: _trabajoId));
+        urls.add(await DocumentoService.subirArchivo(widget.casaId, p.archivo, p.nombre, elementoId: _elementoId, registroId: _registroId));
       }
       final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+      // Un registro nunca vive sin elemento -- si este documento no venía ya
+      // vinculado a un registro concreto pero sí hay un elemento de por
+      // medio, se crea aquí su registro fundacional para que el documento
+      // quede reflejado en el historial del elemento (octubre 2026, fusión
+      // Elemento/Trabajo/Evento). Un documento sin elemento sigue sin tener
+      // registro -- se archiva igualmente en Documentos, sin historial.
+      String? registroId = _registroId;
+      final crearRegistroNuevo = !comoBorrador && registroId == null && _elementoId != null;
+      if (crearRegistroNuevo) {
+        registroId = await RegistroService.crear(
+          widget.casaId,
+          _elementoId!,
+          Registro(
+            id: '',
+            elementoNombre: _nombreElementoParaRegistro(),
+            tipo: _tipoRegistro,
+            esConProfesional: false,
+            titulo: _numeroCtrl.text.trim().isNotEmpty
+                ? '${_nombreTipoDoc(_tipo)} · ${_numeroCtrl.text.trim()}'
+                : _nombreTipoDoc(_tipo),
+            estado: EstadoRegistro.terminado,
+            fecha: _fecha ?? DateTime.now(),
+            descripcion: _descripcionCtrl.text.trim().isEmpty ? null : _descripcionCtrl.text.trim(),
+            garantiaHasta: _fechaVencimiento,
+            coste: _importe,
+            profesionalNombre: _proveedor,
+          ),
+          createdBy: uid,
+        );
+      }
 
       final documento = Documento(
         id: '',
@@ -492,7 +521,7 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
         observaciones: _observacionesCtrl.text.trim().isEmpty ? null : _observacionesCtrl.text.trim(),
         archivosAdicionales: urls.skip(1).toList(),
         elementoId: _elementoId,
-        trabajoId: _trabajoId,
+        registroId: registroId,
         habitacionId: widget.habitacionIdInicial,
         estadoIA: comoBorrador ? EstadoIA.pendiente : EstadoIA.confirmado,
         creadoPorIA: widget.sugerencia != null,
@@ -502,26 +531,8 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
       unawaited(AnalyticsService.firstDocumentUploaded());
       unawaited(AnalyticsService.documentConfirmed(comoBorrador: comoBorrador));
 
-      if (!comoBorrador) {
-        await EventoService.crear(
-          widget.casaId,
-          Evento(
-            id: '',
-            tipo: _tipoEvento,
-            titulo: _numeroCtrl.text.trim().isNotEmpty
-                ? '${_nombreTipoDoc(_tipo)} · ${_numeroCtrl.text.trim()}'
-                : _nombreTipoDoc(_tipo),
-            descripcion: _descripcionCtrl.text.trim().isEmpty ? null : _descripcionCtrl.text.trim(),
-            elementoId: _elementoId,
-            habitacionId: widget.habitacionIdInicial,
-            trabajoId: _trabajoId,
-            coste: _importe,
-            profesionalNombre: _proveedor,
-            documentoIds: [documentoId],
-            fecha: _fecha ?? DateTime.now(),
-          ),
-          createdBy: uid,
-        );
+      if (crearRegistroNuevo) {
+        await RegistroService.actualizar(widget.casaId, _elementoId!, registroId!, {'documentoIds': [documentoId]});
       }
 
       if (mounted) {
@@ -663,11 +674,11 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
             ),
             const SizedBox(height: 20),
             _seccion(context, 'Relación con tu casa'),
-            // Si ya se abrió el escáner desde la ficha de un elemento/trabajo
+            // Si ya se abrió el escáner desde la ficha de un elemento/registro
             // concreto (widget.*Inicial), ese vínculo queda fijo -- no se
             // ofrece un desplegable que además, para un profesional sin
-            // permiso para listar TODOS los elementos/trabajos de la casa,
-            // ni siquiera podría rellenarse con opciones.
+            // permiso para listar TODOS los elementos de la casa, ni
+            // siquiera podría rellenarse con opciones.
             if (widget.elementoIdInicial != null)
               _VinculoFijo(icono: Icons.category_outlined, texto: _tituloElemento(widget.elementos, widget.elementoIdInicial!))
             else if (_crearElementoNuevo)
@@ -714,26 +725,18 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
                 ],
                 onChanged: (v) => setState(() => _elementoId = v),
               ),
-            const SizedBox(height: 12),
-            if (widget.trabajoIdInicial != null)
-              _VinculoFijo(icono: Icons.build_outlined, texto: _tituloTrabajo(widget.trabajos, widget.trabajoIdInicial!))
-            else
-              DropdownButtonFormField<String?>(
-                initialValue: _trabajoId,
-                decoration: const InputDecoration(labelText: 'Trabajo relacionado (opcional)'),
-                items: [
-                  const DropdownMenuItem(value: null, child: Text('Sin trabajo específico')),
-                  ...widget.trabajos.map((t) => DropdownMenuItem(value: t.id, child: Text(t.titulo))),
-                ],
-                onChanged: (v) => setState(() => _trabajoId = v),
+            if (widget.registroIdInicial != null) ...[
+              const SizedBox(height: 12),
+              const _VinculoFijo(icono: Icons.build_outlined, texto: 'Este registro'),
+            ] else if (_elementoId != null) ...[
+              const SizedBox(height: 12),
+              DropdownButtonFormField<TipoRegistro>(
+                initialValue: _tipoRegistro,
+                decoration: const InputDecoration(labelText: 'Aparecerá en el historial del elemento como'),
+                items: TipoRegistro.values.map((t) => DropdownMenuItem(value: t, child: Text(nombreTipoRegistro(t)))).toList(),
+                onChanged: (v) => setState(() => _tipoRegistro = v ?? _tipoRegistro),
               ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<TipoEvento>(
-              initialValue: _tipoEvento,
-              decoration: const InputDecoration(labelText: 'Aparecerá en el historial como'),
-              items: TipoEvento.values.map((t) => DropdownMenuItem(value: t, child: Text(_nombreTipoEvento(t)))).toList(),
-              onChanged: (v) => setState(() => _tipoEvento = v ?? _tipoEvento),
-            ),
+            ],
             const SizedBox(height: 24),
             FilledButton(
               onPressed: _guardando ? null : () => _guardar(comoBorrador: false),
@@ -781,13 +784,6 @@ String _tituloElemento(List<Elemento> elementos, String id) {
   return 'Elemento de esta ficha';
 }
 
-String _tituloTrabajo(List<Trabajo> trabajos, String id) {
-  for (final t in trabajos) {
-    if (t.id == id) return t.titulo;
-  }
-  return 'Este trabajo';
-}
-
 Widget _seccion(BuildContext context, String titulo) => Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Text(titulo, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700, color: context.colors.brand)),
@@ -800,13 +796,4 @@ String _nombreTipoDoc(TipoDocumento t) => switch (t) {
       TipoDocumento.manual => 'Manual',
       TipoDocumento.contrato => 'Contrato',
       TipoDocumento.otro => 'Otro',
-    };
-
-String _nombreTipoEvento(TipoEvento t) => switch (t) {
-      TipoEvento.instalacion => 'Instalación',
-      TipoEvento.revision => 'Revisión',
-      TipoEvento.reparacion => 'Reparación',
-      TipoEvento.sustitucion => 'Sustitución',
-      TipoEvento.reforma => 'Reforma',
-      TipoEvento.nota => 'Nota',
     };

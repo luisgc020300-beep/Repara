@@ -1,9 +1,10 @@
-// lib/screens/trabajo_detail_screen.dart
+// lib/screens/registro_detail_screen.dart
 //
-// Expediente de un trabajo (sección 13 del spec, simplificado para v1: sin
-// ScopeGuard/cambios de alcance todavía). Al finalizar, se ofrece volcar el
-// trabajo como un evento permanente en el historial de la casa (sección 21:
-// "¿Qué quieres guardar en el historial de la vivienda?").
+// Expediente de un registro (sección 13 del spec, simplificado para v1: sin
+// ScopeGuard/cambios de alcance todavía más allá de lo ya construido). Un
+// registro con profesional (esConProfesional) despliega presupuesto/pagos/
+// invitación igual que el antiguo TrabajoDetailScreen; uno simple (una
+// compra, una nota) solo muestra sus datos con editar/eliminar.
 import 'dart:async';
 
 import 'package:cloud_functions/cloud_functions.dart';
@@ -13,12 +14,12 @@ import 'package:share_plus/share_plus.dart';
 import '../models/casa.dart';
 import '../models/documento.dart';
 import '../models/invitacion.dart';
-import '../models/trabajo.dart';
+import '../models/registro.dart';
 import '../services/analytics_service.dart';
 import '../services/documento_service.dart';
 import '../services/invitacion_service.dart';
 import '../services/pago_service.dart';
-import '../services/trabajo_service.dart';
+import '../services/registro_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
 import '../widgets/progreso_pago.dart';
@@ -27,17 +28,18 @@ import 'nuevo_documento_flow.dart';
 import 'pagos_section.dart';
 import 'presupuestos_section.dart';
 
-class TrabajoDetailScreen extends StatelessWidget {
-  const TrabajoDetailScreen({required this.casa, required this.trabajoId, super.key});
+class RegistroDetailScreen extends StatelessWidget {
+  const RegistroDetailScreen({required this.casa, required this.elementoId, required this.registroId, super.key});
 
   final Casa casa;
-  final String trabajoId;
+  final String elementoId;
+  final String registroId;
 
-  Future<void> _finalizar(BuildContext context, Trabajo trabajo) async {
+  Future<void> _finalizar(BuildContext context, Registro registro) async {
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Finalizar trabajo'),
+        title: const Text('Finalizar registro'),
         content: const Text('Se marcará como terminado y quedará guardado en el historial de la casa.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
@@ -46,7 +48,7 @@ class TrabajoDetailScreen extends StatelessWidget {
       ),
     );
     if (confirmar != true || !context.mounted) return;
-    await _confirmarFinalizacion(context, trabajo);
+    await _confirmarFinalizacion(context, registro);
   }
 
   /// Compartido entre "Finalizar" (el propietario cierra directamente) y
@@ -54,21 +56,21 @@ class TrabajoDetailScreen extends StatelessWidget {
   /// haber hecho el profesional) -- en ambos casos el resultado final es
   /// el mismo, lo único que cambia es si hubo o no un paso previo del
   /// profesional (modelo de dos pasos, auditoría de producto, octubre 2026).
-  Future<void> _confirmarFinalizacion(BuildContext context, Trabajo trabajo) async {
+  Future<void> _confirmarFinalizacion(BuildContext context, Registro registro) async {
     // Aviso, no bloqueo (decisión del CEO): que falte pago no debe impedir
-    // cerrar un trabajo si el cobro llega más tarde (transferencia,
+    // cerrar un registro si el cobro llega más tarde (transferencia,
     // financiación...), pero sí se avisa para no perderlo de vista.
     var pagadoDelTodo = false;
-    if (trabajo.presupuesto != null) {
-      final pagado = await PagoService.totalPagado(casa.id, trabajo.id);
-      pagadoDelTodo = pagado >= trabajo.presupuesto!;
+    if (registro.presupuesto != null) {
+      final pagado = await PagoService.totalPagado(casa.id, elementoId, registro.id);
+      pagadoDelTodo = pagado >= registro.presupuesto!;
       if (!pagadoDelTodo && context.mounted) {
         final seguir = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('Todavía no está pagado del todo'),
             content: Text(
-              'Llevas pagado ${pagado.toStringAsFixed(2)} € de ${trabajo.presupuesto!.toStringAsFixed(2)} €. '
+              'Llevas pagado ${pagado.toStringAsFixed(2)} € de ${registro.presupuesto!.toStringAsFixed(2)} €. '
               '¿Quieres finalizar igualmente?',
             ),
             actions: [
@@ -83,30 +85,29 @@ class TrabajoDetailScreen extends StatelessWidget {
     if (!context.mounted) return;
     try {
       // Cloud Function, no escritura directa (auditoría de seguridad,
-      // octubre 2026): estado=terminado y el evento de historial se crean
-      // atómicamente en servidor -- las reglas de Firestore ya bloquean
-      // marcar un trabajo como terminado por una escritura directa.
-      final callable = FirebaseFunctions.instanceFor(region: 'europe-west1').httpsCallable('finalizarTrabajoPropietario');
-      await callable.call<Map<String, dynamic>>({'casaId': casa.id, 'trabajoId': trabajo.id});
+      // octubre 2026): estado=terminado se escribe atómicamente en servidor
+      // -- las reglas de Firestore ya bloquean marcar un registro como
+      // terminado por una escritura directa.
+      await RegistroService.finalizar(casa.id, elementoId, registro.id);
       unawaited(AnalyticsService.workCompleted(pagadoDelTodo: pagadoDelTodo));
-      if (context.mounted) AppError.showSuccess(context, 'Trabajo archivado en el historial.');
+      if (context.mounted) AppError.showSuccess(context, 'Registro archivado en el historial.');
 
       // Bucle viral en UN solo momento (auditoría de producto, octubre
-      // 2026): justo cuando el trabajo ha ido bien de verdad -- terminado Y
+      // 2026): justo cuando el registro ha ido bien de verdad -- terminado Y
       // pagado del todo, con un profesional real de Repara de por medio.
       // Nunca en ningún otro sitio, nunca con descuentos artificiales.
-      if (pagadoDelTodo && trabajo.profesionalUid != null && context.mounted) {
-        await _ofrecerCompartir(context, trabajo);
+      if (pagadoDelTodo && registro.profesionalUid != null && context.mounted) {
+        await _ofrecerCompartir(context, registro);
       }
     } catch (e, st) {
-      if (context.mounted) AppError.show(context, 'No se pudo finalizar el trabajo.', error: e, stackTrace: st);
+      if (context.mounted) AppError.show(context, 'No se pudo finalizar el registro.', error: e, stackTrace: st);
     }
   }
 
   /// El propietario dice que, en realidad, todavía no está terminado --
-  /// devuelve el trabajo a como estaba antes de que el profesional lo
+  /// devuelve el registro a como estaba antes de que el profesional lo
   /// marcara, y le avisa para que siga con él.
-  Future<void> _rechazarFinalizacion(BuildContext context, Trabajo trabajo) async {
+  Future<void> _rechazarFinalizacion(BuildContext context, Registro registro) async {
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -120,19 +121,19 @@ class TrabajoDetailScreen extends StatelessWidget {
     );
     if (confirmar != true || !context.mounted) return;
     try {
-      await TrabajoService.rechazarFinalizacionProfesional(casa.id, trabajo.id);
+      await RegistroService.rechazarFinalizacionProfesional(casa.id, elementoId, registro.id);
     } catch (e, st) {
-      if (context.mounted) AppError.show(context, 'No se pudo actualizar el trabajo.', error: e, stackTrace: st);
+      if (context.mounted) AppError.show(context, 'No se pudo actualizar el registro.', error: e, stackTrace: st);
     }
   }
 
-  Future<void> _ofrecerCompartir(BuildContext context, Trabajo trabajo) async {
+  Future<void> _ofrecerCompartir(BuildContext context, Registro registro) async {
     final compartir = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('¿Te ha ido bien?'),
         content: Text(
-          '${trabajo.profesionalNombre ?? 'Tu profesional'} también puede recibir más clientes como tú a través de Repara.',
+          '${registro.profesionalNombre ?? 'Tu profesional'} también puede recibir más clientes como tú a través de Repara.',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Ahora no')),
@@ -143,37 +144,63 @@ class TrabajoDetailScreen extends StatelessWidget {
     if (compartir != true) return;
     try {
       await Share.share(
-        'He usado Repara para gestionar "${trabajo.titulo}"${trabajo.profesionalNombre != null ? ' con ${trabajo.profesionalNombre}' : ''} '
+        'He usado Repara para gestionar "${registro.titulo}"${registro.profesionalNombre != null ? ' con ${registro.profesionalNombre}' : ''} '
         '-- presupuesto, cambios y pagos, todo en un sitio. Pruébalo tú también.',
       );
     } catch (e) {
       // Decorativo -- que falle el selector de compartir no debe parecer
-      // que el trabajo no se finalizó bien.
+      // que el registro no se finalizó bien.
+    }
+  }
+
+  Future<void> _eliminar(BuildContext context, Registro registro) async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('¿Eliminar este registro?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Eliminar')),
+        ],
+      ),
+    );
+    if (confirmar != true || !context.mounted) return;
+    try {
+      await RegistroService.eliminar(casa.id, elementoId, registro.id);
+      if (context.mounted) Navigator.pop(context);
+    } catch (e, st) {
+      if (context.mounted) AppError.show(context, 'No se pudo eliminar el registro.', error: e, stackTrace: st);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<Trabajo?>(
-      stream: TrabajoService.streamTrabajo(casa.id, trabajoId),
+    return StreamBuilder<Registro?>(
+      stream: RegistroService.streamRegistro(casa.id, elementoId, registroId),
       builder: (context, snapshot) {
-        final trabajo = snapshot.data;
-        if (trabajo == null) {
+        final registro = snapshot.data;
+        if (registro == null) {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
         return Scaffold(
-          appBar: AppBar(title: Text(trabajo.titulo)),
-          floatingActionButton: _estadoControlado(trabajo.estado)
+          appBar: AppBar(
+            title: Text(registro.titulo),
+            actions: [
+              if (!registro.esConProfesional)
+                IconButton(icon: const Icon(Icons.delete_outline), tooltip: 'Eliminar registro', onPressed: () => _eliminar(context, registro)),
+            ],
+          ),
+          floatingActionButton: !registro.esConProfesional || _estadoControlado(registro.estado)
               ? null
               : FloatingActionButton.extended(
-                  onPressed: () => _finalizar(context, trabajo),
+                  onPressed: () => _finalizar(context, registro),
                   icon: const Icon(Icons.check),
                   label: const Text('Finalizar'),
                 ),
           body: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              if (trabajo.estado == EstadoTrabajo.pendienteConfirmacion) ...[
+              if (registro.esConProfesional && registro.estado == EstadoRegistro.pendienteConfirmacion) ...[
                 Card(
                   color: context.colors.warning.withValues(alpha: 0.12),
                   child: Padding(
@@ -187,7 +214,7 @@ class TrabajoDetailScreen extends StatelessWidget {
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
-                                'El profesional dice que ha terminado este trabajo. ¿Lo confirmas?',
+                                'El profesional dice que ha terminado este registro. ¿Lo confirmas?',
                                 style: TextStyle(color: context.colors.ink, fontWeight: FontWeight.w600),
                               ),
                             ),
@@ -198,14 +225,14 @@ class TrabajoDetailScreen extends StatelessWidget {
                           children: [
                             Expanded(
                               child: OutlinedButton(
-                                onPressed: () => _rechazarFinalizacion(context, trabajo),
+                                onPressed: () => _rechazarFinalizacion(context, registro),
                                 child: const Text('Todavía no'),
                               ),
                             ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: FilledButton(
-                                onPressed: () => _confirmarFinalizacion(context, trabajo),
+                                onPressed: () => _confirmarFinalizacion(context, registro),
                                 child: const Text('Confirmar'),
                               ),
                             ),
@@ -223,86 +250,92 @@ class TrabajoDetailScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (trabajo.descripcion != null) ...[
-                        Text(trabajo.descripcion!),
+                      if (registro.descripcion != null) ...[
+                        Text(registro.descripcion!),
                         const SizedBox(height: 12),
                       ],
+                      if (!registro.esConProfesional)
+                        // Registro simple -- sin presupuesto/pagos/invitación,
+                        // igual que una compra o una nota.
+                        TextFormField(
+                          initialValue: _nombreEstadoSimple(registro),
+                          enabled: false,
+                          decoration: const InputDecoration(labelText: 'Estado'),
+                        )
                       // "Terminado"/"Archivado"/"PendienteConfirmacion" nunca
                       // son una opción de este desplegable (auditoría de
                       // seguridad, octubre 2026): "Finalizar" (y, en el modelo
                       // de dos pasos, "Confirmar"/"Todavía no") son las únicas
-                      // vías, porque además archivan el evento en el
+                      // vías, porque además archivan el registro en el
                       // historial y avisan a los demás. El servidor ya lo
-                      // bloquea aunque se fuerce desde fuera de la app, pero
-                      // antes el desplegable seguía mostrando las opciones
-                      // como tocables -- se podía elegir "En curso" sobre un
-                      // trabajo ya terminado (el servidor lo rechazaba en
-                      // silencio) y, si entretanto el estado local optimista
-                      // hacía reaparecer el botón "Finalizar", volver a
-                      // finalizarlo creaba un segundo evento en el historial.
-                      // Ahora, si ya está en un estado controlado, el campo
-                      // se deshabilita del todo en vez de solo vaciar el
-                      // valor seleccionado (auditoría de producto, octubre
-                      // 2026).
-                      if (_estadoControlado(trabajo.estado))
+                      // bloquea aunque se fuerce desde fuera de la app.
+                      else if (_estadoControlado(registro.estado))
                         TextFormField(
-                          key: ValueKey(trabajo.estado),
-                          initialValue: _nombreEstado(trabajo.estado),
+                          key: ValueKey(registro.estado),
+                          initialValue: _nombreEstado(registro.estado),
                           enabled: false,
                           decoration: InputDecoration(
                             labelText: 'Estado',
-                            helperText: switch (trabajo.estado) {
-                              EstadoTrabajo.pendienteConfirmacion => 'Esperando tu confirmación',
+                            helperText: switch (registro.estado) {
+                              EstadoRegistro.pendienteConfirmacion => 'Esperando tu confirmación',
                               _ => 'Ya está finalizado',
                             },
                           ),
                         )
                       else
-                        DropdownButtonFormField<EstadoTrabajo>(
-                          initialValue: trabajo.estado,
+                        DropdownButtonFormField<EstadoRegistro>(
+                          initialValue: registro.estado,
                           decoration: const InputDecoration(labelText: 'Estado'),
                           items: _estadosEditables
                               .map((e) => DropdownMenuItem(value: e, child: Text(_nombreEstado(e))))
                               .toList(),
                           onChanged: (v) {
-                            if (v != null) TrabajoService.actualizarEstado(casa.id, trabajo.id, v);
+                            if (v != null) RegistroService.actualizarEstado(casa.id, elementoId, registro.id, v);
                           },
                         ),
-                      if (trabajo.profesionalNombre != null) ...[
+                      if (registro.profesionalNombre != null) ...[
                         const SizedBox(height: 8),
-                        Text('Profesional: ${trabajo.profesionalNombre}${trabajo.profesionalContacto != null ? ' · ${trabajo.profesionalContacto}' : ''}'),
+                        Text('Profesional: ${registro.profesionalNombre}${registro.profesionalContacto != null ? ' · ${registro.profesionalContacto}' : ''}'),
                       ],
-                      if (trabajo.presupuesto != null) ...[
+                      if (registro.coste != null && !registro.esConProfesional) ...[
                         const SizedBox(height: 4),
-                        Text('Presupuesto: ${trabajo.presupuesto!.toStringAsFixed(0)} €'),
+                        Text('Coste: ${registro.coste!.toStringAsFixed(0)} €'),
+                      ],
+                      if (registro.presupuesto != null) ...[
+                        const SizedBox(height: 4),
+                        Text('Presupuesto: ${registro.presupuesto!.toStringAsFixed(0)} €'),
                         const SizedBox(height: 10),
-                        ProgresoPago(casaId: casa.id, trabajoId: trabajo.id, presupuesto: trabajo.presupuesto!),
+                        ProgresoPago(casaId: casa.id, elementoId: elementoId, registroId: registro.id, presupuesto: registro.presupuesto!),
                       ],
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
-              Text('Profesional', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-              const SizedBox(height: 8),
-              _SeccionInvitarProfesional(casa: casa, trabajo: trabajo),
-              const SizedBox(height: 20),
-              PresupuestosSection(casaId: casa.id, trabajoId: trabajo.id, rol: RolEnTrabajo.propietario),
-              const SizedBox(height: 20),
-              CambiosAlcanceSection(
-                casaId: casa.id,
-                trabajoId: trabajo.id,
-                rol: RolEnTrabajo.propietario,
-                trabajoCerrado: trabajo.estado == EstadoTrabajo.terminado || trabajo.estado == EstadoTrabajo.archivado,
-              ),
-              const SizedBox(height: 20),
-              PagosSection(
-                casaId: casa.id,
-                trabajoId: trabajo.id,
-                trabajoTitulo: trabajo.titulo,
-                presupuesto: trabajo.presupuesto,
-                rol: RolEnTrabajo.propietario,
-              ),
+              if (registro.esConProfesional) ...[
+                const SizedBox(height: 20),
+                Text('Profesional', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 8),
+                _SeccionInvitarProfesional(casa: casa, elementoId: elementoId, registro: registro),
+                const SizedBox(height: 20),
+                PresupuestosSection(casaId: casa.id, elementoId: elementoId, registroId: registro.id, rol: RolEnTrabajo.propietario),
+                const SizedBox(height: 20),
+                CambiosAlcanceSection(
+                  casaId: casa.id,
+                  elementoId: elementoId,
+                  registroId: registro.id,
+                  rol: RolEnTrabajo.propietario,
+                  registroCerrado: registro.estado == EstadoRegistro.terminado || registro.estado == EstadoRegistro.archivado,
+                ),
+                const SizedBox(height: 20),
+                PagosSection(
+                  casaId: casa.id,
+                  elementoId: elementoId,
+                  registroId: registro.id,
+                  registroTitulo: registro.titulo,
+                  presupuesto: registro.presupuesto,
+                  rol: RolEnTrabajo.propietario,
+                ),
+              ],
               const SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -312,8 +345,8 @@ class TrabajoDetailScreen extends StatelessWidget {
                     onPressed: () => iniciarNuevoDocumento(
                       context,
                       casaId: casa.id,
-                      trabajoId: trabajo.id,
-                      habitacionId: trabajo.habitacionId,
+                      elementoId: elementoId,
+                      registroId: registro.id,
                     ),
                     icon: const Icon(Icons.document_scanner_outlined, size: 18),
                     label: const Text('Escanear documento'),
@@ -321,7 +354,7 @@ class TrabajoDetailScreen extends StatelessWidget {
                 ],
               ),
               StreamBuilder<List<Documento>>(
-                stream: DocumentoService.streamDocumentos(casa.id, trabajoId: trabajo.id),
+                stream: DocumentoService.streamDocumentos(casa.id, registroId: registro.id),
                 builder: (context, snapshot) {
                   final documentos = snapshot.data ?? [];
                   if (documentos.isEmpty) {
@@ -353,10 +386,11 @@ class TrabajoDetailScreen extends StatelessWidget {
 /// spec, simplificado a solo email -- ver decisión del CEO). Si ya hay un
 /// profesional vinculado, muestra quién es en vez del formulario.
 class _SeccionInvitarProfesional extends StatefulWidget {
-  const _SeccionInvitarProfesional({required this.casa, required this.trabajo});
+  const _SeccionInvitarProfesional({required this.casa, required this.elementoId, required this.registro});
 
   final Casa casa;
-  final Trabajo trabajo;
+  final String elementoId;
+  final Registro registro;
 
   @override
   State<_SeccionInvitarProfesional> createState() => _SeccionInvitarProfesionalState();
@@ -386,7 +420,8 @@ class _SeccionInvitarProfesionalState extends State<_SeccionInvitarProfesional> 
     try {
       final resultado = await InvitacionService.invitarProfesional(
         casaId: widget.casa.id,
-        trabajoId: widget.trabajo.id,
+        elementoId: widget.elementoId,
+        registroId: widget.registro.id,
         emailProfesional: email.isEmpty ? null : email,
         telefonoProfesional: telefono.isEmpty ? null : telefono,
       );
@@ -415,7 +450,7 @@ class _SeccionInvitarProfesionalState extends State<_SeccionInvitarProfesional> 
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('¿Cancelar invitación?'),
-        content: const Text('Podrás invitar a otro profesional para este trabajo.'),
+        content: const Text('Podrás invitar a otro profesional para este registro.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Seguir esperando')),
           FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Cancelar invitación')),
@@ -436,7 +471,7 @@ class _SeccionInvitarProfesionalState extends State<_SeccionInvitarProfesional> 
   }
 
   Future<void> _compartirCodigo(String codigo) async {
-    final mensaje = 'Te invito a "${widget.trabajo.titulo}" en Repara.\n'
+    final mensaje = 'Te invito a "${widget.registro.titulo}" en Repara.\n'
         'Descárgate la app, crea tu cuenta y activa el modo profesional, y luego introduce este código de invitación: $codigo';
     try {
       await Share.share(mensaje);
@@ -448,18 +483,18 @@ class _SeccionInvitarProfesionalState extends State<_SeccionInvitarProfesional> 
 
   @override
   Widget build(BuildContext context) {
-    if (widget.trabajo.profesionalUid != null) {
+    if (widget.registro.profesionalUid != null) {
       return Card(
         child: ListTile(
           leading: Icon(Icons.verified_user_outlined, color: context.colors.success),
-          title: Text(widget.trabajo.profesionalNombre ?? 'Profesional vinculado'),
-          subtitle: const Text('Puede ver este trabajo y actualizar su estado'),
+          title: Text(widget.registro.profesionalNombre ?? 'Profesional vinculado'),
+          subtitle: const Text('Puede ver este registro y actualizar su estado'),
         ),
       );
     }
 
     return StreamBuilder<Invitacion?>(
-      stream: InvitacionService.streamUltimaInvitacionDe(widget.trabajo.id),
+      stream: InvitacionService.streamUltimaInvitacionDe(widget.registro.id),
       builder: (context, snapshot) {
         final invitacion = snapshot.data;
         if (invitacion != null && invitacion.estado == EstadoInvitacion.pendiente) {
@@ -502,7 +537,7 @@ class _SeccionInvitarProfesionalState extends State<_SeccionInvitarProfesional> 
                     ],
                   ),
                   Text(
-                    'Esa persona no tiene todavía cuenta profesional en Repara. Cuando se registre, introduce este código para vincularse a este trabajo.',
+                    'Esa persona no tiene todavía cuenta profesional en Repara. Cuando se registre, introduce este código para vincularse a este registro.',
                     style: TextStyle(color: context.colors.inkMuted, fontSize: 12),
                   ),
                   const Divider(height: 20),
@@ -543,16 +578,22 @@ class _SeccionInvitarProfesionalState extends State<_SeccionInvitarProfesional> 
 // terminado/archivado/pendienteConfirmacion nunca son editables por esta vía
 // directa -- "Finalizar"/"Confirmar"/"Todavía no" son las únicas puertas
 // (modelo de dos pasos, auditoría de producto, octubre 2026).
-bool _estadoControlado(EstadoTrabajo e) =>
-    e == EstadoTrabajo.terminado || e == EstadoTrabajo.archivado || e == EstadoTrabajo.pendienteConfirmacion;
+bool _estadoControlado(EstadoRegistro e) =>
+    e == EstadoRegistro.terminado || e == EstadoRegistro.archivado || e == EstadoRegistro.pendienteConfirmacion;
 
-String _nombreEstado(EstadoTrabajo e) => switch (e) {
-      EstadoTrabajo.nuevo => 'Nuevo',
-      EstadoTrabajo.presupuestado => 'Presupuestado',
-      EstadoTrabajo.enCurso => 'En curso',
-      EstadoTrabajo.pendienteConfirmacion => 'Pendiente de confirmación',
-      EstadoTrabajo.terminado => 'Terminado',
-      EstadoTrabajo.archivado => 'Archivado',
+String _nombreEstado(EstadoRegistro e) => switch (e) {
+      EstadoRegistro.nuevo => 'Nuevo',
+      EstadoRegistro.presupuestado => 'Presupuestado',
+      EstadoRegistro.enCurso => 'En curso',
+      EstadoRegistro.pendienteConfirmacion => 'Pendiente de confirmación',
+      EstadoRegistro.terminado => 'Terminado',
+      EstadoRegistro.archivado => 'Archivado',
     };
 
-const _estadosEditables = [EstadoTrabajo.nuevo, EstadoTrabajo.presupuestado, EstadoTrabajo.enCurso];
+// Un registro simple (sin profesional) nace directamente "terminado" -- no
+// tiene el ciclo de vida nuevo/presupuestado/en curso, así que aquí solo se
+// distingue archivado de "registrado" en vez de reutilizar los nombres del
+// flujo con profesional.
+String _nombreEstadoSimple(Registro r) => r.estado == EstadoRegistro.archivado ? 'Archivado' : 'Registrado';
+
+const _estadosEditables = [EstadoRegistro.nuevo, EstadoRegistro.presupuestado, EstadoRegistro.enCurso];

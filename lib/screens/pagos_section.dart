@@ -1,8 +1,9 @@
 // lib/screens/pagos_section.dart
 //
-// Lista de pagos de un trabajo, con fecha e importe a simple vista -- tocar
-// uno lleva al detalle completo (PagoDetailScreen). Apartado propio dentro
-// del trabajo, separado del resumen de progreso (ver widgets/progreso_pago.dart).
+// Lista de pagos de un registro, con fecha e importe a simple vista --
+// tocar uno lleva al detalle completo (PagoDetailScreen). Apartado propio
+// dentro del registro, separado del resumen de progreso (ver
+// widgets/progreso_pago.dart).
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -15,16 +16,18 @@ import 'presupuestos_section.dart' show RolEnTrabajo;
 class PagosSection extends StatelessWidget {
   const PagosSection({
     required this.casaId,
-    required this.trabajoId,
-    required this.trabajoTitulo,
+    required this.elementoId,
+    required this.registroId,
+    required this.registroTitulo,
     required this.presupuesto,
     required this.rol,
     super.key,
   });
 
   final String casaId;
-  final String trabajoId;
-  final String trabajoTitulo;
+  final String elementoId;
+  final String registroId;
+  final String registroTitulo;
   final double? presupuesto;
   final RolEnTrabajo rol;
 
@@ -32,7 +35,7 @@ class PagosSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final editable = rol == RolEnTrabajo.propietario;
     return StreamBuilder<List<Pago>>(
-      stream: PagoService.streamPagos(casaId, trabajoId),
+      stream: PagoService.streamPagos(casaId, elementoId, registroId),
       builder: (context, snapshot) {
         final pagos = snapshot.data ?? [];
         return Column(
@@ -49,8 +52,9 @@ class PagosSection extends StatelessWidget {
                       MaterialPageRoute(
                         builder: (_) => PagoDetailScreen(
                           casaId: casaId,
-                          trabajoId: trabajoId,
-                          trabajoTitulo: trabajoTitulo,
+                          elementoId: elementoId,
+                          registroId: registroId,
+                          registroTitulo: registroTitulo,
                           presupuesto: presupuesto,
                           editable: true,
                           conceptoSugerido: 'Pago ${pagos.length + 1}',
@@ -81,8 +85,9 @@ class PagosSection extends StatelessWidget {
                         MaterialPageRoute(
                           builder: (_) => PagoDetailScreen(
                             casaId: casaId,
-                            trabajoId: trabajoId,
-                            trabajoTitulo: trabajoTitulo,
+                            elementoId: elementoId,
+                            registroId: registroId,
+                            registroTitulo: registroTitulo,
                             presupuesto: presupuesto,
                             editable: editable,
                             pago: p,

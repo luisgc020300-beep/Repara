@@ -1,19 +1,19 @@
 // lib/screens/home_tab.dart
 //
-// Inicio + Historial fusionados en una sola pestaña (decisión del CEO: eran
-// demasiado parecidos para ocupar dos huecos en la barra de navegación).
-// Arriba, el estado actual de la casa (avisos de garantías); debajo, la
-// historia completa filtrable -- sección 8 y 12 del spec de producto.
+// Inicio: registro de Elementos de la casa (octubre 2026, fusión Elemento/
+// Trabajo/Evento) -- cada elemento es la unidad que se ve aquí, con su
+// propio historial de Registros dentro de su ficha. Arriba, avisos de
+// garantías/revisiones próximas y un banner de registros en curso con un
+// profesional; debajo, el listado filtrable por ubicación.
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../models/casa.dart';
 import '../models/elemento.dart';
-import '../models/evento.dart';
-import '../models/pago.dart';
+import '../models/habitacion.dart';
 import '../services/elemento_service.dart';
-import '../services/evento_service.dart';
-import '../services/pago_service.dart';
+import '../services/habitacion_service.dart';
+import '../services/registro_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/boton_ajustes.dart';
 import '../widgets/boton_notificaciones.dart';
@@ -21,8 +21,8 @@ import '../widgets/ios_list.dart';
 import 'elemento_detail_screen.dart';
 import 'garantias_proximas_screen.dart';
 import 'menu_anadir.dart';
+import 'registro_detail_screen.dart';
 import 'revisiones_pendientes_screen.dart';
-import 'trabajo_detail_screen.dart';
 
 class HomeTab extends StatefulWidget {
   const HomeTab({required this.casa, super.key});
@@ -34,14 +34,22 @@ class HomeTab extends StatefulWidget {
 }
 
 class _HomeTabState extends State<HomeTab> {
-  TipoEvento? _filtro;
+  String? _habitacionFiltro;
+  final _busquedaCtrl = TextEditingController();
+  String _busqueda = '';
+
+  @override
+  void dispose() {
+    _busquedaCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(widget.casa.nombre), actions: [const BotonNotificaciones(modoPro: false), BotonAjustes(casa: widget.casa)]),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => mostrarMenuAnadir(context, casaId: widget.casa.id),
+        onPressed: () => mostrarMenuAnadir(context, casa: widget.casa),
         icon: const Icon(Icons.add),
         label: const Text('Añadir'),
       ),
@@ -123,51 +131,128 @@ class _HomeTabState extends State<HomeTab> {
               );
             },
           ),
+          StreamBuilder<List<Map<String, dynamic>>>(
+            stream: RegistroService.streamPendientes(widget.casa.id),
+            builder: (context, snapshot) {
+              final pendientes = snapshot.data ?? const [];
+              if (pendientes.isEmpty) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: Card(
+                  clipBehavior: Clip.antiAlias,
+                  child: Theme(
+                    data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                    child: ExpansionTile(
+                      leading: Icon(Icons.hourglass_top_outlined, color: context.colors.brand),
+                      title: Text(
+                        pendientes.length == 1 ? '1 registro en curso con un profesional' : '${pendientes.length} registros en curso con un profesional',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      children: [
+                        for (final p in pendientes) ...[
+                          Divider(height: 1, indent: 56, color: context.colors.inkMuted.withValues(alpha: 0.14)),
+                          IosRow(
+                            icon: Icons.build_outlined,
+                            iconColor: context.colors.brand,
+                            title: p['registroTitulo'] as String? ?? '',
+                            subtitle: p['elementoNombre'] as String? ?? '',
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => RegistroDetailScreen(
+                                  casa: widget.casa,
+                                  elementoId: p['elementoId'] as String? ?? '',
+                                  registroId: p['registroId'] as String? ?? '',
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  ChoiceChip(label: const Text('Todo'), selected: _filtro == null, onSelected: (_) => setState(() => _filtro = null)),
-                  const SizedBox(width: 8),
-                  ...TipoEvento.values.map((t) => Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: ChoiceChip(
-                          label: Text(_nombreTipo(t)),
-                          selected: _filtro == t,
-                          onSelected: (_) => setState(() => _filtro = t),
-                        ),
-                      )),
-                ],
+            child: TextField(
+              controller: _busquedaCtrl,
+              decoration: InputDecoration(
+                hintText: 'Buscar elemento',
+                prefixIcon: const Icon(Icons.search, size: 20),
+                isDense: true,
               ),
+              onChanged: (v) => setState(() => _busqueda = v.trim().toLowerCase()),
             ),
           ),
+          StreamBuilder<List<Habitacion>>(
+            stream: HabitacionService.streamHabitaciones(widget.casa.id),
+            builder: (context, snapshot) {
+              final habitaciones = snapshot.data ?? const [];
+              if (habitaciones.isEmpty) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      ChoiceChip(
+                        label: const Text('Todo'),
+                        selected: _habitacionFiltro == null,
+                        onSelected: (_) => setState(() => _habitacionFiltro = null),
+                      ),
+                      const SizedBox(width: 8),
+                      ...habitaciones.map((h) => Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: ChoiceChip(
+                              label: Text(h.nombre),
+                              selected: _habitacionFiltro == h.id,
+                              onSelected: (_) => setState(() => _habitacionFiltro = h.id),
+                            ),
+                          )),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
           Expanded(
-            child: StreamBuilder<List<Evento>>(
-              stream: EventoService.streamHistorial(widget.casa.id),
+            child: StreamBuilder<List<Elemento>>(
+              stream: ElementoService.streamElementos(widget.casa.id, habitacionId: _habitacionFiltro),
               builder: (context, snapshot) {
-                var eventos = snapshot.data ?? [];
-                if (_filtro != null) eventos = eventos.where((e) => e.tipo == _filtro).toList();
-                if (eventos.isEmpty) {
+                var elementos = snapshot.data ?? [];
+                if (_busqueda.isNotEmpty) {
+                  elementos = elementos.where((e) => e.nombre.toLowerCase().contains(_busqueda)).toList();
+                }
+                if (elementos.isEmpty) {
                   return Center(
                     child: Padding(
                       padding: const EdgeInsets.all(24),
                       child: Text(
-                        _filtro == null
-                            ? 'Aquí verás lo que ya ha pasado en tu casa: trabajos terminados, facturas, revisiones.\nPara gestionar algo que tienes entre manos ahora, ve a la pestaña Trabajos.'
-                            : 'Nada de este tipo todavía.',
+                        'Todavía no hay ningún elemento aquí.\nToca "Añadir" para crear el primero.',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: context.colors.inkMuted),
                       ),
                     ),
                   );
                 }
-                return ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    IosSection(rows: eventos.map((e) => _EventoTile(casa: widget.casa, evento: e)).toList()),
-                  ],
+                return StreamBuilder<List<Habitacion>>(
+                  stream: HabitacionService.streamHabitaciones(widget.casa.id),
+                  builder: (context, habSnapshot) {
+                    final nombrePorHabitacion = {for (final h in habSnapshot.data ?? const <Habitacion>[]) h.id: h.nombre};
+                    return ListView(
+                      padding: const EdgeInsets.all(16),
+                      children: [
+                        IosSection(
+                          rows: elementos
+                              .map((e) => _ElementoTile(casa: widget.casa, elemento: e, ubicacion: nombrePorHabitacion[e.habitacionId]))
+                              .toList(),
+                        ),
+                      ],
+                    );
+                  },
                 );
               },
             ),
@@ -178,88 +263,26 @@ class _HomeTabState extends State<HomeTab> {
   }
 }
 
-class _EventoTile extends StatelessWidget {
-  const _EventoTile({required this.casa, required this.evento});
+class _ElementoTile extends StatelessWidget {
+  const _ElementoTile({required this.casa, required this.elemento, this.ubicacion});
 
   final Casa casa;
-  final Evento evento;
-
-  IconData get _icono => switch (evento.tipo) {
-        TipoEvento.instalacion => Icons.add_box_outlined,
-        TipoEvento.revision => Icons.fact_check_outlined,
-        TipoEvento.reparacion => Icons.build_outlined,
-        TipoEvento.sustitucion => Icons.swap_horiz,
-        TipoEvento.reforma => Icons.architecture_outlined,
-        TipoEvento.nota => Icons.push_pin_outlined,
-      };
-
-  // Breadcrumb tocable al elemento/trabajo de origen (auditoría de
-  // producto, octubre 2026): antes un evento del historial no llevaba a
-  // ningún sitio al tocarlo, ni mostraba de dónde venía.
-  void _abrir(BuildContext context) {
-    if (evento.elementoId != null) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => ElementoDetailScreen(casa: casa, elementoId: evento.elementoId!)));
-    } else if (evento.trabajoId != null) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => TrabajoDetailScreen(casa: casa, trabajoId: evento.trabajoId!)));
-    }
-  }
+  final Elemento elemento;
+  final String? ubicacion;
 
   @override
   Widget build(BuildContext context) {
-    // Solo para el evento que de verdad cierra el trabajo (nunca para
-    // presupuesto aceptado/cambio de alcance, que también llevan coste):
-    // comprobación en vivo de lo pagado, para no perder de vista un cobro
-    // pendiente una vez el trabajo ya aparece como "finalizado" en el
-    // historial (auditoría de producto, octubre 2026) -- antes la única
-    // advertencia era el diálogo al pulsar "Finalizar", y desaparecía para
-    // siempre en cuanto se cerraba.
-    if (evento.esFinalizacion && evento.trabajoId != null && evento.coste != null) {
-      return StreamBuilder<List<Pago>>(
-        stream: PagoService.streamPagos(casa.id, evento.trabajoId!),
-        builder: (context, snapshot) {
-          final pagado = (snapshot.data ?? const <Pago>[]).fold<double>(0, (acc, p) => acc + p.importe);
-          final pendiente = evento.coste! - pagado;
-          return _fila(context, pendiente: pendiente > 0.01 ? pendiente : null);
-        },
-      );
-    }
-    return _fila(context);
-  }
-
-  Widget _fila(BuildContext context, {double? pendiente}) {
-    final navegable = evento.elementoId != null || evento.trabajoId != null;
     return IosRow(
-      icon: _icono,
-      iconColor: pendiente != null ? context.colors.warning : context.colors.brand,
-      title: evento.titulo,
+      icon: Icons.category_outlined,
+      iconColor: elemento.garantiaProximaAVencer ? context.colors.warning : context.colors.brand,
+      title: elemento.nombre,
       subtitle: [
-        DateFormat('d MMM yyyy', 'es_ES').format(evento.fecha),
-        if (evento.profesionalNombre != null) evento.profesionalNombre!,
-        if (pendiente != null) 'Pendiente de cobrar ${pendiente.toStringAsFixed(0)} €',
+        ?ubicacion,
+        if (elemento.profesionalNombre != null) elemento.profesionalNombre!,
+        if (elemento.fechaInstalacion != null) DateFormat('d MMM yyyy', 'es_ES').format(elemento.fechaInstalacion!),
       ].join(' · '),
-      showChevron: navegable,
-      trailing: evento.coste != null
-          ? Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('${evento.coste!.toStringAsFixed(0)} €'),
-                if (navegable) ...[
-                  const SizedBox(width: 6),
-                  Icon(Icons.chevron_right, color: context.colors.inkMuted, size: 20),
-                ],
-              ],
-            )
-          : null,
-      onTap: navegable ? () => _abrir(context) : null,
+      trailing: elemento.coste != null ? Text('${elemento.coste!.toStringAsFixed(0)} €') : null,
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ElementoDetailScreen(casa: casa, elementoId: elemento.id))),
     );
   }
 }
-
-String _nombreTipo(TipoEvento t) => switch (t) {
-      TipoEvento.instalacion => 'Instalación',
-      TipoEvento.revision => 'Revisión',
-      TipoEvento.reparacion => 'Reparación',
-      TipoEvento.sustitucion => 'Sustitución',
-      TipoEvento.reforma => 'Reforma',
-      TipoEvento.nota => 'Nota',
-    };

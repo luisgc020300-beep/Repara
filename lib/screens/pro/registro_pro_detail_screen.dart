@@ -1,16 +1,18 @@
-// lib/screens/pro/trabajo_pro_detail_screen.dart
+// lib/screens/pro/registro_pro_detail_screen.dart
 //
-// Vista de un trabajo desde el lado del profesional (sección 12 del spec).
+// Vista de un registro desde el lado del profesional (sección 12 del spec).
 // El profesional gestiona estado, presupuestos formales, cambios de alcance
-// y documentos -- pero solo de ESTE trabajo, nunca del resto de la casa (ver
-// firestore.rules: el acceso está condicionado a profesionalUid == su uid).
+// y documentos -- pero solo de ESTE registro, nunca del resto de la casa ni
+// del elemento padre (ver firestore.rules: el acceso está condicionado a
+// profesionalUid == su uid, y Registro.elementoNombre va denormalizado para
+// no necesitar leer el elemento).
 import 'package:flutter/material.dart';
 
 import '../../models/documento.dart';
-import '../../models/trabajo.dart';
+import '../../models/registro.dart';
 import '../../services/documento_service.dart';
 import '../../services/pago_service.dart';
-import '../../services/trabajo_service.dart';
+import '../../services/registro_service.dart';
 import '../../theme/design_tokens.dart';
 import '../../widgets/app_error.dart';
 import '../../widgets/progreso_pago.dart';
@@ -19,18 +21,19 @@ import '../nuevo_documento_flow.dart';
 import '../pagos_section.dart';
 import '../presupuestos_section.dart';
 
-class TrabajoProDetailScreen extends StatelessWidget {
-  const TrabajoProDetailScreen({required this.casaId, required this.trabajoId, super.key});
+class RegistroProDetailScreen extends StatelessWidget {
+  const RegistroProDetailScreen({required this.casaId, required this.elementoId, required this.registroId, super.key});
 
   final String casaId;
-  final String trabajoId;
+  final String elementoId;
+  final String registroId;
 
-  Future<void> _finalizar(BuildContext context, Trabajo trabajo) async {
+  Future<void> _finalizar(BuildContext context, Registro registro) async {
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Marcar como finalizado'),
-        content: const Text('Se le pedirá al propietario que confirme que el trabajo está terminado -- todavía no se cierra hasta que lo haga.'),
+        content: const Text('Se le pedirá al propietario que confirme que el registro está terminado -- todavía no se cierra hasta que lo haga.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
           FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Marcar como finalizado')),
@@ -41,16 +44,16 @@ class TrabajoProDetailScreen extends StatelessWidget {
 
     // Mismo aviso no bloqueante que en el lado del propietario: al
     // profesional también le interesa no perder de vista un cobro
-    // pendiente, pero no se le impide cerrar el trabajo por ello.
-    if (trabajo.presupuesto != null) {
-      final pagado = await PagoService.totalPagado(casaId, trabajoId);
-      if (pagado < trabajo.presupuesto! && context.mounted) {
+    // pendiente, pero no se le impide cerrar el registro por ello.
+    if (registro.presupuesto != null) {
+      final pagado = await PagoService.totalPagado(casaId, elementoId, registroId);
+      if (pagado < registro.presupuesto! && context.mounted) {
         final seguir = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('El cliente todavía no ha pagado del todo'),
             content: Text(
-              'Lleva pagado ${pagado.toStringAsFixed(2)} € de ${trabajo.presupuesto!.toStringAsFixed(2)} €. '
+              'Lleva pagado ${pagado.toStringAsFixed(2)} € de ${registro.presupuesto!.toStringAsFixed(2)} €. '
               '¿Quieres finalizar igualmente?',
             ),
             actions: [
@@ -64,35 +67,37 @@ class TrabajoProDetailScreen extends StatelessWidget {
     }
     if (!context.mounted) return;
     try {
-      await TrabajoService.marcarFinalizadoProfesional(casaId, trabajoId);
+      await RegistroService.marcarFinalizadoProfesional(casaId, elementoId, registroId);
       if (context.mounted) AppError.showSuccess(context, 'Esperando a que el propietario lo confirme.');
     } catch (e, st) {
-      if (context.mounted) AppError.show(context, 'No se pudo marcar el trabajo como finalizado.', error: e, stackTrace: st);
+      if (context.mounted) AppError.show(context, 'No se pudo marcar el registro como finalizado.', error: e, stackTrace: st);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<Trabajo?>(
-      stream: TrabajoService.streamTrabajo(casaId, trabajoId),
+    return StreamBuilder<Registro?>(
+      stream: RegistroService.streamRegistro(casaId, elementoId, registroId),
       builder: (context, snapshot) {
-        final trabajo = snapshot.data;
-        if (trabajo == null) {
+        final registro = snapshot.data;
+        if (registro == null) {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
         return Scaffold(
-          appBar: AppBar(title: Text(trabajo.titulo)),
-          floatingActionButton: _estadoControlado(trabajo.estado)
+          appBar: AppBar(title: Text(registro.titulo)),
+          floatingActionButton: _estadoControlado(registro.estado)
               ? null
               : FloatingActionButton.extended(
-                  onPressed: () => _finalizar(context, trabajo),
+                  onPressed: () => _finalizar(context, registro),
                   icon: const Icon(Icons.check),
                   label: const Text('Finalizar'),
                 ),
           body: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              if (trabajo.estado == EstadoTrabajo.pendienteConfirmacion) ...[
+              Text(registro.elementoNombre, style: TextStyle(color: context.colors.inkMuted, fontSize: 13, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              if (registro.estado == EstadoRegistro.pendienteConfirmacion) ...[
                 Card(
                   color: context.colors.warning.withValues(alpha: 0.12),
                   child: Padding(
@@ -113,8 +118,8 @@ class TrabajoProDetailScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
               ],
-              if (trabajo.descripcion != null) ...[
-                Text(trabajo.descripcion!),
+              if (registro.descripcion != null) ...[
+                Text(registro.descripcion!),
                 const SizedBox(height: 16),
               ],
               Card(
@@ -128,62 +133,61 @@ class TrabajoProDetailScreen extends StatelessWidget {
                       // "Finalizar" (auditoría de seguridad, octubre 2026).
                       // El servidor ya lo bloquea aunque se fuerce desde fuera
                       // de la app, pero antes el desplegable seguía
-                      // mostrando las opciones como tocables en un trabajo ya
-                      // cerrado -- el servidor lo rechazaba en silencio, pero
-                      // si el estado local optimista hacía reaparecer el
-                      // botón "Finalizar", volver a tocarlo duplicaba el
-                      // evento en el historial (auditoría de producto,
-                      // octubre 2026). Ahora, si ya está en un estado
-                      // controlado, el campo se deshabilita del todo.
-                      if (_estadoControlado(trabajo.estado))
+                      // mostrando las opciones como tocables en un registro ya
+                      // cerrado (auditoría de producto, octubre 2026). Ahora,
+                      // si ya está en un estado controlado, el campo se
+                      // deshabilita del todo.
+                      if (_estadoControlado(registro.estado))
                         TextFormField(
-                          key: ValueKey(trabajo.estado),
-                          initialValue: _nombreEstado(trabajo.estado),
+                          key: ValueKey(registro.estado),
+                          initialValue: _nombreEstado(registro.estado),
                           enabled: false,
                           decoration: InputDecoration(
                             labelText: 'Estado',
-                            helperText: switch (trabajo.estado) {
-                              EstadoTrabajo.pendienteConfirmacion => 'Esperando confirmación del propietario',
+                            helperText: switch (registro.estado) {
+                              EstadoRegistro.pendienteConfirmacion => 'Esperando confirmación del propietario',
                               _ => 'Ya está finalizado',
                             },
                           ),
                         )
                       else
-                        DropdownButtonFormField<EstadoTrabajo>(
-                          initialValue: trabajo.estado,
+                        DropdownButtonFormField<EstadoRegistro>(
+                          initialValue: registro.estado,
                           decoration: const InputDecoration(labelText: 'Estado'),
                           items: _estadosEditables
                               .map((e) => DropdownMenuItem(value: e, child: Text(_nombreEstado(e))))
                               .toList(),
                           onChanged: (v) {
-                            if (v != null) TrabajoService.actualizarEstado(casaId, trabajoId, v);
+                            if (v != null) RegistroService.actualizarEstado(casaId, elementoId, registroId, v);
                           },
                         ),
-                      if (trabajo.presupuesto != null) ...[
+                      if (registro.presupuesto != null) ...[
                         const SizedBox(height: 8),
-                        Text('Presupuesto acordado: ${trabajo.presupuesto!.toStringAsFixed(2)} €', style: const TextStyle(fontWeight: FontWeight.w600)),
+                        Text('Presupuesto acordado: ${registro.presupuesto!.toStringAsFixed(2)} €', style: const TextStyle(fontWeight: FontWeight.w600)),
                         const SizedBox(height: 10),
-                        ProgresoPago(casaId: casaId, trabajoId: trabajoId, presupuesto: trabajo.presupuesto!),
+                        ProgresoPago(casaId: casaId, elementoId: elementoId, registroId: registroId, presupuesto: registro.presupuesto!),
                       ],
                     ],
                   ),
                 ),
               ),
               const SizedBox(height: 20),
-              PresupuestosSection(casaId: casaId, trabajoId: trabajoId, rol: RolEnTrabajo.profesional),
+              PresupuestosSection(casaId: casaId, elementoId: elementoId, registroId: registroId, rol: RolEnTrabajo.profesional),
               const SizedBox(height: 20),
               CambiosAlcanceSection(
                 casaId: casaId,
-                trabajoId: trabajoId,
+                elementoId: elementoId,
+                registroId: registroId,
                 rol: RolEnTrabajo.profesional,
-                trabajoCerrado: trabajo.estado == EstadoTrabajo.terminado || trabajo.estado == EstadoTrabajo.archivado,
+                registroCerrado: registro.estado == EstadoRegistro.terminado || registro.estado == EstadoRegistro.archivado,
               ),
               const SizedBox(height: 20),
               PagosSection(
                 casaId: casaId,
-                trabajoId: trabajoId,
-                trabajoTitulo: trabajo.titulo,
-                presupuesto: trabajo.presupuesto,
+                elementoId: elementoId,
+                registroId: registroId,
+                registroTitulo: registro.titulo,
+                presupuesto: registro.presupuesto,
                 rol: RolEnTrabajo.profesional,
               ),
               const SizedBox(height: 20),
@@ -192,14 +196,14 @@ class TrabajoProDetailScreen extends StatelessWidget {
                 children: [
                   Text('Documentos', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
                   TextButton.icon(
-                    onPressed: () => iniciarNuevoDocumento(context, casaId: casaId, trabajoId: trabajoId),
+                    onPressed: () => iniciarNuevoDocumento(context, casaId: casaId, elementoId: elementoId, registroId: registroId),
                     icon: const Icon(Icons.document_scanner_outlined, size: 18),
                     label: const Text('Añadir'),
                   ),
                 ],
               ),
               StreamBuilder<List<Documento>>(
-                stream: DocumentoService.streamDocumentos(casaId, trabajoId: trabajoId),
+                stream: DocumentoService.streamDocumentos(casaId, registroId: registroId),
                 builder: (context, snapshot) {
                   final documentos = snapshot.data ?? [];
                   if (documentos.isEmpty) {
@@ -221,7 +225,7 @@ class TrabajoProDetailScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                'Solo ves este trabajo -- no tienes acceso al resto de la casa ni a su historial completo.',
+                'Solo ves este registro -- no tienes acceso al resto de la casa ni a su historial completo.',
                 style: TextStyle(color: context.colors.inkMuted, fontSize: 12),
               ),
             ],
@@ -232,16 +236,16 @@ class TrabajoProDetailScreen extends StatelessWidget {
   }
 }
 
-bool _estadoControlado(EstadoTrabajo e) =>
-    e == EstadoTrabajo.terminado || e == EstadoTrabajo.archivado || e == EstadoTrabajo.pendienteConfirmacion;
+bool _estadoControlado(EstadoRegistro e) =>
+    e == EstadoRegistro.terminado || e == EstadoRegistro.archivado || e == EstadoRegistro.pendienteConfirmacion;
 
-String _nombreEstado(EstadoTrabajo e) => switch (e) {
-      EstadoTrabajo.nuevo => 'Nuevo',
-      EstadoTrabajo.presupuestado => 'Presupuestado',
-      EstadoTrabajo.enCurso => 'En curso',
-      EstadoTrabajo.pendienteConfirmacion => 'Pendiente de confirmación',
-      EstadoTrabajo.terminado => 'Terminado',
-      EstadoTrabajo.archivado => 'Archivado',
+String _nombreEstado(EstadoRegistro e) => switch (e) {
+      EstadoRegistro.nuevo => 'Nuevo',
+      EstadoRegistro.presupuestado => 'Presupuestado',
+      EstadoRegistro.enCurso => 'En curso',
+      EstadoRegistro.pendienteConfirmacion => 'Pendiente de confirmación',
+      EstadoRegistro.terminado => 'Terminado',
+      EstadoRegistro.archivado => 'Archivado',
     };
 
-const _estadosEditables = [EstadoTrabajo.nuevo, EstadoTrabajo.presupuestado, EstadoTrabajo.enCurso];
+const _estadosEditables = [EstadoRegistro.nuevo, EstadoRegistro.presupuestado, EstadoRegistro.enCurso];

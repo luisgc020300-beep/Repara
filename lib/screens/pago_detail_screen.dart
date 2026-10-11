@@ -1,9 +1,9 @@
 // lib/screens/pago_detail_screen.dart
 //
-// Detalle de un pago concreto de un trabajo, con aspecto de recibo formal
+// Detalle de un pago concreto de un registro, con aspecto de recibo formal
 // (número, fecha, filas con regla) -- editable para el propietario (quien
 // registra lo que ha pagado), solo lectura para el profesional asignado a
-// ese trabajo (se entera de todo el detalle sin poder tocarlo). Ver
+// ese registro (se entera de todo el detalle sin poder tocarlo). Ver
 // screens/pagos_section.dart para el listado que abre esta pantalla.
 import 'dart:async';
 
@@ -19,8 +19,9 @@ import '../widgets/app_error.dart';
 class PagoDetailScreen extends StatefulWidget {
   const PagoDetailScreen({
     required this.casaId,
-    required this.trabajoId,
-    required this.trabajoTitulo,
+    required this.elementoId,
+    required this.registroId,
+    required this.registroTitulo,
     required this.presupuesto,
     required this.editable,
     this.pago,
@@ -29,10 +30,11 @@ class PagoDetailScreen extends StatefulWidget {
   });
 
   final String casaId;
-  final String trabajoId;
-  final String trabajoTitulo;
-  /// null si el trabajo todavía no tiene un precio fijado -- en ese caso no
-  /// hay límite contra el que comparar y se deja pagar libremente.
+  final String elementoId;
+  final String registroId;
+  final String registroTitulo;
+  /// null si el registro todavía no tiene un precio fijado -- en ese caso
+  /// no hay límite contra el que comparar y se deja pagar libremente.
   final double? presupuesto;
   final bool editable;
 
@@ -86,7 +88,7 @@ class _PagoDetailScreenState extends State<PagoDetailScreen> {
     // aquí siempre se compara contra el valor en vivo de trabajo.presupuesto.
     final presupuesto = widget.presupuesto;
     if (presupuesto != null) {
-      final totalActual = await PagoService.totalPagado(widget.casaId, widget.trabajoId);
+      final totalActual = await PagoService.totalPagado(widget.casaId, widget.elementoId, widget.registroId);
       final totalSinEste = totalActual - (widget.pago?.importe ?? 0);
       final nuevoTotal = totalSinEste + importe;
       if (nuevoTotal > presupuesto + 0.01) {
@@ -113,10 +115,10 @@ class _PagoDetailScreenState extends State<PagoDetailScreen> {
     );
     try {
       if (widget.pago == null) {
-        await PagoService.crear(widget.casaId, widget.trabajoId, pago);
+        await PagoService.crear(widget.casaId, widget.elementoId, widget.registroId, pago);
         unawaited(AnalyticsService.paymentCreated(importe: importe));
       } else {
-        await PagoService.actualizar(widget.casaId, widget.trabajoId, widget.pago!.id, pago);
+        await PagoService.actualizar(widget.casaId, widget.elementoId, widget.registroId, widget.pago!.id, pago);
       }
       if (mounted) Navigator.pop(context);
     } catch (e, st) {
@@ -139,7 +141,7 @@ class _PagoDetailScreenState extends State<PagoDetailScreen> {
     );
     if (confirmar != true) return;
     try {
-      await PagoService.eliminar(widget.casaId, widget.trabajoId, widget.pago!.id);
+      await PagoService.eliminar(widget.casaId, widget.elementoId, widget.registroId, widget.pago!.id);
       if (mounted) Navigator.pop(context);
     } catch (e, st) {
       if (mounted) AppError.show(context, 'No se pudo eliminar el pago.', error: e, stackTrace: st);
@@ -204,7 +206,7 @@ class _PagoDetailScreenState extends State<PagoDetailScreen> {
                       'RECIBO',
                       style: TextStyle(color: context.colors.brand, fontWeight: FontWeight.w800, fontSize: 20, letterSpacing: 1.2),
                     ),
-                    Text(widget.trabajoTitulo, style: TextStyle(color: context.colors.inkMuted, fontSize: 13)),
+                    Text(widget.registroTitulo, style: TextStyle(color: context.colors.inkMuted, fontSize: 13)),
                   ],
                 ),
               ),

@@ -166,7 +166,7 @@ class _HabitacionCard extends StatelessWidget {
                           onPressed: () => Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => NuevoElementoScreen(casa: casa, habitacionId: habitacion.id),
+                              builder: (_) => NuevoElementoScreen(casa: casa, habitacionIdInicial: habitacion.id),
                             ),
                           ),
                           icon: const Icon(Icons.add, size: 18),

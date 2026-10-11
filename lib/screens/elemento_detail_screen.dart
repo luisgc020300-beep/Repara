@@ -11,17 +11,17 @@ import 'package:intl/intl.dart';
 import '../models/casa.dart';
 import '../models/documento.dart';
 import '../models/elemento.dart';
-import '../models/evento.dart';
+import '../models/registro.dart';
 import '../services/documento_service.dart';
 import '../services/elemento_service.dart';
-import '../services/evento_service.dart';
+import '../services/registro_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
 import '../widgets/ios_list.dart';
 import 'nuevo_documento_flow.dart';
 import 'nuevo_elemento_screen.dart';
-import 'nuevo_evento_sheet.dart';
-import 'trabajo_detail_screen.dart';
+import 'nuevo_registro_sheet.dart';
+import 'registro_detail_screen.dart';
 
 class ElementoDetailScreen extends StatelessWidget {
   const ElementoDetailScreen({required this.casa, required this.elementoId, super.key});
@@ -88,14 +88,16 @@ class ElementoDetailScreen extends StatelessWidget {
     if (intervalo == null) return;
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
     try {
-      await EventoService.crear(
+      await RegistroService.crear(
         casa.id,
-        Evento(
+        elemento.id,
+        Registro(
           id: '',
-          tipo: TipoEvento.revision,
+          elementoNombre: elemento.nombre,
+          tipo: TipoRegistro.mantenimiento,
+          esConProfesional: false,
           titulo: 'Revisión periódica · ${elemento.nombre}',
-          elementoId: elemento.id,
-          habitacionId: elemento.habitacionId,
+          estado: EstadoRegistro.terminado,
           fecha: DateTime.now(),
         ),
         createdBy: uid,
@@ -125,7 +127,7 @@ class ElementoDetailScreen extends StatelessWidget {
                 tooltip: 'Editar ficha',
                 onPressed: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => NuevoElementoScreen(casa: casa, habitacionId: elemento.habitacionId!, existente: elemento)),
+                  MaterialPageRoute(builder: (_) => NuevoElementoScreen(casa: casa, habitacionIdInicial: elemento.habitacionId, existente: elemento)),
                 ),
               ),
               IconButton(
@@ -152,9 +154,9 @@ class ElementoDetailScreen extends StatelessWidget {
             ],
           ),
           floatingActionButton: FloatingActionButton.extended(
-            onPressed: () => mostrarNuevoEventoSheet(context, casaId: casa.id, elementoId: elemento.id),
+            onPressed: () => mostrarNuevoRegistroSheet(context, casaId: casa.id, elementoId: elemento.id, elementoNombre: elemento.nombre),
             icon: const Icon(Icons.add),
-            label: const Text('Registrar mantenimiento'),
+            label: const Text('Añadir registro'),
           ),
           body: ListView(
             padding: const EdgeInsets.all(16),
@@ -176,39 +178,25 @@ class ElementoDetailScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 8),
-              StreamBuilder<List<Evento>>(
-                stream: EventoService.streamHistorial(casa.id, elementoId: elemento.id),
+              StreamBuilder<List<Registro>>(
+                stream: RegistroService.streamRegistros(casa.id, elemento.id),
                 builder: (context, snapshot) {
-                  final eventos = snapshot.data ?? [];
-                  if (eventos.isEmpty) {
-                    return Text('Sin eventos todavía.', style: TextStyle(color: context.colors.inkMuted));
+                  final registros = snapshot.data ?? [];
+                  if (registros.isEmpty) {
+                    return Text('Sin registros todavía.', style: TextStyle(color: context.colors.inkMuted));
                   }
                   return IosSection(
-                    rows: eventos
-                        .map((e) => IosRow(
+                    rows: registros
+                        .map((r) => IosRow(
                               icon: Icons.fact_check_outlined,
                               iconColor: context.colors.brand,
-                              title: e.titulo,
-                              subtitle: DateFormat('d MMM yyyy', 'es_ES').format(e.fecha),
-                              showChevron: e.trabajoId != null,
-                              trailing: e.coste != null
-                                  ? Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text('${e.coste!.toStringAsFixed(0)} €'),
-                                        if (e.trabajoId != null) ...[
-                                          const SizedBox(width: 6),
-                                          Icon(Icons.chevron_right, color: context.colors.inkMuted, size: 20),
-                                        ],
-                                      ],
-                                    )
-                                  : null,
-                              // Breadcrumb tocable al trabajo de origen, si lo
-                              // tiene (auditoría de producto, octubre 2026) --
-                              // no hace falta enlazar a este mismo elemento.
-                              onTap: e.trabajoId != null
-                                  ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => TrabajoDetailScreen(casa: casa, trabajoId: e.trabajoId!)))
-                                  : null,
+                              title: r.titulo,
+                              subtitle: DateFormat('d MMM yyyy', 'es_ES').format(r.fecha),
+                              trailing: r.coste != null ? Text('${r.coste!.toStringAsFixed(0)} €') : null,
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => RegistroDetailScreen(casa: casa, elementoId: elemento.id, registroId: r.id)),
+                              ),
                             ))
                         .toList(),
                   );

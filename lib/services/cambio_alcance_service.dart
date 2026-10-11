@@ -12,19 +12,30 @@ class CambioAlcanceService {
   static final _db = FirebaseFirestore.instance;
   static const _region = 'europe-west1';
 
-  static CollectionReference<Map<String, dynamic>> _col(String casaId, String trabajoId) =>
-      _db.collection('casas').doc(casaId).collection('trabajos').doc(trabajoId).collection('cambiosAlcance');
+  static CollectionReference<Map<String, dynamic>> _col(String casaId, String elementoId, String registroId) => _db
+      .collection('casas')
+      .doc(casaId)
+      .collection('elementos')
+      .doc(elementoId)
+      .collection('registros')
+      .doc(registroId)
+      .collection('cambiosAlcance');
 
-  static Future<String> subirFoto(String casaId, File archivo, String nombreArchivo) async {
-    final ref = FirebaseStorage.instance
-        .ref()
-        .child('casas/$casaId/cambiosAlcance/${DateTime.now().millisecondsSinceEpoch}_$nombreArchivo');
+  /// La ruta de Storage tiene que coincidir exactamente con
+  /// storage.rules (casas/{cid}/elementos/{eid}/registros/{rid}/
+  /// cambiosAlcance/) -- antes de esta migración no coincidían (el upload
+  /// nunca incluía el id del trabajo), así que un profesional no miembro
+  /// de la casa no tenía permiso real para subir su propia foto y caía al
+  /// catch-all genérico de la casa, que SÍ le denegaba. Corregido de paso.
+  static Future<String> subirFoto(String casaId, String elementoId, String registroId, File archivo, String nombreArchivo) async {
+    final ref = FirebaseStorage.instance.ref().child(
+        'casas/$casaId/elementos/$elementoId/registros/$registroId/cambiosAlcance/${DateTime.now().millisecondsSinceEpoch}_$nombreArchivo');
     await ref.putFile(archivo);
     return ref.getDownloadURL();
   }
 
-  static Stream<List<CambioAlcance>> streamCambios(String casaId, String trabajoId) {
-    return _col(casaId, trabajoId)
+  static Stream<List<CambioAlcance>> streamCambios(String casaId, String elementoId, String registroId) {
+    return _col(casaId, elementoId, registroId)
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((s) => s.docs.map(CambioAlcance.fromDoc).toList())
@@ -33,7 +44,8 @@ class CambioAlcanceService {
 
   static Future<void> crear({
     required String casaId,
-    required String trabajoId,
+    required String elementoId,
+    required String registroId,
     required String titulo,
     String? descripcion,
     String? motivo,
@@ -45,7 +57,8 @@ class CambioAlcanceService {
     final callable = FirebaseFunctions.instanceFor(region: _region).httpsCallable('crearCambioAlcance');
     await callable.call<Map<String, dynamic>>({
       'casaId': casaId,
-      'trabajoId': trabajoId,
+      'elementoId': elementoId,
+      'registroId': registroId,
       'titulo': titulo,
       'descripcion': descripcion,
       'motivo': motivo,
@@ -58,21 +71,33 @@ class CambioAlcanceService {
 
   static Future<void> responder({
     required String casaId,
-    required String trabajoId,
+    required String elementoId,
+    required String registroId,
     required String cambioAlcanceId,
     required bool aprobar,
   }) async {
     final callable = FirebaseFunctions.instanceFor(region: _region).httpsCallable('responderCambioAlcance');
     await callable.call<Map<String, dynamic>>({
       'casaId': casaId,
-      'trabajoId': trabajoId,
+      'elementoId': elementoId,
+      'registroId': registroId,
       'cambioAlcanceId': cambioAlcanceId,
       'aprobar': aprobar,
     });
   }
 
-  static Future<void> cancelar({required String casaId, required String trabajoId, required String cambioAlcanceId}) async {
+  static Future<void> cancelar({
+    required String casaId,
+    required String elementoId,
+    required String registroId,
+    required String cambioAlcanceId,
+  }) async {
     final callable = FirebaseFunctions.instanceFor(region: _region).httpsCallable('cancelarCambioAlcance');
-    await callable.call<Map<String, dynamic>>({'casaId': casaId, 'trabajoId': trabajoId, 'cambioAlcanceId': cambioAlcanceId});
+    await callable.call<Map<String, dynamic>>({
+      'casaId': casaId,
+      'elementoId': elementoId,
+      'registroId': registroId,
+      'cambioAlcanceId': cambioAlcanceId,
+    });
   }
 }

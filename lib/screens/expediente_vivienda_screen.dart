@@ -18,21 +18,33 @@ import 'package:share_plus/share_plus.dart';
 import '../models/casa.dart';
 import '../models/documento.dart';
 import '../models/elemento.dart';
-import '../models/trabajo.dart';
+import '../models/registro.dart';
 import '../services/analytics_service.dart';
 import '../services/documento_service.dart';
 import '../services/elemento_service.dart';
-import '../services/trabajo_service.dart';
+import '../services/registro_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
 import '../widgets/ios_list.dart';
+
+double? _costeRegistro(Registro r) => r.esConProfesional ? r.presupuesto : r.coste;
 
 class ExpedienteViviendaScreen extends StatelessWidget {
   const ExpedienteViviendaScreen({required this.casa, super.key});
 
   final Casa casa;
 
-  Future<void> _compartir(BuildContext context, List<Elemento> elementos, List<Trabajo> trabajos, int numDocumentos) async {
+  /// Un registro nunca vive en una colección a nivel de casa (octubre 2026,
+  /// fusión Elemento/Trabajo/Evento) -- se agrega aquí leyendo la
+  /// subcolección de cada elemento, no con una consulta collectionGroup
+  /// (ver firestore.rules: esa vía quedó descartada por limitaciones reales
+  /// del propio Firestore, no solo de sintaxis).
+  Future<List<Registro>> _todosLosRegistros(List<Elemento> elementos) async {
+    final porElemento = await Future.wait(elementos.map((e) => RegistroService.streamRegistros(casa.id, e.id).first));
+    return porElemento.expand((lista) => lista).toList();
+  }
+
+  Future<void> _compartir(BuildContext context, List<Elemento> elementos, List<Registro> registros, int numDocumentos) async {
     final buffer = StringBuffer()
       ..writeln('EXPEDIENTE DE LA VIVIENDA · ${casa.nombre}')
       ..writeln('Generado el ${DateFormat('d MMMM yyyy', 'es_ES').format(DateTime.now())}')
@@ -52,15 +64,16 @@ class ExpedienteViviendaScreen extends StatelessWidget {
       buffer.writeln();
     }
 
-    final finalizados = trabajos.where((t) => t.estado == EstadoTrabajo.terminado || t.estado == EstadoTrabajo.archivado).toList();
+    final finalizados = _finalizados(registros);
     if (finalizados.isNotEmpty) {
-      buffer.writeln('TRABAJOS REALIZADOS (${finalizados.length})');
-      for (final t in finalizados) {
+      buffer.writeln('REGISTROS (${finalizados.length})');
+      for (final r in finalizados) {
+        final coste = _costeRegistro(r);
         final detalle = [
-          if (t.profesionalNombre != null) t.profesionalNombre!,
-          if (t.presupuesto != null) '${t.presupuesto!.toStringAsFixed(0)} €',
+          if (r.profesionalNombre != null) r.profesionalNombre!,
+          if (coste != null) '${coste.toStringAsFixed(0)} €',
         ].join(' · ');
-        buffer.writeln('- ${t.titulo}${detalle.isNotEmpty ? ' ($detalle)' : ''}');
+        buffer.writeln('- ${r.titulo}${detalle.isNotEmpty ? ' ($detalle)' : ''}');
       }
       buffer.writeln();
     }
@@ -90,91 +103,107 @@ class ExpedienteViviendaScreen extends StatelessWidget {
     }
   }
 
+  List<Registro> _finalizados(List<Registro> registros) =>
+      registros.where((r) => !r.esConProfesional || r.estado == EstadoRegistro.terminado || r.estado == EstadoRegistro.archivado).toList();
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Expediente de la vivienda')),
-      body: FutureBuilder(
-        future: Future.wait([
-          ElementoService.streamElementos(casa.id).first,
-          TrabajoService.streamTrabajos(casa.id).first,
-          DocumentoService.streamTodos(casa.id).first,
-        ]),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-          final elementos = snapshot.data![0] as List<Elemento>;
-          final trabajos = snapshot.data![1] as List<Trabajo>;
-          final documentos = snapshot.data![2] as List<Documento>;
-          final finalizados = trabajos.where((t) => t.estado == EstadoTrabajo.terminado || t.estado == EstadoTrabajo.archivado).toList();
-          final conGarantiaVigente = elementos.where((e) => e.garantiaHasta != null && e.garantiaHasta!.isAfter(DateTime.now())).length;
-          final costeTotal = finalizados.fold<double>(0, (acc, t) => acc + (t.presupuesto ?? 0));
-
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              Text(
-                'Un resumen de todo lo que hay registrado en Repara sobre esta vivienda -- útil para vender la casa, renovar el seguro o pedir financiación para una reforma.',
-                style: TextStyle(color: context.colors.inkMuted, fontSize: 13),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(child: _Estadistica(valor: '${elementos.length}', etiqueta: 'Elementos')),
-                  Expanded(child: _Estadistica(valor: '${finalizados.length}', etiqueta: 'Trabajos')),
-                  Expanded(child: _Estadistica(valor: '$conGarantiaVigente', etiqueta: 'Garantías vigentes')),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(child: _Estadistica(valor: '${documentos.length}', etiqueta: 'Documentos')),
-                  Expanded(child: _Estadistica(valor: '${costeTotal.toStringAsFixed(0)} €', etiqueta: 'Invertido en trabajos')),
-                  const Expanded(child: SizedBox()),
-                ],
-              ),
-              const SizedBox(height: 8),
-              if (elementos.isNotEmpty)
-                IosSection(
-                  header: 'Elementos',
-                  rows: elementos
-                      .map((e) => _filaResumen(
-                            context,
-                            titulo: e.nombre,
-                            subtitulo: [
-                              if (e.marca != null) '${e.marca} ${e.modelo ?? ''}'.trim(),
-                              if (e.garantiaHasta != null) 'garantía hasta ${DateFormat('MM/yyyy').format(e.garantiaHasta!)}',
-                            ].where((s) => s.isNotEmpty).join(' · '),
-                            valor: e.coste != null ? '${e.coste!.toStringAsFixed(0)} €' : null,
-                          ))
-                      .toList(),
-                ),
-              if (finalizados.isNotEmpty)
-                IosSection(
-                  header: 'Trabajos realizados',
-                  rows: finalizados
-                      .map((t) => _filaResumen(
-                            context,
-                            titulo: t.titulo,
-                            subtitulo: t.profesionalNombre ?? '',
-                            valor: t.presupuesto != null ? '${t.presupuesto!.toStringAsFixed(0)} €' : null,
-                          ))
-                      .toList(),
-                ),
-              if (elementos.isEmpty && finalizados.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 24),
-                  child: Text('Todavía no hay suficientes datos para generar un expediente útil.', style: TextStyle(color: context.colors.inkMuted)),
-                ),
-              const SizedBox(height: 8),
-              FilledButton.icon(
-                onPressed: () => _compartir(context, elementos, trabajos, documentos.length),
-                icon: const Icon(Icons.ios_share_outlined),
-                label: const Text('Compartir resumen'),
-              ),
-            ],
+      body: FutureBuilder<List<Elemento>>(
+        future: ElementoService.streamElementos(casa.id).first,
+        builder: (context, elementosSnapshot) {
+          if (!elementosSnapshot.hasData) return const Center(child: CircularProgressIndicator());
+          final elementos = elementosSnapshot.data!;
+          return FutureBuilder(
+            future: Future.wait([_todosLosRegistros(elementos), DocumentoService.streamTodos(casa.id).first]),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+              final registros = snapshot.data![0] as List<Registro>;
+              final documentos = snapshot.data![1] as List<Documento>;
+              final finalizados = _finalizados(registros);
+              final conGarantiaVigente = elementos.where((e) => e.garantiaHasta != null && e.garantiaHasta!.isAfter(DateTime.now())).length;
+              final costeTotal = finalizados.fold<double>(0, (acc, r) => acc + (_costeRegistro(r) ?? 0));
+              return _cuerpo(context, elementos, finalizados, documentos, conGarantiaVigente, costeTotal, registros);
+            },
           );
         },
       ),
+    );
+  }
+
+  Widget _cuerpo(
+    BuildContext context,
+    List<Elemento> elementos,
+    List<Registro> finalizados,
+    List<Documento> documentos,
+    int conGarantiaVigente,
+    double costeTotal,
+    List<Registro> registros,
+  ) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Text(
+          'Un resumen de todo lo que hay registrado en Repara sobre esta vivienda -- útil para vender la casa, renovar el seguro o pedir financiación para una reforma.',
+          style: TextStyle(color: context.colors.inkMuted, fontSize: 13),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(child: _Estadistica(valor: '${elementos.length}', etiqueta: 'Elementos')),
+            Expanded(child: _Estadistica(valor: '${finalizados.length}', etiqueta: 'Registros')),
+            Expanded(child: _Estadistica(valor: '$conGarantiaVigente', etiqueta: 'Garantías vigentes')),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(child: _Estadistica(valor: '${documentos.length}', etiqueta: 'Documentos')),
+            Expanded(child: _Estadistica(valor: '${costeTotal.toStringAsFixed(0)} €', etiqueta: 'Invertido en registros')),
+            const Expanded(child: SizedBox()),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (elementos.isNotEmpty)
+          IosSection(
+            header: 'Elementos',
+            rows: elementos
+                .map((e) => _filaResumen(
+                      context,
+                      titulo: e.nombre,
+                      subtitulo: [
+                        if (e.marca != null) '${e.marca} ${e.modelo ?? ''}'.trim(),
+                        if (e.garantiaHasta != null) 'garantía hasta ${DateFormat('MM/yyyy').format(e.garantiaHasta!)}',
+                      ].where((s) => s.isNotEmpty).join(' · '),
+                      valor: e.coste != null ? '${e.coste!.toStringAsFixed(0)} €' : null,
+                    ))
+                .toList(),
+          ),
+        if (finalizados.isNotEmpty)
+          IosSection(
+            header: 'Registros',
+            rows: finalizados
+                .map((r) => _filaResumen(
+                      context,
+                      titulo: r.titulo,
+                      subtitulo: r.profesionalNombre ?? '',
+                      valor: _costeRegistro(r) != null ? '${_costeRegistro(r)!.toStringAsFixed(0)} €' : null,
+                    ))
+                .toList(),
+          ),
+        if (elementos.isEmpty && finalizados.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            child: Text('Todavía no hay suficientes datos para generar un expediente útil.', style: TextStyle(color: context.colors.inkMuted)),
+          ),
+        const SizedBox(height: 8),
+        FilledButton.icon(
+          onPressed: () => _compartir(context, elementos, registros, documentos.length),
+          icon: const Icon(Icons.ios_share_outlined),
+          label: const Text('Compartir resumen'),
+        ),
+      ],
     );
   }
 

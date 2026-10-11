@@ -48,15 +48,15 @@ class ProfesionalService {
     }, SetOptions(merge: true));
   }
 
-  /// Trabajos aceptados por el profesional -- copia ligera guardada por la
+  /// Registros aceptados por el profesional -- copia ligera guardada por la
   /// Cloud Function al aceptar una invitación (ver responderInvitacion),
   /// para no necesitar permiso de lectura sobre casas ajenas.
-  static Stream<List<TrabajoProRef>> streamTrabajosProRefs() {
+  static Stream<List<RegistroProRef>> streamRegistrosProRefs() {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return Stream.value(const []);
     return _db.collection('users').doc(uid).snapshots().map((d) {
-      final lista = (d.data()?['trabajosProRefs'] as List?) ?? [];
-      return lista.map((e) => TrabajoProRef.fromMap(Map<String, dynamic>.from(e as Map))).toList();
+      final lista = (d.data()?['registrosProRefs'] as List?) ?? [];
+      return lista.map((e) => RegistroProRef.fromMap(Map<String, dynamic>.from(e as Map))).toList();
     }).conRegistroDeErrores();
   }
 }

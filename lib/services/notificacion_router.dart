@@ -7,36 +7,38 @@ import 'package:flutter/material.dart';
 
 import '../models/notificacion.dart';
 import '../screens/pago_detail_screen.dart';
-import '../screens/pro/trabajo_pro_detail_screen.dart';
-import '../screens/trabajo_detail_screen.dart';
+import '../screens/pro/registro_pro_detail_screen.dart';
+import '../screens/registro_detail_screen.dart';
 import 'casa_service.dart';
 import 'pago_service.dart';
-import 'trabajo_service.dart';
+import 'registro_service.dart';
 
 Future<void> abrirDestinoNotificacion(
   BuildContext context, {
   required String tipo,
   String? casaId,
-  String? trabajoId,
+  String? elementoId,
+  String? registroId,
   String? pagoId,
 }) async {
-  if (casaId == null || trabajoId == null || !context.mounted) return;
+  if (casaId == null || elementoId == null || registroId == null || !context.mounted) return;
   final modoPro = tipoEsParaProfesional(tipo);
 
   // "Te han registrado un pago" lleva directo al detalle de ESE pago, no
-  // solo al trabajo -- es lo que el profesional quiere ver primero.
+  // solo al registro -- es lo que el profesional quiere ver primero.
   if (tipo == 'pago_registrado' && pagoId != null) {
-    final trabajo = await TrabajoService.streamTrabajo(casaId, trabajoId).first;
-    final pago = await PagoService.obtenerPago(casaId, trabajoId, pagoId);
-    if (!context.mounted || trabajo == null || pago == null) return;
+    final registro = await RegistroService.streamRegistro(casaId, elementoId, registroId).first;
+    final pago = await PagoService.obtenerPago(casaId, elementoId, registroId, pagoId);
+    if (!context.mounted || registro == null || pago == null) return;
     await Navigator.push<void>(
       context,
       MaterialPageRoute(
         builder: (_) => PagoDetailScreen(
           casaId: casaId,
-          trabajoId: trabajoId,
-          trabajoTitulo: trabajo.titulo,
-          presupuesto: trabajo.presupuesto,
+          elementoId: elementoId,
+          registroId: registroId,
+          registroTitulo: registro.titulo,
+          presupuesto: registro.presupuesto,
           editable: false,
           pago: pago,
         ),
@@ -47,11 +49,11 @@ Future<void> abrirDestinoNotificacion(
 
   if (modoPro) {
     // El profesional no es miembro de la casa (ver firestore.rules) -- solo
-    // tiene acceso al trabajo concreto, no hace falta ni se puede leer la
+    // tiene acceso al registro concreto, no hace falta ni se puede leer la
     // casa entera.
     await Navigator.push<void>(
       context,
-      MaterialPageRoute(builder: (_) => TrabajoProDetailScreen(casaId: casaId, trabajoId: trabajoId)),
+      MaterialPageRoute(builder: (_) => RegistroProDetailScreen(casaId: casaId, elementoId: elementoId, registroId: registroId)),
     );
     return;
   }
@@ -59,6 +61,6 @@ Future<void> abrirDestinoNotificacion(
   if (!context.mounted) return;
   await Navigator.push<void>(
     context,
-    MaterialPageRoute(builder: (_) => TrabajoDetailScreen(casa: casa, trabajoId: trabajoId)),
+    MaterialPageRoute(builder: (_) => RegistroDetailScreen(casa: casa, elementoId: elementoId, registroId: registroId)),
   );
 }
