@@ -334,6 +334,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                 ],
               ),
+              _SeccionTusCasas(casaActivaId: casa.id),
               _SeccionProfesional(),
               IosSection(
                 rows: [
@@ -563,6 +564,149 @@ class _SeccionSeguridadState extends State<_SeccionSeguridad> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Selector de varias casas por usuario (octubre 2026, feedback de
+/// producto: gente con más de una propiedad). createCasa/joinCasa ya
+/// guardaban casaIds como array -- esto era solo la UI que faltaba.
+class _SeccionTusCasas extends StatefulWidget {
+  const _SeccionTusCasas({required this.casaActivaId});
+
+  final String casaActivaId;
+
+  @override
+  State<_SeccionTusCasas> createState() => _SeccionTusCasasState();
+}
+
+class _SeccionTusCasasState extends State<_SeccionTusCasas> {
+  bool _procesando = false;
+
+  Future<void> _cambiarA(String casaId) async {
+    if (casaId == widget.casaActivaId || _procesando) return;
+    setState(() => _procesando = true);
+    try {
+      await CasaService.cambiarCasaActiva(casaId);
+      // Igual que al cerrar sesión: hay que volver a la raíz para que
+      // CasaGateScreen vuelva a ser la pantalla activa y recoja el nuevo
+      // activeCasaId -- si no, esta pantalla de Ajustes (apilada por
+      // encima de la casa anterior) seguiría mostrando datos viejos.
+      if (!mounted) return;
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } catch (e, st) {
+      await FirebaseCrashlytics.instance.recordError(e, st);
+      if (mounted) AppError.show(context, 'No se pudo cambiar de casa.');
+    } finally {
+      if (mounted) setState(() => _procesando = false);
+    }
+  }
+
+  Future<void> _crearOtraCasa() async {
+    final ctrl = TextEditingController();
+    final nombre = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Nueva casa'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'p.ej. Casa de la playa'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, ctrl.text.trim()), child: const Text('Crear')),
+        ],
+      ),
+    );
+    if (nombre == null || nombre.isEmpty || !mounted) return;
+    setState(() => _procesando = true);
+    try {
+      await CasaService.createCasa(nombre);
+      if (!mounted) return;
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } catch (e, st) {
+      await FirebaseCrashlytics.instance.recordError(e, st);
+      if (mounted) AppError.show(context, 'No se pudo crear la casa.');
+    } finally {
+      if (mounted) setState(() => _procesando = false);
+    }
+  }
+
+  Future<void> _unirseAOtraCasa() async {
+    final ctrl = TextEditingController();
+    final codigo = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Código de la casa'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          textCapitalization: TextCapitalization.characters,
+          decoration: const InputDecoration(hintText: 'Ej. AB12CD'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, ctrl.text.trim()), child: const Text('Unirme')),
+        ],
+      ),
+    );
+    if (codigo == null || codigo.isEmpty || !mounted) return;
+    setState(() => _procesando = true);
+    try {
+      await CasaService.joinCasa(codigo);
+      if (!mounted) return;
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } catch (e, st) {
+      await FirebaseCrashlytics.instance.recordError(e, st);
+      if (mounted) AppError.show(context, 'Ese código no es válido o ya se ha usado.');
+    } finally {
+      if (mounted) setState(() => _procesando = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<String>>(
+      stream: CasaService.streamCasaIds(),
+      builder: (context, snapshot) {
+        final casaIds = snapshot.data ?? [widget.casaActivaId];
+        return IosSection(
+          header: 'Tus casas',
+          rows: [
+            for (final id in casaIds)
+              FutureBuilder<Casa?>(
+                future: CasaService.obtenerCasa(id),
+                builder: (context, snap) {
+                  final activa = id == widget.casaActivaId;
+                  return IosRow(
+                    icon: Icons.house_outlined,
+                    iconColor: context.colors.brand,
+                    title: snap.data?.nombre ?? '…',
+                    showChevron: false,
+                    selected: activa,
+                    trailing: activa ? Icon(Icons.check, color: context.colors.brand) : null,
+                    onTap: _procesando ? null : () => _cambiarA(id),
+                  );
+                },
+              ),
+            IosRow(
+              icon: Icons.add_home_outlined,
+              iconColor: Colors.green,
+              title: 'Crear otra casa',
+              showChevron: false,
+              onTap: _procesando ? null : _crearOtraCasa,
+            ),
+            IosRow(
+              icon: Icons.key_outlined,
+              iconColor: Colors.purple,
+              title: 'Unirme a otra casa con código',
+              showChevron: false,
+              onTap: _procesando ? null : _unirseAOtraCasa,
+            ),
+          ],
+        );
+      },
     );
   }
 }

@@ -31,6 +31,35 @@ class CasaService {
         .conRegistroDeErrores();
   }
 
+  /// Todas las casas a las que pertenece el usuario (octubre 2026: selector
+  /// de varias casas) -- no solo la activa. createCasa/joinCasa ya la
+  /// mantienen actualizada con arrayUnion.
+  static Stream<List<String>> streamCasaIds() {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return Stream.value(const []);
+    return _db
+        .collection('users')
+        .doc(uid)
+        .snapshots()
+        .map((doc) => List<String>.from(doc.data()?['casaIds'] as List? ?? const []))
+        .conRegistroDeErrores();
+  }
+
+  /// Lectura puntual (no stream) de una casa por id -- para listar nombres
+  /// en el selector sin abrir un stream permanente por cada una.
+  static Future<Casa?> obtenerCasa(String casaId) async {
+    final doc = await _db.collection('casas').doc(casaId).get();
+    return doc.exists ? Casa.fromDoc(doc) : null;
+  }
+
+  /// Cambia la casa activa a otra a la que el usuario ya pertenece. Pasa por
+  /// Cloud Function (no escritura directa) para que el servidor valide que
+  /// de verdad está en casaIds, mismo criterio que activarModoProfesional.
+  static Future<void> cambiarCasaActiva(String casaId) async {
+    final callable = FirebaseFunctions.instanceFor(region: _region).httpsCallable('cambiarCasaActiva');
+    await callable.call<Map<String, dynamic>>({'casaId': casaId});
+  }
+
   static Future<({String casaId, String joinCode})> createCasa(String nombre) async {
     final callable = FirebaseFunctions.instanceFor(region: _region).httpsCallable('createCasa');
     final result = await callable.call<Map<String, dynamic>>({'nombre': nombre});

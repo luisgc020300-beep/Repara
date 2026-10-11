@@ -162,6 +162,29 @@ exports.joinCasa = onCall({ region: REGION }, async (request) => {
   return { ok: true, casaId };
 });
 
+// -----------------------------------------------------------------------------
+// 2b. CAMBIAR DE CASA ACTIVA (octubre 2026, feedback de producto: gente con
+// más de una propiedad). createCasa/joinCasa ya guardaban casaIds como
+// array -- esto es lo único que faltaba, pasar por CF (no escritura directa
+// del cliente) para no fiarse de que el cliente valide pertenencia, mismo
+// criterio que activarModoProfesional.
+// -----------------------------------------------------------------------------
+exports.cambiarCasaActiva = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+  const uid = request.auth.uid;
+  const { casaId } = request.data || {};
+  if (!casaId) throw new HttpsError('invalid-argument', 'Falta casaId.');
+
+  const userSnap = await db.collection('users').doc(uid).get();
+  const casaIds = userSnap.exists ? (userSnap.data().casaIds || []) : [];
+  if (!casaIds.includes(casaId)) {
+    throw new HttpsError('permission-denied', 'No perteneces a esa casa.');
+  }
+
+  await db.collection('users').doc(uid).update({ activeCasaId: casaId });
+  return { ok: true };
+});
+
 // =============================================================================
 // REPARA PRO — rol profesional, invitación a un trabajo y aceptación
 // =============================================================================
