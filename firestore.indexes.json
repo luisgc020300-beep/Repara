@@ -4,7 +4,7 @@
       "collectionGroup": "invitaciones",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "trabajoId", "order": "ASCENDING" },
+        { "fieldPath": "registroId", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     },
@@ -17,14 +17,6 @@
       ]
     },
     {
-      "collectionGroup": "eventos",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "elementoId", "order": "ASCENDING" },
-        { "fieldPath": "fecha", "order": "DESCENDING" }
-      ]
-    },
-    {
       "collectionGroup": "documentos",
       "queryScope": "COLLECTION",
       "fields": [
@@ -36,8 +28,16 @@
       "collectionGroup": "documentos",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "trabajoId", "order": "ASCENDING" },
+        { "fieldPath": "registroId", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "registros",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "casaId", "order": "ASCENDING" },
+        { "fieldPath": "esConProfesional", "order": "ASCENDING" }
       ]
     }
   ],

@@ -3,15 +3,18 @@
 // Tests de seguridad de firestore.rules contra el Firebase Emulator Suite
 // (auditoría de seguridad, octubre 2026). Cubre explícitamente los
 // escenarios de ataque pedidos: usuario A contra vivienda de B, profesional
-// contra trabajo/vivienda ajenos, manipulación de profesionalUid/ownerUid/
+// contra registro/vivienda ajenos, manipulación de profesionalUid/ownerUid/
 // estado/presupuesto, y aislamiento de invitaciones/pagos/documentos.
+//
+// Octubre 2026 -- reestructurado para la fusión Elemento/Trabajo/Evento en
+// Elemento→Registro: lo que antes era casas/{cid}/trabajos/{tid} es ahora
+// casas/{cid}/elementos/{eid}/registros/{rid}.
 //
 // Ejecutar: npm run test:emulator (desde esta carpeta) -- arranca el
 // emulador de Firestore, corre los tests y lo para solo. Nunca toca el
 // proyecto real: initializeTestEnvironment apunta siempre al emulador
 // local (127.0.0.1:8080), nunca a repara-hogar-app.
 const test = require('node:test');
-const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { initializeTestEnvironment, assertSucceeds, assertFails } = require('@firebase/rules-unit-testing');
@@ -22,7 +25,7 @@ const { describe, it, before, after, beforeEach } = test;
 let testEnv;
 
 // IDs reutilizados en todo el fichero -- dos casas distintas (A y B), con
-// un propietario cada una, un profesional asignado a un trabajo de la
+// un propietario cada una, un profesional asignado a un registro de la
 // casa A, y un usuario externo sin relación con ninguna de las dos.
 const OWNER_A = 'owner-a';
 const OWNER_B = 'owner-b';
@@ -32,9 +35,11 @@ const EXTRANO = 'usuario-externo';
 
 const CASA_A = 'casa-a';
 const CASA_B = 'casa-b';
-const TRABAJO_A1 = 'trabajo-a1'; // asignado a PRO
-const TRABAJO_A2 = 'trabajo-a2'; // sin profesional asignado, solo de OWNER_A
-const TRABAJO_B1 = 'trabajo-b1'; // de la casa B, sin relación con PRO
+const ELEMENTO_A1 = 'elemento-a1';
+const ELEMENTO_B1 = 'elemento-b1';
+const REGISTRO_A1 = 'registro-a1'; // asignado a PRO
+const REGISTRO_A2 = 'registro-a2'; // sin profesional asignado, solo de OWNER_A
+const REGISTRO_B1 = 'registro-b1'; // de la casa B, sin relación con PRO
 
 before(async () => {
   testEnv = await initializeTestEnvironment({
@@ -64,18 +69,21 @@ beforeEach(async () => {
     await setDoc(doc(db, 'casas', CASA_B), {
       nombre: 'Casa B', ownerUid: OWNER_B, members: [OWNER_B], memberProfiles: {}, joinCode: 'BBBBBB',
     });
-    await setDoc(doc(db, `casas/${CASA_A}/trabajos`, TRABAJO_A1), {
-      titulo: 'Trabajo A1', tipo: 'averia', estado: 'nuevo', profesionalUid: PRO, presupuesto: 100,
+    await setDoc(doc(db, `casas/${CASA_A}/elementos`, ELEMENTO_A1), { nombre: 'Elemento A1' });
+    await setDoc(doc(db, `casas/${CASA_B}/elementos`, ELEMENTO_B1), { nombre: 'Elemento B1' });
+    await setDoc(doc(db, `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros`, REGISTRO_A1), {
+      casaId: CASA_A, titulo: 'Registro A1', tipo: 'averia', esConProfesional: true, estado: 'nuevo', profesionalUid: PRO, presupuesto: 100,
     });
-    await setDoc(doc(db, `casas/${CASA_A}/trabajos`, TRABAJO_A2), {
-      titulo: 'Trabajo A2', tipo: 'averia', estado: 'nuevo', profesionalUid: null,
+    await setDoc(doc(db, `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros`, REGISTRO_A2), {
+      casaId: CASA_A, titulo: 'Registro A2', tipo: 'averia', esConProfesional: false, estado: 'nuevo', profesionalUid: null,
     });
-    await setDoc(doc(db, `casas/${CASA_B}/trabajos`, TRABAJO_B1), {
-      titulo: 'Trabajo B1', tipo: 'averia', estado: 'nuevo', profesionalUid: null,
+    await setDoc(doc(db, `casas/${CASA_B}/elementos/${ELEMENTO_B1}/registros`, REGISTRO_B1), {
+      casaId: CASA_B, titulo: 'Registro B1', tipo: 'averia', esConProfesional: false, estado: 'nuevo', profesionalUid: null,
     });
-    await setDoc(doc(db, `casas/${CASA_A}/documentos`, 'doc-a1'), { trabajoId: TRABAJO_A1, nombreArchivo: 'factura.pdf' });
-    await setDoc(doc(db, `casas/${CASA_A}/trabajos/${TRABAJO_A1}/presupuestos`, 'pres-a1'), { estado: 'enviado', creadoPorUid: PRO, total: 100 });
-    await setDoc(doc(db, `casas/${CASA_A}/trabajos/${TRABAJO_A1}/pagos`, 'pago-a1'), { importe: 50, fecha: new Date() });
+    await setDoc(doc(db, `casas/${CASA_A}/documentos`, 'doc-a1'), { elementoId: ELEMENTO_A1, registroId: REGISTRO_A1, nombreArchivo: 'factura.pdf' });
+    await setDoc(doc(db, `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/presupuestos`, 'pres-a1'), { estado: 'enviado', creadoPorUid: PRO, total: 100 });
+    await setDoc(doc(db, `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/pagos`, 'pago-a1'), { importe: 50, fecha: new Date() });
+    await setDoc(doc(db, `casas/${CASA_A}/resumen`, 'pendientes'), { registros: [], actualizadoEn: new Date() });
     await setDoc(doc(db, 'notificaciones', 'notif-owner-a'), { uid: OWNER_A, tipo: 'presupuesto_enviado', titulo: 't', cuerpo: 'c', leida: false });
   });
 });
@@ -97,7 +105,7 @@ describe('casas -- aislamiento entre viviendas', () => {
     await assertFails(getDoc(doc(as(EXTRANO), 'casas', CASA_A)));
   });
 
-  it('DENY: un profesional asignado a un trabajo NO obtiene acceso a la vivienda completa', async () => {
+  it('DENY: un profesional asignado a un registro NO obtiene acceso a la vivienda completa', async () => {
     await assertFails(getDoc(doc(as(PRO), 'casas', CASA_A)));
   });
 
@@ -122,53 +130,53 @@ describe('casas -- aislamiento entre viviendas', () => {
   });
 });
 
-describe('trabajos -- acceso del propietario y del profesional asignado', () => {
-  it('ALLOW: el propietario lee los trabajos de su casa', async () => {
-    await assertSucceeds(getDoc(doc(as(OWNER_A), `casas/${CASA_A}/trabajos`, TRABAJO_A1)));
+describe('registros -- acceso del propietario y del profesional asignado', () => {
+  it('ALLOW: el propietario lee los registros de su elemento', async () => {
+    await assertSucceeds(getDoc(doc(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros`, REGISTRO_A1)));
   });
 
-  it('ALLOW: el profesional asignado lee SU trabajo', async () => {
-    await assertSucceeds(getDoc(doc(as(PRO), `casas/${CASA_A}/trabajos`, TRABAJO_A1)));
+  it('ALLOW: el profesional asignado lee SU registro', async () => {
+    await assertSucceeds(getDoc(doc(as(PRO), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros`, REGISTRO_A1)));
   });
 
-  it('DENY: el profesional NO puede leer otro trabajo de la MISMA casa al que no está asignado', async () => {
-    await assertFails(getDoc(doc(as(PRO), `casas/${CASA_A}/trabajos`, TRABAJO_A2)));
+  it('DENY: el profesional NO puede leer otro registro del MISMO elemento al que no está asignado', async () => {
+    await assertFails(getDoc(doc(as(PRO), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros`, REGISTRO_A2)));
   });
 
-  it('DENY: el profesional no puede leer un trabajo de OTRA casa manipulando el trabajoId', async () => {
-    await assertFails(getDoc(doc(as(PRO), `casas/${CASA_B}/trabajos`, TRABAJO_B1)));
+  it('DENY: el profesional no puede leer un registro de OTRA casa manipulando el id', async () => {
+    await assertFails(getDoc(doc(as(PRO), `casas/${CASA_B}/elementos/${ELEMENTO_B1}/registros`, REGISTRO_B1)));
   });
 
-  it('DENY: un usuario externo no puede leer ningún trabajo de la casa A', async () => {
-    await assertFails(getDoc(doc(as(EXTRANO), `casas/${CASA_A}/trabajos`, TRABAJO_A1)));
+  it('DENY: un usuario externo no puede leer ningún registro de la casa A', async () => {
+    await assertFails(getDoc(doc(as(EXTRANO), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros`, REGISTRO_A1)));
   });
 
   it('DENY: un usuario (incluso miembro) no puede escribir profesionalUid directamente', async () => {
-    await assertFails(updateDoc(doc(as(OWNER_A), `casas/${CASA_A}/trabajos`, TRABAJO_A2), { profesionalUid: PRO_AJENO }));
+    await assertFails(updateDoc(doc(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros`, REGISTRO_A2), { profesionalUid: PRO_AJENO }));
   });
 
-  it('DENY: el propio profesional no puede reasignarse otro trabajo escribiendo profesionalUid', async () => {
-    await assertFails(updateDoc(doc(as(PRO_AJENO), `casas/${CASA_A}/trabajos`, TRABAJO_A2), { profesionalUid: PRO_AJENO }));
+  it('DENY: el propio profesional no puede reasignarse otro registro escribiendo profesionalUid', async () => {
+    await assertFails(updateDoc(doc(as(PRO_AJENO), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros`, REGISTRO_A2), { profesionalUid: PRO_AJENO }));
   });
 
-  it('DENY: un miembro no puede marcar un trabajo como "terminado" con una escritura directa', async () => {
-    await assertFails(updateDoc(doc(as(OWNER_A), `casas/${CASA_A}/trabajos`, TRABAJO_A2), { estado: 'terminado' }));
+  it('DENY: un miembro no puede marcar un registro como "terminado" con una escritura directa', async () => {
+    await assertFails(updateDoc(doc(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros`, REGISTRO_A2), { estado: 'terminado' }));
   });
 
-  it('DENY: el profesional tampoco puede marcar su propio trabajo como "terminado" directamente', async () => {
-    await assertFails(updateDoc(doc(as(PRO), `casas/${CASA_A}/trabajos`, TRABAJO_A1), { estado: 'terminado' }));
+  it('DENY: el profesional tampoco puede marcar su propio registro como "terminado" directamente', async () => {
+    await assertFails(updateDoc(doc(as(PRO), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros`, REGISTRO_A1), { estado: 'terminado' }));
   });
 
-  it('DENY: el profesional no puede escribir "presupuesto" directamente en el trabajo', async () => {
-    await assertFails(updateDoc(doc(as(PRO), `casas/${CASA_A}/trabajos`, TRABAJO_A1), { presupuesto: 999999 }));
+  it('DENY: el profesional no puede escribir "presupuesto" directamente en el registro', async () => {
+    await assertFails(updateDoc(doc(as(PRO), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros`, REGISTRO_A1), { presupuesto: 999999 }));
   });
 
-  it('ALLOW: el profesional SÍ puede mover su trabajo a un estado no terminal (p.ej. "enCurso")', async () => {
-    await assertSucceeds(updateDoc(doc(as(PRO), `casas/${CASA_A}/trabajos`, TRABAJO_A1), { estado: 'enCurso' }));
+  it('ALLOW: el profesional SÍ puede mover su registro a un estado no terminal (p.ej. "enCurso")', async () => {
+    await assertSucceeds(updateDoc(doc(as(PRO), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros`, REGISTRO_A1), { estado: 'enCurso' }));
   });
 
-  it('DENY: un profesional ajeno (sin asignar) no puede tocar el trabajo de otro profesional', async () => {
-    await assertFails(updateDoc(doc(as(PRO_AJENO), `casas/${CASA_A}/trabajos`, TRABAJO_A1), { estado: 'enCurso' }));
+  it('DENY: un profesional ajeno (sin asignar) no puede tocar el registro de otro profesional', async () => {
+    await assertFails(updateDoc(doc(as(PRO_AJENO), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros`, REGISTRO_A1), { estado: 'enCurso' }));
   });
 
   // Modelo de dos pasos (auditoría de producto, octubre 2026): el profesional
@@ -176,102 +184,119 @@ describe('trabajos -- acceso del propietario y del profesional asignado', () => 
   // puede "deshacer" una confirmación pendiente sin pasar por
   // rechazarFinalizacionProfesional (que es quien avisa al profesional).
   it('DENY: el profesional no puede escribir "pendienteConfirmacion" directamente', async () => {
-    await assertFails(updateDoc(doc(as(PRO), `casas/${CASA_A}/trabajos`, TRABAJO_A1), { estado: 'pendienteConfirmacion' }));
+    await assertFails(updateDoc(doc(as(PRO), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros`, REGISTRO_A1), { estado: 'pendienteConfirmacion' }));
   });
 
   it('DENY: el propietario tampoco puede escribir "pendienteConfirmacion" directamente', async () => {
-    await assertFails(updateDoc(doc(as(OWNER_A), `casas/${CASA_A}/trabajos`, TRABAJO_A1), { estado: 'pendienteConfirmacion' }));
+    await assertFails(updateDoc(doc(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros`, REGISTRO_A1), { estado: 'pendienteConfirmacion' }));
   });
 
-  it('DENY: el propietario no puede sacar un trabajo de "pendienteConfirmacion" con una escritura directa', async () => {
+  it('DENY: el propietario no puede sacar un registro de "pendienteConfirmacion" con una escritura directa', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      await setDoc(doc(ctx.firestore(), `casas/${CASA_A}/trabajos`, TRABAJO_A1), { estado: 'pendienteConfirmacion' }, { merge: true });
+      await setDoc(doc(ctx.firestore(), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros`, REGISTRO_A1), { estado: 'pendienteConfirmacion' }, { merge: true });
     });
-    await assertFails(updateDoc(doc(as(OWNER_A), `casas/${CASA_A}/trabajos`, TRABAJO_A1), { estado: 'enCurso' }));
+    await assertFails(updateDoc(doc(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros`, REGISTRO_A1), { estado: 'enCurso' }));
   });
 
   it('DENY: el propietario no puede escribir "estadoPrevioAPendiente" directamente', async () => {
-    await assertFails(updateDoc(doc(as(OWNER_A), `casas/${CASA_A}/trabajos`, TRABAJO_A1), { estadoPrevioAPendiente: 'enCurso' }));
+    await assertFails(updateDoc(doc(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros`, REGISTRO_A1), { estadoPrevioAPendiente: 'enCurso' }));
+  });
+});
+
+describe('resumen -- banner de "pendientes" en Inicio (mantenido por Cloud Function)', () => {
+  // Reemplaza la consulta collectionGroup('registros') descartada tras
+  // validarla contra el emulador (ver firestore.rules) -- un único
+  // documento de solo lectura, mantenido por onRegistroEstadoCambiado.
+  it('ALLOW: un miembro lee el resumen de pendientes de su casa', async () => {
+    await assertSucceeds(getDoc(doc(as(OWNER_A), `casas/${CASA_A}/resumen`, 'pendientes')));
+  });
+
+  it('DENY: un usuario externo no puede leer el resumen de pendientes de una casa ajena', async () => {
+    await assertFails(getDoc(doc(as(EXTRANO), `casas/${CASA_A}/resumen`, 'pendientes')));
+  });
+
+  it('DENY: nadie escribe el resumen directamente, ni el propietario (solo la Cloud Function)', async () => {
+    await assertFails(setDoc(doc(as(OWNER_A), `casas/${CASA_A}/resumen`, 'pendientes'), { registros: [] }));
   });
 });
 
 describe('presupuestos y cambios de alcance -- siempre de solo lectura para el cliente', () => {
-  it('ALLOW: el propietario lee los presupuestos de su trabajo', async () => {
-    await assertSucceeds(getDoc(doc(as(OWNER_A), `casas/${CASA_A}/trabajos/${TRABAJO_A1}/presupuestos`, 'pres-a1')));
+  it('ALLOW: el propietario lee los presupuestos de su registro', async () => {
+    await assertSucceeds(getDoc(doc(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/presupuestos`, 'pres-a1')));
   });
 
-  it('ALLOW: el profesional asignado lee los presupuestos de SU trabajo', async () => {
-    await assertSucceeds(getDoc(doc(as(PRO), `casas/${CASA_A}/trabajos/${TRABAJO_A1}/presupuestos`, 'pres-a1')));
+  it('ALLOW: el profesional asignado lee los presupuestos de SU registro', async () => {
+    await assertSucceeds(getDoc(doc(as(PRO), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/presupuestos`, 'pres-a1')));
   });
 
-  it('DENY: un profesional ajeno no puede leer presupuestos de un trabajo que no es suyo', async () => {
-    await assertFails(getDoc(doc(as(PRO_AJENO), `casas/${CASA_A}/trabajos/${TRABAJO_A1}/presupuestos`, 'pres-a1')));
+  it('DENY: un profesional ajeno no puede leer presupuestos de un registro que no es suyo', async () => {
+    await assertFails(getDoc(doc(as(PRO_AJENO), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/presupuestos`, 'pres-a1')));
   });
 
   it('DENY: nadie puede escribir un presupuesto directamente, ni el propietario', async () => {
-    await assertFails(setDoc(doc(as(OWNER_A), `casas/${CASA_A}/trabajos/${TRABAJO_A1}/presupuestos`, 'falso'), { total: 1 }));
+    await assertFails(setDoc(doc(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/presupuestos`, 'falso'), { total: 1 }));
   });
 
   it('DENY: el profesional no puede auto-aprobarse un presupuesto con una escritura directa', async () => {
-    await assertFails(updateDoc(doc(as(PRO), `casas/${CASA_A}/trabajos/${TRABAJO_A1}/presupuestos`, 'pres-a1'), { estado: 'aceptado' }));
+    await assertFails(updateDoc(doc(as(PRO), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/presupuestos`, 'pres-a1'), { estado: 'aceptado' }));
   });
 
   it('DENY: nadie puede escribir un cambio de alcance directamente', async () => {
-    await assertFails(addDoc(collection(as(PRO), `casas/${CASA_A}/trabajos/${TRABAJO_A1}/cambiosAlcance`), { titulo: 'x', estado: 'pendiente' }));
+    await assertFails(addDoc(collection(as(PRO), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/cambiosAlcance`), { titulo: 'x', estado: 'pendiente' }));
   });
 });
 
 describe('pagos -- solo el propietario escribe, el profesional asignado solo lee', () => {
-  it('ALLOW: el propietario registra un pago en su trabajo', async () => {
-    await assertSucceeds(addDoc(collection(as(OWNER_A), `casas/${CASA_A}/trabajos/${TRABAJO_A1}/pagos`), { importe: 10, fecha: new Date() }));
+  it('ALLOW: el propietario registra un pago en su registro', async () => {
+    await assertSucceeds(addDoc(collection(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/pagos`), { importe: 10, fecha: new Date() }));
   });
 
-  it('ALLOW: el profesional asignado lee los pagos de SU trabajo', async () => {
-    await assertSucceeds(getDoc(doc(as(PRO), `casas/${CASA_A}/trabajos/${TRABAJO_A1}/pagos`, 'pago-a1')));
+  it('ALLOW: el profesional asignado lee los pagos de SU registro', async () => {
+    await assertSucceeds(getDoc(doc(as(PRO), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/pagos`, 'pago-a1')));
   });
 
   it('DENY: el profesional no puede crear ni editar pagos', async () => {
-    await assertFails(addDoc(collection(as(PRO), `casas/${CASA_A}/trabajos/${TRABAJO_A1}/pagos`), { importe: 10, fecha: new Date() }));
+    await assertFails(addDoc(collection(as(PRO), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/pagos`), { importe: 10, fecha: new Date() }));
   });
 
-  it('DENY: un profesional ajeno no puede leer pagos de un trabajo que no es suyo', async () => {
-    await assertFails(getDoc(doc(as(PRO_AJENO), `casas/${CASA_A}/trabajos/${TRABAJO_A1}/pagos`, 'pago-a1')));
+  it('DENY: un profesional ajeno no puede leer pagos de un registro que no es suyo', async () => {
+    await assertFails(getDoc(doc(as(PRO_AJENO), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/pagos`, 'pago-a1')));
   });
 
   it('DENY: un usuario externo no puede escribir pagos en una casa ajena', async () => {
-    await assertFails(addDoc(collection(as(EXTRANO), `casas/${CASA_A}/trabajos/${TRABAJO_A1}/pagos`), { importe: 10, fecha: new Date() }));
+    await assertFails(addDoc(collection(as(EXTRANO), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/pagos`), { importe: 10, fecha: new Date() }));
   });
 
   // Auditoría de seguridad, octubre 2026: antes no había ninguna validación
   // server-side de `importe` -- una llamada directa al SDK (fuera de la UI,
   // que sí valida) podía crear un pago negativo, a cero, o absurdamente alto.
   it('DENY: el propietario no puede registrar un pago con importe negativo', async () => {
-    await assertFails(addDoc(collection(as(OWNER_A), `casas/${CASA_A}/trabajos/${TRABAJO_A1}/pagos`), { importe: -10, fecha: new Date() }));
+    await assertFails(addDoc(collection(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/pagos`), { importe: -10, fecha: new Date() }));
   });
 
   it('DENY: el propietario no puede registrar un pago de importe cero', async () => {
-    await assertFails(addDoc(collection(as(OWNER_A), `casas/${CASA_A}/trabajos/${TRABAJO_A1}/pagos`), { importe: 0, fecha: new Date() }));
+    await assertFails(addDoc(collection(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/pagos`), { importe: 0, fecha: new Date() }));
   });
 
   it('DENY: el propietario no puede registrar un pago con un importe absurdamente alto', async () => {
-    await assertFails(addDoc(collection(as(OWNER_A), `casas/${CASA_A}/trabajos/${TRABAJO_A1}/pagos`), { importe: 50000000, fecha: new Date() }));
+    await assertFails(addDoc(collection(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/pagos`), { importe: 50000000, fecha: new Date() }));
   });
 
   it('DENY: el propietario no puede editar un pago para ponerle un importe negativo', async () => {
-    await assertFails(updateDoc(doc(as(OWNER_A), `casas/${CASA_A}/trabajos/${TRABAJO_A1}/pagos`, 'pago-a1'), { importe: -5 }));
+    await assertFails(updateDoc(doc(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/pagos`, 'pago-a1'), { importe: -5 }));
   });
 });
 
-describe('documentos -- acceso acotado al trabajo concreto del profesional', () => {
+describe('documentos -- acceso acotado al registro concreto del profesional', () => {
   it('ALLOW: el propietario lee los documentos de su casa', async () => {
     await assertSucceeds(getDoc(doc(as(OWNER_A), `casas/${CASA_A}/documentos`, 'doc-a1')));
   });
 
-  it('ALLOW: el profesional asignado lee un documento ligado a SU trabajo', async () => {
+  it('ALLOW: el profesional asignado lee un documento ligado a SU registro', async () => {
     await assertSucceeds(getDoc(doc(as(PRO), `casas/${CASA_A}/documentos`, 'doc-a1')));
   });
 
-  it('DENY: un profesional ajeno no puede leer un documento ligado a un trabajo que no es suyo', async () => {
+  it('DENY: un profesional ajeno no puede leer un documento ligado a un registro que no es suyo', async () => {
     await assertFails(getDoc(doc(as(PRO_AJENO), `casas/${CASA_A}/documentos`, 'doc-a1')));
   });
 
@@ -341,8 +366,12 @@ describe('habitaciones, elementos y contactos -- solo miembros de la casa', () =
     await assertFails(addDoc(collection(as(EXTRANO), `casas/${CASA_A}/elementos`), { nombre: 'Intruso' }));
   });
 
-  it('DENY: un profesional asignado a un trabajo no puede crear elementos en la casa (solo documentos de su trabajo)', async () => {
+  it('DENY: un profesional asignado a un registro no puede crear elementos en la casa (solo documentos de su registro)', async () => {
     await assertFails(addDoc(collection(as(PRO), `casas/${CASA_A}/elementos`), { nombre: 'Intento de profesional' }));
+  });
+
+  it('DENY: un profesional asignado a un registro no puede leer el elemento padre', async () => {
+    await assertFails(getDoc(doc(as(PRO), `casas/${CASA_A}/elementos`, ELEMENTO_A1)));
   });
 
   it('DENY: un usuario externo no puede leer la libreta de contactos de otra casa', async () => {

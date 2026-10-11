@@ -70,8 +70,85 @@ service cloud.firestore {
         allow read, write: if isAuth() && isMember(cid);
       }
 
+      // Un elemento (objeto físico o servicio contratado -- fusión de lo
+      // que antes eran Elemento y Trabajo, octubre 2026) nunca se abre a
+      // profesionales: ellos solo acceden a SU registro concreto (ver
+      // abajo), nunca al elemento padre -- por eso Registro denormaliza
+      // elementoNombre, para que el lado Pro no necesite leer este doc.
       match /elementos/{eid} {
         allow read, write: if isAuth() && isMember(cid);
+
+        // Un registro es cada suceso de un elemento -- fusión de lo que
+        // antes eran Trabajo y Evento. Visible/editable por los miembros de
+        // la casa como siempre, y ADEMÁS por el profesional asignado en
+        // profesionalUid (si lo hay, solo cuando esConProfesional) -- ese
+        // profesional no es miembro de la casa, así que esto es una
+        // segunda vía de acceso, no una sustitución de isMember(). Su
+        // escritura queda limitada a estado: nunca puede cambiar el
+        // título, la descripción ni reasignarse a sí mismo otro registro.
+        match /registros/{rid} {
+          allow read: if isAuth() && (isMember(cid) || resource.data.profesionalUid == request.auth.uid);
+          allow create: if isAuth() && isMember(cid);
+          // profesionalUid NUNCA es escribible por un miembro -- solo
+          // responderInvitacion (Cloud Function, Admin SDK, salta estas
+          // reglas) lo asigna, tras el apretón de manos de invitación y
+          // aceptación. Sin esto, cualquier miembro podría escribir
+          // directamente un uid ajeno en este campo y darle acceso al
+          // registro sin pasar por invitar/aceptar.
+          //
+          // Un miembro puede escribir cualquier otro campo, pero nunca
+          // puede hacer que "estado" entre NI salga de un estado
+          // controlado por esta vía (si ya estaba ahí y se queda igual, no
+          // cuenta como transición -- permite editar otros campos sin
+          // tocar estado). El profesional asignado solo puede tocar
+          // "estado" -- nunca "presupuesto" directamente (eso solo lo fija
+          // responderPresupuesto/responderCambioAlcance en servidor) -- y
+          // tampoco puede entrar ni salir de un estado controlado por esta
+          // vía. "estadoPrevioAPendiente" tampoco es escribible por el
+          // cliente -- es lo que usa rechazarFinalizacionProfesional para
+          // saber a dónde volver.
+          allow update: if isAuth() && (
+            (isMember(cid) &&
+             !request.resource.data.diff(resource.data).affectedKeys().hasAny(['profesionalUid', 'estadoPrevioAPendiente']) &&
+             (resource.data.estado == request.resource.data.estado ||
+              (!estadoControlado(resource.data.estado) && !estadoControlado(request.resource.data.estado)))) ||
+            (resource.data.profesionalUid == request.auth.uid &&
+             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado']) &&
+             (resource.data.estado == request.resource.data.estado ||
+              (!estadoControlado(resource.data.estado) && !estadoControlado(request.resource.data.estado))))
+          );
+          allow delete: if isAuth() && isMember(cid);
+
+          // Presupuestos formales (sección 15 del spec) -- toda escritura
+          // pasa por Cloud Functions (crearPresupuesto, enviarPresupuesto,
+          // responderPresupuesto...) para que los totales se calculen
+          // siempre en servidor y nadie pueda autoaprobarse el suyo. El
+          // cliente solo lee, y solo si es miembro de la casa o el
+          // profesional de ESE registro concreto.
+          match /presupuestos/{pid} {
+            allow read: if isAuth() && (isMember(cid) || get(/databases/$(database)/documents/casas/$(cid)/elementos/$(eid)/registros/$(rid)).data.profesionalUid == request.auth.uid);
+            allow write: if false;
+          }
+
+          // ScopeGuard -- cambios de alcance (sección 19 del spec). Misma
+          // lógica: todo escrito por Cloud Functions, el cliente solo lee.
+          match /cambiosAlcance/{caid} {
+            allow read: if isAuth() && (isMember(cid) || get(/databases/$(database)/documents/casas/$(cid)/elementos/$(eid)/registros/$(rid)).data.profesionalUid == request.auth.uid);
+            allow write: if false;
+          }
+
+          // Pagos registrados por el propietario contra el presupuesto del
+          // registro. A diferencia de presupuestos/cambiosAlcance, aquí no
+          // hay una aprobación entre dos partes que proteger -- solo el
+          // propietario escribe sus propios pagos, directo desde el
+          // cliente. El profesional asignado los lee con todo el detalle,
+          // pero nunca puede crearlos, editarlos ni borrarlos.
+          match /pagos/{pagoid} {
+            allow read: if isAuth() && (isMember(cid) || get(/databases/$(database)/documents/casas/$(cid)/elementos/$(eid)/registros/$(rid)).data.profesionalUid == request.auth.uid);
+            allow create, update: if isAuth() && isMember(cid) && importeValido(request.resource.data.importe);
+            allow delete: if isAuth() && isMember(cid);
+          }
+        }
       }
 
       // Libreta privada de profesionales de confianza de la casa -- nunca
@@ -80,104 +157,40 @@ service cloud.firestore {
         allow read, write: if isAuth() && isMember(cid);
       }
 
-      // La historia de la casa (sección 12 del spec de producto) -- de
-      // momento editable por cualquier miembro para poder corregir errores;
-      // el endurecimiento a append-only con auditoría (sección 46) queda
-      // para cuando haya más de un miembro real por casa.
-      match /eventos/{evid} {
-        allow read, write: if isAuth() && isMember(cid);
-      }
-
       // Un documento es visible/gestionable por los miembros de la casa como
-      // siempre. Si además está ligado a un trabajo concreto (trabajoId), el
-      // profesional asignado a ESE trabajo también puede verlo y añadir
+      // siempre. Si además está ligado a un registro concreto (registroId),
+      // el profesional asignado a ESE registro también puede verlo y añadir
       // documentos nuevos a él -- nunca a documentos de otras habitaciones o
-      // sin relación con su trabajo (sección 24 del spec: acceso específico,
-      // nunca a todos los documentos de la casa).
+      // sin relación con su registro (sección 24 del spec: acceso
+      // específico, nunca a todos los documentos de la casa).
       match /documentos/{did} {
         allow read: if isAuth() && (
           isMember(cid) ||
-          (resource.data.trabajoId != null &&
-           get(/databases/$(database)/documents/casas/$(cid)/trabajos/$(resource.data.trabajoId)).data.profesionalUid == request.auth.uid)
+          (resource.data.registroId != null && resource.data.elementoId != null &&
+           get(/databases/$(database)/documents/casas/$(cid)/elementos/$(resource.data.elementoId)/registros/$(resource.data.registroId)).data.profesionalUid == request.auth.uid)
         );
         allow create: if isAuth() && (
           isMember(cid) ||
-          (request.resource.data.trabajoId != null &&
-           get(/databases/$(database)/documents/casas/$(cid)/trabajos/$(request.resource.data.trabajoId)).data.profesionalUid == request.auth.uid)
+          (request.resource.data.registroId != null && request.resource.data.elementoId != null &&
+           get(/databases/$(database)/documents/casas/$(cid)/elementos/$(request.resource.data.elementoId)/registros/$(request.resource.data.registroId)).data.profesionalUid == request.auth.uid)
         );
         allow update, delete: if isAuth() && isMember(cid);
       }
 
-      // Un trabajo es visible/editable por los miembros de la casa como
-      // siempre, y ADEMÁS por el profesional asignado en profesionalUid (si
-      // lo hay) -- ese profesional no es miembro de la casa, así que esto es
-      // una segunda vía de acceso, no una sustitución de isMember(). Su
-      // escritura queda limitada a estado/presupuesto: nunca puede cambiar el
-      // título, la descripción ni reasignarse a sí mismo otro trabajo.
-      match /trabajos/{tid} {
-        allow read: if isAuth() && (isMember(cid) || resource.data.profesionalUid == request.auth.uid);
-        allow create: if isAuth() && isMember(cid);
-        // profesionalUid NUNCA es escribible por un miembro -- solo
-        // responderInvitacion (Cloud Function, Admin SDK, salta estas
-        // reglas) lo asigna, tras el apretón de manos de invitación y
-        // aceptación. Sin esto, cualquier miembro podría escribir
-        // directamente un uid ajeno en este campo y darle acceso al trabajo
-        // sin pasar por invitar/aceptar -- hallazgo de la auditoría de
-        // seguridad (octubre 2026).
-        //
-        // Un miembro puede escribir cualquier otro campo, pero nunca puede
-        // hacer que "estado" entre NI salga de un estado controlado por esta
-        // vía (si ya estaba ahí y se queda igual, no cuenta como transición
-        // -- permite editar otros campos sin tocar estado). El profesional
-        // asignado solo puede tocar "estado" -- nunca "presupuesto"
-        // directamente (eso solo lo fija responderPresupuesto/
-        // responderCambioAlcance en servidor) -- y tampoco puede entrar ni
-        // salir de un estado controlado por esta vía. "estadoPrevioAPendiente"
-        // tampoco es escribible por el cliente -- es lo que usa
-        // rechazarFinalizacionProfesional para saber a dónde volver, y
-        // manipularlo podría colar una transición a un estado controlado
-        // sin pasar por esa función.
-        allow update: if isAuth() && (
-          (isMember(cid) &&
-           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['profesionalUid', 'estadoPrevioAPendiente']) &&
-           (resource.data.estado == request.resource.data.estado ||
-            (!estadoControlado(resource.data.estado) && !estadoControlado(request.resource.data.estado)))) ||
-          (resource.data.profesionalUid == request.auth.uid &&
-           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado']) &&
-           (resource.data.estado == request.resource.data.estado ||
-            (!estadoControlado(resource.data.estado) && !estadoControlado(request.resource.data.estado))))
-        );
-        allow delete: if isAuth() && isMember(cid);
-
-        // Presupuestos formales (sección 15 del spec) -- toda escritura pasa
-        // por Cloud Functions (crearPresupuesto, enviarPresupuesto,
-        // responderPresupuesto...) para que los totales se calculen siempre
-        // en servidor y nadie pueda autoaprobarse el suyo. El cliente solo
-        // lee, y solo si es miembro de la casa o el profesional de ESE
-        // trabajo concreto.
-        match /presupuestos/{pid} {
-          allow read: if isAuth() && (isMember(cid) || get(/databases/$(database)/documents/casas/$(cid)/trabajos/$(tid)).data.profesionalUid == request.auth.uid);
-          allow write: if false;
-        }
-
-        // ScopeGuard -- cambios de alcance (sección 19 del spec). Misma
-        // lógica: todo escrito por Cloud Functions, el cliente solo lee.
-        match /cambiosAlcance/{caid} {
-          allow read: if isAuth() && (isMember(cid) || get(/databases/$(database)/documents/casas/$(cid)/trabajos/$(tid)).data.profesionalUid == request.auth.uid);
-          allow write: if false;
-        }
-
-        // Pagos registrados por el propietario contra el presupuesto del
-        // trabajo. A diferencia de presupuestos/cambiosAlcance, aquí no hay
-        // una aprobación entre dos partes que proteger -- solo el
-        // propietario escribe sus propios pagos, directo desde el cliente.
-        // El profesional asignado los lee con todo el detalle, pero nunca
-        // puede crearlos, editarlos ni borrarlos.
-        match /pagos/{pagoid} {
-          allow read: if isAuth() && (isMember(cid) || get(/databases/$(database)/documents/casas/$(cid)/trabajos/$(tid)).data.profesionalUid == request.auth.uid);
-          allow create, update: if isAuth() && isMember(cid) && importeValido(request.resource.data.importe);
-          allow delete: if isAuth() && isMember(cid);
-        }
+      // Resumen de "pendientes" para el banner de Inicio (octubre 2026) --
+      // un único documento mantenido por la Cloud Function
+      // onRegistroEstadoCambiado, en vez de una consulta
+      // collectionGroup('registros'). Se descartó el collection-group tras
+      // validarlo contra el emulador: Firestore necesita poder demostrar
+      // que la regla se cumple para TODA la colección, no solo para lo que
+      // el filtro de la consulta devolvería -- con un registro de otra
+      // casa que no cumple la regla para este propietario, deniega la
+      // consulta entera aunque ese documento nunca fuera a aparecer en el
+      // resultado. Un solo documento de solo lectura evita el problema
+      // entero.
+      match /resumen/{rid} {
+        allow read: if isAuth() && isMember(cid);
+        allow write: if false;
       }
     }
 

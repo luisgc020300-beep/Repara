@@ -4,7 +4,7 @@
 // Deploy: firebase deploy --only functions
 
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
-const { onDocumentCreated } = require('firebase-functions/v2/firestore');
+const { onDocumentCreated, onDocumentWritten } = require('firebase-functions/v2/firestore');
 const { defineSecret } = require('firebase-functions/params');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestore');
@@ -185,6 +185,46 @@ exports.cambiarCasaActiva = onCall({ region: REGION }, async (request) => {
   return { ok: true };
 });
 
+// -----------------------------------------------------------------------------
+// 2c. MANTENER EL RESUMEN DE "PENDIENTES" (banner de Inicio, octubre 2026,
+// fusión Elemento/Trabajo/Evento). Se descartó una consulta
+// collectionGroup('registros') directa desde el cliente tras validarla
+// contra el emulador: Firestore deniega la consulta ENTERA si no puede
+// demostrar que la regla se cumple para toda la colección, no solo para lo
+// que el filtro devolvería -- con registros de otras casas de por medio,
+// eso nunca iba a ser demostrable. En su lugar, este trigger recalcula un
+// único documento (casas/{casaId}/resumen/pendientes) cada vez que se
+// escribe un registro; el cliente solo lee ese documento, sin
+// collection-group ni reglas nuevas. Admin SDK no pasa por firestore.rules,
+// así que SÍ puede hacer la consulta collectionGroup aquí dentro sin
+// problema -- la limitación de antes era solo para consultas del cliente.
+// -----------------------------------------------------------------------------
+exports.onRegistroEstadoCambiado = onDocumentWritten(
+  { region: REGION, document: 'casas/{casaId}/elementos/{elementoId}/registros/{registroId}' },
+  async (event) => {
+    const { casaId } = event.params;
+    const registrosSnap = await db.collectionGroup('registros')
+      .where('casaId', '==', casaId)
+      .where('esConProfesional', '==', true)
+      .get();
+
+    const pendientes = registrosSnap.docs
+      .filter((d) => !['terminado', 'archivado'].includes(d.data().estado))
+      .map((d) => ({
+        elementoId: d.ref.parent.parent.id,
+        elementoNombre: d.data().elementoNombre || '',
+        registroId: d.id,
+        registroTitulo: d.data().titulo || '',
+        estado: d.data().estado,
+      }));
+
+    await db.doc(`casas/${casaId}/resumen/pendientes`).set({
+      registros: pendientes,
+      actualizadoEn: FieldValue.serverTimestamp(),
+    });
+  }
+);
+
 // =============================================================================
 // REPARA PRO — rol profesional, invitación a un trabajo y aceptación
 // =============================================================================
@@ -237,20 +277,21 @@ async function generarCodigoInvitacionUnico() {
 exports.invitarProfesional = onCall({ region: REGION }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
   const propietarioUid = request.auth.uid;
-  const { casaId, trabajoId, emailProfesional, telefonoProfesional } = request.data || {};
+  const { casaId, elementoId, registroId, emailProfesional, telefonoProfesional } = request.data || {};
   const email = typeof emailProfesional === 'string' ? emailProfesional.trim().toLowerCase() : '';
   const telefono = typeof telefonoProfesional === 'string' ? telefonoProfesional.trim() : '';
-  if (!casaId || !trabajoId || (!email && !telefono)) {
+  if (!casaId || !elementoId || !registroId || (!email && !telefono)) {
     throw new HttpsError('invalid-argument', 'Faltan datos para la invitación.');
   }
 
   const casaRef = db.collection('casas').doc(casaId);
-  const trabajoRef = casaRef.collection('trabajos').doc(trabajoId);
-  const [casaSnap, trabajoSnap] = await Promise.all([casaRef.get(), trabajoRef.get()]);
+  const regRef = registroRef(casaId, elementoId, registroId);
+  const [casaSnap, registroSnap] = await Promise.all([casaRef.get(), regRef.get()]);
   if (!casaSnap.exists || !(casaSnap.data().members || []).includes(propietarioUid)) {
     throw new HttpsError('permission-denied', 'No perteneces a esa casa.');
   }
-  if (!trabajoSnap.exists) throw new HttpsError('not-found', 'El trabajo no existe.');
+  if (!registroSnap.exists) throw new HttpsError('not-found', 'El registro no existe.');
+  const registro = registroSnap.data();
 
   let profesionalUid = null;
   if (email) {
@@ -274,8 +315,10 @@ exports.invitarProfesional = onCall({ region: REGION }, async (request) => {
     const invitacionRef = db.collection('invitaciones').doc();
     await invitacionRef.set({
       casaId,
-      trabajoId,
-      trabajoTitulo: trabajoSnap.data().titulo || '',
+      elementoId,
+      elementoNombre: registro.elementoNombre || '',
+      registroId,
+      registroTitulo: registro.titulo || '',
       casaNombre: casaSnap.data().nombre || 'Una casa',
       propietarioUid,
       profesionalUid,
@@ -292,8 +335,10 @@ exports.invitarProfesional = onCall({ region: REGION }, async (request) => {
   const codigo = await generarCodigoInvitacionUnico();
   await db.collection('invitacionesAbiertas').doc(codigo).set({
     casaId,
-    trabajoId,
-    trabajoTitulo: trabajoSnap.data().titulo || '',
+    elementoId,
+    elementoNombre: registro.elementoNombre || '',
+    registroId,
+    registroTitulo: registro.titulo || '',
     casaNombre: casaSnap.data().nombre || 'Una casa',
     propietarioUid,
     contactoEmail: email || null,
@@ -339,8 +384,10 @@ exports.canjearCodigoInvitacion = onCall({ region: REGION }, async (request) => 
     const invitacionRef = db.collection('invitaciones').doc();
     tx.set(invitacionRef, {
       casaId: inv.casaId,
-      trabajoId: inv.trabajoId,
-      trabajoTitulo: inv.trabajoTitulo,
+      elementoId: inv.elementoId,
+      elementoNombre: inv.elementoNombre,
+      registroId: inv.registroId,
+      registroTitulo: inv.registroTitulo,
       casaNombre: inv.casaNombre,
       propietarioUid: inv.propietarioUid,
       profesionalUid: uid,
@@ -351,7 +398,7 @@ exports.canjearCodigoInvitacion = onCall({ region: REGION }, async (request) => 
     tx.update(abiertaRef, { estado: 'canjeado', profesionalUidCanjeo: uid });
     tx.set(db.collection('users').doc(uid), { esProfesional: true }, { merge: true });
 
-    return { casaNombre: inv.casaNombre, trabajoTitulo: inv.trabajoTitulo };
+    return { casaNombre: inv.casaNombre, registroTitulo: inv.registroTitulo };
   });
 
   const profRef = db.collection('profesionales').doc(uid);
@@ -363,9 +410,9 @@ exports.canjearCodigoInvitacion = onCall({ region: REGION }, async (request) => 
 
 // -----------------------------------------------------------------------------
 // 3c. RESPONDER A UNA INVITACIÓN (aceptar/rechazar)
-// Al aceptar: vincula profesionalUid en el trabajo y guarda una copia ligera
-// en users/{uid}.trabajosProRefs para que "Trabajos"/"Clientes" en REPARA
-// Pro no necesiten permiso de lectura sobre la casa entera.
+// Al aceptar: vincula profesionalUid en el registro y guarda una copia
+// ligera en users/{uid}.registrosProRefs para que "Trabajos"/"Clientes" en
+// REPARA Pro no necesiten permiso de lectura sobre la casa entera.
 // -----------------------------------------------------------------------------
 exports.responderInvitacion = onCall({ region: REGION }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
@@ -397,16 +444,18 @@ exports.responderInvitacion = onCall({ region: REGION }, async (request) => {
     tx.update(invitacionRef, { estado: aceptar ? 'aceptada' : 'rechazada' });
 
     if (aceptar) {
-      const trabajoRef = db.collection('casas').doc(inv.casaId).collection('trabajos').doc(inv.trabajoId);
-      tx.update(trabajoRef, {
+      const regRef = registroRef(inv.casaId, inv.elementoId, inv.registroId);
+      tx.update(regRef, {
         profesionalUid: uid,
         ...(nombreProfesional ? { profesionalNombre: nombreProfesional } : {}),
       });
       tx.set(db.collection('users').doc(uid), {
-        trabajosProRefs: FieldValue.arrayUnion({
+        registrosProRefs: FieldValue.arrayUnion({
           casaId: inv.casaId,
-          trabajoId: inv.trabajoId,
-          trabajoTitulo: inv.trabajoTitulo,
+          elementoId: inv.elementoId,
+          elementoNombre: inv.elementoNombre,
+          registroId: inv.registroId,
+          registroTitulo: inv.registroTitulo,
           casaNombre: inv.casaNombre,
         }),
       }, { merge: true });
@@ -445,9 +494,9 @@ exports.cancelarInvitacion = onCall({ region: REGION }, async (request) => {
 // app, también hay que poder borrarla desde la app.
 //
 // Si el usuario es propietario único (único miembro) de una casa, se borra
-// esa casa entera -- documento, subcolecciones (trabajos, presupuestos,
-// cambiosAlcance, pagos, documentos, habitaciones, elementos, contactos,
-// eventos) y los archivos de Storage bajo casas/{casaId}/. Si el usuario es
+// esa casa entera -- documento, subcolecciones (elementos y sus registros
+// anidados con presupuestos/cambiosAlcance/pagos, documentos, habitaciones,
+// contactos) y los archivos de Storage bajo casas/{casaId}/. Si el usuario es
 // propietario de una casa con OTROS miembros, se bloquea la eliminación en
 // vez de borrar en silencio los datos de esos otros miembros -- todavía no
 // hay un flujo de "transferir propiedad" o "expulsar miembro" en la app, y
@@ -523,9 +572,7 @@ exports.cerrarSesionesEnTodosLosDispositivos = onCall({ region: REGION }, async 
 });
 
 // =============================================================================
-// Helpers compartidos — notificaciones internas y eventos de historial
-// (sección 22 del spec: nada de esto debe vivir desconectado del historial
-// de la vivienda).
+// Helpers compartidos — notificaciones internas.
 // =============================================================================
 async function crearNotificacion(uid, tipo, titulo, cuerpo, extra) {
   await db.collection('notificaciones').add({
@@ -543,8 +590,8 @@ async function crearNotificacion(uid, tipo, titulo, cuerpo, extra) {
 // Push complementaria a la notificación interna (nunca la sustituye -- si
 // el usuario no tiene ningún token o falla el envío, la notificación ya
 // quedó guardada arriba). El payload de datos de FCM solo admite strings,
-// por eso se filtra extra() a solo sus valores string (casaId/trabajoId/
-// pagoId/etc, nunca algo numérico o anidado).
+// por eso se filtra extra() a solo sus valores string (casaId/elementoId/
+// registroId/pagoId/etc, nunca algo numérico o anidado).
 async function enviarPush(uid, tipo, titulo, cuerpo, extra) {
   const userSnap = await db.collection('users').doc(uid).get();
   const tokens = userSnap.data()?.fcmTokens;
@@ -576,15 +623,6 @@ async function enviarPush(uid, tipo, titulo, cuerpo, extra) {
     // crearNotificacion -- la notificación interna ya se guardó.
     console.error('enviarPush', e);
   }
-}
-
-async function crearEventoHistorial(casaId, evento) {
-  await db.collection('casas').doc(casaId).collection('eventos').add({
-    documentoIds: [],
-    ...evento,
-    fecha: evento.fecha || FieldValue.serverTimestamp(),
-    createdAt: FieldValue.serverTimestamp(),
-  });
 }
 
 function redondear2(n) {
@@ -630,10 +668,14 @@ function calcularTotales(lineas) {
   return { subtotal: redondear2(subtotal), iva: redondear2(iva), total: redondear2(subtotal + iva) };
 }
 
-async function getTrabajoOThrow(casaId, trabajoId) {
-  const ref = db.collection('casas').doc(casaId).collection('trabajos').doc(trabajoId);
+function registroRef(casaId, elementoId, registroId) {
+  return db.collection('casas').doc(casaId).collection('elementos').doc(elementoId).collection('registros').doc(registroId);
+}
+
+async function getRegistroOThrow(casaId, elementoId, registroId) {
+  const ref = registroRef(casaId, elementoId, registroId);
   const snap = await ref.get();
-  if (!snap.exists) throw new HttpsError('not-found', 'El trabajo no existe.');
+  if (!snap.exists) throw new HttpsError('not-found', 'El registro no existe.');
   return { ref, snap, data: snap.data() };
 }
 
@@ -643,7 +685,7 @@ async function esMiembroCasa(casaId, uid) {
 }
 
 // =============================================================================
-// PRESUPUESTOS — casas/{cid}/trabajos/{tid}/presupuestos/{pid}
+// PRESUPUESTOS — casas/{cid}/elementos/{eid}/registros/{rid}/presupuestos/{pid}
 // Todas las escrituras pasan por aquí (las reglas de Firestore deniegan
 // escritura directa del cliente) para que subtotal/IVA/total nunca dependan
 // de lo que mande la app, y para impedir que el profesional se autoapruebe.
@@ -652,26 +694,26 @@ async function esMiembroCasa(casaId, uid) {
 exports.crearPresupuesto = onCall({ region: REGION }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
   const uid = request.auth.uid;
-  const { casaId, trabajoId, notas } = request.data || {};
-  if (!casaId || !trabajoId) throw new HttpsError('invalid-argument', 'Faltan datos.');
+  const { casaId, elementoId, registroId, notas } = request.data || {};
+  if (!casaId || !elementoId || !registroId) throw new HttpsError('invalid-argument', 'Faltan datos.');
   const lineas = validarLineas(request.data?.lineas);
 
-  const { ref: trabajoRef, data: trabajo } = await getTrabajoOThrow(casaId, trabajoId);
-  const esProfesionalAsignado = trabajo.profesionalUid === uid;
+  const { ref: regRef, data: registro } = await getRegistroOThrow(casaId, elementoId, registroId);
+  const esProfesionalAsignado = registro.profesionalUid === uid;
   if (!esProfesionalAsignado && !(await esMiembroCasa(casaId, uid))) {
-    throw new HttpsError('permission-denied', 'No tienes acceso a este trabajo.');
+    throw new HttpsError('permission-denied', 'No tienes acceso a este registro.');
   }
 
   const totales = calcularTotales(lineas);
-  const presupuestosCol = trabajoRef.collection('presupuestos');
+  const presupuestosCol = regRef.collection('presupuestos');
   const existentesSnap = await presupuestosCol.get();
   // Si ya hay uno aceptado, no se crea otro desde cero (auditoría de
   // seguridad, octubre 2026) -- responderPresupuesto sobrescribe
-  // trabajo.presupuesto por completo al aceptar, así que un segundo
+  // registro.presupuesto por completo al aceptar, así que un segundo
   // presupuesto aceptado borraría en silencio cualquier incremento que ya
   // hubiera aplicado un cambio de alcance aprobado sobre el primero.
   if (existentesSnap.docs.some((d) => d.data().estado === 'aceptado')) {
-    throw new HttpsError('failed-precondition', 'Este trabajo ya tiene un presupuesto aceptado.');
+    throw new HttpsError('failed-precondition', 'Este registro ya tiene un presupuesto aceptado.');
   }
   const numero = existentesSnap.docs.filter((d) => !d.data().presupuestoAnteriorId).length + 1;
 
@@ -695,11 +737,11 @@ exports.crearPresupuesto = onCall({ region: REGION }, async (request) => {
 exports.actualizarLineasPresupuesto = onCall({ region: REGION }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
   const uid = request.auth.uid;
-  const { casaId, trabajoId, presupuestoId, notas } = request.data || {};
-  if (!casaId || !trabajoId || !presupuestoId) throw new HttpsError('invalid-argument', 'Faltan datos.');
+  const { casaId, elementoId, registroId, presupuestoId, notas } = request.data || {};
+  if (!casaId || !elementoId || !registroId || !presupuestoId) throw new HttpsError('invalid-argument', 'Faltan datos.');
   const lineas = validarLineas(request.data?.lineas);
 
-  const ref = db.collection('casas').doc(casaId).collection('trabajos').doc(trabajoId).collection('presupuestos').doc(presupuestoId);
+  const ref = registroRef(casaId, elementoId, registroId).collection('presupuestos').doc(presupuestoId);
   const snap = await ref.get();
   if (!snap.exists) throw new HttpsError('not-found', 'El presupuesto no existe.');
   const p = snap.data();
@@ -714,25 +756,25 @@ exports.actualizarLineasPresupuesto = onCall({ region: REGION }, async (request)
 exports.enviarPresupuesto = onCall({ region: REGION }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
   const uid = request.auth.uid;
-  const { casaId, trabajoId, presupuestoId } = request.data || {};
-  if (!casaId || !trabajoId || !presupuestoId) throw new HttpsError('invalid-argument', 'Faltan datos.');
+  const { casaId, elementoId, registroId, presupuestoId } = request.data || {};
+  if (!casaId || !elementoId || !registroId || !presupuestoId) throw new HttpsError('invalid-argument', 'Faltan datos.');
 
-  const trabajoRef = db.collection('casas').doc(casaId).collection('trabajos').doc(trabajoId);
-  const ref = trabajoRef.collection('presupuestos').doc(presupuestoId);
-  const [snap, trabajoSnap] = await Promise.all([ref.get(), trabajoRef.get()]);
-  if (!snap.exists || !trabajoSnap.exists) throw new HttpsError('not-found', 'No encontrado.');
+  const regRef = registroRef(casaId, elementoId, registroId);
+  const ref = regRef.collection('presupuestos').doc(presupuestoId);
+  const [snap, registroSnap] = await Promise.all([ref.get(), regRef.get()]);
+  if (!snap.exists || !registroSnap.exists) throw new HttpsError('not-found', 'No encontrado.');
   const p = snap.data();
   if (p.creadoPorUid !== uid) throw new HttpsError('permission-denied', 'Solo quien lo creó puede enviarlo.');
   if (p.estado !== 'borrador') throw new HttpsError('failed-precondition', 'Este presupuesto ya se envió.');
 
   await ref.update({ estado: 'enviado', fechaEnvio: FieldValue.serverTimestamp() });
 
-  const trabajo = trabajoSnap.data();
+  const registro = registroSnap.data();
   const casaSnap = await db.collection('casas').doc(casaId).get();
   for (const memberUid of casaSnap.data().members || []) {
     await crearNotificacion(memberUid, 'presupuesto_enviado',
-      'Nuevo presupuesto', `Has recibido un presupuesto de ${p.total.toFixed(2)} € para "${trabajo.titulo}".`,
-      { casaId, trabajoId, presupuestoId });
+      'Nuevo presupuesto', `Has recibido un presupuesto de ${p.total.toFixed(2)} € para "${registro.titulo}".`,
+      { casaId, elementoId, registroId, presupuestoId });
   }
   return { ok: true };
 });
@@ -740,32 +782,30 @@ exports.enviarPresupuesto = onCall({ region: REGION }, async (request) => {
 exports.responderPresupuesto = onCall({ region: REGION }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
   const uid = request.auth.uid;
-  const { casaId, trabajoId, presupuestoId, aceptar } = request.data || {};
-  if (!casaId || !trabajoId || !presupuestoId || typeof aceptar !== 'boolean') {
+  const { casaId, elementoId, registroId, presupuestoId, aceptar } = request.data || {};
+  if (!casaId || !elementoId || !registroId || !presupuestoId || typeof aceptar !== 'boolean') {
     throw new HttpsError('invalid-argument', 'Faltan datos.');
   }
   if (!(await esMiembroCasa(casaId, uid))) throw new HttpsError('permission-denied', 'No perteneces a esa casa.');
 
-  const trabajoRef = db.collection('casas').doc(casaId).collection('trabajos').doc(trabajoId);
-  const ref = trabajoRef.collection('presupuestos').doc(presupuestoId);
+  const regRef = registroRef(casaId, elementoId, registroId);
+  const ref = regRef.collection('presupuestos').doc(presupuestoId);
 
   // Transacción (auditoría de seguridad, octubre 2026): sin esto, dos
   // respuestas simultáneas al mismo presupuesto (doble toque, o dos
   // miembros de la misma casa a la vez) podían pasar ambas la comprobación
-  // de estado antes de que ninguna hubiera escrito todavía, duplicando el
-  // evento de historial. Todas las lecturas van antes que las escrituras
-  // (regla de las transacciones de Firestore).
+  // de estado antes de que ninguna hubiera escrito todavía, duplicando la
+  // actualización. Todas las lecturas van antes que las escrituras (regla
+  // de las transacciones de Firestore).
   const p = await db.runTransaction(async (tx) => {
-    const [trabajoSnap, snap] = await Promise.all([tx.get(trabajoRef), tx.get(ref)]);
-    if (!trabajoSnap.exists) throw new HttpsError('not-found', 'El trabajo no existe.');
-    // Un trabajo ya cerrado no debe poder "reabrirse" en silencio al
+    const [registroSnap, snap] = await Promise.all([tx.get(regRef), tx.get(ref)]);
+    if (!registroSnap.exists) throw new HttpsError('not-found', 'El registro no existe.');
+    // Un registro ya cerrado no debe poder "reabrirse" en silencio al
     // aceptar un presupuesto -- si no se bloquea aquí, el estado pasa a
-    // 'presupuestado', el botón de Finalizar del propietario reaparece y,
-    // al volver a pulsarlo, se duplica el evento de historial del mismo
-    // trabajo.
-    const estadoTrabajo = trabajoSnap.data().estado;
-    if (estadoTrabajo === 'terminado' || estadoTrabajo === 'archivado') {
-      throw new HttpsError('failed-precondition', 'Este trabajo ya está finalizado, no se pueden responder presupuestos.');
+    // 'presupuestado' y el botón de Finalizar del propietario reaparece.
+    const estadoRegistro = registroSnap.data().estado;
+    if (estadoRegistro === 'terminado' || estadoRegistro === 'archivado') {
+      throw new HttpsError('failed-precondition', 'Este registro ya está finalizado, no se pueden responder presupuestos.');
     }
     if (!snap.exists) throw new HttpsError('not-found', 'El presupuesto no existe.');
     const presupuesto = snap.data();
@@ -781,24 +821,16 @@ exports.responderPresupuesto = onCall({ region: REGION }, async (request) => {
       respondidoPorUid: uid,
     });
     if (aceptar) {
-      tx.update(trabajoRef, { presupuesto: presupuesto.total, estado: 'presupuestado' });
+      tx.update(regRef, { presupuesto: presupuesto.total, estado: 'presupuestado' });
     }
     return presupuesto;
-  });
-
-  await crearEventoHistorial(casaId, {
-    tipo: 'nota',
-    titulo: aceptar ? `Presupuesto aceptado (${p.total.toFixed(2)} €)` : 'Presupuesto rechazado',
-    trabajoId,
-    coste: aceptar ? p.total : null,
-    createdBy: uid,
   });
 
   if (p.creadoPorUid) {
     await crearNotificacion(p.creadoPorUid, aceptar ? 'presupuesto_aceptado' : 'presupuesto_rechazado',
       aceptar ? 'Presupuesto aceptado' : 'Presupuesto rechazado',
       aceptar ? `Te han aceptado el presupuesto de ${p.total.toFixed(2)} €.` : 'Te han rechazado un presupuesto.',
-      { casaId, trabajoId, presupuestoId });
+      { casaId, elementoId, registroId, presupuestoId });
   }
   return { ok: true };
 });
@@ -806,12 +838,12 @@ exports.responderPresupuesto = onCall({ region: REGION }, async (request) => {
 exports.crearNuevaVersionPresupuesto = onCall({ region: REGION }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
   const uid = request.auth.uid;
-  const { casaId, trabajoId, presupuestoAnteriorId, notas } = request.data || {};
-  if (!casaId || !trabajoId || !presupuestoAnteriorId) throw new HttpsError('invalid-argument', 'Faltan datos.');
+  const { casaId, elementoId, registroId, presupuestoAnteriorId, notas } = request.data || {};
+  if (!casaId || !elementoId || !registroId || !presupuestoAnteriorId) throw new HttpsError('invalid-argument', 'Faltan datos.');
   const lineas = validarLineas(request.data?.lineas);
 
-  const trabajoRef = db.collection('casas').doc(casaId).collection('trabajos').doc(trabajoId);
-  const anteriorRef = trabajoRef.collection('presupuestos').doc(presupuestoAnteriorId);
+  const regRef = registroRef(casaId, elementoId, registroId);
+  const anteriorRef = regRef.collection('presupuestos').doc(presupuestoAnteriorId);
   const anteriorSnap = await anteriorRef.get();
   if (!anteriorSnap.exists) throw new HttpsError('not-found', 'El presupuesto anterior no existe.');
   const anterior = anteriorSnap.data();
@@ -822,7 +854,7 @@ exports.crearNuevaVersionPresupuesto = onCall({ region: REGION }, async (request
   if (anterior.estado !== 'rechazado') throw new HttpsError('failed-precondition', 'Solo se puede crear una nueva versión de un presupuesto rechazado.');
 
   const totales = calcularTotales(lineas);
-  const ref = await trabajoRef.collection('presupuestos').add({
+  const ref = await regRef.collection('presupuestos').add({
     numero: anterior.numero,
     version: anterior.version + 1,
     estado: 'borrador',
@@ -840,27 +872,27 @@ exports.crearNuevaVersionPresupuesto = onCall({ region: REGION }, async (request
 });
 
 // =============================================================================
-// SCOPEGUARD — cambios de alcance, casas/{cid}/trabajos/{tid}/cambiosAlcance
+// SCOPEGUARD — cambios de alcance, casas/{cid}/elementos/{eid}/registros/{rid}/cambiosAlcance
 // =============================================================================
 
 exports.crearCambioAlcance = onCall({ region: REGION }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
   const uid = request.auth.uid;
-  const { casaId, trabajoId, titulo, descripcion, motivo, importeAdicional, tiempoAdicionalHoras, fotos, presupuestoId } = request.data || {};
-  if (!casaId || !trabajoId || typeof titulo !== 'string' || !titulo.trim()) {
+  const { casaId, elementoId, registroId, titulo, descripcion, motivo, importeAdicional, tiempoAdicionalHoras, fotos, presupuestoId } = request.data || {};
+  if (!casaId || !elementoId || !registroId || typeof titulo !== 'string' || !titulo.trim()) {
     throw new HttpsError('invalid-argument', 'Faltan datos.');
   }
-  const { ref: trabajoRef, data: trabajo } = await getTrabajoOThrow(casaId, trabajoId);
-  if (trabajo.profesionalUid !== uid) {
+  const { ref: regRef, data: registro } = await getRegistroOThrow(casaId, elementoId, registroId);
+  if (registro.profesionalUid !== uid) {
     throw new HttpsError('permission-denied', 'Solo el profesional asignado puede solicitar un cambio de alcance.');
   }
-  // Un trabajo ya cerrado no admite nuevas solicitudes (auditoría de
+  // Un registro ya cerrado no admite nuevas solicitudes (auditoría de
   // seguridad, octubre 2026) -- mismo criterio que responderPresupuesto.
   // Tampoco mientras está pendiente de confirmación (modelo de dos pasos):
   // no tiene sentido pedir más alcance sobre algo que el propio profesional
   // acaba de decir que ha terminado.
-  if (trabajo.estado === 'terminado' || trabajo.estado === 'archivado' || trabajo.estado === 'pendienteConfirmacion') {
-    throw new HttpsError('failed-precondition', 'Este trabajo ya está finalizado o pendiente de confirmación, no se pueden solicitar cambios de alcance.');
+  if (registro.estado === 'terminado' || registro.estado === 'archivado' || registro.estado === 'pendienteConfirmacion') {
+    throw new HttpsError('failed-precondition', 'Este registro ya está finalizado o pendiente de confirmación, no se pueden solicitar cambios de alcance.');
   }
   const importeBruto = importeAdicional == null ? null : Number(importeAdicional);
   if (importeBruto != null && (!Number.isFinite(importeBruto) || importeBruto < -1000000 || importeBruto > 1000000)) {
@@ -871,7 +903,7 @@ exports.crearCambioAlcance = onCall({ region: REGION }, async (request) => {
   // limpio a 2 decimales para no acumular deriva de coma flotante.
   const importe = importeBruto == null ? null : redondear2(importeBruto);
 
-  const ref = await trabajoRef.collection('cambiosAlcance').add({
+  const ref = await regRef.collection('cambiosAlcance').add({
     titulo: titulo.trim().slice(0, 120),
     descripcion: typeof descripcion === 'string' ? descripcion.trim().slice(0, 1000) : null,
     motivo: typeof motivo === 'string' ? motivo.trim().slice(0, 1000) : null,
@@ -887,8 +919,8 @@ exports.crearCambioAlcance = onCall({ region: REGION }, async (request) => {
   const casaSnap = await db.collection('casas').doc(casaId).get();
   for (const memberUid of casaSnap.data().members || []) {
     await crearNotificacion(memberUid, 'cambio_alcance_solicitado',
-      'Cambio de alcance solicitado', `Se ha solicitado un cambio en "${trabajo.titulo}": ${titulo.trim()}`,
-      { casaId, trabajoId, cambioAlcanceId: ref.id });
+      'Cambio de alcance solicitado', `Se ha solicitado un cambio en "${registro.titulo}": ${titulo.trim()}`,
+      { casaId, elementoId, registroId, cambioAlcanceId: ref.id });
   }
   return { ok: true, cambioAlcanceId: ref.id };
 });
@@ -896,14 +928,14 @@ exports.crearCambioAlcance = onCall({ region: REGION }, async (request) => {
 exports.responderCambioAlcance = onCall({ region: REGION }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
   const uid = request.auth.uid;
-  const { casaId, trabajoId, cambioAlcanceId, aprobar } = request.data || {};
-  if (!casaId || !trabajoId || !cambioAlcanceId || typeof aprobar !== 'boolean') {
+  const { casaId, elementoId, registroId, cambioAlcanceId, aprobar } = request.data || {};
+  if (!casaId || !elementoId || !registroId || !cambioAlcanceId || typeof aprobar !== 'boolean') {
     throw new HttpsError('invalid-argument', 'Faltan datos.');
   }
   if (!(await esMiembroCasa(casaId, uid))) throw new HttpsError('permission-denied', 'No perteneces a esa casa.');
 
-  const trabajoRef = db.collection('casas').doc(casaId).collection('trabajos').doc(trabajoId);
-  const ref = trabajoRef.collection('cambiosAlcance').doc(cambioAlcanceId);
+  const regRef = registroRef(casaId, elementoId, registroId);
+  const ref = regRef.collection('cambiosAlcance').doc(cambioAlcanceId);
 
   // Transacción + FieldValue.increment (auditoría de seguridad, octubre
   // 2026): antes, dos cambios de alcance aprobados casi a la vez podían
@@ -913,15 +945,14 @@ exports.responderCambioAlcance = onCall({ region: REGION }, async (request) => {
   // comprobación de estado va en la misma transacción que la escritura,
   // para que una doble respuesta simultánea no duplique nada.
   const c = await db.runTransaction(async (tx) => {
-    const [trabajoSnap, snap] = await Promise.all([tx.get(trabajoRef), tx.get(ref)]);
-    // Mismo criterio que responderPresupuesto (auditoría de seguridad,
-    // octubre 2026): sin esto, un cambio de alcance pendiente se podía
-    // aprobar sobre un trabajo ya cerrado, incrementando `presupuesto` vía
-    // FieldValue.increment() después de que el evento de historial ya se
-    // hubiera creado con un coste fijo -- desincronizando ambos importes.
-    const estadoTrabajo = trabajoSnap.exists ? trabajoSnap.data().estado : null;
-    if (estadoTrabajo === 'terminado' || estadoTrabajo === 'archivado') {
-      throw new HttpsError('failed-precondition', 'Este trabajo ya está finalizado, no se pueden responder cambios de alcance.');
+    const [registroSnap, snap] = await Promise.all([tx.get(regRef), tx.get(ref)]);
+    // Mismo criterio que responderPresupuesto: sin esto, un cambio de
+    // alcance pendiente se podía aprobar sobre un registro ya cerrado,
+    // incrementando `presupuesto` vía FieldValue.increment() después de
+    // cerrado -- desincronizando el importe mostrado.
+    const estadoRegistro = registroSnap.exists ? registroSnap.data().estado : null;
+    if (estadoRegistro === 'terminado' || estadoRegistro === 'archivado') {
+      throw new HttpsError('failed-precondition', 'Este registro ya está finalizado, no se pueden responder cambios de alcance.');
     }
     if (!snap.exists) throw new HttpsError('not-found', 'El cambio de alcance no existe.');
     const cambio = snap.data();
@@ -936,23 +967,15 @@ exports.responderCambioAlcance = onCall({ region: REGION }, async (request) => {
       : { estado: 'rechazado', rechazadoPorUid: uid, rechazadoAt: FieldValue.serverTimestamp() });
 
     if (aprobar && cambio.importeAdicional) {
-      tx.update(trabajoRef, { presupuesto: FieldValue.increment(cambio.importeAdicional) });
+      tx.update(regRef, { presupuesto: FieldValue.increment(cambio.importeAdicional) });
     }
     return cambio;
-  });
-
-  await crearEventoHistorial(casaId, {
-    tipo: 'nota',
-    titulo: aprobar ? `Cambio de alcance aprobado: ${c.titulo}` : `Cambio de alcance rechazado: ${c.titulo}`,
-    trabajoId,
-    coste: aprobar ? c.importeAdicional : null,
-    createdBy: uid,
   });
 
   await crearNotificacion(c.creadoPorUid, aprobar ? 'cambio_alcance_aprobado' : 'cambio_alcance_rechazado',
     aprobar ? 'Cambio de alcance aprobado' : 'Cambio de alcance rechazado',
     `Tu solicitud "${c.titulo}" ha sido ${aprobar ? 'aprobada' : 'rechazada'}.`,
-    { casaId, trabajoId, cambioAlcanceId });
+    { casaId, elementoId, registroId, cambioAlcanceId });
 
   return { ok: true };
 });
@@ -960,10 +983,10 @@ exports.responderCambioAlcance = onCall({ region: REGION }, async (request) => {
 exports.cancelarCambioAlcance = onCall({ region: REGION }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
   const uid = request.auth.uid;
-  const { casaId, trabajoId, cambioAlcanceId } = request.data || {};
-  if (!casaId || !trabajoId || !cambioAlcanceId) throw new HttpsError('invalid-argument', 'Faltan datos.');
+  const { casaId, elementoId, registroId, cambioAlcanceId } = request.data || {};
+  if (!casaId || !elementoId || !registroId || !cambioAlcanceId) throw new HttpsError('invalid-argument', 'Faltan datos.');
 
-  const ref = db.collection('casas').doc(casaId).collection('trabajos').doc(trabajoId).collection('cambiosAlcance').doc(cambioAlcanceId);
+  const ref = registroRef(casaId, elementoId, registroId).collection('cambiosAlcance').doc(cambioAlcanceId);
   const snap = await ref.get();
   if (!snap.exists) throw new HttpsError('not-found', 'No existe.');
   if (snap.data().creadoPorUid !== uid) throw new HttpsError('permission-denied', 'Solo quien lo creó puede cancelarlo.');
@@ -973,67 +996,38 @@ exports.cancelarCambioAlcance = onCall({ region: REGION }, async (request) => {
 });
 
 // =============================================================================
-// FINALIZAR TRABAJO (lado propietario) -- auditoría de seguridad, octubre
-// 2026. Antes esto era una escritura directa del cliente (estado=terminado
-// + crear el evento por separado desde Flutter); las reglas de Firestore
-// ya bloquean esa escritura directa (ver match /trabajos/{tid}), así que
-// hace falta esta función para que el botón "Finalizar" del propietario
-// siga funcionando -- ahora el estado Y el evento de historial se crean
-// atómicamente en el servidor, nunca por separado desde el cliente.
+// FINALIZAR REGISTRO (lado propietario) -- auditoría de seguridad, octubre
+// 2026. Antes esto era una escritura directa del cliente; las reglas de
+// Firestore ya bloquean esa escritura directa (ver match /registros/{rid}),
+// así que hace falta esta función para que el botón "Finalizar" del
+// propietario siga funcionando. El propio registro (con su estado y fecha)
+// es ya el historial -- no hace falta crear un evento aparte.
 // =============================================================================
-const TIPO_EVENTO_POR_TRABAJO = {
-  averia: 'reparacion',
-  reparacion: 'reparacion',
-  mantenimiento: 'revision',
-  reforma: 'reforma',
-  instalacion: 'instalacion',
-  otro: 'nota',
-};
-
 exports.finalizarTrabajoPropietario = onCall({ region: REGION }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
   const uid = request.auth.uid;
-  const { casaId, trabajoId } = request.data || {};
-  if (!casaId || !trabajoId) throw new HttpsError('invalid-argument', 'Faltan datos.');
+  const { casaId, elementoId, registroId } = request.data || {};
+  if (!casaId || !elementoId || !registroId) throw new HttpsError('invalid-argument', 'Faltan datos.');
   if (!(await esMiembroCasa(casaId, uid))) throw new HttpsError('permission-denied', 'No perteneces a esa casa.');
 
-  const trabajoRef = db.collection('casas').doc(casaId).collection('trabajos').doc(trabajoId);
+  const regRef = registroRef(casaId, elementoId, registroId);
   // Transacción (auditoría de seguridad, octubre 2026): sin esto, pulsar
   // "Finalizar" dos veces seguidas muy rápido (o desde dos dispositivos)
   // podía pasar la comprobación de estado las dos veces antes de que
-  // ninguna hubiera escrito, duplicando el evento de historial.
-  const trabajo = await db.runTransaction(async (tx) => {
-    const snap = await tx.get(trabajoRef);
-    if (!snap.exists) throw new HttpsError('not-found', 'El trabajo no existe.');
+  // ninguna hubiera escrito.
+  const registro = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(regRef);
+    if (!snap.exists) throw new HttpsError('not-found', 'El registro no existe.');
     const data = snap.data();
     if (data.estado === 'terminado' || data.estado === 'archivado') {
-      throw new HttpsError('failed-precondition', 'Este trabajo ya estaba finalizado.');
+      throw new HttpsError('failed-precondition', 'Este registro ya estaba finalizado.');
     }
     // Confirma tanto si el propietario lo cierra directamente como si está
     // confirmando que el profesional de verdad ha terminado (modelo de dos
     // pasos) -- en ambos casos el resultado es el mismo: terminado de
-    // verdad, con su evento de historial.
-    tx.update(trabajoRef, { estado: 'terminado', estadoPrevioAPendiente: FieldValue.delete() });
+    // verdad.
+    tx.update(regRef, { estado: 'terminado', estadoPrevioAPendiente: FieldValue.delete() });
     return data;
-  });
-
-  await crearEventoHistorial(casaId, {
-    tipo: TIPO_EVENTO_POR_TRABAJO[trabajo.tipo] || 'nota',
-    titulo: trabajo.titulo,
-    descripcion: trabajo.descripcion || null,
-    elementoId: trabajo.elementoId || null,
-    habitacionId: trabajo.habitacionId || null,
-    trabajoId,
-    coste: trabajo.presupuesto || null,
-    profesionalNombre: trabajo.profesionalNombre || null,
-    createdBy: uid,
-    // Marca este evento (y solo este) como el cierre real de un trabajo --
-    // auditoría de producto, octubre 2026: sin esto, el historial no podía
-    // distinguir "el trabajo se finalizó aquí" de otros eventos que también
-    // llevan trabajoId/coste (presupuesto aceptado, cambio de alcance
-    // aprobado...), así que la UI no sabía sobre cuál comprobar si quedaba
-    // dinero pendiente de cobrar.
-    esFinalizacion: true,
   });
 
   // Avisa al resto de la casa (si hay más de un miembro), nunca a quien
@@ -1042,19 +1036,19 @@ exports.finalizarTrabajoPropietario = onCall({ region: REGION }, async (request)
   for (const memberUid of casaSnap.data().members || []) {
     if (memberUid === uid) continue;
     await crearNotificacion(memberUid, 'trabajo_finalizado',
-      'Trabajo finalizado', `"${trabajo.titulo}" se ha marcado como terminado.`,
-      { casaId, trabajoId });
+      'Registro finalizado', `"${registro.titulo}" se ha marcado como terminado.`,
+      { casaId, elementoId, registroId });
   }
   return { ok: true };
 });
 
 // =============================================================================
-// FINALIZAR TRABAJO (lado profesional) -- modelo de DOS PASOS (auditoría de
-// producto, octubre 2026): antes, el profesional podía cerrar el trabajo
+// FINALIZAR REGISTRO (lado profesional) -- modelo de DOS PASOS (auditoría de
+// producto, octubre 2026): antes, el profesional podía cerrar el registro
 // exactamente igual que el propietario, sin que este último tuviera que
 // estar de acuerdo en que de verdad estaba terminado -- y una vez cerrado,
 // no había forma de reabrirlo. Ahora, "marcar como finalizado" del
-// profesional solo deja el trabajo pendiente de confirmación; el
+// profesional solo deja el registro pendiente de confirmación; el
 // propietario es quien de verdad lo cierra (finalizarTrabajoPropietario,
 // que ya acepta este estado como punto de partida) o lo rechaza
 // (rechazarFinalizacionProfesional), devolviéndolo a como estaba.
@@ -1064,27 +1058,27 @@ const _ESTADOS_PREVIOS_VALIDOS = ['nuevo', 'presupuestado', 'enCurso'];
 exports.marcarTrabajoFinalizadoProfesional = onCall({ region: REGION }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
   const uid = request.auth.uid;
-  const { casaId, trabajoId } = request.data || {};
-  if (!casaId || !trabajoId) throw new HttpsError('invalid-argument', 'Faltan datos.');
+  const { casaId, elementoId, registroId } = request.data || {};
+  if (!casaId || !elementoId || !registroId) throw new HttpsError('invalid-argument', 'Faltan datos.');
 
-  const trabajoRef = db.collection('casas').doc(casaId).collection('trabajos').doc(trabajoId);
-  const trabajo = await db.runTransaction(async (tx) => {
-    const snap = await tx.get(trabajoRef);
-    if (!snap.exists) throw new HttpsError('not-found', 'El trabajo no existe.');
+  const regRef = registroRef(casaId, elementoId, registroId);
+  const registro = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(regRef);
+    if (!snap.exists) throw new HttpsError('not-found', 'El registro no existe.');
     const data = snap.data();
-    if (data.profesionalUid !== uid) throw new HttpsError('permission-denied', 'No eres el profesional de este trabajo.');
+    if (data.profesionalUid !== uid) throw new HttpsError('permission-denied', 'No eres el profesional de este registro.');
     if (!_ESTADOS_PREVIOS_VALIDOS.includes(data.estado)) {
-      throw new HttpsError('failed-precondition', 'Este trabajo ya está pendiente de confirmación o finalizado.');
+      throw new HttpsError('failed-precondition', 'Este registro ya está pendiente de confirmación o finalizado.');
     }
-    tx.update(trabajoRef, { estado: 'pendienteConfirmacion', estadoPrevioAPendiente: data.estado });
+    tx.update(regRef, { estado: 'pendienteConfirmacion', estadoPrevioAPendiente: data.estado });
     return data;
   });
 
   const casaSnap = await db.collection('casas').doc(casaId).get();
   for (const memberUid of casaSnap.data().members || []) {
     await crearNotificacion(memberUid, 'trabajo_pendiente_confirmacion',
-      'Pendiente de confirmar', `El profesional dice que ha terminado "${trabajo.titulo}". Confirma si está completo.`,
-      { casaId, trabajoId });
+      'Pendiente de confirmar', `El profesional dice que ha terminado "${registro.titulo}". Confirma si está completo.`,
+      { casaId, elementoId, registroId });
   }
   return { ok: true };
 });
@@ -1092,30 +1086,30 @@ exports.marcarTrabajoFinalizadoProfesional = onCall({ region: REGION }, async (r
 exports.rechazarFinalizacionProfesional = onCall({ region: REGION }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
   const uid = request.auth.uid;
-  const { casaId, trabajoId } = request.data || {};
-  if (!casaId || !trabajoId) throw new HttpsError('invalid-argument', 'Faltan datos.');
+  const { casaId, elementoId, registroId } = request.data || {};
+  if (!casaId || !elementoId || !registroId) throw new HttpsError('invalid-argument', 'Faltan datos.');
   if (!(await esMiembroCasa(casaId, uid))) throw new HttpsError('permission-denied', 'No perteneces a esa casa.');
 
-  const trabajoRef = db.collection('casas').doc(casaId).collection('trabajos').doc(trabajoId);
-  const trabajo = await db.runTransaction(async (tx) => {
-    const snap = await tx.get(trabajoRef);
-    if (!snap.exists) throw new HttpsError('not-found', 'El trabajo no existe.');
+  const regRef = registroRef(casaId, elementoId, registroId);
+  const registro = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(regRef);
+    if (!snap.exists) throw new HttpsError('not-found', 'El registro no existe.');
     const data = snap.data();
     if (data.estado !== 'pendienteConfirmacion') {
-      throw new HttpsError('failed-precondition', 'Este trabajo no está pendiente de confirmación.');
+      throw new HttpsError('failed-precondition', 'Este registro no está pendiente de confirmación.');
     }
     // Nunca se confía ciegamente en estadoPrevioAPendiente -- un valor fuera
     // de esta lista (manipulado o corrupto) no debe poder colar un estado
     // controlado (p.ej. "terminado") por esta vía.
     const vuelveA = _ESTADOS_PREVIOS_VALIDOS.includes(data.estadoPrevioAPendiente) ? data.estadoPrevioAPendiente : 'enCurso';
-    tx.update(trabajoRef, { estado: vuelveA, estadoPrevioAPendiente: FieldValue.delete() });
+    tx.update(regRef, { estado: vuelveA, estadoPrevioAPendiente: FieldValue.delete() });
     return data;
   });
 
-  if (trabajo.profesionalUid) {
-    await crearNotificacion(trabajo.profesionalUid, 'trabajo_finalizacion_rechazada',
-      'Todavía no está terminado', `El propietario no ha confirmado que "${trabajo.titulo}" esté terminado. Revísalo.`,
-      { casaId, trabajoId });
+  if (registro.profesionalUid) {
+    await crearNotificacion(registro.profesionalUid, 'trabajo_finalizacion_rechazada',
+      'Todavía no está terminado', `El propietario no ha confirmado que "${registro.titulo}" esté terminado. Revísalo.`,
+      { casaId, elementoId, registroId });
   }
   return { ok: true };
 });
@@ -1130,20 +1124,20 @@ exports.rechazarFinalizacionProfesional = onCall({ region: REGION }, async (requ
 // llame el cliente.
 // =============================================================================
 exports.onPagoCreado = onDocumentCreated(
-  { region: REGION, document: 'casas/{casaId}/trabajos/{trabajoId}/pagos/{pagoId}' },
+  { region: REGION, document: 'casas/{casaId}/elementos/{elementoId}/registros/{registroId}/pagos/{pagoId}' },
   async (event) => {
     const pago = event.data?.data();
     if (!pago) return;
-    const { casaId, trabajoId, pagoId } = event.params;
+    const { casaId, elementoId, registroId, pagoId } = event.params;
 
-    const trabajoSnap = await db.collection('casas').doc(casaId).collection('trabajos').doc(trabajoId).get();
-    if (!trabajoSnap.exists) return;
-    const trabajo = trabajoSnap.data();
-    if (!trabajo.profesionalUid) return; // sin profesional en la app, nadie a quien avisar
+    const registroSnap = await registroRef(casaId, elementoId, registroId).get();
+    if (!registroSnap.exists) return;
+    const registro = registroSnap.data();
+    if (!registro.profesionalUid) return; // sin profesional en la app, nadie a quien avisar
 
-    await crearNotificacion(trabajo.profesionalUid, 'pago_registrado',
-      'Nuevo pago registrado', `Te han registrado un pago de ${Number(pago.importe || 0).toFixed(2)} € en "${trabajo.titulo}".`,
-      { casaId, trabajoId, pagoId });
+    await crearNotificacion(registro.profesionalUid, 'pago_registrado',
+      'Nuevo pago registrado', `Te han registrado un pago de ${Number(pago.importe || 0).toFixed(2)} € en "${registro.titulo}".`,
+      { casaId, elementoId, registroId, pagoId });
   }
 );
 
@@ -1165,7 +1159,7 @@ exports.classifyDocument = onCall(
     // [paginas] es la forma nueva (varias páginas de un mismo documento);
     // se mantiene el nombre antiguo imageBase64/mediaType como fallback para
     // no romper si algo sigue llamando a la forma vieja.
-    const { paginas, imageBase64, mediaType, elementosDisponibles, trabajosDisponibles } = request.data || {};
+    const { paginas, imageBase64, mediaType, elementosDisponibles } = request.data || {};
     const listaPaginas = Array.isArray(paginas) && paginas.length
         ? paginas
         : (typeof imageBase64 === 'string' && imageBase64 ? [{ data: imageBase64, mediaType: mediaType || 'image/jpeg' }] : []);
@@ -1186,11 +1180,13 @@ exports.classifyDocument = onCall(
     }
     await verificarYRegistrarUsoIA(request.auth.uid);
 
-    // Nombres existentes en la casa para que la IA pueda sugerir con cuál se
-    // relaciona el documento, sin inventar uno que no existe -- el cliente
-    // decide si acepta la sugerencia o elige otro/crea uno nuevo.
+    // Nombres de elementos existentes en la casa para que la IA pueda
+    // sugerir con cuál se relaciona el documento, sin inventar uno que no
+    // existe -- el cliente decide si acepta la sugerencia o elige otro/crea
+    // uno nuevo. Ya no hay un "trabajo" por separado que sugerir (octubre
+    // 2026, fusión Elemento/Trabajo): un servicio contratado es ahora
+    // también un elemento.
     const listaElementos = Array.isArray(elementosDisponibles) ? elementosDisponibles.slice(0, 50) : [];
-    const listaTrabajos = Array.isArray(trabajosDisponibles) ? trabajosDisponibles.slice(0, 50) : [];
 
     const apiKey = _anthropicKey.value();
     if (!apiKey) throw new HttpsError('internal', 'API key no configurada en el servidor.');
@@ -1212,17 +1208,15 @@ Devuelve EXCLUSIVAMENTE un objeto JSON con esta forma exacta, sin texto adiciona
   "garantiaTexto": "texto literal sobre garantía si aparece, o null",
   "observaciones": "cualquier detalle relevante que no encaje en los campos anteriores, o null",
   "elementoSugerido": "uno de los nombres EXACTOS de la lista de elementos, o null",
-  "trabajoSugerido": "uno de los nombres EXACTOS de la lista de trabajos, o null",
   "confianza": "alta|media|baja"
 }
 Reglas estrictas:
 - Nunca inventes un dato que no puedas leer en el documento: si no se ve o no aparece, usa null.
 - "importe" es el total final del documento, no un subtotal.
 - La fecha es la del documento (emisión/factura), nunca la de hoy.
-- "elementoSugerido" y "trabajoSugerido" deben ser EXACTAMENTE uno de los nombres de las listas de abajo, o null si ninguno encaja -- nunca inventes un nombre nuevo aquí.
+- "elementoSugerido" debe ser EXACTAMENTE uno de los nombres de la lista de abajo, o null si ninguno encaja -- nunca inventes un nombre nuevo aquí.
 - "confianza" baja significa que la imagen es difícil de leer o el documento es ambiguo.
-Elementos existentes en esta casa: ${listaElementos.length ? listaElementos.join(', ') : '(ninguno todavía)'}
-Trabajos existentes en esta casa: ${listaTrabajos.length ? listaTrabajos.join(', ') : '(ninguno todavía)'}`;
+Elementos existentes en esta casa: ${listaElementos.length ? listaElementos.join(', ') : '(ninguno todavía)'}`;
 
     const contenido = listaPaginas.map((p) => ({
       type: p.mediaType === 'application/pdf' ? 'document' : 'image',
