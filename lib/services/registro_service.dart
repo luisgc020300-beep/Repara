@@ -6,7 +6,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
+import '../models/elemento.dart';
 import '../models/registro.dart';
+import 'elemento_service.dart';
 import 'stream_error_logging.dart';
 
 class RegistroService {
@@ -92,5 +94,29 @@ class RegistroService {
         .map((d) => List<Map<String, dynamic>>.from(
             (d.data()?['registros'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)) ?? const []))
         .conRegistroDeErrores();
+  }
+
+  /// Botón "Trabajos pendientes" de Inicio: un elemento por cada uno que
+  /// tenga al menos un registro con profesional todavía sin cerrar. Lectura
+  /// puntual (no stream) recorriendo la subcolección de registros de cada
+  /// elemento -- un registro nunca vive en una colección a nivel de casa,
+  /// así que no hay una única consulta que lo traiga todo de golpe (mismo
+  /// patrón que ExpedienteViviendaScreen._todosLosRegistros). Ordenado por
+  /// fecha ascendente: el que lleva más tiempo esperando sale primero.
+  static Future<List<({Elemento elemento, String registroTitulo, DateTime fecha})>> elementosConTrabajoPendiente(
+      String casaId) async {
+    final elementos = await ElementoService.streamElementos(casaId).first;
+    final resultado = <({Elemento elemento, String registroTitulo, DateTime fecha})>[];
+    for (final elemento in elementos) {
+      final registros = await streamRegistros(casaId, elemento.id).first;
+      final pendientes = registros
+          .where((r) => r.esConProfesional && r.estado != EstadoRegistro.terminado && r.estado != EstadoRegistro.archivado)
+          .toList()
+        ..sort((a, b) => a.fecha.compareTo(b.fecha));
+      if (pendientes.isEmpty) continue;
+      resultado.add((elemento: elemento, registroTitulo: pendientes.first.titulo, fecha: pendientes.first.fecha));
+    }
+    resultado.sort((a, b) => a.fecha.compareTo(b.fecha));
+    return resultado;
   }
 }

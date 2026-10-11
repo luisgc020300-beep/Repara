@@ -14,9 +14,7 @@ import '../widgets/app_error.dart';
 import '../widgets/boton_ajustes.dart';
 import '../widgets/ios_list.dart';
 import 'elemento_detail_screen.dart';
-import 'garantias_proximas_screen.dart';
 import 'nuevo_elemento_screen.dart';
-import 'revisiones_pendientes_screen.dart';
 
 class CasaTab extends StatelessWidget {
   const CasaTab({required this.casa, super.key});
@@ -59,32 +57,6 @@ class CasaTab extends StatelessWidget {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              IosSection(
-                rows: [
-                  IosRow(
-                    icon: Icons.shield_outlined,
-                    iconColor: context.colors.warning,
-                    title: 'Garantías',
-                    onTap: () async {
-                      final elementos = await ElementoService.conGarantia(casa.id);
-                      if (context.mounted) {
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => GarantiasProximasScreen(casa: casa, elementos: elementos, titulo: 'Todas las garantías')));
-                      }
-                    },
-                  ),
-                  IosRow(
-                    icon: Icons.build_circle_outlined,
-                    iconColor: context.colors.brand,
-                    title: 'Mantenimiento',
-                    onTap: () async {
-                      final elementos = await ElementoService.conMantenimientoConfigurado(casa.id);
-                      if (context.mounted) {
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => RevisionesPendientesScreen(casa: casa, elementos: elementos, titulo: 'Todo el mantenimiento')));
-                      }
-                    },
-                  ),
-                ],
-              ),
               if (habitaciones.isEmpty)
                 Card(
                   child: Padding(

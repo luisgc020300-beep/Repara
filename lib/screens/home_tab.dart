@@ -2,9 +2,10 @@
 //
 // Inicio: registro de Elementos de la casa (octubre 2026, fusión Elemento/
 // Trabajo/Evento) -- cada elemento es la unidad que se ve aquí, con su
-// propio historial de Registros dentro de su ficha. Arriba, avisos de
-// garantías/revisiones próximas y un banner de registros en curso con un
-// profesional; debajo, el listado filtrable por ubicación.
+// propio historial de Registros dentro de su ficha. Arriba, tres accesos
+// directos (garantías, mantenimiento, trabajos pendientes) que antes vivían
+// en la pestaña Casa -- tienen más sentido en Inicio, que es donde se mira
+// a diario (CEO, octubre 2026); debajo, el listado filtrable por ubicación.
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -21,8 +22,8 @@ import '../widgets/ios_list.dart';
 import 'elemento_detail_screen.dart';
 import 'garantias_proximas_screen.dart';
 import 'menu_anadir.dart';
-import 'registro_detail_screen.dart';
 import 'revisiones_pendientes_screen.dart';
+import 'trabajos_pendientes_screen.dart';
 
 class HomeTab extends StatefulWidget {
   const HomeTab({required this.casa, super.key});
@@ -55,7 +56,46 @@ class _HomeTabState extends State<HomeTab> {
       ),
       body: Column(
         children: [
-          _AvisosCard(casa: widget.casa),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: IosSection(
+              rows: [
+                IosRow(
+                  icon: Icons.shield_outlined,
+                  iconColor: context.colors.warning,
+                  title: 'Garantías',
+                  onTap: () async {
+                    final elementos = await ElementoService.conGarantia(widget.casa.id);
+                    if (context.mounted) {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => GarantiasProximasScreen(casa: widget.casa, elementos: elementos, titulo: 'Todas las garantías')));
+                    }
+                  },
+                ),
+                IosRow(
+                  icon: Icons.build_circle_outlined,
+                  iconColor: context.colors.brand,
+                  title: 'Mantenimiento',
+                  onTap: () async {
+                    final elementos = await ElementoService.conMantenimientoConfigurado(widget.casa.id);
+                    if (context.mounted) {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => RevisionesPendientesScreen(casa: widget.casa, elementos: elementos, titulo: 'Todo el mantenimiento')));
+                    }
+                  },
+                ),
+                IosRow(
+                  icon: Icons.hourglass_top_outlined,
+                  iconColor: context.colors.brand,
+                  title: 'Trabajos pendientes',
+                  onTap: () async {
+                    final items = await RegistroService.elementosConTrabajoPendiente(widget.casa.id);
+                    if (context.mounted) {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => TrabajosPendientesScreen(casa: widget.casa, items: items)));
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
             child: TextField(
@@ -140,165 +180,6 @@ class _HomeTabState extends State<HomeTab> {
           ),
         ],
       ),
-    );
-  }
-}
-
-/// Las tres señales de "esto necesita tu atención" (garantías, revisiones,
-/// registros en curso con un profesional) vivían como tres tarjetas
-/// apiladas y empujaban la lista fuera de la pantalla en cuanto había más
-/// de una activa a la vez (feedback del CEO, octubre 2026). Ahora son una
-/// sola tarjeta plegada por defecto -- una línea si no hay nada que ver,
-/// una línea con el recuento si lo hay, y el detalle de cada una solo al
-/// tocarla.
-class _AvisosCard extends StatelessWidget {
-  const _AvisosCard({required this.casa});
-
-  final Casa casa;
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<List<List<Elemento>>>(
-      future: Future.wait([
-        ElementoService.conGarantiaProximaAVencer(casa.id),
-        ElementoService.conRevisionPendiente(casa.id),
-      ]),
-      builder: (context, snapshot) {
-        final garantias = snapshot.data?[0] ?? const <Elemento>[];
-        final revisiones = snapshot.data?[1] ?? const <Elemento>[];
-        return StreamBuilder<List<Map<String, dynamic>>>(
-          stream: RegistroService.streamPendientes(casa.id),
-          builder: (context, pendSnapshot) {
-            final pendientes = pendSnapshot.data ?? const [];
-            final numAvisos = (garantias.isNotEmpty ? 1 : 0) + (revisiones.isNotEmpty ? 1 : 0) + (pendientes.isNotEmpty ? 1 : 0);
-            if (numAvisos == 0) return const SizedBox.shrink();
-
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: Card(
-                clipBehavior: Clip.antiAlias,
-                child: Theme(
-                  data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                  child: ExpansionTile(
-                    leading: Icon(Icons.notifications_active_outlined, color: context.colors.warning),
-                    title: Text(
-                      numAvisos == 1 ? 'Tienes 1 aviso' : 'Tienes $numAvisos avisos',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    children: [
-                      if (garantias.isNotEmpty)
-                        _filaAviso(
-                          context,
-                          icon: Icons.shield_outlined,
-                          iconColor: context.colors.warning,
-                          texto: garantias.length == 1
-                              ? 'La garantía de "${garantias.first.nombre}" termina pronto.'
-                              : '${garantias.length} garantías están a punto de terminar.',
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => GarantiasProximasScreen(casa: casa, elementos: garantias)),
-                          ),
-                        ),
-                      if (revisiones.isNotEmpty)
-                        _filaAviso(
-                          context,
-                          icon: Icons.build_circle_outlined,
-                          iconColor: context.colors.brand,
-                          texto: revisiones.length == 1
-                              ? 'Toca revisar "${revisiones.first.nombre}".'
-                              : '${revisiones.length} elementos tienen una revisión pendiente.',
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => RevisionesPendientesScreen(casa: casa, elementos: revisiones)),
-                          ),
-                        ),
-                      if (pendientes.isNotEmpty)
-                        _filaAviso(
-                          context,
-                          icon: Icons.hourglass_top_outlined,
-                          iconColor: context.colors.brand,
-                          texto: pendientes.length == 1
-                              ? '1 registro en curso con un profesional.'
-                              : '${pendientes.length} registros en curso con un profesional.',
-                          // Con más de un pendiente no hay un único registro al
-                          // que navegar -- se despliega la lista en vez de
-                          // saltar directo, igual que hacía el banner suelto.
-                          children: pendientes.length == 1
-                              ? null
-                              : pendientes
-                                  .map((p) => IosRow(
-                                        icon: Icons.build_outlined,
-                                        iconColor: context.colors.brand,
-                                        title: p['registroTitulo'] as String? ?? '',
-                                        subtitle: p['elementoNombre'] as String? ?? '',
-                                        onTap: () => Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => RegistroDetailScreen(
-                                              casa: casa,
-                                              elementoId: p['elementoId'] as String? ?? '',
-                                              registroId: p['registroId'] as String? ?? '',
-                                            ),
-                                          ),
-                                        ),
-                                      ))
-                                  .toList(),
-                          onTap: pendientes.length == 1
-                              ? () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => RegistroDetailScreen(
-                                        casa: casa,
-                                        elementoId: pendientes.first['elementoId'] as String? ?? '',
-                                        registroId: pendientes.first['registroId'] as String? ?? '',
-                                      ),
-                                    ),
-                                  )
-                              : null,
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _filaAviso(
-    BuildContext context, {
-    required IconData icon,
-    required Color iconColor,
-    required String texto,
-    VoidCallback? onTap,
-    List<Widget>? children,
-  }) {
-    final divisor = Divider(height: 1, indent: 56, color: context.colors.inkMuted.withValues(alpha: 0.14));
-    if (children != null) {
-      // Sub-lista desplegable dentro de la propia fila (p.ej. varios
-      // registros en curso) -- mismo ExpansionTile anidado que ya usaba el
-      // banner de pendientes suelto.
-      return Column(
-        children: [
-          divisor,
-          Theme(
-            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-            child: ExpansionTile(
-              leading: Icon(icon, color: iconColor),
-              title: Text(texto),
-              children: children,
-            ),
-          ),
-        ],
-      );
-    }
-    return Column(
-      children: [
-        divisor,
-        IosRow(icon: icon, iconColor: iconColor, title: texto, onTap: onTap),
-      ],
     );
   }
 }
