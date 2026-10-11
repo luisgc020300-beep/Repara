@@ -8,6 +8,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import '../models/pago.dart';
@@ -179,138 +180,141 @@ class _PagoDetailScreenState extends State<PagoDetailScreen> {
     );
   }
 
+  // Borde superior perforado, como un tique arrancado de un talonario
+  // (octubre 2026, pasada de craft) -- el detalle de marca más literal que
+  // tiene la app: Repara es un documento real, no un dato suelto.
   Widget _tarjetaRecibo(BuildContext context) {
-    final lineaColor = context.colors.inkMuted.withValues(alpha: 0.18);
-    return Container(
-      decoration: BoxDecoration(
-        color: context.colors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: lineaColor),
-      ),
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Cabecera: título "RECIBO" + icono a la izquierda, número y fecha
-          // a la derecha -- mismo esquema que un recibo de papel real.
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(Icons.receipt_long_outlined, color: context.colors.brand, size: 28),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    return PhysicalShape(
+      clipper: const _ReciboScallopClipper(),
+      color: context.colors.surface,
+      elevation: 10,
+      shadowColor: context.colors.ink,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(22, 30, 22, 26),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Cabecera: título "RECIBO" + icono a la izquierda, número y fecha
+            // a la derecha -- mismo esquema que un recibo de papel real.
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.receipt_long_outlined, color: context.colors.brand, size: 26),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'RECIBO',
+                        style: GoogleFonts.newsreader(color: context.colors.brand, fontWeight: FontWeight.w800, fontSize: 20, letterSpacing: 0.4),
+                      ),
+                      Text(widget.registroTitulo, style: TextStyle(color: context.colors.inkMuted, fontSize: 12.5)),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text(
-                      'RECIBO',
-                      style: TextStyle(color: context.colors.brand, fontWeight: FontWeight.w800, fontSize: 20, letterSpacing: 1.2),
-                    ),
-                    Text(widget.registroTitulo, style: TextStyle(color: context.colors.inkMuted, fontSize: 13)),
+                    Text('Nº $_numeroRecibo', style: TextStyle(color: context.colors.inkMuted, fontSize: 11.5, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 4),
+                    widget.editable
+                        ? InkWell(
+                            onTap: _elegirFecha,
+                            child: Row(
+                              children: [
+                                Text(
+                                  DateFormat('d MMM yyyy', 'es_ES').format(_fecha),
+                                  style: TextStyle(color: context.colors.ink, fontWeight: FontWeight.w600, fontSize: 13),
+                                ),
+                                const SizedBox(width: 2),
+                                Icon(Icons.edit_calendar_outlined, size: 14, color: context.colors.inkMuted),
+                              ],
+                            ),
+                          )
+                        : Text(
+                            DateFormat('d MMM yyyy', 'es_ES').format(_fecha),
+                            style: TextStyle(color: context.colors.ink, fontWeight: FontWeight.w600, fontSize: 13),
+                          ),
                   ],
                 ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text('Nº $_numeroRecibo', style: TextStyle(color: context.colors.inkMuted, fontSize: 12, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 4),
-                  widget.editable
-                      ? InkWell(
-                          onTap: _elegirFecha,
-                          child: Row(
-                            children: [
-                              Text(
-                                DateFormat('d MMM yyyy', 'es_ES').format(_fecha),
-                                style: TextStyle(color: context.colors.ink, fontWeight: FontWeight.w600, fontSize: 13),
-                              ),
-                              const SizedBox(width: 2),
-                              Icon(Icons.edit_calendar_outlined, size: 14, color: context.colors.inkMuted),
-                            ],
-                          ),
-                        )
-                      : Text(
-                          DateFormat('d MMM yyyy', 'es_ES').format(_fecha),
-                          style: TextStyle(color: context.colors.ink, fontWeight: FontWeight.w600, fontSize: 13),
-                        ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Divider(height: 1, thickness: 1.2, color: lineaColor),
-          const SizedBox(height: 18),
+              ],
+            ),
+            const SizedBox(height: 18),
+            const _LineaPunteada(),
+            const SizedBox(height: 18),
 
-          // Cantidad recibida -- la fila más importante del recibo.
-          _filaEtiqueta(context, 'CANTIDAD RECIBIDA'),
-          const SizedBox(height: 6),
-          widget.editable
-              ? TextField(
-                  controller: _importeCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  style: TextStyle(color: context.colors.brand, fontSize: 32, fontWeight: FontWeight.w800),
-                  decoration: InputDecoration(
-                    isDense: true,
-                    filled: false,
-                    border: InputBorder.none,
-                    hintText: '0',
-                    suffixText: ' €',
-                    suffixStyle: TextStyle(color: context.colors.brand, fontSize: 20, fontWeight: FontWeight.w700),
+            // Cantidad recibida -- la fila más importante del recibo.
+            _filaEtiqueta(context, 'CANTIDAD RECIBIDA'),
+            const SizedBox(height: 6),
+            widget.editable
+                ? TextField(
+                    controller: _importeCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    style: GoogleFonts.newsreader(color: context.colors.brand, fontSize: 40, fontWeight: FontWeight.w700),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      filled: false,
+                      border: InputBorder.none,
+                      hintText: '0',
+                      suffixText: ' €',
+                      suffixStyle: GoogleFonts.newsreader(color: context.colors.brand, fontSize: 24, fontWeight: FontWeight.w700),
+                    ),
+                  )
+                : Text('${_formato(widget.pago!.importe)} €', style: GoogleFonts.newsreader(color: context.colors.brand, fontSize: 40, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 14),
+            const _LineaPunteada(),
+            const SizedBox(height: 14),
+
+            _filaEtiqueta(context, 'PARA EL PAGO DE'),
+            const SizedBox(height: 6),
+            widget.editable
+                ? TextField(
+                    controller: _conceptoCtrl,
+                    decoration: const InputDecoration(isDense: true, filled: false, border: InputBorder.none, hintText: 'p.ej. Primer pago · 50%'),
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  )
+                : Text(
+                    widget.pago!.concepto?.isNotEmpty == true ? widget.pago!.concepto! : 'Sin concepto',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                   ),
-                )
-              : Text('${_formato(widget.pago!.importe)} €', style: TextStyle(color: context.colors.brand, fontSize: 32, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 14),
-          Divider(height: 1, color: lineaColor),
-          const SizedBox(height: 14),
+            const SizedBox(height: 14),
+            const _LineaPunteada(),
+            const SizedBox(height: 14),
 
-          _filaEtiqueta(context, 'PARA EL PAGO DE'),
-          const SizedBox(height: 6),
-          widget.editable
-              ? TextField(
-                  controller: _conceptoCtrl,
-                  decoration: const InputDecoration(isDense: true, filled: false, border: InputBorder.none, hintText: 'p.ej. Primer pago · 50%'),
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                )
-              : Text(
-                  widget.pago!.concepto?.isNotEmpty == true ? widget.pago!.concepto! : 'Sin concepto',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
-          const SizedBox(height: 14),
-          Divider(height: 1, color: lineaColor),
-          const SizedBox(height: 14),
+            _filaEtiqueta(context, 'MÉTODO DE PAGO'),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: MetodoPago.values.map((m) {
+                final seleccionado = _metodo == m;
+                return ChoiceChip(
+                  label: Text(_nombreMetodo(m)),
+                  selected: seleccionado,
+                  onSelected: widget.editable ? (_) => setState(() => _metodo = seleccionado ? null : m) : null,
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 14),
+            const _LineaPunteada(),
+            const SizedBox(height: 14),
 
-          _filaEtiqueta(context, 'MÉTODO DE PAGO'),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: MetodoPago.values.map((m) {
-              final seleccionado = _metodo == m;
-              return ChoiceChip(
-                label: Text(_nombreMetodo(m)),
-                selected: seleccionado,
-                onSelected: widget.editable ? (_) => setState(() => _metodo = seleccionado ? null : m) : null,
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 14),
-          Divider(height: 1, color: lineaColor),
-          const SizedBox(height: 14),
-
-          _filaEtiqueta(context, 'DESCRIPCIÓN (OPCIONAL)'),
-          const SizedBox(height: 6),
-          widget.editable
-              ? TextField(
-                  controller: _descripcionCtrl,
-                  minLines: 1,
-                  maxLines: 4,
-                  decoration: const InputDecoration(isDense: true, filled: false, border: InputBorder.none, hintText: 'Notas sobre este pago'),
-                )
-              : Text(
-                  widget.pago!.descripcion?.isNotEmpty == true ? widget.pago!.descripcion! : 'Sin descripción',
-                  style: TextStyle(color: context.colors.inkMuted),
-                ),
-        ],
+            _filaEtiqueta(context, 'DESCRIPCIÓN (OPCIONAL)'),
+            const SizedBox(height: 6),
+            widget.editable
+                ? TextField(
+                    controller: _descripcionCtrl,
+                    minLines: 1,
+                    maxLines: 4,
+                    decoration: const InputDecoration(isDense: true, filled: false, border: InputBorder.none, hintText: 'Notas sobre este pago'),
+                  )
+                : Text(
+                    widget.pago!.descripcion?.isNotEmpty == true ? widget.pago!.descripcion! : 'Sin descripción',
+                    style: TextStyle(color: context.colors.inkMuted),
+                  ),
+          ],
+        ),
       ),
     );
   }
@@ -318,6 +322,79 @@ class _PagoDetailScreenState extends State<PagoDetailScreen> {
   Widget _filaEtiqueta(BuildContext context, String texto) {
     return Text(texto, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: context.colors.inkMuted, letterSpacing: 0.6));
   }
+}
+
+/// Separador punteado -- el recibo de papel real usa líneas de puntos para
+/// marcar dónde se dobla o se corta, nunca una regla sólida continua.
+class _LineaPunteada extends StatelessWidget {
+  const _LineaPunteada();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 1,
+      width: double.infinity,
+      child: CustomPaint(painter: _DashedPainter(color: context.colors.surfaceSunken)),
+    );
+  }
+}
+
+class _DashedPainter extends CustomPainter {
+  const _DashedPainter({required this.color});
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.2;
+    const dashWidth = 5.0;
+    const dashGap = 4.0;
+    var x = 0.0;
+    while (x < size.width) {
+      canvas.drawLine(Offset(x, 0), Offset(x + dashWidth, 0), paint);
+      x += dashWidth + dashGap;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedPainter oldDelegate) => oldDelegate.color != color;
+}
+
+/// Recorta el borde superior de la tarjeta en pequeñas muescas semicirculares
+/// -- el "diente de sello" de un tique real arrancado de un talonario.
+/// PhysicalShape (no solo ClipPath) para que la sombra siga también la
+/// silueta recortada en vez de ser un rectángulo.
+class _ReciboScallopClipper extends CustomClipper<Path> {
+  const _ReciboScallopClipper();
+
+  static const double notchRadius = 7;
+  static const double notchSpacing = 22;
+  static const double cornerRadius = 20;
+
+  @override
+  Path getClip(Size size) {
+    final notchCount = (size.width / notchSpacing).floor().clamp(3, 200);
+    final spacing = size.width / notchCount;
+    final path = Path()..moveTo(0, 0);
+    for (var i = 0; i < notchCount; i++) {
+      final cx = spacing * i + spacing / 2;
+      path
+        ..lineTo(cx - notchRadius, 0)
+        ..quadraticBezierTo(cx, notchRadius * 1.6, cx + notchRadius, 0);
+    }
+    path
+      ..lineTo(size.width, 0)
+      ..lineTo(size.width, size.height - cornerRadius)
+      ..arcToPoint(Offset(size.width - cornerRadius, size.height), radius: Radius.circular(cornerRadius))
+      ..lineTo(cornerRadius, size.height)
+      ..arcToPoint(Offset(0, size.height - cornerRadius), radius: Radius.circular(cornerRadius))
+      ..close();
+    return path;
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
 }
 
 String _nombreMetodo(MetodoPago m) => switch (m) {

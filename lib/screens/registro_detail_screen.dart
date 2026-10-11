@@ -183,8 +183,11 @@ class RegistroDetailScreen extends StatelessWidget {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
         return Scaffold(
+          extendBodyBehindAppBar: true,
           appBar: AppBar(
-            title: Text(registro.titulo),
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            iconTheme: const IconThemeData(color: Colors.white),
             actions: [
               if (!registro.esConProfesional)
                 IconButton(icon: const Icon(Icons.delete_outline), tooltip: 'Eliminar registro', onPressed: () => _eliminar(context, registro)),
@@ -198,8 +201,47 @@ class RegistroDetailScreen extends StatelessWidget {
                   label: const Text('Finalizar'),
                 ),
           body: ListView(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.zero,
             children: [
+              // Sin foto real todavía -- un marcador es mejor que fingir una
+              // (auditoría de craft, octubre 2026): el degradado de marca
+              // avisa de que es un hueco, no un dato.
+              Container(
+                height: 156,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [context.colors.surfaceMuted, context.colors.sand],
+                  ),
+                ),
+                child: Center(
+                  child: Icon(Icons.image_outlined, size: 34, color: context.colors.inkFaint),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      registro.elementoNombre.toUpperCase(),
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: context.colors.inkMuted),
+                    ),
+                    Text(registro.titulo, style: Theme.of(context).textTheme.displaySmall),
+                    if (registro.esConProfesional) ...[
+                      const SizedBox(height: 10),
+                      _EstadoChip(estado: registro.estado),
+                    ],
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
               if (registro.esConProfesional && registro.estado == EstadoRegistro.pendienteConfirmacion) ...[
                 Card(
                   color: context.colors.warning.withValues(alpha: 0.12),
@@ -256,7 +298,9 @@ class RegistroDetailScreen extends StatelessWidget {
                       ],
                       if (!registro.esConProfesional)
                         // Registro simple -- sin presupuesto/pagos/invitación,
-                        // igual que una compra o una nota.
+                        // igual que una compra o una nota. Sin chip arriba
+                        // (eso es solo para esConProfesional), así que aquí
+                        // sí hace falta mostrar el estado.
                         TextFormField(
                           initialValue: _nombreEstadoSimple(registro),
                           enabled: false,
@@ -268,21 +312,10 @@ class RegistroDetailScreen extends StatelessWidget {
                       // de dos pasos, "Confirmar"/"Todavía no") son las únicas
                       // vías, porque además archivan el registro en el
                       // historial y avisan a los demás. El servidor ya lo
-                      // bloquea aunque se fuerce desde fuera de la app.
-                      else if (_estadoControlado(registro.estado))
-                        TextFormField(
-                          key: ValueKey(registro.estado),
-                          initialValue: _nombreEstado(registro.estado),
-                          enabled: false,
-                          decoration: InputDecoration(
-                            labelText: 'Estado',
-                            helperText: switch (registro.estado) {
-                              EstadoRegistro.pendienteConfirmacion => 'Esperando tu confirmación',
-                              _ => 'Ya está finalizado',
-                            },
-                          ),
-                        )
-                      else
+                      // bloquea aunque se fuerce desde fuera de la app. El
+                      // chip de la cabecera ya muestra el estado en ese caso
+                      // -- este desplegable solo aparece cuando es editable.
+                      else if (!_estadoControlado(registro.estado))
                         DropdownButtonFormField<EstadoRegistro>(
                           initialValue: registro.estado,
                           decoration: const InputDecoration(labelText: 'Estado'),
@@ -313,7 +346,7 @@ class RegistroDetailScreen extends StatelessWidget {
               ),
               if (registro.esConProfesional) ...[
                 const SizedBox(height: 20),
-                Text('Profesional', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                Text('Profesional', style: Theme.of(context).textTheme.headlineSmall),
                 const SizedBox(height: 8),
                 _SeccionInvitarProfesional(casa: casa, elementoId: elementoId, registro: registro),
                 const SizedBox(height: 20),
@@ -340,7 +373,7 @@ class RegistroDetailScreen extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Documentos', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                  Text('Documentos', style: Theme.of(context).textTheme.headlineSmall),
                   TextButton.icon(
                     onPressed: () => iniciarNuevoDocumento(
                       context,
@@ -373,6 +406,9 @@ class RegistroDetailScreen extends StatelessWidget {
                         .toList(),
                   );
                 },
+              ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -571,6 +607,33 @@ class _SeccionInvitarProfesionalState extends State<_SeccionInvitarProfesional> 
           ),
         );
       },
+    );
+  }
+}
+
+/// Chip de estado en la cabecera (octubre 2026, pasada de craft) -- antes el
+/// estado solo se veía dentro de un TextFormField deshabilitado, igual de
+/// discreto que cualquier otro campo. Ahora es visible de un vistazo sin
+/// leer nada, con el color semántico que le corresponde.
+class _EstadoChip extends StatelessWidget {
+  const _EstadoChip({required this.estado});
+
+  final EstadoRegistro estado;
+
+  @override
+  Widget build(BuildContext context) {
+    final (Color fg, Color bg) = switch (estado) {
+      EstadoRegistro.pendienteConfirmacion => (context.colors.warningText, context.colors.warning.withValues(alpha: 0.12)),
+      EstadoRegistro.terminado || EstadoRegistro.archivado => (context.colors.success, context.colors.success.withValues(alpha: 0.12)),
+      EstadoRegistro.nuevo || EstadoRegistro.presupuestado || EstadoRegistro.enCurso => (context.colors.brand, context.colors.brandTint),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(ReparaRadius.pill)),
+      child: Text(
+        _nombreEstado(estado).toUpperCase(),
+        style: TextStyle(color: fg, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.5),
+      ),
     );
   }
 }
