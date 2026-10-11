@@ -174,7 +174,7 @@ class ElementoDetailScreen extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Historial', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                  Text('Historial', style: Theme.of(context).textTheme.headlineSmall),
                 ],
               ),
               const SizedBox(height: 8),
@@ -206,7 +206,7 @@ class ElementoDetailScreen extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Documentos', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                  Text('Documentos', style: Theme.of(context).textTheme.headlineSmall),
                   TextButton.icon(
                     onPressed: () => iniciarNuevoDocumento(
                       context,

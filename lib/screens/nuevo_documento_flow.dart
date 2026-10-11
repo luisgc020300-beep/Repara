@@ -557,7 +557,7 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
           children: [
             Text(
               widget.sugerencia != null ? 'Hemos preparado el registro de tu documento' : 'No hemos podido leer el documento automáticamente',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+              style: Theme.of(context).textTheme.displaySmall,
             ),
             const SizedBox(height: 4),
             Text(

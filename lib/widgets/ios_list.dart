@@ -30,7 +30,7 @@ class IosSection extends StatelessWidget {
               padding: const EdgeInsets.only(left: 6, bottom: 6),
               child: Text(
                 header!.toUpperCase(),
-                style: TextStyle(fontSize: 12, letterSpacing: 0.6, fontWeight: FontWeight.w600, color: context.colors.inkMuted),
+                style: TextStyle(fontSize: 12, letterSpacing: 0.6, fontWeight: FontWeight.w700, color: context.colors.inkMuted),
               ),
             ),
           Card(
@@ -98,7 +98,10 @@ class IosValueRow extends StatelessWidget {
                 child: Text(
                   value,
                   textAlign: TextAlign.right,
-                  style: TextStyle(fontSize: 15, color: destacado ? context.colors.warning : context.colors.inkMuted, fontWeight: destacado ? FontWeight.w600 : FontWeight.w400),
+                  // warningText, no warning -- el ámbar base no llega a
+                  // 4.5:1 de contraste como texto (auditoría de
+                  // accesibilidad, octubre 2026).
+                  style: TextStyle(fontSize: 15, color: destacado ? context.colors.warningText : context.colors.inkMuted, fontWeight: destacado ? FontWeight.w600 : FontWeight.w400),
                 ),
               ),
               if (onTap != null) ...[

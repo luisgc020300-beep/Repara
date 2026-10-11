@@ -52,7 +52,7 @@ class CambiosAlcanceSection extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Cambios del registro', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                Text('Cambios del registro', style: Theme.of(context).textTheme.headlineSmall),
                 if (rol == RolEnTrabajo.profesional && !registroCerrado)
                   TextButton.icon(
                     onPressed: () => _abrirFormulario(context),
@@ -116,8 +116,10 @@ class _CambioCardState extends State<_CambioCard> {
   // enseñaba un error confuso por una acción que ya se había completado.
   bool _procesando = false;
 
+  // warningText, no warning -- el ámbar base no llega a 4.5:1 de contraste
+  // como texto (auditoría de accesibilidad, octubre 2026).
   Color _color(BuildContext context) => switch (widget.cambio.estado) {
-        EstadoCambioAlcance.pendiente => context.colors.warning,
+        EstadoCambioAlcance.pendiente => context.colors.warningText,
         EstadoCambioAlcance.aprobado => context.colors.success,
         EstadoCambioAlcance.rechazado => context.colors.error,
         EstadoCambioAlcance.cancelado => context.colors.inkMuted,
@@ -337,7 +339,7 @@ class _FormularioCambioSheetState extends State<_FormularioCambioSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Solicitar cambio del registro', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+            Text('Solicitar cambio del registro', style: Theme.of(context).textTheme.displaySmall),
             const SizedBox(height: 12),
             TextField(controller: _tituloCtrl, decoration: const InputDecoration(labelText: 'Título (p.ej. Sustituir válvula adicional)')),
             const SizedBox(height: 12),

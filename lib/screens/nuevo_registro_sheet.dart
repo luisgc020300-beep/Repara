@@ -103,7 +103,7 @@ class _NuevoRegistroFormState extends State<_NuevoRegistroForm> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Añadir registro', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+            Text('Añadir registro', style: Theme.of(context).textTheme.displaySmall),
             const SizedBox(height: 16),
             Wrap(
               spacing: 8,

@@ -51,7 +51,7 @@ class PresupuestosSection extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Presupuestos', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                Text('Presupuestos', style: Theme.of(context).textTheme.headlineSmall),
                 if (puedeCrearNuevo)
                   TextButton.icon(
                     onPressed: () => _abrirEditor(
@@ -110,9 +110,12 @@ class _PresupuestoCardState extends State<_PresupuestoCard> {
   // confuso por una acción que en realidad ya se había completado bien.
   bool _procesando = false;
 
+  // warningText, no warning -- el ámbar base no llega a 4.5:1 de contraste
+  // como texto (auditoría de accesibilidad, octubre 2026), solo vale como
+  // icono o como fondo tenue.
   Color _colorEstado(BuildContext context) => switch (widget.presupuesto.estado) {
         EstadoPresupuesto.borrador => context.colors.inkMuted,
-        EstadoPresupuesto.enviado => context.colors.warning,
+        EstadoPresupuesto.enviado => context.colors.warningText,
         EstadoPresupuesto.aceptado => context.colors.success,
         EstadoPresupuesto.rechazado => context.colors.error,
         EstadoPresupuesto.cancelado => context.colors.inkMuted,
@@ -391,7 +394,7 @@ class _EditorPresupuestoSheetState extends State<_EditorPresupuestoSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Nuevo presupuesto', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+            Text('Nuevo presupuesto', style: Theme.of(context).textTheme.displaySmall),
             if (_desdePlantilla) ...[
               const SizedBox(height: 4),
               Row(

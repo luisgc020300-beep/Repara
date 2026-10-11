@@ -76,7 +76,7 @@ class _NuevoContactoFormState extends State<_NuevoContactoForm> {
           children: [
             Text(
               widget.existente != null ? 'Editar contacto' : 'Nuevo contacto de confianza',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+              style: Theme.of(context).textTheme.displaySmall,
             ),
             const SizedBox(height: 16),
             Row(

@@ -34,7 +34,7 @@ class InicioProTab extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Text('Invitaciones pendientes', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+          Text('Invitaciones pendientes', style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: 8),
           StreamBuilder<List<Invitacion>>(
             stream: InvitacionService.streamPendientesParaMi(),

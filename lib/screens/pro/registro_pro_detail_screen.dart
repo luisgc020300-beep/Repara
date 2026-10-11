@@ -194,7 +194,7 @@ class RegistroProDetailScreen extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Documentos', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                  Text('Documentos', style: Theme.of(context).textTheme.headlineSmall),
                   TextButton.icon(
                     onPressed: () => iniciarNuevoDocumento(context, casaId: casaId, elementoId: elementoId, registroId: registroId),
                     icon: const Icon(Icons.document_scanner_outlined, size: 18),

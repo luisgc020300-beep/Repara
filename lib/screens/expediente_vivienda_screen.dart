@@ -230,7 +230,7 @@ class _Estadistica extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 14),
         child: Column(
           children: [
-            Text(valor, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: context.colors.brand)),
+            Text(valor, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800, color: context.colors.brand)),
             const SizedBox(height: 2),
             Text(etiqueta, textAlign: TextAlign.center, style: TextStyle(fontSize: 10.5, color: context.colors.inkMuted)),
           ],

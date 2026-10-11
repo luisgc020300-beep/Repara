@@ -44,7 +44,7 @@ class PagosSection extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Pagos', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                Text('Pagos', style: Theme.of(context).textTheme.headlineSmall),
                 if (editable)
                   TextButton.icon(
                     onPressed: () => Navigator.push(
