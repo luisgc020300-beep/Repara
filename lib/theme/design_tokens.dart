@@ -4,8 +4,8 @@
 // nunca blanco puro ni negro puro. El modo oscuro (añadido a petición del
 // CEO) mantiene la misma calma -- no es el táctico/oscuro de RiskRunner,
 // es la misma paleta cálida invertida, no un tema distinto.
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class ReparaColors extends ThemeExtension<ReparaColors> {
   const ReparaColors({
@@ -149,43 +149,50 @@ extension ReparaThemeContextX on BuildContext {
   ReparaColors get colors => Theme.of(this).extension<ReparaColors>()!;
 }
 
-/// Newsreader solo para titulares (display*/headlineSmall) -- Fraunces era
-/// la primera elección pero es ya la serif por defecto de cualquier diseño
-/// hecho con IA (auditoría de diseño, octubre 2026); Inter se queda para
-/// todo lo demás, que es donde ya funciona bien.
+/// Fuente nativa del sistema -- SF Pro en iPhone, Roboto en Android, nunca una
+/// fuente descargada -- exactamente lo que hace que WhatsApp o Instagram se
+/// sientan "de app" y no de página web. Sustituye a Newsreader+Inter (CEO,
+/// octubre 2026): la pareja serif/sans vía Google Fonts, aunque deliberada en
+/// su momento para evitar el look por defecto de un diseño hecho con IA,
+/// acabó leyéndose como tipografía editorial de web, no como una app nativa.
 class ReparaText {
   ReparaText._();
+
+  static String get fontFamily => defaultTargetPlatform == TargetPlatform.iOS ? '.SF Pro Text' : 'Roboto';
 
   static TextTheme uiTextTheme(Brightness brightness) {
     final base = brightness == Brightness.dark ? ThemeData.dark().textTheme : ThemeData.light().textTheme;
     final palette = brightness == Brightness.dark ? ReparaColors.dark : ReparaColors.light;
-    final inter = GoogleFonts.interTextTheme(base).apply(
+    final sistema = base.apply(
+      fontFamily: fontFamily,
       bodyColor: palette.ink,
       displayColor: palette.ink,
     );
-    TextStyle display(double size, double height) => GoogleFonts.newsreader(
+    TextStyle display(double size, double height) => TextStyle(
+          fontFamily: fontFamily,
           color: palette.ink,
           fontSize: size,
           height: height / size,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w700,
           letterSpacing: -0.2,
         );
-    return inter.copyWith(
+    return sistema.copyWith(
       displayMedium: display(28, 34), // display-lg: recibo, estado vacío
       displaySmall: display(22, 28), // display-md: "Nuevo elemento", "RECIBO"
       headlineSmall: display(18, 24), // heading: título de sección
-      labelSmall: inter.labelSmall?.copyWith(fontWeight: FontWeight.w700, letterSpacing: 0.6), // label: eyebrow en mayúsculas
-      bodyLarge: inter.bodyLarge?.copyWith(fontSize: 15, height: 22 / 15, fontWeight: FontWeight.w400), // body
-      titleMedium: inter.titleMedium?.copyWith(fontSize: 15, height: 22 / 15, fontWeight: FontWeight.w600), // body-strong: título de fila
-      bodySmall: inter.bodySmall?.copyWith(fontSize: 12.5, height: 17 / 12.5, fontWeight: FontWeight.w500, color: palette.inkMuted), // caption
-      labelLarge: inter.labelLarge?.copyWith(fontSize: 15, fontWeight: FontWeight.w600, letterSpacing: 0.2), // button
+      labelSmall: sistema.labelSmall?.copyWith(fontWeight: FontWeight.w700, letterSpacing: 0.6), // label: eyebrow en mayúsculas
+      bodyLarge: sistema.bodyLarge?.copyWith(fontSize: 15, height: 22 / 15, fontWeight: FontWeight.w400), // body
+      titleMedium: sistema.titleMedium?.copyWith(fontSize: 15, height: 22 / 15, fontWeight: FontWeight.w600), // body-strong: título de fila
+      bodySmall: sistema.bodySmall?.copyWith(fontSize: 12.5, height: 17 / 12.5, fontWeight: FontWeight.w500, color: palette.inkMuted), // caption
+      labelLarge: sistema.labelLarge?.copyWith(fontSize: 15, fontWeight: FontWeight.w600, letterSpacing: 0.2), // button
     );
   }
 
   /// Importes -- siempre tabularNums para que las columnas de precio alineen.
   static TextStyle amount(BuildContext context, {bool large = false}) {
     final palette = Theme.of(context).extension<ReparaColors>()!;
-    return GoogleFonts.inter(
+    return TextStyle(
+      fontFamily: fontFamily,
       color: palette.ink,
       fontSize: large ? 32 : 17,
       fontWeight: large ? FontWeight.w800 : FontWeight.w700,
@@ -220,10 +227,11 @@ ThemeData _buildReparaTheme(Brightness brightness) {
       foregroundColor: palette.ink,
       elevation: 0,
       centerTitle: false,
-      titleTextStyle: GoogleFonts.newsreader(
+      titleTextStyle: TextStyle(
+        fontFamily: ReparaText.fontFamily,
         color: palette.ink,
         fontSize: 22,
-        fontWeight: FontWeight.w600,
+        fontWeight: FontWeight.w700,
         letterSpacing: -0.2,
       ),
     ),

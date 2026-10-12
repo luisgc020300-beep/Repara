@@ -8,7 +8,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import '../models/pago.dart';
@@ -207,7 +206,7 @@ class _PagoDetailScreenState extends State<PagoDetailScreen> {
                     children: [
                       Text(
                         'RECIBO',
-                        style: GoogleFonts.newsreader(color: context.colors.brand, fontWeight: FontWeight.w800, fontSize: 20, letterSpacing: 0.4),
+                        style: TextStyle(fontFamily: ReparaText.fontFamily, color: context.colors.brand, fontWeight: FontWeight.w800, fontSize: 20, letterSpacing: 0.4),
                       ),
                       Text(widget.registroTitulo, style: TextStyle(color: context.colors.inkMuted, fontSize: 12.5)),
                     ],
@@ -251,17 +250,20 @@ class _PagoDetailScreenState extends State<PagoDetailScreen> {
                 ? TextField(
                     controller: _importeCtrl,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    style: GoogleFonts.newsreader(color: context.colors.brand, fontSize: 40, fontWeight: FontWeight.w700),
+                    style: TextStyle(fontFamily: ReparaText.fontFamily, color: context.colors.brand, fontSize: 40, fontWeight: FontWeight.w700),
                     decoration: InputDecoration(
                       isDense: true,
                       filled: false,
                       border: InputBorder.none,
                       hintText: '0',
                       suffixText: ' €',
-                      suffixStyle: GoogleFonts.newsreader(color: context.colors.brand, fontSize: 24, fontWeight: FontWeight.w700),
+                      suffixStyle: TextStyle(fontFamily: ReparaText.fontFamily, color: context.colors.brand, fontSize: 24, fontWeight: FontWeight.w700),
                     ),
                   )
-                : Text('${_formato(widget.pago!.importe)} €', style: GoogleFonts.newsreader(color: context.colors.brand, fontSize: 40, fontWeight: FontWeight.w700)),
+                : Text(
+                    '${_formato(widget.pago!.importe)} €',
+                    style: TextStyle(fontFamily: ReparaText.fontFamily, color: context.colors.brand, fontSize: 40, fontWeight: FontWeight.w700),
+                  ),
             const SizedBox(height: 14),
             const _LineaPunteada(),
             const SizedBox(height: 14),
