@@ -29,7 +29,18 @@ class _TrabajosProTabState extends State<TrabajosProTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Trabajos'), actions: const [BotonAjustes(modoPro: true)]),
+      appBar: AppBar(
+        toolbarHeight: 68,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('MODO PROFESIONAL', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: context.colors.inkMuted)),
+            Text('Trabajos', style: Theme.of(context).textTheme.displayMedium?.copyWith(fontSize: 26)),
+          ],
+        ),
+        actions: const [BotonAjustes(modoPro: true)],
+      ),
       body: StreamBuilder<List<RegistroProRef>>(
         stream: ProfesionalService.streamRegistrosProRefs(),
         builder: (context, snapshot) {
@@ -38,10 +49,22 @@ class _TrabajosProTabState extends State<TrabajosProTab> {
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
-                child: Text(
-                  'Aquí gestionas cada trabajo entero (presupuesto, cambios, pagos, documentos) en cuanto aceptes una invitación.\nPara ver solo el estado de tus presupuestos de todos los trabajos a la vez, ve a la pestaña Presupuestos.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: context.colors.inkMuted),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 72,
+                      height: 72,
+                      decoration: BoxDecoration(color: context.colors.brandTint, shape: BoxShape.circle),
+                      child: Icon(Icons.build_outlined, size: 32, color: context.colors.brand),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Aquí gestionas cada trabajo entero (presupuesto, cambios, pagos, documentos) en cuanto aceptes una invitación.\nPara ver solo el estado de tus presupuestos de todos los trabajos a la vez, ve a la pestaña Presupuestos.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: context.colors.inkMuted),
+                    ),
+                  ],
                 ),
               ),
             );
@@ -91,23 +114,43 @@ class _ListaPorTrabajo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        IosSection(
-          rows: trabajos
-              .map((t) => IosRow(
-                    icon: Icons.build_outlined,
-                    iconColor: context.colors.brand,
-                    title: t.registroTitulo,
-                    subtitle: t.casaNombre,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => RegistroProDetailScreen(casaId: t.casaId, elementoId: t.elementoId, registroId: t.registroId)),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      children: trabajos
+          .map((t) => Card(
+                margin: const EdgeInsets.only(bottom: 9),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(ReparaRadius.md),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => RegistroProDetailScreen(casaId: t.casaId, elementoId: t.elementoId, registroId: t.registroId)),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(color: context.colors.brandTint, borderRadius: BorderRadius.circular(ReparaRadius.sm)),
+                          child: Icon(Icons.build_outlined, size: 20, color: context.colors.brand),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(t.registroTitulo, style: Theme.of(context).textTheme.titleMedium),
+                              Text(t.casaNombre, style: Theme.of(context).textTheme.bodySmall),
+                            ],
+                          ),
+                        ),
+                        Icon(Icons.chevron_right, color: context.colors.inkMuted),
+                      ],
                     ),
-                  ))
-              .toList(),
-        ),
-      ],
+                  ),
+                ),
+              ))
+          .toList(),
     );
   }
 }
@@ -125,20 +168,25 @@ class _ListaPorCliente extends StatelessWidget {
     }
     final casas = porCasa.entries.toList();
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       itemCount: casas.length,
       itemBuilder: (context, i) {
         final entry = casas[i];
         final trabajosDeEstaCasa = entry.value;
         return Card(
-          margin: const EdgeInsets.only(bottom: 12),
+          margin: const EdgeInsets.only(bottom: 10),
           clipBehavior: Clip.antiAlias,
           child: Theme(
             data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
             child: ExpansionTile(
-              leading: Icon(Icons.house_outlined, color: context.colors.brand),
-              title: Text(trabajosDeEstaCasa.first.casaNombre),
-              subtitle: Text('${trabajosDeEstaCasa.length} trabajo${trabajosDeEstaCasa.length == 1 ? '' : 's'}'),
+              leading: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(color: context.colors.brandTint, borderRadius: BorderRadius.circular(ReparaRadius.sm)),
+                child: Icon(Icons.house_outlined, size: 19, color: context.colors.brand),
+              ),
+              title: Text(trabajosDeEstaCasa.first.casaNombre, style: Theme.of(context).textTheme.titleMedium),
+              subtitle: Text('${trabajosDeEstaCasa.length} trabajo${trabajosDeEstaCasa.length == 1 ? '' : 's'}', style: Theme.of(context).textTheme.bodySmall),
               children: [
                 for (var i = 0; i < trabajosDeEstaCasa.length; i++) ...[
                   Divider(height: 1, indent: 56, color: context.colors.inkMuted.withValues(alpha: 0.14)),

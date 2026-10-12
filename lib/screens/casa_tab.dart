@@ -49,29 +49,43 @@ class CasaTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Tu casa'), actions: [BotonAjustes(casa: casa)]),
+      appBar: AppBar(
+        toolbarHeight: 68,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('VIVIENDA', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: context.colors.inkMuted)),
+            Text('Tu casa', style: Theme.of(context).textTheme.displayMedium?.copyWith(fontSize: 26)),
+          ],
+        ),
+        actions: [BotonAjustes(casa: casa)],
+      ),
       body: StreamBuilder<List<Habitacion>>(
         stream: HabitacionService.streamHabitaciones(casa.id),
         builder: (context, snapshot) {
           final habitaciones = snapshot.data ?? [];
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             children: [
               if (habitaciones.isEmpty)
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      children: [
-                        Icon(Icons.meeting_room_outlined, size: 32, color: context.colors.inkMuted),
-                        const SizedBox(height: 10),
-                        Text(
-                          'Todavía no has añadido ninguna habitación.\nEmpieza por el salón, la cocina o el baño.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: context.colors.inkMuted),
-                        ),
-                      ],
-                    ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 72,
+                        height: 72,
+                        decoration: BoxDecoration(color: context.colors.brandTint, shape: BoxShape.circle),
+                        child: Icon(Icons.meeting_room_outlined, size: 32, color: context.colors.brand),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Todavía no has añadido ninguna habitación.\nEmpieza por el salón, la cocina o el baño.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: context.colors.inkMuted),
+                      ),
+                    ],
                   ),
                 )
               else
@@ -98,61 +112,66 @@ class _HabitacionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      clipBehavior: Clip.antiAlias,
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          leading: Icon(Icons.meeting_room_outlined, color: context.colors.brand),
-          title: Text(habitacion.nombre, style: const TextStyle(fontWeight: FontWeight.w700)),
-          childrenPadding: const EdgeInsets.only(bottom: 8),
-          children: [
-            StreamBuilder<List<Elemento>>(
-              stream: ElementoService.streamElementos(casa.id, habitacionId: habitacion.id),
-              builder: (context, snapshot) {
-                final elementos = snapshot.data ?? [];
-                return Column(
-                  children: [
-                    for (var i = 0; i < elementos.length; i++) ...[
-                      if (i > 0) Divider(height: 1, indent: 56, color: context.colors.inkMuted.withValues(alpha: 0.14)),
-                      IosRow(
-                        icon: Icons.category_outlined,
-                        iconColor: Colors.blueGrey,
-                        title: elementos[i].nombre,
-                        subtitle: elementos[i].marca != null ? '${elementos[i].marca} ${elementos[i].modelo ?? ''}'.trim() : null,
-                        trailing: elementos[i].garantiaProximaAVencer
-                            ? Icon(Icons.shield_outlined, color: context.colors.warning, size: 20)
-                            : null,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => ElementoDetailScreen(casa: casa, elementoId: elementos[i].id)),
-                        ),
-                      ),
-                    ],
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: TextButton.icon(
-                          onPressed: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => NuevoElementoScreen(casa: casa, habitacionIdInicial: habitacion.id),
-                            ),
-                          ),
-                          icon: const Icon(Icons.add, size: 18),
-                          label: const Text('Añadir elemento'),
-                        ),
-                      ),
+    return StreamBuilder<List<Elemento>>(
+      stream: ElementoService.streamElementos(casa.id, habitacionId: habitacion.id),
+      builder: (context, snapshot) {
+        final elementos = snapshot.data ?? [];
+        return Card(
+          margin: const EdgeInsets.only(bottom: 10),
+          clipBehavior: Clip.antiAlias,
+          child: Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              leading: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(color: context.colors.brandTint, borderRadius: BorderRadius.circular(ReparaRadius.sm)),
+                child: Icon(Icons.meeting_room_outlined, size: 19, color: context.colors.brand),
+              ),
+              title: Text(habitacion.nombre, style: Theme.of(context).textTheme.titleMedium),
+              subtitle: Text(
+                elementos.isEmpty ? 'Sin elementos todavía' : '${elementos.length} elemento${elementos.length == 1 ? '' : 's'}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              childrenPadding: const EdgeInsets.only(bottom: 8),
+              children: [
+                for (var i = 0; i < elementos.length; i++) ...[
+                  if (i > 0) Divider(height: 1, indent: 56, color: context.colors.inkMuted.withValues(alpha: 0.14)),
+                  IosRow(
+                    icon: Icons.category_outlined,
+                    iconColor: context.colors.brand,
+                    title: elementos[i].nombre,
+                    subtitle: elementos[i].marca != null ? '${elementos[i].marca} ${elementos[i].modelo ?? ''}'.trim() : null,
+                    trailing: elementos[i].garantiaProximaAVencer
+                        ? Icon(Icons.shield_outlined, color: context.colors.warning, size: 20)
+                        : null,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => ElementoDetailScreen(casa: casa, elementoId: elementos[i].id)),
                     ),
-                  ],
-                );
-              },
+                  ),
+                ],
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => NuevoElementoScreen(casa: casa, habitacionIdInicial: habitacion.id),
+                        ),
+                      ),
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Añadir elemento'),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }

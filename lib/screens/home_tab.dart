@@ -122,10 +122,22 @@ class _HomeTabState extends State<HomeTab> {
                   return Center(
                     child: Padding(
                       padding: const EdgeInsets.all(24),
-                      child: Text(
-                        'Todavía no hay ningún elemento aquí.\nToca "Añadir" para crear el primero.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: context.colors.inkMuted),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 72,
+                            height: 72,
+                            decoration: BoxDecoration(color: context.colors.brandTint, shape: BoxShape.circle),
+                            child: Icon(Icons.inventory_2_outlined, size: 32, color: context.colors.brand),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Todavía no hay ningún elemento aquí.\nToca "Añadir" para crear el primero.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: context.colors.inkMuted),
+                          ),
+                        ],
                       ),
                     ),
                   );

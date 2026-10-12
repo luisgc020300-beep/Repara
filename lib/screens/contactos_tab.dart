@@ -9,7 +9,6 @@ import '../models/contacto.dart';
 import '../services/contacto_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/boton_ajustes.dart';
-import '../widgets/ios_list.dart';
 import 'contacto_acciones.dart';
 import 'nuevo_contacto_sheet.dart';
 
@@ -21,7 +20,18 @@ class ContactosTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Contactos'), actions: [BotonAjustes(casa: casa)]),
+      appBar: AppBar(
+        toolbarHeight: 68,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('AGENDA', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: context.colors.inkMuted)),
+            Text('Contactos', style: Theme.of(context).textTheme.displayMedium?.copyWith(fontSize: 26)),
+          ],
+        ),
+        actions: [BotonAjustes(casa: casa)],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => mostrarNuevoContactoSheet(context, casaId: casa.id),
         icon: const Icon(Icons.add),
@@ -38,8 +48,13 @@ class ContactosTab extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.contact_phone_outlined, size: 32, color: context.colors.inkMuted),
-                    const SizedBox(height: 10),
+                    Container(
+                      width: 72,
+                      height: 72,
+                      decoration: BoxDecoration(color: context.colors.brandTint, shape: BoxShape.circle),
+                      child: Icon(Icons.contact_phone_outlined, size: 32, color: context.colors.brand),
+                    ),
+                    const SizedBox(height: 16),
                     Text(
                       'Guarda aquí a tu fontanero, electricista o cualquier profesional de confianza.\nLlamarlo o avisarle será mucho más rápido.',
                       textAlign: TextAlign.center,
@@ -51,22 +66,67 @@ class ContactosTab extends StatelessWidget {
             );
           }
           return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              IosSection(
-                rows: contactos
-                    .map((c) => IosRow(
-                          icon: c.tipo == TipoContacto.empresa ? Icons.store_outlined : Icons.person_outline,
-                          iconColor: context.colors.brand,
-                          title: c.nombre,
-                          subtitle: c.especialidad ?? c.telefono,
-                          onTap: () => mostrarAccionesContacto(context, casaId: casa.id, contacto: c),
-                        ))
-                    .toList(),
-              ),
-            ],
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 90),
+            children: contactos.map((c) => _ContactoCard(casa: casa, contacto: c)).toList(),
           );
         },
+      ),
+    );
+  }
+}
+
+class _ContactoCard extends StatelessWidget {
+  const _ContactoCard({required this.casa, required this.contacto});
+
+  final Casa casa;
+  final Contacto contacto;
+
+  @override
+  Widget build(BuildContext context) {
+    final esEmpresa = contacto.tipo == TipoContacto.empresa;
+    final inicial = contacto.nombre.isNotEmpty ? contacto.nombre[0].toUpperCase() : '?';
+    return Card(
+      margin: const EdgeInsets.only(bottom: 9),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(ReparaRadius.md),
+        onTap: () => mostrarAccionesContacto(context, casaId: casa.id, contacto: contacto),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(color: context.colors.brandTint, shape: BoxShape.circle),
+                child: esEmpresa
+                    ? Icon(Icons.store_outlined, size: 20, color: context.colors.brand)
+                    : Center(
+                        child: Text(inicial, style: Theme.of(context).textTheme.titleMedium?.copyWith(color: context.colors.brand)),
+                      ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(contacto.nombre, style: Theme.of(context).textTheme.titleMedium),
+                    Text(
+                      contacto.especialidad ?? contacto.telefono,
+                      style: Theme.of(context).textTheme.bodySmall,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: Icon(Icons.call_outlined, color: context.colors.brand),
+                tooltip: 'Llamar a ${contacto.nombre}',
+                onPressed: () => mostrarAccionesContacto(context, casaId: casa.id, contacto: contacto),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -18,7 +18,6 @@ import '../../theme/design_tokens.dart';
 import '../../widgets/app_error.dart';
 import '../../widgets/boton_ajustes.dart';
 import '../../widgets/boton_notificaciones.dart';
-import '../../widgets/ios_list.dart';
 
 const _mensajeInvitarCliente = 'Llevo el mantenimiento de tus trabajos con Repara -- así queda todo el historial, '
     'presupuestos y fotos organizados en un solo sitio, no perdido entre WhatsApps. '
@@ -30,10 +29,60 @@ class InicioProTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Repara Pro'), actions: const [BotonNotificaciones(modoPro: true), BotonAjustes(modoPro: true)]),
+      appBar: AppBar(
+        toolbarHeight: 68,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('MODO PROFESIONAL', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: context.colors.inkMuted)),
+            Text('Repara Pro', style: Theme.of(context).textTheme.displayMedium?.copyWith(fontSize: 26)),
+          ],
+        ),
+        actions: const [BotonNotificaciones(modoPro: true), BotonAjustes(modoPro: true)],
+      ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         children: [
+          StreamBuilder<List<RegistroProRef>>(
+            stream: ProfesionalService.streamRegistrosProRefs(),
+            builder: (context, snapshot) {
+              final trabajos = snapshot.data ?? const <RegistroProRef>[];
+              final totalCasas = trabajos.map((t) => t.casaId).toSet().length;
+              return Card(
+                margin: const EdgeInsets.only(bottom: 20),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(color: context.colors.brandTint, borderRadius: BorderRadius.circular(ReparaRadius.sm)),
+                        child: Icon(Icons.build_outlined, size: 22, color: context.colors.brand),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${trabajos.length} trabajo${trabajos.length == 1 ? '' : 's'} activo${trabajos.length == 1 ? '' : 's'}',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            Text(
+                              totalCasas == 0 ? 'Revisa la pestaña Trabajos para ver el detalle' : 'Repartidos en $totalCasas casa${totalCasas == 1 ? '' : 's'} distinta${totalCasas == 1 ? '' : 's'}',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
           Text('Invitaciones pendientes', style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: 8),
           StreamBuilder<List<Invitacion>>(
@@ -51,34 +100,36 @@ class InicioProTab extends StatelessWidget {
               return Column(children: invitaciones.map((i) => _InvitacionCard(invitacion: i)).toList());
             },
           ),
-          const SizedBox(height: 4),
-          StreamBuilder<List<RegistroProRef>>(
-            stream: ProfesionalService.streamRegistrosProRefs(),
-            builder: (context, snapshot) {
-              final trabajos = snapshot.data ?? const <RegistroProRef>[];
-              final totalCasas = trabajos.map((t) => t.casaId).toSet().length;
-              return IosSection(
-                rows: [
-                  IosRow(
-                    icon: Icons.build_outlined,
-                    iconColor: context.colors.brand,
-                    title: '${trabajos.length} trabajo${trabajos.length == 1 ? '' : 's'} activo${trabajos.length == 1 ? '' : 's'}',
-                    subtitle: totalCasas == 0
-                        ? 'Revisa la pestaña Trabajos para ver el detalle'
-                        : 'Repartidos en $totalCasas casa${totalCasas == 1 ? '' : 's'} distinta${totalCasas == 1 ? '' : 's'}',
-                    showChevron: false,
-                  ),
-                  IosRow(
-                    icon: Icons.person_add_alt_outlined,
-                    iconColor: Colors.purple,
-                    title: 'Invita a un cliente a Repara',
-                    subtitle: 'Para que puedas mandarle presupuestos y avisos desde aquí',
-                    trailing: Icon(Icons.share_outlined, size: 18, color: context.colors.inkMuted),
-                    onTap: () => Share.share(_mensajeInvitarCliente),
-                  ),
-                ],
-              );
-            },
+          const SizedBox(height: 20),
+          Card(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(ReparaRadius.md),
+              onTap: () => Share.share(_mensajeInvitarCliente),
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(color: context.colors.sand.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(ReparaRadius.sm)),
+                      child: Icon(Icons.person_add_alt_outlined, size: 20, color: context.colors.ink),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Invita a un cliente a Repara', style: Theme.of(context).textTheme.titleMedium),
+                          Text('Para que puedas mandarle presupuestos y avisos desde aquí', style: Theme.of(context).textTheme.bodySmall),
+                        ],
+                      ),
+                    ),
+                    Icon(Icons.share_outlined, size: 18, color: context.colors.inkMuted),
+                  ],
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -119,7 +170,7 @@ class _InvitacionCardState extends State<_InvitacionCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(widget.invitacion.registroTitulo, style: const TextStyle(fontWeight: FontWeight.w700)),
+            Text(widget.invitacion.registroTitulo, style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 4),
             Text('en ${widget.invitacion.casaNombre}', style: TextStyle(color: context.colors.inkMuted)),
             const SizedBox(height: 10),

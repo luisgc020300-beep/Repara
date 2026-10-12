@@ -99,22 +99,45 @@ class _PresupuestosProTabState extends State<PresupuestosProTab> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Presupuestos'), actions: const [BotonAjustes(modoPro: true)]),
+      appBar: AppBar(
+        toolbarHeight: 68,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('MODO PROFESIONAL', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: context.colors.inkMuted)),
+            Text('Presupuestos', style: Theme.of(context).textTheme.displayMedium?.copyWith(fontSize: 26)),
+          ],
+        ),
+        actions: const [BotonAjustes(modoPro: true)],
+      ),
       body: _cargando
           ? const Center(child: CircularProgressIndicator())
           : todos.isEmpty
               ? Center(
                   child: Padding(
                     padding: const EdgeInsets.all(24),
-                    child: Text(
-                      'Aquí verás, de un vistazo, el estado de TODOS tus presupuestos (esperando respuesta, aceptados, rechazados...) sin entrar trabajo por trabajo.\nCréalo desde el detalle de un trabajo, en la pestaña Trabajos.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: context.colors.inkMuted),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 72,
+                          height: 72,
+                          decoration: BoxDecoration(color: context.colors.brandTint, shape: BoxShape.circle),
+                          child: Icon(Icons.request_quote_outlined, size: 32, color: context.colors.brand),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Aquí verás, de un vistazo, el estado de TODOS tus presupuestos (esperando respuesta, aceptados, rechazados...) sin entrar trabajo por trabajo.\nCréalo desde el detalle de un trabajo, en la pestaña Trabajos.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: context.colors.inkMuted),
+                        ),
+                      ],
                     ),
                   ),
                 )
               : ListView(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   children: [
                     for (final estado in _ordenGrupos)
                       if (grupos[estado]!.isNotEmpty)
@@ -189,7 +212,7 @@ class _PresupuestoTile extends StatelessWidget {
       iconColor: _colorGrupo(context, p.estado),
       title: item.trabajo.registroTitulo,
       subtitle: '${item.trabajo.casaNombre} · Presupuesto nº${p.numero}${p.version > 1 ? ' (v${p.version})' : ''}',
-      trailing: Text('${p.total.toStringAsFixed(2)} €', style: const TextStyle(fontWeight: FontWeight.w700)),
+      trailing: Text('${p.total.toStringAsFixed(2)} €', style: ReparaText.amount(context)),
       onTap: onTap,
     );
   }
