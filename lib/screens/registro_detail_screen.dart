@@ -332,11 +332,21 @@ class RegistroDetailScreen extends StatelessWidget {
                       ],
                       if (registro.coste != null && !registro.esConProfesional) ...[
                         const SizedBox(height: 4),
-                        Text('Coste: ${registro.coste!.toStringAsFixed(0)} €'),
+                        Row(
+                          children: [
+                            Text('Coste: ', style: TextStyle(color: context.colors.inkMuted)),
+                            Text('${registro.coste!.toStringAsFixed(0)} €', style: ReparaText.amount(context)),
+                          ],
+                        ),
                       ],
                       if (registro.presupuesto != null) ...[
                         const SizedBox(height: 4),
-                        Text('Presupuesto: ${registro.presupuesto!.toStringAsFixed(0)} €'),
+                        Row(
+                          children: [
+                            Text('Presupuesto: ', style: TextStyle(color: context.colors.inkMuted)),
+                            Text('${registro.presupuesto!.toStringAsFixed(0)} €', style: ReparaText.amount(context)),
+                          ],
+                        ),
                         const SizedBox(height: 10),
                         ProgresoPago(casaId: casa.id, elementoId: elementoId, registroId: registro.id, presupuesto: registro.presupuesto!),
                       ],
@@ -396,11 +406,24 @@ class RegistroDetailScreen extends StatelessWidget {
                   return Column(
                     children: documentos
                         .map((d) => Card(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              child: ListTile(
-                                leading: const Icon(Icons.insert_drive_file_outlined),
-                                title: Text(d.proveedor ?? d.nombreArchivo),
-                                trailing: d.importe != null ? Text('${d.importe!.toStringAsFixed(0)} €') : null,
+                              margin: const EdgeInsets.only(bottom: 9),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 40,
+                                      height: 40,
+                                      decoration: BoxDecoration(color: context.colors.brandTint, borderRadius: BorderRadius.circular(ReparaRadius.sm)),
+                                      child: Icon(Icons.insert_drive_file_outlined, size: 20, color: context.colors.brand),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(d.proveedor ?? d.nombreArchivo, style: Theme.of(context).textTheme.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                    ),
+                                    if (d.importe != null) Text('${d.importe!.toStringAsFixed(0)} €', style: ReparaText.amount(context)),
+                                  ],
+                                ),
                               ),
                             ))
                         .toList(),
