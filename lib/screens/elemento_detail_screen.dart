@@ -4,8 +4,11 @@
 // que el spec marca como "estrella" porque representan la propuesta de
 // valor: convertir un aparato suelto en una identidad digital con su propio
 // historial y documentación.
+import 'dart:io';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../models/casa.dart';
@@ -82,6 +85,51 @@ class ElementoDetailScreen extends StatelessWidget {
       );
     } catch (e, st) {
       if (context.mounted) AppError.show(context, 'No se pudo guardar la revisión periódica.', error: e, stackTrace: st);
+    }
+  }
+
+  Future<void> _cambiarFoto(BuildContext context, Elemento elemento) async {
+    final picker = ImagePicker();
+    final foto = await showModalBottomSheet<XFile?>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(ReparaSpace.s4, ReparaSpace.s2, ReparaSpace.s4, ReparaSpace.s4),
+          child: IosSection(
+            rows: [
+              IosRow(
+                icon: Icons.photo_camera_outlined,
+                iconColor: Colors.blue,
+                title: 'Hacer una foto',
+                onTap: () async {
+                  final navigator = Navigator.of(ctx);
+                  final imagen = await picker.pickImage(source: ImageSource.camera, imageQuality: 85, maxWidth: 1600, maxHeight: 1600);
+                  if (!ctx.mounted) return;
+                  navigator.pop(imagen);
+                },
+              ),
+              IosRow(
+                icon: Icons.photo_library_outlined,
+                iconColor: Colors.purple,
+                title: 'Elegir de la galería',
+                onTap: () async {
+                  final navigator = Navigator.of(ctx);
+                  final imagen = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85, maxWidth: 1600, maxHeight: 1600);
+                  if (!ctx.mounted) return;
+                  navigator.pop(imagen);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (foto == null || !context.mounted) return;
+    try {
+      final url = await ElementoService.subirFoto(casa.id, elemento.id, File(foto.path));
+      await ElementoService.actualizarFoto(casa.id, elemento.id, url);
+    } catch (e, st) {
+      if (context.mounted) AppError.show(context, 'No se pudo guardar la foto.', error: e, stackTrace: st);
     }
   }
 
@@ -166,20 +214,40 @@ class ElementoDetailScreen extends StatelessWidget {
           body: ListView(
             padding: EdgeInsets.zero,
             children: [
-              // Sin foto real todavía -- un marcador es mejor que fingir una
-              // (auditoría de craft, octubre 2026): el degradado de marca
-              // avisa de que es un hueco, no un dato.
-              Container(
-                height: 156,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [context.colors.surfaceMuted, context.colors.sand],
+              // Sin foto todavía -- un marcador tocable es mejor que fingir
+              // una (auditoría de craft, octubre 2026): el degradado de marca
+              // avisa de que es un hueco, no un dato, y toca para añadirla.
+              GestureDetector(
+                onTap: () => _cambiarFoto(context, elemento),
+                child: Container(
+                  height: 156,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    gradient: elemento.fotoUrl == null
+                        ? LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [context.colors.surfaceMuted, context.colors.sand],
+                          )
+                        : null,
+                    image: elemento.fotoUrl != null
+                        ? DecorationImage(image: NetworkImage(elemento.fotoUrl!), fit: BoxFit.cover)
+                        : null,
                   ),
+                  child: elemento.fotoUrl == null
+                      ? Center(child: Icon(Icons.add_a_photo_outlined, size: 34, color: context.colors.inkFaint))
+                      : Align(
+                          alignment: Alignment.bottomRight,
+                          child: Padding(
+                            padding: const EdgeInsets.all(ReparaSpace.s2),
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.45), shape: BoxShape.circle),
+                              child: const Icon(Icons.edit_outlined, size: 16, color: Colors.white),
+                            ),
+                          ),
+                        ),
                 ),
-                child: Center(child: Icon(Icons.image_outlined, size: 34, color: context.colors.inkFaint)),
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 18, 20, 4),

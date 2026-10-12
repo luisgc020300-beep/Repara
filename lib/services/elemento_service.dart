@@ -1,6 +1,9 @@
 // lib/services/elemento_service.dart
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 import '../models/elemento.dart';
 import '../models/registro.dart';
@@ -63,6 +66,22 @@ class ElementoService {
 
   static Future<void> eliminar(String casaId, String elementoId) async {
     await _col(casaId).doc(elementoId).delete();
+  }
+
+  /// Foto del elemento -- la única forma de rellenar [Elemento.fotoUrl],
+  /// aparte del propio campo en Firestore (CEO, octubre 2026: se edita desde
+  /// la ficha, tocando el hueco de foto, no desde el formulario de
+  /// creación -- muchas veces la foto se hace después, no al crear el
+  /// elemento). Nombre de archivo fijo ("foto") en vez de con timestamp: una
+  /// foto nueva sustituye a la anterior, nunca se acumulan fotos sueltas.
+  static Future<String> subirFoto(String casaId, String elementoId, File archivo) async {
+    final ref = FirebaseStorage.instance.ref().child('casas/$casaId/elementos/$elementoId/foto');
+    await ref.putFile(archivo);
+    return ref.getDownloadURL();
+  }
+
+  static Future<void> actualizarFoto(String casaId, String elementoId, String fotoUrl) async {
+    await _col(casaId).doc(elementoId).update({'fotoUrl': fotoUrl});
   }
 
   /// Único flujo de creación de la app (octubre 2026, fusión Elemento/
