@@ -11,9 +11,11 @@ import 'package:intl/intl.dart';
 import '../models/casa.dart';
 import '../models/documento.dart';
 import '../models/elemento.dart';
+import '../models/habitacion.dart';
 import '../models/registro.dart';
 import '../services/documento_service.dart';
 import '../services/elemento_service.dart';
+import '../services/habitacion_service.dart';
 import '../services/registro_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
@@ -119,8 +121,11 @@ class ElementoDetailScreen extends StatelessWidget {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
         return Scaffold(
+          extendBodyBehindAppBar: true,
           appBar: AppBar(
-            title: Text(elemento.nombre),
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            iconTheme: const IconThemeData(color: Colors.white),
             actions: [
               IconButton(
                 icon: const Icon(Icons.edit_outlined),
@@ -159,75 +164,137 @@ class ElementoDetailScreen extends StatelessWidget {
             label: const Text('Añadir registro'),
           ),
           body: ListView(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.zero,
             children: [
-              _FichaCard(elemento: elemento, onEditarMantenimiento: () => _editarMantenimiento(context, elemento)),
-              if (elemento.intervaloMantenimientoMeses != null) ...[
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: () => _marcarRevisionHecha(context, elemento),
-                  icon: const Icon(Icons.check_circle_outline, size: 18),
-                  label: const Text('Marcar revisión como hecha'),
-                ),
-              ],
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Historial', style: Theme.of(context).textTheme.headlineSmall),
-                ],
-              ),
-              const SizedBox(height: 8),
-              StreamBuilder<List<Registro>>(
-                stream: RegistroService.streamRegistros(casa.id, elemento.id),
-                builder: (context, snapshot) {
-                  final registros = snapshot.data ?? [];
-                  if (registros.isEmpty) {
-                    return Text('Sin registros todavía.', style: TextStyle(color: context.colors.inkMuted));
-                  }
-                  return IosSection(
-                    rows: registros
-                        .map((r) => IosRow(
-                              icon: Icons.fact_check_outlined,
-                              iconColor: context.colors.brand,
-                              title: r.titulo,
-                              subtitle: DateFormat('d MMM yyyy', 'es_ES').format(r.fecha),
-                              trailing: r.coste != null ? Text('${r.coste!.toStringAsFixed(0)} €') : null,
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (_) => RegistroDetailScreen(casa: casa, elementoId: elemento.id, registroId: r.id)),
-                              ),
-                            ))
-                        .toList(),
-                  );
-                },
-              ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Documentos', style: Theme.of(context).textTheme.headlineSmall),
-                  TextButton.icon(
-                    onPressed: () => iniciarNuevoDocumento(
-                      context,
-                      casaId: casa.id,
-                      elementoId: elemento.id,
-                      habitacionId: elemento.habitacionId,
-                    ),
-                    icon: const Icon(Icons.document_scanner_outlined, size: 18),
-                    label: const Text('Escanear documento'),
+              // Sin foto real todavía -- un marcador es mejor que fingir una
+              // (auditoría de craft, octubre 2026): el degradado de marca
+              // avisa de que es un hueco, no un dato.
+              Container(
+                height: 156,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [context.colors.surfaceMuted, context.colors.sand],
                   ),
-                ],
+                ),
+                child: Center(child: Icon(Icons.image_outlined, size: 34, color: context.colors.inkFaint)),
               ),
-              StreamBuilder<List<Documento>>(
-                stream: DocumentoService.streamDocumentos(casa.id, elementoId: elemento.id),
-                builder: (context, snapshot) {
-                  final documentos = snapshot.data ?? [];
-                  if (documentos.isEmpty) {
-                    return Text('Sin documentos todavía.', style: TextStyle(color: context.colors.inkMuted));
-                  }
-                  return IosSection(rows: documentos.map((d) => _DocumentoTile(documento: d)).toList());
-                },
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 4),
+                child: StreamBuilder<List<Habitacion>>(
+                  stream: HabitacionService.streamHabitaciones(casa.id),
+                  builder: (context, habSnapshot) {
+                    final coincidencias = (habSnapshot.data ?? const <Habitacion>[]).where((h) => h.id == elemento.habitacionId);
+                    final nombreHabitacion = coincidencias.isEmpty ? null : coincidencias.first.nombre;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          (nombreHabitacion ?? 'Elemento').toUpperCase(),
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: context.colors.inkMuted),
+                        ),
+                        Text(elemento.nombre, style: Theme.of(context).textTheme.displaySmall),
+                      ],
+                    );
+                  },
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _FichaCard(elemento: elemento, onEditarMantenimiento: () => _editarMantenimiento(context, elemento)),
+                    if (elemento.intervaloMantenimientoMeses != null) ...[
+                      const SizedBox(height: 10),
+                      OutlinedButton.icon(
+                        onPressed: () => _marcarRevisionHecha(context, elemento),
+                        icon: const Icon(Icons.check_circle_outline, size: 18),
+                        label: const Text('Marcar revisión como hecha'),
+                      ),
+                    ],
+                    const SizedBox(height: 22),
+                    Text('Historial', style: Theme.of(context).textTheme.headlineSmall),
+                    const SizedBox(height: 10),
+                    StreamBuilder<List<Registro>>(
+                      stream: RegistroService.streamRegistros(casa.id, elemento.id),
+                      builder: (context, snapshot) {
+                        final registros = snapshot.data ?? [];
+                        if (registros.isEmpty) {
+                          return Text('Sin registros todavía.', style: TextStyle(color: context.colors.inkMuted));
+                        }
+                        return Column(
+                          children: registros
+                              .map((r) => Card(
+                                    margin: const EdgeInsets.only(bottom: 9),
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(ReparaRadius.md),
+                                      onTap: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(builder: (_) => RegistroDetailScreen(casa: casa, elementoId: elemento.id, registroId: r.id)),
+                                      ),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                                        child: Row(
+                                          children: [
+                                            Container(
+                                              width: 38,
+                                              height: 38,
+                                              decoration: BoxDecoration(color: context.colors.brandTint, borderRadius: BorderRadius.circular(ReparaRadius.sm)),
+                                              child: Icon(Icons.fact_check_outlined, size: 18, color: context.colors.brand),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(r.titulo, style: Theme.of(context).textTheme.titleMedium),
+                                                  Text(DateFormat('d MMM yyyy', 'es_ES').format(r.fecha), style: Theme.of(context).textTheme.bodySmall),
+                                                ],
+                                              ),
+                                            ),
+                                            if (r.coste != null) Text('${r.coste!.toStringAsFixed(0)} €', style: ReparaText.amount(context)),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ))
+                              .toList(),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 22),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Documentos', style: Theme.of(context).textTheme.headlineSmall),
+                        TextButton.icon(
+                          onPressed: () => iniciarNuevoDocumento(
+                            context,
+                            casaId: casa.id,
+                            elementoId: elemento.id,
+                            habitacionId: elemento.habitacionId,
+                          ),
+                          icon: const Icon(Icons.document_scanner_outlined, size: 18),
+                          label: const Text('Escanear documento'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    StreamBuilder<List<Documento>>(
+                      stream: DocumentoService.streamDocumentos(casa.id, elementoId: elemento.id),
+                      builder: (context, snapshot) {
+                        final documentos = snapshot.data ?? [];
+                        if (documentos.isEmpty) {
+                          return Text('Sin documentos todavía.', style: TextStyle(color: context.colors.inkMuted));
+                        }
+                        return IosSection(rows: documentos.map((d) => _DocumentoTile(documento: d)).toList());
+                      },
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -290,10 +357,10 @@ class _DocumentoTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return IosRow(
       icon: _icono,
-      iconColor: Colors.blue,
+      iconColor: context.colors.brand,
       title: documento.proveedor ?? documento.nombreArchivo,
       subtitle: documento.fecha != null ? DateFormat('d MMM yyyy', 'es_ES').format(documento.fecha!) : null,
-      trailing: documento.importe != null ? Text('${documento.importe!.toStringAsFixed(0)} €') : null,
+      trailing: documento.importe != null ? Text('${documento.importe!.toStringAsFixed(0)} €', style: ReparaText.amount(context)) : null,
       showChevron: false,
     );
   }

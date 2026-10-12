@@ -12,7 +12,6 @@ import '../services/analytics_service.dart';
 import '../services/notificacion_router.dart';
 import '../services/notificacion_service.dart';
 import '../theme/design_tokens.dart';
-import '../widgets/ios_list.dart';
 
 class NotificacionesScreen extends StatelessWidget {
   const NotificacionesScreen({required this.modoPro, super.key});
@@ -31,43 +30,91 @@ class NotificacionesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Notificaciones')),
+      appBar: AppBar(title: Text('Notificaciones', style: Theme.of(context).textTheme.displaySmall)),
       body: StreamBuilder<List<Notificacion>>(
         stream: NotificacionService.streamMisNotificaciones(),
         builder: (context, snapshot) {
           final notificaciones = (snapshot.data ?? []).where((n) => n.esParaProfesional == modoPro).toList();
           if (notificaciones.isEmpty) {
-            return Center(child: Text('No tienes notificaciones todavía.', style: TextStyle(color: context.colors.inkMuted)));
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 72,
+                      height: 72,
+                      decoration: BoxDecoration(color: context.colors.brandTint, shape: BoxShape.circle),
+                      child: Icon(Icons.notifications_outlined, size: 32, color: context.colors.brand),
+                    ),
+                    const SizedBox(height: 16),
+                    Text('No tienes notificaciones todavía.', style: TextStyle(color: context.colors.inkMuted)),
+                  ],
+                ),
+              ),
+            );
           }
           return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              IosSection(
-                rows: notificaciones
-                    .map((n) => IosRow(
-                          icon: _iconoTipo(n.tipo),
-                          iconColor: n.leida ? context.colors.inkMuted : context.colors.brand,
-                          title: n.titulo,
-                          titleColor: n.leida ? null : context.colors.ink,
-                          subtitle: n.cuerpo,
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (!n.leida) ...[
-                                Container(width: 7, height: 7, decoration: BoxDecoration(color: context.colors.brand, shape: BoxShape.circle)),
-                                const SizedBox(width: 6),
-                              ],
-                              if (n.createdAt != null)
-                                Text(DateFormat('d MMM', 'es_ES').format(n.createdAt!), style: TextStyle(color: context.colors.inkMuted, fontSize: 12)),
-                            ],
-                          ),
-                          onTap: () => _abrirTrabajo(context, n),
-                        ))
-                    .toList(),
-              ),
-            ],
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            children: notificaciones.map((n) => _NotificacionCard(notificacion: n, onTap: () => _abrirTrabajo(context, n))).toList(),
           );
         },
+      ),
+    );
+  }
+}
+
+class _NotificacionCard extends StatelessWidget {
+  const _NotificacionCard({required this.notificacion, required this.onTap});
+
+  final Notificacion notificacion;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final n = notificacion;
+    final color = n.leida ? context.colors.inkMuted : context.colors.brand;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 9),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(ReparaRadius.md),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(ReparaRadius.sm)),
+                child: Icon(_iconoTipo(n.tipo), size: 20, color: color),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(n.titulo, style: Theme.of(context).textTheme.titleMedium?.copyWith(color: n.leida ? context.colors.inkMuted : context.colors.ink)),
+                    Text(n.cuerpo, style: Theme.of(context).textTheme.bodySmall, maxLines: 2, overflow: TextOverflow.ellipsis),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (!n.leida) Container(width: 7, height: 7, decoration: BoxDecoration(color: context.colors.brand, shape: BoxShape.circle)),
+                  if (n.createdAt != null) ...[
+                    const SizedBox(height: 4),
+                    Text(DateFormat('d MMM', 'es_ES').format(n.createdAt!), style: TextStyle(color: context.colors.inkMuted, fontSize: 11.5)),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

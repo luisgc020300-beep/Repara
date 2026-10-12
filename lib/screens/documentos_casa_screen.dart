@@ -15,7 +15,6 @@ import '../services/security/biometric_service.dart';
 import '../services/security/security_preferences_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
-import '../widgets/ios_list.dart';
 import 'elemento_detail_screen.dart';
 import 'nuevo_documento_flow.dart';
 import 'registro_detail_screen.dart';
@@ -55,7 +54,17 @@ class DocumentosCasaScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Documentos')),
+      appBar: AppBar(
+        toolbarHeight: 68,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('CASA', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: context.colors.inkMuted)),
+            Text('Documentos', style: Theme.of(context).textTheme.displayMedium?.copyWith(fontSize: 26)),
+          ],
+        ),
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => iniciarNuevoDocumento(context, casaId: casa.id),
         icon: const Icon(Icons.document_scanner_outlined),
@@ -72,8 +81,13 @@ class DocumentosCasaScreen extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.folder_open_outlined, size: 32, color: context.colors.inkMuted),
-                    const SizedBox(height: 10),
+                    Container(
+                      width: 72,
+                      height: 72,
+                      decoration: BoxDecoration(color: context.colors.brandTint, shape: BoxShape.circle),
+                      child: Icon(Icons.folder_open_outlined, size: 32, color: context.colors.brand),
+                    ),
+                    const SizedBox(height: 16),
                     Text(
                       'Todavía no has guardado ningún documento.\nFotografía una factura, garantía o presupuesto para empezar.',
                       textAlign: TextAlign.center,
@@ -85,33 +99,52 @@ class DocumentosCasaScreen extends StatelessWidget {
             );
           }
           return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              IosSection(
-                rows: documentos
-                    .map((d) => IosRow(
-                          icon: _iconoTipo(d.tipo),
-                          iconColor: Colors.blue,
-                          title: d.proveedor ?? d.nombreArchivo,
-                          subtitle: [
-                            if (d.fecha != null) DateFormat('d MMM yyyy', 'es_ES').format(d.fecha!),
-                            if (d.estadoIA == EstadoIA.pendiente) 'Borrador',
-                          ].join(' · '),
-                          trailing: d.importe != null
-                              ? Row(
-                                  mainAxisSize: MainAxisSize.min,
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 90),
+            children: documentos
+                .map((d) => Card(
+                      margin: const EdgeInsets.only(bottom: 9),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(ReparaRadius.md),
+                        onTap: () => _abrir(context, d),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(color: context.colors.brandTint, borderRadius: BorderRadius.circular(ReparaRadius.sm)),
+                                child: Icon(_iconoTipo(d.tipo), size: 20, color: context.colors.brand),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text('${d.importe!.toStringAsFixed(0)} €'),
-                                    const SizedBox(width: 6),
-                                    Icon(Icons.chevron_right, color: context.colors.inkMuted, size: 20),
+                                    Text(d.proveedor ?? d.nombreArchivo, style: Theme.of(context).textTheme.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                    Row(
+                                      children: [
+                                        if (d.fecha != null) Text(DateFormat('d MMM yyyy', 'es_ES').format(d.fecha!), style: Theme.of(context).textTheme.bodySmall),
+                                        if (d.estadoIA == EstadoIA.pendiente) ...[
+                                          const SizedBox(width: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                            decoration: BoxDecoration(color: context.colors.sand.withValues(alpha: 0.4), borderRadius: BorderRadius.circular(ReparaRadius.pill)),
+                                            child: Text('BORRADOR', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, letterSpacing: 0.4, color: context.colors.ink)),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
                                   ],
-                                )
-                              : null,
-                          onTap: () => _abrir(context, d),
-                        ))
-                    .toList(),
-              ),
-            ],
+                                ),
+                              ),
+                              if (d.importe != null) Text('${d.importe!.toStringAsFixed(0)} €', style: ReparaText.amount(context)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ))
+                .toList(),
           );
         },
       ),
