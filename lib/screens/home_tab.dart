@@ -316,11 +316,14 @@ class _ElementoTile extends StatelessWidget {
               Container(
                 width: 40,
                 height: 40,
+                clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
                   color: avisado ? context.colors.warning.withValues(alpha: 0.12) : context.colors.brandTint,
                   borderRadius: BorderRadius.circular(ReparaRadius.sm),
                 ),
-                child: Icon(Icons.category_outlined, size: 20, color: avisado ? context.colors.warning : context.colors.brand),
+                child: elemento.fotoUrl != null
+                    ? Image.network(elemento.fotoUrl!, fit: BoxFit.cover)
+                    : Icon(Icons.category_outlined, size: 20, color: avisado ? context.colors.warning : context.colors.brand),
               ),
               const SizedBox(width: 12),
               Expanded(
