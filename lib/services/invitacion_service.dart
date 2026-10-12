@@ -53,6 +53,10 @@ class InvitacionService {
   static Future<void> responder(String invitacionId, {required bool aceptar}) async {
     final callable = FirebaseFunctions.instanceFor(region: _region).httpsCallable('responderInvitacion');
     await callable.call<Map<String, dynamic>>({'invitacionId': invitacionId, 'aceptar': aceptar});
+    // Al aceptar, el servidor añade este registro al claim registrosProId
+    // (ver sincronizarClaimsUid) -- refrescar ya el token para que Storage
+    // reconozca el acceso sin esperar a la próxima renovación automática.
+    if (aceptar) await FirebaseAuth.instance.currentUser?.getIdToken(true);
   }
 
   /// Para cuando el profesional invitado nunca responde -- sin esto el

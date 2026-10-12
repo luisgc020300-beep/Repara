@@ -63,6 +63,7 @@ class CasaService {
   static Future<({String casaId, String joinCode})> createCasa(String nombre) async {
     final callable = FirebaseFunctions.instanceFor(region: _region).httpsCallable('createCasa');
     final result = await callable.call<Map<String, dynamic>>({'nombre': nombre});
+    await _refrescarToken();
     final data = result.data;
     return (casaId: data['casaId'] as String, joinCode: data['joinCode'] as String);
   }
@@ -70,7 +71,25 @@ class CasaService {
   static Future<String> joinCasa(String joinCode) async {
     final callable = FirebaseFunctions.instanceFor(region: _region).httpsCallable('joinCasa');
     final result = await callable.call<Map<String, dynamic>>({'joinCode': joinCode});
+    await _refrescarToken();
     return result.data['casaId'] as String;
+  }
+
+  /// El servidor ya recalculó los custom claims (casaIds/registrosProId --
+  /// ver sincronizarClaimsUid en functions/index.js) como parte de
+  /// createCasa/joinCasa -- esto solo hace que el cliente los recoja ya,
+  /// sin esperar a la próxima renovación automática del token (hasta una
+  /// hora). Sin esto, justo después de crear o unirte a una casa, Storage
+  /// seguiría rechazando las subidas con el token viejo.
+  static Future<void> _refrescarToken() => FirebaseAuth.instance.currentUser?.getIdToken(true) ?? Future.value();
+
+  /// Backfill para cuentas que ya tenían casaIds antes de que existieran
+  /// estas claims, y refresco general -- se llama una vez por sesión al
+  /// iniciar la app (ver main.dart).
+  static Future<void> sincronizarClaims() async {
+    final callable = FirebaseFunctions.instanceFor(region: _region).httpsCallable('sincronizarClaims');
+    await callable.call<Map<String, dynamic>>();
+    await _refrescarToken();
   }
 
   /// El nombre de la casa es el único campo del documento editable en

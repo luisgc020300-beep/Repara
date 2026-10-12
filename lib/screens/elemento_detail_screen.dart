@@ -129,10 +129,7 @@ class ElementoDetailScreen extends StatelessWidget {
       final url = await ElementoService.subirFoto(casa.id, elemento.id, File(foto.path));
       await ElementoService.actualizarFoto(casa.id, elemento.id, url);
     } catch (e, st) {
-      // TODO(temporal): mensaje con el error real para diagnosticar por qué
-      // falla en producción -- volver al mensaje genérico en cuanto se
-      // confirme la causa.
-      if (context.mounted) AppError.show(context, 'No se pudo guardar la foto: $e', error: e, stackTrace: st);
+      if (context.mounted) AppError.show(context, 'No se pudo guardar la foto.', error: e, stackTrace: st);
     }
   }
 

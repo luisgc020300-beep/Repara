@@ -1,13 +1,25 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    // Firestore (nam5/EE.UU.) y este bucket de Storage (europe-west1) están
+    // en regiones distintas -- Firebase solo permite que storage.rules lea
+    // Firestore con firestore.get() cuando ambos servicios comparten región,
+    // así que aquí NO se puede comprobar membresía leyendo el documento de
+    // la casa directamente (octubre 2026, bug real: la subida de cualquier
+    // archivo devolvía "unauthorized" pase lo que pase). En su lugar se lee
+    // un custom claim del token de Auth (casaIds/registrosProId), que viaja
+    // con la petición sin depender de la región -- lo recalcula el servidor
+    // en functions/index.js (sincronizarClaimsUid) cada vez que cambia la
+    // membresía real en Firestore, nunca al revés.
     function isMember(casaId) {
       return request.auth != null &&
-          request.auth.uid in firestore.get(/databases/(default)/documents/casas/$(casaId)).data.members;
+          request.auth.token.casaIds != null &&
+          casaId in request.auth.token.casaIds;
     }
     function esProfesionalDelRegistro(casaId, elementoId, registroId) {
       return request.auth != null &&
-          request.auth.uid == firestore.get(/databases/(default)/documents/casas/$(casaId)/elementos/$(elementoId)/registros/$(registroId)).data.profesionalUid;
+          request.auth.token.registrosProId != null &&
+          registroId in request.auth.token.registrosProId;
     }
 
     // Documentos generales de la casa (sin registro asociado) -- solo

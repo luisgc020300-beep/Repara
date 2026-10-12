@@ -73,6 +73,35 @@ async function verificarYRegistrarIntentoCodigo(uid, accion) {
   });
 }
 
+// =============================================================================
+// CUSTOM CLAIMS (octubre 2026) -- Storage y Firestore están en regiones
+// distintas (Firestore en nam5/EE.UU., Storage en europe-west1), y Firebase
+// solo permite que storage.rules lea Firestore con firestore.get() cuando
+// ambos servicios comparten región. Como no es el caso aquí, storage.rules
+// no puede comprobar "¿eres miembro de esta casa?" leyendo Firestore
+// directamente -- en su lugar lee un custom claim del token de Auth
+// (casaIds/registrosProId), que SÍ viaja con cada petición sin depender de
+// la región. Estas claims se recalculan aquí, en el servidor, a partir del
+// mismo estado de Firestore que ya es la fuente de verdad -- nunca al
+// revés, para que no puedan desincronizarse por un fallo del cliente.
+// =============================================================================
+async function sincronizarClaimsUid(uid) {
+  const snap = await db.collection('users').doc(uid).get();
+  const data = snap.exists ? snap.data() : {};
+  const casaIds = data.casaIds || [];
+  const registrosProId = (data.registrosProRefs || []).map((r) => r.registroId).filter(Boolean);
+  await getAuth().setCustomUserClaims(uid, { casaIds, registrosProId });
+}
+
+// Llamable por el propio cliente -- backfill para cuentas que ya tenían
+// casaIds/registrosProRefs ANTES de que existieran estas claims, y refresco
+// general en cada arranque de la app por si acaso.
+exports.sincronizarClaims = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+  await sincronizarClaimsUid(request.auth.uid);
+  return { ok: true };
+});
+
 async function generarCodigoUnico() {
   for (let intento = 0; intento < 10; intento++) {
     let code = '';
@@ -117,6 +146,7 @@ exports.createCasa = onCall({ region: REGION }, async (request) => {
       casaIds: FieldValue.arrayUnion(casaRef.id),
     }, { merge: true });
   });
+  await sincronizarClaimsUid(uid);
 
   return { ok: true, casaId: casaRef.id, joinCode };
 });
@@ -158,6 +188,7 @@ exports.joinCasa = onCall({ region: REGION }, async (request) => {
       casaIds: FieldValue.arrayUnion(casaId),
     }, { merge: true });
   });
+  await sincronizarClaimsUid(uid);
 
   return { ok: true, casaId };
 });
@@ -461,6 +492,7 @@ exports.responderInvitacion = onCall({ region: REGION }, async (request) => {
       }, { merge: true });
     }
   });
+  if (aceptar) await sincronizarClaimsUid(uid);
 
   return { ok: true };
 });

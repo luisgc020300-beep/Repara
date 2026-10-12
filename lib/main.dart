@@ -104,7 +104,14 @@ void main() async {
   // haya siquiera nombrado su casa, tiene peor tasa de aceptación que
   // pedirlo una vez ya está dentro de la app de verdad.
   FirebaseAuth.instance.authStateChanges().listen((user) {
-    if (user != null) unawaited(CasaService.asegurarPerfilUsuario());
+    if (user != null) {
+      unawaited(CasaService.asegurarPerfilUsuario());
+      // Backfill de custom claims (casaIds/registrosProId) para cuentas que
+      // ya existían antes de que Storage las necesitara (octubre 2026, ver
+      // storage.rules) -- sin esto, cualquiera que inició sesión antes de
+      // este cambio se queda sin subir nada hasta que el token expire solo.
+      unawaited(CasaService.sincronizarClaims());
+    }
   });
 
   // Push tocada con la app en segundo plano, o que abre la app desde frío.
