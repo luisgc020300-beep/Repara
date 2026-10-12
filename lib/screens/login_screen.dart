@@ -67,30 +67,32 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(ReparaSpace.s6),
             child: Form(
               key: _formKey,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
-                    child: Image.asset('assets/icon/app_icon.png', width: 88, height: 88),
+                  Center(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(ReparaRadius.md),
+                      child: Image.asset('assets/icon/app_icon.png', width: 88, height: 88),
+                    ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: ReparaSpace.s5),
                   Text(
                     'Repara',
                     textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w700),
+                    style: Theme.of(context).textTheme.displaySmall,
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: ReparaSpace.s2),
                   Text(
                     'Tu casa tiene una historia. Repara la recuerda.',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: context.colors.inkMuted),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: ReparaSpace.s8),
                   AutofillGroup(
                     child: Column(
                       children: [
@@ -98,25 +100,31 @@ class _LoginScreenState extends State<LoginScreen> {
                           controller: _emailCtrl,
                           keyboardType: TextInputType.emailAddress,
                           autofillHints: const [AutofillHints.email],
-                          decoration: const InputDecoration(labelText: 'Correo'),
+                          decoration: const InputDecoration(labelText: 'Correo', prefixIcon: Icon(Icons.mail_outline)),
                           validator: (v) => (v == null || !v.contains('@')) ? 'Correo no válido' : null,
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: ReparaSpace.s3),
                         TextFormField(
                           controller: _passCtrl,
                           obscureText: true,
                           autofillHints: [_esRegistro ? AutofillHints.newPassword : AutofillHints.password],
-                          decoration: const InputDecoration(labelText: 'Contraseña'),
+                          decoration: const InputDecoration(labelText: 'Contraseña', prefixIcon: Icon(Icons.lock_outline)),
                           validator: (v) => (v == null || v.length < 6) ? 'Mínimo 6 caracteres' : null,
                         ),
                       ],
                     ),
                   ),
                   if (_error != null) ...[
-                    const SizedBox(height: 12),
-                    Text(_error!, style: TextStyle(color: context.colors.error)),
+                    const SizedBox(height: ReparaSpace.s3),
+                    Row(
+                      children: [
+                        Icon(Icons.error_outline, size: 18, color: context.colors.error),
+                        const SizedBox(width: ReparaSpace.s2),
+                        Expanded(child: Text(_error!, style: TextStyle(color: context.colors.error))),
+                      ],
+                    ),
                   ],
-                  const SizedBox(height: 20),
+                  const SizedBox(height: ReparaSpace.s5),
                   FilledButton(
                     onPressed: _cargando ? null : _enviar,
                     child: _cargando
@@ -127,7 +135,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           )
                         : Text(_esRegistro ? 'Crear cuenta' : 'Entrar'),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: ReparaSpace.s2),
                   TextButton(
                     onPressed: _cargando ? null : () => setState(() => _esRegistro = !_esRegistro),
                     child: Text(_esRegistro ? '¿Ya tienes cuenta? Entra' : '¿No tienes cuenta? Regístrate'),

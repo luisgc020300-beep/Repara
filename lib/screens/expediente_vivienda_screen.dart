@@ -195,7 +195,22 @@ class ExpedienteViviendaScreen extends StatelessWidget {
         if (elementos.isEmpty && finalizados.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 24),
-            child: Text('Todavía no hay suficientes datos para generar un expediente útil.', style: TextStyle(color: context.colors.inkMuted)),
+            child: Column(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(color: context.colors.brandTint, shape: BoxShape.circle),
+                  child: Icon(Icons.summarize_outlined, size: 26, color: context.colors.brand),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Todavía no hay suficientes datos para generar un expediente útil.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: context.colors.inkMuted),
+                ),
+              ],
+            ),
           ),
         const SizedBox(height: 8),
         FilledButton.icon(

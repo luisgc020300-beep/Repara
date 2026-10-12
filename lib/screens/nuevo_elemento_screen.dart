@@ -236,14 +236,14 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(editando ? 'Editar elemento' : 'Nuevo elemento')),
       body: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(ReparaSpace.s5),
         children: [
           if (!editando) ...[
             Text('Tipo', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700, color: context.colors.brand)),
-            const SizedBox(height: 8),
+            const SizedBox(height: ReparaSpace.s2),
             Wrap(
-              spacing: 8,
-              runSpacing: 8,
+              spacing: ReparaSpace.s2,
+              runSpacing: ReparaSpace.s2,
               children: TipoRegistro.values
                   .map((t) => ChoiceChip(
                         label: Text(nombreTipoRegistro(t)),
@@ -252,7 +252,7 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
                       ))
                   .toList(),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: ReparaSpace.s3),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('¿Lo hace un profesional?'),
@@ -260,10 +260,10 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
               value: _esConProfesional,
               onChanged: (v) => setState(() => _esConProfesional = v),
             ),
-            const Divider(height: 32),
+            const Divider(height: ReparaSpace.s8),
           ],
           TextField(controller: _nombreCtrl, decoration: const InputDecoration(labelText: 'Nombre (p.ej. Aire acondicionado)')),
-          const SizedBox(height: 12),
+          const SizedBox(height: ReparaSpace.s3),
           StreamBuilder<List<Habitacion>>(
             stream: HabitacionService.streamHabitaciones(widget.casa.id),
             builder: (context, snapshot) {
@@ -279,15 +279,15 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
               );
             },
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: ReparaSpace.s3),
           Row(
             children: [
               Expanded(child: TextField(controller: _marcaCtrl, decoration: const InputDecoration(labelText: 'Marca'))),
-              const SizedBox(width: 12),
+              const SizedBox(width: ReparaSpace.s3),
               Expanded(child: TextField(controller: _modeloCtrl, decoration: const InputDecoration(labelText: 'Modelo'))),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: ReparaSpace.s3),
           Row(
             children: [
               Expanded(
@@ -297,7 +297,7 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
                   decoration: const InputDecoration(labelText: 'Coste (€)'),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: ReparaSpace.s3),
               Expanded(
                 child: RawAutocomplete<Contacto>(
                   textEditingController: _profesionalCtrl,
@@ -342,7 +342,7 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: ReparaSpace.s3),
           OutlinedButton.icon(
             onPressed: () => _elegirFecha(esGarantia: false),
             icon: const Icon(Icons.calendar_today_outlined, size: 18),
@@ -350,7 +350,7 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
                 ? 'Fecha'
                 : '${_fechaInstalacion!.day}/${_fechaInstalacion!.month}/${_fechaInstalacion!.year}'),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: ReparaSpace.s2),
           OutlinedButton.icon(
             onPressed: () => _elegirFecha(esGarantia: true),
             icon: const Icon(Icons.shield_outlined, size: 18),
@@ -358,14 +358,14 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
                 ? 'Garantía hasta (opcional)'
                 : '${_garantiaHasta!.day}/${_garantiaHasta!.month}/${_garantiaHasta!.year}'),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: ReparaSpace.s5),
           Text('Revisión periódica (opcional)', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700, color: context.colors.brand)),
-          const SizedBox(height: 4),
+          const SizedBox(height: ReparaSpace.s1),
           Text(
             'Repara te avisará cuando toque revisarlo. Puedes escribir el número a mano o pedirle una sugerencia a la IA según el tipo de elemento.',
             style: TextStyle(fontSize: 12, color: context.colors.inkMuted),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: ReparaSpace.s2),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -376,7 +376,7 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
                   decoration: const InputDecoration(labelText: 'Revisar cada cuántos meses'),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: ReparaSpace.s3),
               OutlinedButton.icon(
                 onPressed: _sugiriendo ? null : _sugerirIntervalo,
                 icon: _sugiriendo
@@ -386,7 +386,7 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: ReparaSpace.s6),
           FilledButton(
             onPressed: _guardando ? null : _guardar,
             child: _guardando

@@ -26,35 +26,35 @@ Future<void> mostrarAccionesContacto(BuildContext context, {required String casa
     context: context,
     builder: (ctx) => SafeArea(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        padding: const EdgeInsets.fromLTRB(ReparaSpace.s4, ReparaSpace.s2, ReparaSpace.s4, ReparaSpace.s4),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               width: 36,
               height: 4,
-              margin: const EdgeInsets.only(bottom: 16),
+              margin: const EdgeInsets.only(bottom: ReparaSpace.s4),
               decoration: BoxDecoration(color: ctx.colors.inkMuted.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(2)),
             ),
             Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: ctx.colors.brand.withValues(alpha: 0.1),
+                  backgroundColor: ctx.colors.brandTint,
                   child: Icon(contacto.tipo == TipoContacto.empresa ? Icons.store_outlined : Icons.person_outline, color: ctx.colors.brand),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: ReparaSpace.s3),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(contacto.nombre, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-                      if (contacto.especialidad != null) Text(contacto.especialidad!),
+                      Text(contacto.nombre, style: Theme.of(ctx).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                      if (contacto.especialidad != null) Text(contacto.especialidad!, style: TextStyle(color: ctx.colors.inkMuted)),
                     ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: ReparaSpace.s4),
             IosSection(
               rows: [
                 IosRow(
@@ -115,7 +115,7 @@ Future<void> _iniciarReporte(BuildContext context, {required String casaId, requ
     context: context,
     builder: (ctx) => SafeArea(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        padding: const EdgeInsets.fromLTRB(ReparaSpace.s4, ReparaSpace.s2, ReparaSpace.s4, ReparaSpace.s4),
         child: IosSection(
           rows: [
             IosRow(

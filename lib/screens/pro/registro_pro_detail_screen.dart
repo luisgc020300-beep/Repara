@@ -84,7 +84,20 @@ class RegistroProDetailScreen extends StatelessWidget {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
         return Scaffold(
-          appBar: AppBar(title: Text(registro.titulo)),
+          appBar: AppBar(
+            toolbarHeight: 68,
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  registro.elementoNombre.toUpperCase(),
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: context.colors.inkMuted),
+                ),
+                Text(registro.titulo, style: Theme.of(context).textTheme.displaySmall?.copyWith(fontSize: 22), maxLines: 1, overflow: TextOverflow.ellipsis),
+              ],
+            ),
+          ),
           floatingActionButton: _estadoControlado(registro.estado)
               ? null
               : FloatingActionButton.extended(
@@ -95,8 +108,6 @@ class RegistroProDetailScreen extends StatelessWidget {
           body: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              Text(registro.elementoNombre, style: TextStyle(color: context.colors.inkMuted, fontSize: 13, fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
               if (registro.estado == EstadoRegistro.pendienteConfirmacion) ...[
                 Card(
                   color: context.colors.warning.withValues(alpha: 0.12),
@@ -163,7 +174,12 @@ class RegistroProDetailScreen extends StatelessWidget {
                         ),
                       if (registro.presupuesto != null) ...[
                         const SizedBox(height: 8),
-                        Text('Presupuesto acordado: ${registro.presupuesto!.toStringAsFixed(2)} €', style: const TextStyle(fontWeight: FontWeight.w600)),
+                        Row(
+                          children: [
+                            Text('Presupuesto acordado: ', style: TextStyle(color: context.colors.inkMuted)),
+                            Text('${registro.presupuesto!.toStringAsFixed(2)} €', style: ReparaText.amount(context)),
+                          ],
+                        ),
                         const SizedBox(height: 10),
                         ProgresoPago(casaId: casaId, elementoId: elementoId, registroId: registroId, presupuesto: registro.presupuesto!),
                       ],
@@ -212,11 +228,24 @@ class RegistroProDetailScreen extends StatelessWidget {
                   return Column(
                     children: documentos
                         .map((d) => Card(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              child: ListTile(
-                                leading: const Icon(Icons.insert_drive_file_outlined),
-                                title: Text(d.proveedor ?? d.nombreArchivo),
-                                trailing: d.importe != null ? Text('${d.importe!.toStringAsFixed(0)} €') : null,
+                              margin: const EdgeInsets.only(bottom: 9),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 40,
+                                      height: 40,
+                                      decoration: BoxDecoration(color: context.colors.brandTint, borderRadius: BorderRadius.circular(ReparaRadius.sm)),
+                                      child: Icon(Icons.insert_drive_file_outlined, size: 20, color: context.colors.brand),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(d.proveedor ?? d.nombreArchivo, style: Theme.of(context).textTheme.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                    ),
+                                    if (d.importe != null) Text('${d.importe!.toStringAsFixed(0)} €', style: ReparaText.amount(context)),
+                                  ],
+                                ),
                               ),
                             ))
                         .toList(),

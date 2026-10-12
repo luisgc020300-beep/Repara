@@ -100,35 +100,52 @@ class _OnboardingCasaScreenState extends State<OnboardingCasaScreen> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(ReparaSpace.s6),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                Center(
+                  child: Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(color: context.colors.brandTint, shape: BoxShape.circle),
+                    child: Icon(Icons.home_work_outlined, size: 30, color: context.colors.brand),
+                  ),
+                ),
+                const SizedBox(height: ReparaSpace.s6),
+                Text(
+                  'REPARA',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(color: context.colors.brand),
+                ),
+                const SizedBox(height: ReparaSpace.s2),
                 Text(
                   _unirse ? '¿Cuál es el código de la casa?' : '¿Cómo quieres llamar a tu vivienda?',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.displaySmall,
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: ReparaSpace.s2),
                 Text(
                   _unirse
                       ? 'Pídeselo a quien ya la tenga registrada en Repara.'
                       : 'Por ejemplo: "Casa Málaga" o "Piso de mis padres".',
+                  textAlign: TextAlign.center,
                   style: TextStyle(color: context.colors.inkMuted),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: ReparaSpace.s6),
                 if (_unirse)
                   TextField(
                     controller: _codigoCtrl,
                     textCapitalization: TextCapitalization.characters,
-                    decoration: const InputDecoration(labelText: 'Código de casa'),
+                    decoration: const InputDecoration(labelText: 'Código de casa', prefixIcon: Icon(Icons.key_outlined)),
                   )
                 else
                   TextField(
                     controller: _nombreCtrl,
-                    decoration: const InputDecoration(labelText: 'Nombre de la casa'),
+                    decoration: const InputDecoration(labelText: 'Nombre de la casa', prefixIcon: Icon(Icons.edit_outlined)),
                   ),
-                const SizedBox(height: 20),
+                const SizedBox(height: ReparaSpace.s5),
                 FilledButton(
                   onPressed: _cargando ? null : (_unirse ? _unirseACasa : _crear),
                   child: _cargando
@@ -136,7 +153,7 @@ class _OnboardingCasaScreenState extends State<OnboardingCasaScreen> {
                           width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                       : Text(_unirse ? 'Unirme' : 'Crear mi casa'),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: ReparaSpace.s2),
                 TextButton(
                   onPressed: _cargando ? null : () => setState(() => _unirse = !_unirse),
                   child: Text(_unirse ? 'Prefiero crear una casa nueva' : 'Ya tengo un código para unirme'),

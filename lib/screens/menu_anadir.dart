@@ -17,14 +17,14 @@ Future<void> mostrarMenuAnadir(BuildContext context, {required Casa casa}) {
     context: context,
     builder: (ctx) => SafeArea(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        padding: const EdgeInsets.fromLTRB(ReparaSpace.s4, ReparaSpace.s2, ReparaSpace.s4, ReparaSpace.s4),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               width: 36,
               height: 4,
-              margin: const EdgeInsets.only(bottom: 16),
+              margin: const EdgeInsets.only(bottom: ReparaSpace.s4),
               decoration: BoxDecoration(color: ctx.colors.inkMuted.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(2)),
             ),
             IosSection(

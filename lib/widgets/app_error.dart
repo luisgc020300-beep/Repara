@@ -15,10 +15,22 @@ class AppError {
     if (error != null) {
       FirebaseCrashlytics.instance.recordError(error, stackTrace, fatal: false);
     }
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    _mostrar(context, message, icon: Icons.error_outline);
   }
 
   static void showSuccess(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    _mostrar(context, message, icon: Icons.check_circle_outline);
+  }
+
+  static void _mostrar(BuildContext context, String message, {required IconData icon}) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Row(
+        children: [
+          Icon(icon, size: 18, color: Theme.of(context).scaffoldBackgroundColor),
+          const SizedBox(width: 10),
+          Expanded(child: Text(message)),
+        ],
+      ),
+    ));
   }
 }

@@ -486,9 +486,14 @@ class _EditorPresupuestoSheetState extends State<_EditorPresupuestoSheet> {
             const SizedBox(height: 8),
             TextField(controller: _notasCtrl, minLines: 1, maxLines: 3, decoration: const InputDecoration(labelText: 'Notas (opcional)')),
             const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Text('Total estimado: ${_totalEstimado.toStringAsFixed(2)} €', style: const TextStyle(fontWeight: FontWeight.w700)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text('Total estimado: ', style: TextStyle(color: context.colors.inkMuted)),
+                Text('${_totalEstimado.toStringAsFixed(2)} €', style: ReparaText.amount(context)),
+              ],
             ),
             const SizedBox(height: 16),
             FilledButton(
