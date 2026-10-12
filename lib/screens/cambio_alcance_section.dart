@@ -155,21 +155,24 @@ class _CambioCardState extends State<_CambioCard> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(child: Text(cambio.titulo, style: const TextStyle(fontWeight: FontWeight.w700))),
+                Expanded(child: Text(cambio.titulo, style: Theme.of(context).textTheme.titleMedium)),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(color: _color(context).withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
-                  child: Text(_nombreEstado(cambio.estado), style: TextStyle(color: _color(context), fontSize: 11, fontWeight: FontWeight.w700)),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(color: _color(context).withValues(alpha: 0.15), borderRadius: BorderRadius.circular(ReparaRadius.pill)),
+                  child: Text(
+                    _nombreEstado(cambio.estado).toUpperCase(),
+                    style: TextStyle(color: _color(context), fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 0.4),
+                  ),
                 ),
               ],
             ),
             if (cambio.descripcion != null) ...[
               const SizedBox(height: 4),
-              Text(cambio.descripcion!),
+              Text(cambio.descripcion!, style: Theme.of(context).textTheme.bodyLarge),
             ],
             if (cambio.importeAdicional != null) ...[
               const SizedBox(height: 4),
-              Text('Coste adicional: +${cambio.importeAdicional!.toStringAsFixed(2)} €', style: const TextStyle(fontWeight: FontWeight.w600)),
+              Text('Coste adicional: +${cambio.importeAdicional!.toStringAsFixed(2)} €', style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600)),
             ],
             if (cambio.fotos.isNotEmpty) ...[
               const SizedBox(height: 10),
@@ -182,7 +185,7 @@ class _CambioCardState extends State<_CambioCard> {
                   itemBuilder: (context, i) => GestureDetector(
                     onTap: () => _verFotoCompleta(context, cambio.fotos[i]),
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(ReparaRadius.xs),
                       child: Image.network(cambio.fotos[i], width: 70, height: 70, fit: BoxFit.cover),
                     ),
                   ),

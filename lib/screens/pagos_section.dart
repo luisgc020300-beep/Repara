@@ -70,16 +70,9 @@ class PagosSection extends StatelessWidget {
               Text('Sin pagos registrados todavía.', style: TextStyle(color: context.colors.inkMuted))
             else
               ...pagos.map((p) => Card(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    child: ListTile(
-                      leading: const Icon(Icons.payments_outlined),
-                      title: Text('${p.importe.toStringAsFixed(2)} €', style: const TextStyle(fontWeight: FontWeight.w700)),
-                      subtitle: Text(
-                        p.concepto?.isNotEmpty == true
-                            ? '${DateFormat('d MMM yyyy', 'es_ES').format(p.fecha)} · ${p.concepto}'
-                            : DateFormat('d MMM yyyy', 'es_ES').format(p.fecha),
-                      ),
-                      trailing: const Icon(Icons.chevron_right),
+                    margin: const EdgeInsets.only(bottom: 9),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(ReparaRadius.md),
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -92,6 +85,33 @@ class PagosSection extends StatelessWidget {
                             editable: editable,
                             pago: p,
                           ),
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(color: context.colors.brandTint, borderRadius: BorderRadius.circular(ReparaRadius.sm)),
+                              child: Icon(Icons.payments_outlined, size: 20, color: context.colors.brand),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    p.concepto?.isNotEmpty == true ? p.concepto! : DateFormat('d MMM yyyy', 'es_ES').format(p.fecha),
+                                    style: Theme.of(context).textTheme.titleMedium,
+                                  ),
+                                  if (p.concepto?.isNotEmpty == true) Text(DateFormat('d MMM yyyy', 'es_ES').format(p.fecha), style: Theme.of(context).textTheme.bodySmall),
+                                ],
+                              ),
+                            ),
+                            Text('${p.importe.toStringAsFixed(2)} €', style: ReparaText.amount(context)),
+                          ],
                         ),
                       ),
                     ),

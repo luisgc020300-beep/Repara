@@ -167,11 +167,14 @@ class _PresupuestoCardState extends State<_PresupuestoCard> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Presupuesto #${presupuesto.numero} · v${presupuesto.version}', style: const TextStyle(fontWeight: FontWeight.w700)),
+                Text('Presupuesto #${presupuesto.numero} · v${presupuesto.version}', style: Theme.of(context).textTheme.titleMedium),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(color: _colorEstado(context).withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
-                  child: Text(_nombreEstado(presupuesto.estado), style: TextStyle(color: _colorEstado(context), fontSize: 11, fontWeight: FontWeight.w700)),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(color: _colorEstado(context).withValues(alpha: 0.15), borderRadius: BorderRadius.circular(ReparaRadius.pill)),
+                  child: Text(
+                    _nombreEstado(presupuesto.estado).toUpperCase(),
+                    style: TextStyle(color: _colorEstado(context), fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 0.4),
+                  ),
                 ),
               ],
             ),
@@ -180,8 +183,8 @@ class _PresupuestoCardState extends State<_PresupuestoCard> {
                   padding: const EdgeInsets.symmetric(vertical: 2),
                   child: Row(
                     children: [
-                      Expanded(child: Text('${l.descripcion} (${l.cantidad.toStringAsFixed(l.cantidad == l.cantidad.roundToDouble() ? 0 : 1)})')),
-                      Text('${l.importeSinIva.toStringAsFixed(2)} €'),
+                      Expanded(child: Text('${l.descripcion} (${l.cantidad.toStringAsFixed(l.cantidad == l.cantidad.roundToDouble() ? 0 : 1)})', style: Theme.of(context).textTheme.bodyLarge)),
+                      Text('${l.importeSinIva.toStringAsFixed(2)} €', style: Theme.of(context).textTheme.bodyLarge),
                     ],
                   ),
                 )),
@@ -189,8 +192,8 @@ class _PresupuestoCardState extends State<_PresupuestoCard> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Subtotal ${presupuesto.subtotal.toStringAsFixed(2)} € · IVA ${presupuesto.iva.toStringAsFixed(2)} €'),
-                Text('${presupuesto.total.toStringAsFixed(2)} €', style: const TextStyle(fontWeight: FontWeight.w700)),
+                Expanded(child: Text('Subtotal ${presupuesto.subtotal.toStringAsFixed(2)} € · IVA ${presupuesto.iva.toStringAsFixed(2)} €', style: Theme.of(context).textTheme.bodySmall)),
+                Text('${presupuesto.total.toStringAsFixed(2)} €', style: ReparaText.amount(context)),
               ],
             ),
             if (presupuesto.estado == EstadoPresupuesto.borrador && widget.rol == RolEnTrabajo.profesional) ...[
