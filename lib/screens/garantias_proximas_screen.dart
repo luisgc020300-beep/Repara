@@ -1,8 +1,12 @@
 // lib/screens/garantias_proximas_screen.dart
 //
-// Lista de elementos cuya garantía vence en los próximos 30 días -- se abre
-// al tocar el aviso de Inicio, para comprobar de un vistazo la fecha exacta
-// de cada uno antes de entrar al detalle completo del elemento.
+// Lista de garantías -- puede ser solo las que vencen en los próximos 30
+// días (desde el aviso de Inicio) o todas las que hay guardadas (desde la
+// tarjeta "Garantías" de Inicio, título "Todas las garantías"). En el
+// segundo caso cada fila distingue su propio estado (próxima a vencer /
+// vigente sin prisa / ya caducada) en vez de pintarlas todas igual de
+// urgentes -- si no, un listado de "todas" parece confirmar que las 6 están
+// a punto de caducar cuando solo 3 lo están de verdad (CEO, octubre 2026).
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -11,12 +15,32 @@ import '../models/elemento.dart';
 import '../theme/design_tokens.dart';
 import 'elemento_detail_screen.dart';
 
+enum _EstadoGarantia { proxima, vigente, caducada }
+
 class GarantiasProximasScreen extends StatelessWidget {
   const GarantiasProximasScreen({required this.casa, required this.elementos, this.titulo = 'Garantías a punto de terminar', super.key});
 
   final Casa casa;
   final List<Elemento> elementos;
   final String titulo;
+
+  static _EstadoGarantia _estado(Elemento e) {
+    if (e.garantiaProximaAVencer) return _EstadoGarantia.proxima;
+    if (e.garantiaHasta != null && e.garantiaHasta!.isBefore(DateTime.now())) return _EstadoGarantia.caducada;
+    return _EstadoGarantia.vigente;
+  }
+
+  List<Elemento> get _ordenados {
+    final copia = [...elementos];
+    copia.sort((a, b) {
+      final estadoA = _estado(a).index;
+      final estadoB = _estado(b).index;
+      if (estadoA != estadoB) return estadoA.compareTo(estadoB);
+      if (a.garantiaHasta == null || b.garantiaHasta == null) return 0;
+      return a.garantiaHasta!.compareTo(b.garantiaHasta!);
+    });
+    return copia;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,44 +67,61 @@ class GarantiasProximasScreen extends StatelessWidget {
             )
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-              children: elementos
-                  .map((e) => Card(
-                        margin: const EdgeInsets.only(bottom: 9),
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(ReparaRadius.md),
-                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ElementoDetailScreen(casa: casa, elementoId: e.id))),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 40,
-                                  height: 40,
-                                  decoration: BoxDecoration(color: context.colors.warning.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(ReparaRadius.sm)),
-                                  child: Icon(Icons.shield_outlined, size: 20, color: context.colors.warning),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(e.nombre, style: Theme.of(context).textTheme.titleMedium),
-                                      if (e.garantiaHasta != null)
-                                        Text(
-                                          'Hasta ${DateFormat('d MMMM yyyy', 'es_ES').format(e.garantiaHasta!)}',
-                                          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.colors.warningText, fontWeight: FontWeight.w600),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                                Icon(Icons.chevron_right, color: context.colors.inkMuted),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ))
-                  .toList(),
+              children: _ordenados.map((e) => _FilaGarantia(casa: casa, elemento: e, estado: _estado(e))).toList(),
             ),
+    );
+  }
+}
+
+class _FilaGarantia extends StatelessWidget {
+  const _FilaGarantia({required this.casa, required this.elemento, required this.estado});
+
+  final Casa casa;
+  final Elemento elemento;
+  final _EstadoGarantia estado;
+
+  @override
+  Widget build(BuildContext context) {
+    final (Color color, String etiqueta) = switch (estado) {
+      _EstadoGarantia.proxima => (context.colors.warningText, 'Termina el'),
+      _EstadoGarantia.vigente => (context.colors.brand, 'Vigente hasta'),
+      _EstadoGarantia.caducada => (context.colors.inkMuted, 'Caducó el'),
+    };
+    final colorInsignia = estado == _EstadoGarantia.proxima ? context.colors.warning : context.colors.brand;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 9),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(ReparaRadius.md),
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ElementoDetailScreen(casa: casa, elementoId: elemento.id))),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(color: colorInsignia.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(ReparaRadius.sm)),
+                child: Icon(Icons.shield_outlined, size: 20, color: colorInsignia),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(elemento.nombre, style: Theme.of(context).textTheme.titleMedium),
+                    if (elemento.garantiaHasta != null)
+                      Text(
+                        '$etiqueta ${DateFormat('d MMMM yyyy', 'es_ES').format(elemento.garantiaHasta!)}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: color, fontWeight: FontWeight.w600),
+                      ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: context.colors.inkMuted),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
