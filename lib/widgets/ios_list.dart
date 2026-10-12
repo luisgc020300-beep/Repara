@@ -128,6 +128,7 @@ class IosRow extends StatelessWidget {
     this.showChevron = true,
     this.dense = false,
     this.selected,
+    this.imageUrl,
     super.key,
   });
 
@@ -138,6 +139,11 @@ class IosRow extends StatelessWidget {
   final Widget? trailing;
   final VoidCallback? onTap;
   final Color? titleColor;
+
+  /// Si se pasa, sustituye la insignia de icono por esta miniatura (p.ej. la
+  /// foto real de un elemento) -- null en el resto de filas, que se quedan
+  /// con el icono de siempre.
+  final String? imageUrl;
 
   /// false en filas de acción (cerrar sesión, eliminar, aceptar/rechazar...)
   /// que no navegan a ningún sitio -- el chevron de iOS solo aparece cuando
@@ -168,8 +174,9 @@ class IosRow extends StatelessWidget {
               Container(
                 width: 29,
                 height: 29,
+                clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(color: iconColor, borderRadius: BorderRadius.circular(7)),
-                child: Icon(icon, color: Colors.white, size: 17),
+                child: imageUrl != null ? Image.network(imageUrl!, fit: BoxFit.cover) : Icon(icon, color: Colors.white, size: 17),
               ),
               const SizedBox(width: 12),
               Expanded(

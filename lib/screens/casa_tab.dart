@@ -140,6 +140,7 @@ class _HabitacionCard extends StatelessWidget {
                   IosRow(
                     icon: Icons.category_outlined,
                     iconColor: context.colors.brand,
+                    imageUrl: elementos[i].fotoUrl,
                     title: elementos[i].nombre,
                     subtitle: elementos[i].marca != null ? '${elementos[i].marca} ${elementos[i].modelo ?? ''}'.trim() : null,
                     trailing: elementos[i].garantiaProximaAVencer
