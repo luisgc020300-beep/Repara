@@ -39,6 +39,14 @@
         { "fieldPath": "casaId", "order": "ASCENDING" },
         { "fieldPath": "esConProfesional", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "elementos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "habitacionId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

@@ -13,8 +13,12 @@ class ElementoService {
   static CollectionReference<Map<String, dynamic>> _col(String casaId) =>
       _db.collection('casas').doc(casaId).collection('elementos');
 
+  // El más reciente primero (CEO, octubre 2026: sin orderBy, Firestore
+  // devuelve los documentos en un orden interno no garantizado -- no es el
+  // orden de creación -- así que un elemento recién añadido podía aparecer
+  // en cualquier sitio de la lista, no arriba).
   static Stream<List<Elemento>> streamElementos(String casaId, {String? habitacionId}) {
-    Query<Map<String, dynamic>> q = _col(casaId);
+    Query<Map<String, dynamic>> q = _col(casaId).orderBy('createdAt', descending: true);
     if (habitacionId != null) q = q.where('habitacionId', isEqualTo: habitacionId);
     return q.snapshots().map((s) => s.docs.map(Elemento.fromDoc).toList()).conRegistroDeErrores();
   }
