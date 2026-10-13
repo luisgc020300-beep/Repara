@@ -164,7 +164,11 @@ Future<void> _iniciarReporte(BuildContext context, {required String casaId, requ
   if (descripcion == null || descripcion.isEmpty || !context.mounted) return;
 
   try {
-    await Share.shareXFiles([XFile(foto.path)], text: descripcion);
+    // sharePositionOrigin es obligatorio en iOS (ancla del popover en
+    // iPad, y share_plus valida que no sea el rect vacío por defecto ni
+    // en iPhone) -- sin esto, Share.share/shareXFiles revienta siempre
+    // con PlatformException "must be non-zero" (CEO, octubre 2026).
+    await Share.shareXFiles([XFile(foto.path)], text: descripcion, sharePositionOrigin: Offset.zero & MediaQuery.of(context).size);
   } catch (e) {
     if (context.mounted) AppError.show(context, 'No se pudo abrir el selector para compartir.');
   }

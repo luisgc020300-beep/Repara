@@ -104,7 +104,9 @@ class InicioProTab extends StatelessWidget {
           Card(
             child: InkWell(
               borderRadius: BorderRadius.circular(ReparaRadius.md),
-              onTap: () => Share.share(_mensajeInvitarCliente),
+              // sharePositionOrigin obligatorio en iOS -- ver nota en
+              // contacto_acciones.dart.
+              onTap: () => Share.share(_mensajeInvitarCliente, sharePositionOrigin: Offset.zero & MediaQuery.of(context).size),
               child: Padding(
                 padding: const EdgeInsets.all(14),
                 child: Row(

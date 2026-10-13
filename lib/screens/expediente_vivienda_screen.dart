@@ -95,14 +95,13 @@ class ExpedienteViviendaScreen extends StatelessWidget {
       // compartió el contenido, solo que no se puede saber qué eligió el
       // usuario; tratarlo como error habría disparado un aviso falso en
       // cada el uso normal donde esa información no está disponible.
-      await Share.share(buffer.toString(), subject: 'Expediente de ${casa.nombre}');
+      // sharePositionOrigin obligatorio en iOS -- ver nota en
+      // contacto_acciones.dart (mismo fallo, mismo arreglo).
+      await Share.share(buffer.toString(), subject: 'Expediente de ${casa.nombre}', sharePositionOrigin: Offset.zero & MediaQuery.of(context).size);
       unawaited(AnalyticsService.householdRecordShared());
     } catch (e, st) {
       await FirebaseCrashlytics.instance.recordError(e, st);
-      // TODO(temporal): mensaje con el error real para diagnosticar por qué
-      // falla en producción -- volver al mensaje genérico en cuanto se
-      // confirme la causa.
-      if (context.mounted) AppError.show(context, 'No se pudo abrir el selector para compartir: $e');
+      if (context.mounted) AppError.show(context, 'No se pudo abrir el selector para compartir.');
     }
   }
 

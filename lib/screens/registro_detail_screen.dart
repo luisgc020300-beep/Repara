@@ -141,11 +141,14 @@ class RegistroDetailScreen extends StatelessWidget {
         ],
       ),
     );
-    if (compartir != true) return;
+    if (compartir != true || !context.mounted) return;
     try {
+      // sharePositionOrigin obligatorio en iOS -- ver nota en
+      // contacto_acciones.dart.
       await Share.share(
         'He usado Repara para gestionar "${registro.titulo}"${registro.profesionalNombre != null ? ' con ${registro.profesionalNombre}' : ''} '
         '-- presupuesto, cambios y pagos, todo en un sitio. Pruébalo tú también.',
+        sharePositionOrigin: Offset.zero & MediaQuery.of(context).size,
       );
     } catch (e) {
       // Decorativo -- que falle el selector de compartir no debe parecer
@@ -532,8 +535,11 @@ class _SeccionInvitarProfesionalState extends State<_SeccionInvitarProfesional> 
   Future<void> _compartirCodigo(String codigo) async {
     final mensaje = 'Te invito a "${widget.registro.titulo}" en Repara.\n'
         'Descárgate la app, crea tu cuenta y activa el modo profesional, y luego introduce este código de invitación: $codigo';
+    if (!mounted) return;
     try {
-      await Share.share(mensaje);
+      // sharePositionOrigin obligatorio en iOS -- ver nota en
+      // contacto_acciones.dart.
+      await Share.share(mensaje, sharePositionOrigin: Offset.zero & MediaQuery.of(context).size);
     } catch (e) {
       // El código ya se generó y se muestra en pantalla -- que falle el
       // selector de compartir no debe parecer que la invitación falló.
