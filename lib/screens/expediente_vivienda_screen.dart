@@ -99,7 +99,10 @@ class ExpedienteViviendaScreen extends StatelessWidget {
       unawaited(AnalyticsService.householdRecordShared());
     } catch (e, st) {
       await FirebaseCrashlytics.instance.recordError(e, st);
-      if (context.mounted) AppError.show(context, 'No se pudo abrir el selector para compartir.');
+      // TODO(temporal): mensaje con el error real para diagnosticar por qué
+      // falla en producción -- volver al mensaje genérico en cuanto se
+      // confirme la causa.
+      if (context.mounted) AppError.show(context, 'No se pudo abrir el selector para compartir: $e');
     }
   }
 
