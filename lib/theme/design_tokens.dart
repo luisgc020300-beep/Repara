@@ -1,9 +1,10 @@
 // lib/theme/design_tokens.dart
 //
-// Identidad visual de Repara: "la ficha viva de la casa". Fondo cálido,
-// nunca blanco puro ni negro puro. El modo oscuro (añadido a petición del
-// CEO) mantiene la misma calma -- no es el táctico/oscuro de RiskRunner,
-// es la misma paleta cálida invertida, no un tema distinto.
+// Identidad visual de Repara -- azul noche + azul sofisticado + lavanda
+// sobre superficies claras ("niebla"), premium y minimalista (rediseño
+// CEO, octubre 2026: reemplaza la paleta cálida verde/beige anterior).
+// El azul manda, la lavanda da personalidad en acentos puntuales, el
+// resto de colores queda para superficies y estados concretos.
 import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 
@@ -25,64 +26,68 @@ class ReparaColors extends ThemeExtension<ReparaColors> {
     required this.warning,
     required this.warningText,
     required this.error,
+    required this.errorText,
     required this.overlay,
   });
 
-  final Color background; // fondo general -- marfil roto / carbón cálido
-  final Color surface; // tarjetas
+  final Color background; // fondo general -- niebla azulada clara
+  final Color surface; // tarjetas -- blanco
   final Color surfaceMuted; // campos de entrada, filas alternas
   final Color surfaceSunken; // pista vacía de una barra de progreso, separadores gruesos
-  final Color ink; // texto principal
-  final Color inkMuted; // texto secundario
+  final Color ink; // texto principal -- azul noche
+  final Color inkMuted; // texto secundario -- gris azulado
   final Color inkFaint; // texto terciario, iconos en reposo -- NUNCA para texto que haya que leer
-  final Color brand; // verde salvia -- color de marca
+  final Color brand; // azul sofisticado -- botones, navegación activa, enlaces
   final Color brandStrong; // pressed/activo; texto de marca con más contraste
   final Color brandOn; // texto/icono sobre un fondo de marca relleno
-  final Color brandTint; // fondo tenue de marca: chip activo, icono circular
-  final Color sand; // acento secundario -- beige/arena, decorativo nunca semántico
+  final Color brandTint; // fondo tenue lavanda: icono circular, chip activo
+  final Color sand; // acento lavanda -- decorativo/secundario, nunca semántico
   final Color success;
   final Color warning; // SOLO icono o fondo tenue -- como texto no llega a 4.5:1, usa warningText
   final Color warningText; // variante oscurecida de warning para cumplir contraste de texto
-  final Color error;
+  final Color error; // SOLO icono, borde o fondo tenue -- como texto usa errorText
+  final Color errorText; // variante de error que sí cumple contraste de texto
   final Color overlay; // scrim bajo una hoja modal o diálogo
 
   static const light = ReparaColors(
-    background: Color(0xFFF7F3EC),
-    surface: Color(0xFFFDFBF7),
-    surfaceMuted: Color(0xFFEFE8DA),
-    surfaceSunken: Color(0xFFE3D9C4),
-    ink: Color(0xFF241F1A),
-    inkMuted: Color(0xFF6B6053),
-    inkFaint: Color(0xFF9C917E),
-    brand: Color(0xFF2F4A3C),
-    brandStrong: Color(0xFF1F3329),
+    background: Color(0xFFF4F5F9),
+    surface: Color(0xFFFFFFFF),
+    surfaceMuted: Color(0xFFECEEF5),
+    surfaceSunken: Color(0xFFE2E6EF),
+    ink: Color(0xFF26365B),
+    inkMuted: Color(0xFF64748B),
+    inkFaint: Color(0xFF97A1B5),
+    brand: Color(0xFF5268D9),
+    brandStrong: Color(0xFF3B4FBF),
     brandOn: Color(0xFFFFFFFF),
-    brandTint: Color(0x1F2F4A3C),
-    sand: Color(0xFFD8C8A8),
-    success: Color(0xFF3E7A4F),
-    warning: Color(0xFFB8842E),
-    warningText: Color(0xFF8A6220),
-    error: Color(0xFFB4463A),
-    overlay: Color(0x26000000),
+    brandTint: Color(0x24A99AE8),
+    sand: Color(0xFFA99AE8),
+    success: Color(0xFF23856D),
+    warning: Color(0xFFE5A23B),
+    warningText: Color(0xFF8A5A1F),
+    error: Color(0xFFE57373),
+    errorText: Color(0xFFC23B3B),
+    overlay: Color(0x26131A2B),
   );
 
   static const dark = ReparaColors(
-    background: Color(0xFF1B1E1B),
-    surface: Color(0xFF242824),
-    surfaceMuted: Color(0xFF2E332E),
-    surfaceSunken: Color(0xFF343A34),
-    ink: Color(0xFFF2EFE8),
-    inkMuted: Color(0xFFA8A79C),
-    inkFaint: Color(0xFF7A796E),
-    brand: Color(0xFF84AC92),
-    brandStrong: Color(0xFFA8C9B2),
-    brandOn: Color(0xFF0F2016),
-    brandTint: Color(0x2684AC92),
-    sand: Color(0xFFCBB98C),
-    success: Color(0xFF6FBF8B),
-    warning: Color(0xFFD9A548),
-    warningText: Color(0xFFF0C07A),
-    error: Color(0xFFE0776A),
+    background: Color(0xFF0F1422),
+    surface: Color(0xFF1A2235),
+    surfaceMuted: Color(0xFF212B42),
+    surfaceSunken: Color(0xFF2A3550),
+    ink: Color(0xFFEEF1FA),
+    inkMuted: Color(0xFF9AA6C0),
+    inkFaint: Color(0xFF6E7996),
+    brand: Color(0xFF7C8CEF),
+    brandStrong: Color(0xFF99A6F5),
+    brandOn: Color(0xFF10142A),
+    brandTint: Color(0x33A99AE8),
+    sand: Color(0xFFBFB2F0),
+    success: Color(0xFF4FB996),
+    warning: Color(0xFFF0B860),
+    warningText: Color(0xFFF3C88A),
+    error: Color(0xFFE88888),
+    errorText: Color(0xFFF2A7A7),
     overlay: Color(0x59000000),
   );
 
@@ -91,7 +96,8 @@ class ReparaColors extends ThemeExtension<ReparaColors> {
     Color? background, Color? surface, Color? surfaceMuted, Color? surfaceSunken,
     Color? ink, Color? inkMuted, Color? inkFaint,
     Color? brand, Color? brandStrong, Color? brandOn, Color? brandTint,
-    Color? sand, Color? success, Color? warning, Color? warningText, Color? error, Color? overlay,
+    Color? sand, Color? success, Color? warning, Color? warningText,
+    Color? error, Color? errorText, Color? overlay,
   }) {
     return ReparaColors(
       background: background ?? this.background,
@@ -110,6 +116,7 @@ class ReparaColors extends ThemeExtension<ReparaColors> {
       warning: warning ?? this.warning,
       warningText: warningText ?? this.warningText,
       error: error ?? this.error,
+      errorText: errorText ?? this.errorText,
       overlay: overlay ?? this.overlay,
     );
   }

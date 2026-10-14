@@ -608,7 +608,7 @@ class _SeccionInvitarProfesionalState extends State<_SeccionInvitarProfesional> 
                   const Divider(height: 20),
                 ],
                 if (invitacion != null && invitacion.estado == EstadoInvitacion.rechazada) ...[
-                  Text('${invitacion.profesionalEmail} rechazó la invitación anterior.', style: TextStyle(color: context.colors.error)),
+                  Text('${invitacion.profesionalEmail} rechazó la invitación anterior.', style: TextStyle(color: context.colors.errorText)),
                   const SizedBox(height: 8),
                 ],
                 const Text('Invita a tu profesional de confianza -- si ya tiene cuenta en Repara, le llega directo; si no, te doy un código para que se lo mandes tú.'),

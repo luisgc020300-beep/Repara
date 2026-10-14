@@ -120,7 +120,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       children: [
                         Icon(Icons.error_outline, size: 18, color: context.colors.error),
                         const SizedBox(width: ReparaSpace.s2),
-                        Expanded(child: Text(_error!, style: TextStyle(color: context.colors.error))),
+                        Expanded(child: Text(_error!, style: TextStyle(color: context.colors.errorText))),
                       ],
                     ),
                   ],

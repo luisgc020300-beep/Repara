@@ -46,6 +46,7 @@ class RevisionesPendientesScreen extends StatelessWidget {
                 final dias = e.proximoMantenimiento!.difference(DateTime.now()).inDays;
                 final atrasada = dias < 0;
                 final color = atrasada ? context.colors.error : context.colors.brand;
+                final colorTexto = atrasada ? context.colors.errorText : context.colors.inkMuted;
                 return Card(
                   margin: const EdgeInsets.only(bottom: 9),
                   child: InkWell(
@@ -71,7 +72,7 @@ class RevisionesPendientesScreen extends StatelessWidget {
                                   atrasada
                                       ? 'Atrasada desde el ${DateFormat('d MMMM yyyy', 'es_ES').format(e.proximoMantenimiento!)}'
                                       : 'Próxima: ${DateFormat('d MMMM yyyy', 'es_ES').format(e.proximoMantenimiento!)}',
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: atrasada ? context.colors.error : context.colors.inkMuted, fontWeight: atrasada ? FontWeight.w600 : FontWeight.w500),
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: colorTexto, fontWeight: atrasada ? FontWeight.w600 : FontWeight.w500),
                                 ),
                               ],
                             ),

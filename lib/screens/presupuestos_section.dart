@@ -117,7 +117,7 @@ class _PresupuestoCardState extends State<_PresupuestoCard> {
         EstadoPresupuesto.borrador => context.colors.inkMuted,
         EstadoPresupuesto.enviado => context.colors.warningText,
         EstadoPresupuesto.aceptado => context.colors.success,
-        EstadoPresupuesto.rechazado => context.colors.error,
+        EstadoPresupuesto.rechazado => context.colors.errorText,
         EstadoPresupuesto.cancelado => context.colors.inkMuted,
       };
 

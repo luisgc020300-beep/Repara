@@ -186,7 +186,7 @@ Color _colorGrupo(BuildContext context, EstadoPresupuesto e) => switch (e) {
       EstadoPresupuesto.enviado => context.colors.brand,
       EstadoPresupuesto.borrador => context.colors.inkMuted,
       EstadoPresupuesto.aceptado => context.colors.success,
-      EstadoPresupuesto.rechazado => context.colors.error,
+      EstadoPresupuesto.rechazado => context.colors.errorText,
       EstadoPresupuesto.cancelado => context.colors.inkMuted,
     };
 

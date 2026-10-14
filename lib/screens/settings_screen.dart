@@ -129,7 +129,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: context.colors.error),
+            style: FilledButton.styleFrom(backgroundColor: context.colors.errorText),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Eliminar cuenta'),
           ),
@@ -428,23 +428,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
               rows: [
                 IosRow(
                   icon: Icons.logout_outlined,
-                  iconColor: context.colors.error,
+                  iconColor: context.colors.errorText,
                   title: 'Cerrar sesión',
-                  titleColor: context.colors.error,
+                  titleColor: context.colors.errorText,
                   showChevron: false,
                   onTap: _confirmarCerrarSesion,
                 ),
                 IosRow(
                   icon: Icons.devices_outlined,
-                  iconColor: context.colors.error,
+                  iconColor: context.colors.errorText,
                   title: 'Cerrar sesión en todos los dispositivos',
-                  titleColor: context.colors.error,
+                  titleColor: context.colors.errorText,
                   showChevron: false,
                   trailing: _cerrandoTodo
                       ? SizedBox(
                           width: 18,
                           height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: context.colors.error),
+                          child: CircularProgressIndicator(strokeWidth: 2, color: context.colors.errorText),
                         )
                       : null,
                   onTap: _cerrandoTodo ? null : _confirmarCerrarSesionEnTodosLosDispositivos,
@@ -455,15 +455,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
               rows: [
                 IosRow(
                   icon: Icons.delete_outline,
-                  iconColor: context.colors.error,
+                  iconColor: context.colors.errorText,
                   title: 'Eliminar cuenta',
-                  titleColor: context.colors.error,
+                  titleColor: context.colors.errorText,
                   showChevron: false,
                   trailing: _eliminandoCuenta
                       ? SizedBox(
                           width: 18,
                           height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: context.colors.error),
+                          child: CircularProgressIndicator(strokeWidth: 2, color: context.colors.errorText),
                         )
                       : null,
                   onTap: _eliminandoCuenta ? null : _confirmarEliminarCuenta,
