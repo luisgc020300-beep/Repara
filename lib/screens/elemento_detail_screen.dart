@@ -217,10 +217,15 @@ class ElementoDetailScreen extends StatelessWidget {
               // Sin foto todavía -- un marcador tocable es mejor que fingir
               // una (auditoría de craft, octubre 2026): el degradado de marca
               // avisa de que es un hueco, no un dato, y toca para añadirla.
+              // Con foto, tocarla la amplía a pantalla completa -- cambiarla
+              // es el lápiz pequeño de la esquina, no toda el área (CEO,
+              // octubre 2026: "se ve muy poco, que se pueda ampliar").
               GestureDetector(
-                onTap: () => _cambiarFoto(context, elemento),
+                onTap: () => elemento.fotoUrl == null
+                    ? _cambiarFoto(context, elemento)
+                    : Navigator.push(context, MaterialPageRoute(builder: (_) => _FotoAmpliadaScreen(url: elemento.fotoUrl!))),
                 child: Container(
-                  height: 156,
+                  height: 220,
                   width: double.infinity,
                   decoration: BoxDecoration(
                     gradient: elemento.fotoUrl == null
@@ -240,10 +245,13 @@ class ElementoDetailScreen extends StatelessWidget {
                           alignment: Alignment.bottomRight,
                           child: Padding(
                             padding: const EdgeInsets.all(ReparaSpace.s2),
-                            child: Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.45), shape: BoxShape.circle),
-                              child: const Icon(Icons.edit_outlined, size: 16, color: Colors.white),
+                            child: GestureDetector(
+                              onTap: () => _cambiarFoto(context, elemento),
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.45), shape: BoxShape.circle),
+                                child: const Icon(Icons.edit_outlined, size: 16, color: Colors.white),
+                              ),
                             ),
                           ),
                         ),
@@ -430,6 +438,31 @@ class _DocumentoTile extends StatelessWidget {
       subtitle: documento.fecha != null ? DateFormat('d MMM yyyy', 'es_ES').format(documento.fecha!) : null,
       trailing: documento.importe != null ? Text('${documento.importe!.toStringAsFixed(0)} €', style: ReparaText.amount(context)) : null,
       showChevron: false,
+    );
+  }
+}
+
+/// Foto del elemento a pantalla completa, con zoom -- InteractiveViewer
+/// basta (pellizcar para ampliar), sin necesidad de ningún paquete nuevo.
+class _FotoAmpliadaScreen extends StatelessWidget {
+  const _FotoAmpliadaScreen({required this.url});
+
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: Center(
+        child: InteractiveViewer(
+          maxScale: 4,
+          child: Image.network(url, fit: BoxFit.contain),
+        ),
+      ),
     );
   }
 }
