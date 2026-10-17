@@ -14,9 +14,11 @@ service cloud.firestore {
     // finalizarTrabajoPropietario/marcarTrabajoFinalizadoProfesional/
     // rechazarFinalizacionProfesional (Admin SDK, saltan estas reglas) --
     // nunca por una escritura directa del cliente, porque esas funciones son
-    // las que crean el evento de historial y las notificaciones; una
-    // escritura directa los dejaría "terminados" (o "pendientes") en
-    // silencio (auditoría de seguridad, octubre 2026). Modelo de dos pasos:
+    // las que generan las notificaciones; una escritura directa los dejaría
+    // "terminados" (o "pendientes") en silencio (auditoría de seguridad,
+    // octubre 2026). No existe un evento de historial separado -- el propio
+    // registro es el historial, igual que ya documenta
+    // finalizarTrabajoPropietario en functions/index.js. Modelo de dos pasos:
     // pendienteConfirmacion tampoco es editable directamente en ninguna
     // dirección, para que ni el profesional pueda fingir que el propietario
     // ya confirmó, ni el propietario pueda saltarse rechazarFinalizacion
@@ -88,7 +90,15 @@ service cloud.firestore {
         // título, la descripción ni reasignarse a sí mismo otro registro.
         match /registros/{rid} {
           allow read: if isAuth() && (isMember(cid) || resource.data.profesionalUid == request.auth.uid);
-          allow create: if isAuth() && isMember(cid);
+          // profesionalUid tampoco es escribible EN LA CREACIÓN -- sin esto,
+          // un miembro podría crear el registro ya con un profesionalUid
+          // ajeno puesto, dándole acceso sin pasar por invitar/aceptar; ni
+          // con estado ya en uno controlado, saltándose por completo el
+          // flujo de finalizarTrabajoPropietario (auditoría de seguridad,
+          // octubre 2026).
+          allow create: if isAuth() && isMember(cid)
+              && !('profesionalUid' in request.resource.data)
+              && !estadoControlado(request.resource.data.estado);
           // profesionalUid NUNCA es escribible por un miembro -- solo
           // responderInvitacion (Cloud Function, Admin SDK, salta estas
           // reglas) lo asigna, tras el apretón de manos de invitación y
@@ -142,11 +152,16 @@ service cloud.firestore {
           // hay una aprobación entre dos partes que proteger -- solo el
           // propietario escribe sus propios pagos, directo desde el
           // cliente. El profesional asignado los lee con todo el detalle,
-          // pero nunca puede crearlos, editarlos ni borrarlos.
+          // pero nunca puede crearlos, editarlos ni borrarlos. Editar/borrar
+          // además se restringe a quien lo creó (createdBy) -- antes
+          // cualquier miembro de la casa podía tocar un pago registrado por
+          // otro miembro, con solo el rango numérico de importeValido como
+          // freno (auditoría de seguridad, octubre 2026).
           match /pagos/{pagoid} {
             allow read: if isAuth() && (isMember(cid) || get(/databases/$(database)/documents/casas/$(cid)/elementos/$(eid)/registros/$(rid)).data.profesionalUid == request.auth.uid);
-            allow create, update: if isAuth() && isMember(cid) && importeValido(request.resource.data.importe);
-            allow delete: if isAuth() && isMember(cid);
+            allow create: if isAuth() && isMember(cid) && importeValido(request.resource.data.importe);
+            allow update: if isAuth() && isMember(cid) && resource.data.createdBy == request.auth.uid && importeValido(request.resource.data.importe);
+            allow delete: if isAuth() && isMember(cid) && resource.data.createdBy == request.auth.uid;
           }
         }
       }

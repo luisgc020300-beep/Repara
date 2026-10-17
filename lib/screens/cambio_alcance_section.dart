@@ -130,7 +130,7 @@ class _CambioCardState extends State<_CambioCard> {
     try {
       await CambioAlcanceService.responder(
           casaId: widget.casaId, elementoId: widget.elementoId, registroId: widget.registroId, cambioAlcanceId: widget.cambio.id, aprobar: aprobar);
-      if (aprobar) unawaited(AnalyticsService.scopeChangeAccepted());
+      unawaited(aprobar ? AnalyticsService.scopeChangeAccepted() : AnalyticsService.scopeChangeRejected());
     } on FirebaseFunctionsException catch (e, st) {
       if (context.mounted) {
         AppError.show(context, e.message ?? 'No se pudo responder a la solicitud.', error: e, stackTrace: st);

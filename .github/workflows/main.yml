@@ -25,6 +25,21 @@ jobs:
         run: flutter analyze --no-fatal-infos
       - name: Flutter test
         run: flutter test
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Setup Java (requerido por el emulador de Firestore)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Install firestore-tests dependencies
+        working-directory: firestore-tests
+        run: npm install
+      - name: Firestore rules tests (emulador)
+        working-directory: firestore-tests
+        run: npm run test:emulator
 
   build-ios:
     needs: test

@@ -60,6 +60,7 @@ class AnalyticsService {
   // ── SCOPEGUARD ────────────────────────────────────────────────────────
   static Future<void> scopeChangeCreated() => _log('scope_change_created');
   static Future<void> scopeChangeAccepted() => _log('scope_change_accepted');
+  static Future<void> scopeChangeRejected() => _log('scope_change_rejected');
 
   // ── PAGOS Y FINALIZACIÓN ──────────────────────────────────────────────
   static Future<void> paymentCreated({required double importe}) =>
