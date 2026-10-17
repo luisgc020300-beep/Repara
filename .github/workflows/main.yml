@@ -29,11 +29,23 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: firestore-tests/package-lock.json
       - name: Setup Java (requerido por los emuladores de Firestore/Storage)
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
+      # Los binarios .jar de los emuladores (varios cientos de MB) no vienen
+      # con firebase-tools -- se descargan la primera vez que se usan. Sin
+      # cachear esto, cada ejecución de CI los volvería a descargar desde
+      # cero (lento, y un fallo de red tira el job entero -- ya ha pasado).
+      - name: Cache Firebase emulator binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}-${{ hashFiles('firestore-tests/package-lock.json') }}
+          restore-keys: firebase-emulators-${{ runner.os }}-
       - name: Install firestore-tests dependencies
         working-directory: firestore-tests
         run: npm install
