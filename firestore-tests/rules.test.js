@@ -270,6 +270,42 @@ describe('presupuestos y cambios de alcance -- siempre de solo lectura para el c
   });
 });
 
+describe('historial -- append-only, mismo criterio de lectura que presupuestos/cambiosAlcance', () => {
+  it('ALLOW: el propietario lee el historial de su registro', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/historial`, 'h1'), {
+        actorUid: PRO, entidad: 'presupuesto', entidadId: 'pres-a1', accion: 'creado',
+      });
+    });
+    await assertSucceeds(getDoc(doc(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/historial`, 'h1')));
+  });
+
+  it('ALLOW: el profesional asignado lee el historial de SU registro', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/historial`, 'h1'), { accion: 'creado' });
+    });
+    await assertSucceeds(getDoc(doc(as(PRO), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/historial`, 'h1')));
+  });
+
+  it('DENY: un profesional ajeno no puede leer el historial de un registro que no es suyo', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/historial`, 'h1'), { accion: 'creado' });
+    });
+    await assertFails(getDoc(doc(as(PRO_AJENO), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/historial`, 'h1')));
+  });
+
+  it('DENY: nadie puede escribir en el historial directamente, ni el propietario', async () => {
+    await assertFails(setDoc(doc(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/historial`, 'falso'), { accion: 'manipulado' }));
+  });
+
+  it('DENY: un usuario externo no puede leer el historial de una casa ajena', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/historial`, 'h1'), { accion: 'creado' });
+    });
+    await assertFails(getDoc(doc(as(EXTRANO), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/historial`, 'h1')));
+  });
+});
+
 describe('pagos -- solo el propietario escribe, el profesional asignado solo lee', () => {
   it('ALLOW: el propietario registra un pago en su registro', async () => {
     await assertSucceeds(addDoc(collection(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/pagos`), { importe: 10, fecha: new Date() }));

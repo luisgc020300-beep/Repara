@@ -163,6 +163,18 @@ service cloud.firestore {
             allow update: if isAuth() && isMember(cid) && resource.data.createdBy == request.auth.uid && importeValido(request.resource.data.importe);
             allow delete: if isAuth() && isMember(cid) && resource.data.createdBy == request.auth.uid;
           }
+
+          // Historial append-only de presupuestos/cambiosAlcance/pagos
+          // (auditoría de seguridad, octubre 2026) -- lo escriben solo las
+          // Cloud Functions (Admin SDK, salta estas reglas) en cada
+          // transición de estado real; el cliente nunca escribe aquí
+          // directamente, ni siquiera el propietario. Mismo criterio de
+          // lectura que presupuestos/cambiosAlcance: miembros de la casa o
+          // el profesional de ESE registro concreto.
+          match /historial/{hid} {
+            allow read: if isAuth() && (isMember(cid) || get(/databases/$(database)/documents/casas/$(cid)/elementos/$(eid)/registros/$(rid)).data.profesionalUid == request.auth.uid);
+            allow write: if false;
+          }
         }
       }
 

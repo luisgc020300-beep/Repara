@@ -704,6 +704,38 @@ function registroRef(casaId, elementoId, registroId) {
   return db.collection('casas').doc(casaId).collection('elementos').doc(elementoId).collection('registros').doc(registroId);
 }
 
+// =============================================================================
+// HISTORIAL append-only — casas/{cid}/elementos/{eid}/registros/{rid}/historial
+// Incremento de octubre 2026: antes no existía ningún evento separado del
+// propio documento (presupuesto/cambioAlcance/pago) que cambiaba de estado --
+// si alguien manipulaba o se perdía ese documento, no había nada de donde
+// reconstruir qué pasó. Nunca escribible por el cliente (ver firestore.rules);
+// solo lo escriben las Cloud Functions de aquí abajo y el trigger de pagos.
+// `tx` es opcional -- si se pasa (dentro de una transacción ya abierta en
+// responderPresupuesto/responderCambioAlcance), el registro de historial se
+// confirma atómicamente junto con el resto de la escritura; si no, se añade
+// aparte con un .add() normal.
+function registrarHistorial(regRef, { tx, actorUid, entidad, entidadId, accion, estadoAnterior, estadoNuevo, importe, version, motivo }) {
+  const ref = regRef.collection('historial').doc();
+  const datos = {
+    actorUid: actorUid || null,
+    entidad,
+    entidadId,
+    accion,
+    estadoAnterior: estadoAnterior ?? null,
+    estadoNuevo: estadoNuevo ?? null,
+    importe: importe ?? null,
+    version: version ?? null,
+    motivo: motivo ?? null,
+    timestamp: FieldValue.serverTimestamp(),
+  };
+  if (tx) {
+    tx.set(ref, datos);
+    return;
+  }
+  return ref.set(datos);
+}
+
 async function getRegistroOThrow(casaId, elementoId, registroId) {
   const ref = registroRef(casaId, elementoId, registroId);
   const snap = await ref.get();
@@ -762,6 +794,10 @@ exports.crearPresupuesto = onCall({ region: REGION }, async (request) => {
     fechaEnvio: null,
     fechaRespuesta: null,
   });
+  await registrarHistorial(regRef, {
+    actorUid: uid, entidad: 'presupuesto', entidadId: ref.id, accion: 'creado',
+    estadoNuevo: 'borrador', importe: totales.total, version: 1,
+  });
 
   return { ok: true, presupuestoId: ref.id, ...totales };
 });
@@ -773,7 +809,8 @@ exports.actualizarLineasPresupuesto = onCall({ region: REGION }, async (request)
   if (!casaId || !elementoId || !registroId || !presupuestoId) throw new HttpsError('invalid-argument', 'Faltan datos.');
   const lineas = validarLineas(request.data?.lineas);
 
-  const ref = registroRef(casaId, elementoId, registroId).collection('presupuestos').doc(presupuestoId);
+  const regRef = registroRef(casaId, elementoId, registroId);
+  const ref = regRef.collection('presupuestos').doc(presupuestoId);
   const snap = await ref.get();
   if (!snap.exists) throw new HttpsError('not-found', 'El presupuesto no existe.');
   const p = snap.data();
@@ -782,6 +819,10 @@ exports.actualizarLineasPresupuesto = onCall({ region: REGION }, async (request)
 
   const totales = calcularTotales(lineas);
   await ref.update({ lineas, notas: typeof notas === 'string' ? notas.trim().slice(0, 1000) : p.notas, ...totales });
+  await registrarHistorial(regRef, {
+    actorUid: uid, entidad: 'presupuesto', entidadId: presupuestoId, accion: 'editado',
+    estadoAnterior: 'borrador', estadoNuevo: 'borrador', importe: totales.total, version: p.version,
+  });
   return { ok: true, ...totales };
 });
 
@@ -800,6 +841,10 @@ exports.enviarPresupuesto = onCall({ region: REGION }, async (request) => {
   if (p.estado !== 'borrador') throw new HttpsError('failed-precondition', 'Este presupuesto ya se envió.');
 
   await ref.update({ estado: 'enviado', fechaEnvio: FieldValue.serverTimestamp() });
+  await registrarHistorial(regRef, {
+    actorUid: uid, entidad: 'presupuesto', entidadId: presupuestoId, accion: 'enviado',
+    estadoAnterior: 'borrador', estadoNuevo: 'enviado', importe: p.total, version: p.version,
+  });
 
   const registro = registroSnap.data();
   const casaSnap = await db.collection('casas').doc(casaId).get();
@@ -855,6 +900,12 @@ exports.responderPresupuesto = onCall({ region: REGION }, async (request) => {
     if (aceptar) {
       tx.update(regRef, { presupuesto: presupuesto.total, estado: 'presupuestado' });
     }
+    registrarHistorial(regRef, {
+      tx, actorUid: uid, entidad: 'presupuesto', entidadId: presupuestoId,
+      accion: aceptar ? 'aceptado' : 'rechazado',
+      estadoAnterior: 'enviado', estadoNuevo: aceptar ? 'aceptado' : 'rechazado',
+      importe: presupuesto.total, version: presupuesto.version,
+    });
     return presupuesto;
   });
 
@@ -899,6 +950,10 @@ exports.crearNuevaVersionPresupuesto = onCall({ region: REGION }, async (request
     fechaEnvio: null,
     fechaRespuesta: null,
   });
+  await registrarHistorial(regRef, {
+    actorUid: uid, entidad: 'presupuesto', entidadId: ref.id, accion: 'nueva_version',
+    estadoAnterior: 'rechazado', estadoNuevo: 'borrador', importe: totales.total, version: anterior.version + 1,
+  });
 
   return { ok: true, presupuestoId: ref.id, ...totales };
 });
@@ -935,10 +990,11 @@ exports.crearCambioAlcance = onCall({ region: REGION }, async (request) => {
   // limpio a 2 decimales para no acumular deriva de coma flotante.
   const importe = importeBruto == null ? null : redondear2(importeBruto);
 
+  const motivoLimpio = typeof motivo === 'string' ? motivo.trim().slice(0, 1000) : null;
   const ref = await regRef.collection('cambiosAlcance').add({
     titulo: titulo.trim().slice(0, 120),
     descripcion: typeof descripcion === 'string' ? descripcion.trim().slice(0, 1000) : null,
-    motivo: typeof motivo === 'string' ? motivo.trim().slice(0, 1000) : null,
+    motivo: motivoLimpio,
     fotos: Array.isArray(fotos) ? fotos.slice(0, 10) : [],
     importeAdicional: importe,
     tiempoAdicionalHoras: tiempoAdicionalHoras == null ? null : Number(tiempoAdicionalHoras),
@@ -946,6 +1002,10 @@ exports.crearCambioAlcance = onCall({ region: REGION }, async (request) => {
     estado: 'pendiente',
     creadoPorUid: uid,
     createdAt: FieldValue.serverTimestamp(),
+  });
+  await registrarHistorial(regRef, {
+    actorUid: uid, entidad: 'cambioAlcance', entidadId: ref.id, accion: 'creado',
+    estadoNuevo: 'pendiente', importe, motivo: motivoLimpio,
   });
 
   const casaSnap = await db.collection('casas').doc(casaId).get();
@@ -1001,6 +1061,12 @@ exports.responderCambioAlcance = onCall({ region: REGION }, async (request) => {
     if (aprobar && cambio.importeAdicional) {
       tx.update(regRef, { presupuesto: FieldValue.increment(cambio.importeAdicional) });
     }
+    registrarHistorial(regRef, {
+      tx, actorUid: uid, entidad: 'cambioAlcance', entidadId: cambioAlcanceId,
+      accion: aprobar ? 'aprobado' : 'rechazado',
+      estadoAnterior: 'pendiente', estadoNuevo: aprobar ? 'aprobado' : 'rechazado',
+      importe: cambio.importeAdicional, motivo: cambio.motivo,
+    });
     return cambio;
   });
 
@@ -1018,12 +1084,17 @@ exports.cancelarCambioAlcance = onCall({ region: REGION }, async (request) => {
   const { casaId, elementoId, registroId, cambioAlcanceId } = request.data || {};
   if (!casaId || !elementoId || !registroId || !cambioAlcanceId) throw new HttpsError('invalid-argument', 'Faltan datos.');
 
-  const ref = registroRef(casaId, elementoId, registroId).collection('cambiosAlcance').doc(cambioAlcanceId);
+  const regRef = registroRef(casaId, elementoId, registroId);
+  const ref = regRef.collection('cambiosAlcance').doc(cambioAlcanceId);
   const snap = await ref.get();
   if (!snap.exists) throw new HttpsError('not-found', 'No existe.');
   if (snap.data().creadoPorUid !== uid) throw new HttpsError('permission-denied', 'Solo quien lo creó puede cancelarlo.');
   if (snap.data().estado !== 'pendiente') throw new HttpsError('failed-precondition', 'Ya se respondió a esta solicitud.');
   await ref.update({ estado: 'cancelado' });
+  await registrarHistorial(regRef, {
+    actorUid: uid, entidad: 'cambioAlcance', entidadId: cambioAlcanceId, accion: 'cancelado',
+    estadoAnterior: 'pendiente', estadoNuevo: 'cancelado', importe: snap.data().importeAdicional,
+  });
   return { ok: true };
 });
 
@@ -1170,6 +1241,29 @@ exports.onPagoCreado = onDocumentCreated(
     await crearNotificacion(registro.profesionalUid, 'pago_registrado',
       'Nuevo pago registrado', `Te han registrado un pago de ${Number(pago.importe || 0).toFixed(2)} € en "${registro.titulo}".`,
       { casaId, elementoId, registroId, pagoId });
+  }
+);
+
+// Los pagos no pasan por una Cloud Function (ver arriba), así que es este
+// trigger -- no una llamada directa como en presupuestos/cambiosAlcance --
+// quien deja constancia en el historial de que se creó, editó o borró uno.
+// onDocumentWritten cubre los tres casos con un único listener.
+exports.onPagoEscritoHistorial = onDocumentWritten(
+  { region: REGION, document: 'casas/{casaId}/elementos/{elementoId}/registros/{registroId}/pagos/{pagoId}' },
+  async (event) => {
+    const { casaId, elementoId, registroId, pagoId } = event.params;
+    const before = event.data?.before?.exists ? event.data.before.data() : null;
+    const after = event.data?.after?.exists ? event.data.after.data() : null;
+    if (!before && !after) return;
+    const accion = !before ? 'creado' : !after ? 'eliminado' : 'editado';
+    // El pago solo lo puede crear/editar/borrar quien lo creó (createdBy,
+    // ver firestore.rules) -- así que createdBy es siempre el actor real de
+    // cualquiera de los tres casos, no solo de la creación.
+    const actorUid = (after || before).createdBy || null;
+    const importe = (after || before).importe ?? null;
+    await registrarHistorial(registroRef(casaId, elementoId, registroId), {
+      actorUid, entidad: 'pago', entidadId: pagoId, accion, importe,
+    });
   }
 );
 
