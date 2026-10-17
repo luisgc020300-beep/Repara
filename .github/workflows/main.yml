@@ -31,11 +31,15 @@ jobs:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: firestore-tests/package-lock.json
-      - name: Setup Java (requerido por los emuladores de Firestore/Storage)
+      # firebase-tools 15.x exige Java 21+ en tiempo de ejecución (no solo
+      # para los propios emuladores) -- con 17 el CLI entero se niega a
+      # arrancar ("no longer supports Java version before 21"). En local no
+      # se ve porque ya había un JDK más nuevo instalado aparte.
+      - name: Setup Java (requerido por firebase-tools y los emuladores)
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
       # Los binarios .jar de los emuladores (varios cientos de MB) no vienen
       # con firebase-tools -- se descargan la primera vez que se usan. Sin
       # cachear esto, cada ejecución de CI los volvería a descargar desde
