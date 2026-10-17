@@ -5,6 +5,7 @@
 // Elemento, casas/{casaId}/elementos/{elementoId}/registros/{registroId}.
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/elemento.dart';
 import '../models/registro.dart';
@@ -12,7 +13,12 @@ import 'elemento_service.dart';
 import 'stream_error_logging.dart';
 
 class RegistroService {
-  static final _db = FirebaseFirestore.instance;
+  /// Seam de solo test -- nunca se asigna en código de producción. Ver
+  /// casa_service.dart para el criterio general.
+  @visibleForTesting
+  static FirebaseFirestore? debugFirestoreOverride;
+
+  static FirebaseFirestore get _db => debugFirestoreOverride ?? FirebaseFirestore.instance;
   static const _region = 'europe-west1';
 
   static CollectionReference<Map<String, dynamic>> _col(String casaId, String elementoId) =>

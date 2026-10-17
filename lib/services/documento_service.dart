@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/documento.dart';
 import 'stream_error_logging.dart';
@@ -74,7 +75,12 @@ class PaginaDocumento {
 }
 
 class DocumentoService {
-  static final _db = FirebaseFirestore.instance;
+  /// Seam de solo test -- nunca se asigna en código de producción. Ver
+  /// casa_service.dart para el criterio general.
+  @visibleForTesting
+  static FirebaseFirestore? debugFirestoreOverride;
+
+  static FirebaseFirestore get _db => debugFirestoreOverride ?? FirebaseFirestore.instance;
   static const _region = 'europe-west1';
 
   static CollectionReference<Map<String, dynamic>> _col(String casaId) =>

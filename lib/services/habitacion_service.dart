@@ -1,11 +1,17 @@
 // lib/services/habitacion_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/habitacion.dart';
 import 'stream_error_logging.dart';
 
 class HabitacionService {
-  static final _db = FirebaseFirestore.instance;
+  /// Seam de solo test -- nunca se asigna en código de producción. Ver
+  /// casa_service.dart para el criterio general.
+  @visibleForTesting
+  static FirebaseFirestore? debugFirestoreOverride;
+
+  static FirebaseFirestore get _db => debugFirestoreOverride ?? FirebaseFirestore.instance;
 
   static CollectionReference<Map<String, dynamic>> _col(String casaId) =>
       _db.collection('casas').doc(casaId).collection('habitaciones');

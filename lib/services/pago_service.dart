@@ -6,12 +6,23 @@
 // hay ninguna aprobación entre dos partes que proteger.
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/pago.dart';
 import 'stream_error_logging.dart';
 
 class PagoService {
-  static final _db = FirebaseFirestore.instance;
+  /// Seams de solo test -- nunca se asignan en código de producción. Ver
+  /// casa_service.dart para el criterio general.
+  @visibleForTesting
+  static FirebaseFirestore? debugFirestoreOverride;
+  @visibleForTesting
+  static String? debugUidOverride;
+
+  static FirebaseFirestore get _db => debugFirestoreOverride ?? FirebaseFirestore.instance;
+  // Ver casa_service.dart: debugFirestoreOverride (no debugUidOverride) es
+  // la señal real de "estamos en test", para poder simular uid null aposta.
+  static String? get _uid => debugFirestoreOverride != null ? debugUidOverride : FirebaseAuth.instance.currentUser?.uid;
 
   static CollectionReference<Map<String, dynamic>> _col(String casaId, String elementoId, String registroId) => _db
       .collection('casas')
@@ -31,8 +42,7 @@ class PagoService {
   }
 
   static Future<void> crear(String casaId, String elementoId, String registroId, Pago pago) async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    await _col(casaId, elementoId, registroId).add({...pago.toMap(), 'createdAt': FieldValue.serverTimestamp(), 'createdBy': uid});
+    await _col(casaId, elementoId, registroId).add({...pago.toMap(), 'createdAt': FieldValue.serverTimestamp(), 'createdBy': _uid});
   }
 
   static Future<void> actualizar(String casaId, String elementoId, String registroId, String pagoId, Pago pago) async {

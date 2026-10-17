@@ -2,16 +2,34 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/casa.dart';
 import 'stream_error_logging.dart';
 
 class CasaService {
-  static final _db = FirebaseFirestore.instance;
+  /// Seams de solo test -- nunca se asignan en código de producción. Permiten
+  /// probar la lógica de consultas/streams contra un Firestore falso
+  /// (fake_cloud_firestore) sin tocar la firma pública de ningún método.
+  /// Operaciones que necesitan el User completo de FirebaseAuth (email,
+  /// refresco de token) siguen usando FirebaseAuth.instance.currentUser
+  /// directamente -- no hay en este repo un paquete de auth-mock para eso.
+  @visibleForTesting
+  static FirebaseFirestore? debugFirestoreOverride;
+  @visibleForTesting
+  static String? debugUidOverride;
+
+  static FirebaseFirestore get _db => debugFirestoreOverride ?? FirebaseFirestore.instance;
+  // debugUidOverride != null NO basta como señal de "estamos en test" --
+  // un test que simula "sin sesión" necesita poder poner el override a
+  // null a propósito. Usamos debugFirestoreOverride (siempre presente en
+  // cualquier test que toque _uid) como la señal real de modo test.
+  static String? get _uid => debugFirestoreOverride != null ? debugUidOverride : FirebaseAuth.instance.currentUser?.uid;
+
   static const _region = 'europe-west1';
 
   static Stream<String?> streamActiveCasaId() {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final uid = _uid;
     if (uid == null) return Stream.value(null);
     return _db
         .collection('users')
@@ -35,7 +53,7 @@ class CasaService {
   /// de varias casas) -- no solo la activa. createCasa/joinCasa ya la
   /// mantienen actualizada con arrayUnion.
   static Stream<List<String>> streamCasaIds() {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final uid = _uid;
     if (uid == null) return Stream.value(const []);
     return _db
         .collection('users')

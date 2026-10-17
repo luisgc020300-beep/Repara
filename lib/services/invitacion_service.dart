@@ -2,6 +2,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/invitacion.dart';
 import 'stream_error_logging.dart';
@@ -16,7 +17,17 @@ class ResultadoInvitacion {
 }
 
 class InvitacionService {
-  static final _db = FirebaseFirestore.instance;
+  /// Seams de solo test -- nunca se asignan en código de producción. Ver
+  /// casa_service.dart para el criterio general.
+  @visibleForTesting
+  static FirebaseFirestore? debugFirestoreOverride;
+  @visibleForTesting
+  static String? debugUidOverride;
+
+  static FirebaseFirestore get _db => debugFirestoreOverride ?? FirebaseFirestore.instance;
+  // Ver casa_service.dart: debugFirestoreOverride (no debugUidOverride) es
+  // la señal real de "estamos en test", para poder simular uid null aposta.
+  static String? get _uid => debugFirestoreOverride != null ? debugUidOverride : FirebaseAuth.instance.currentUser?.uid;
   static const _region = 'europe-west1';
 
   static Future<ResultadoInvitacion> invitarProfesional({
@@ -80,7 +91,7 @@ class InvitacionService {
 
   /// Invitaciones pendientes de respuesta para el profesional actual.
   static Stream<List<Invitacion>> streamPendientesParaMi() {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final uid = _uid;
     if (uid == null) return Stream.value(const []);
     return _db
         .collection('invitaciones')

@@ -17,7 +17,19 @@ import 'package:flutter/foundation.dart';
 class FcmService {
   FcmService._();
 
-  static final _db = FirebaseFirestore.instance;
+  /// Seams de solo test -- nunca se asignan en código de producción. Ver
+  /// casa_service.dart para el criterio general (FirebaseMessaging en sí no
+  /// tiene equivalente falso en este repo, así que esto solo cubre la
+  /// escritura en Firestore, no el flujo de push completo).
+  @visibleForTesting
+  static FirebaseFirestore? debugFirestoreOverride;
+  @visibleForTesting
+  static String? debugUidOverride;
+
+  static FirebaseFirestore get _db => debugFirestoreOverride ?? FirebaseFirestore.instance;
+  // Ver casa_service.dart: debugFirestoreOverride (no debugUidOverride) es
+  // la señal real de "estamos en test", para poder simular uid null aposta.
+  static String? get _uid => debugFirestoreOverride != null ? debugUidOverride : FirebaseAuth.instance.currentUser?.uid;
   static StreamSubscription<String>? _refreshSub;
 
   /// Pide permiso y registra el token del dispositivo. Se llama una vez
@@ -40,7 +52,7 @@ class FcmService {
   }
 
   static Future<void> _guardarToken(String token) async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final uid = _uid;
     if (uid == null) return;
     try {
       await _db.collection('users').doc(uid).update({
@@ -55,7 +67,7 @@ class FcmService {
   /// Se llama antes de cerrar sesión -- sin esto, el dispositivo seguiría
   /// recibiendo pushes de una cuenta de la que ya no se ha hecho logout.
   static Future<void> olvidarEsteDispositivo() async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final uid = _uid;
     try {
       final token = await FirebaseMessaging.instance.getToken();
       if (uid != null && token != null) {
