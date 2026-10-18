@@ -363,7 +363,7 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
           const SizedBox(height: ReparaSpace.s1),
           Text(
             'Repara te avisará cuando toque revisarlo. Puedes escribir el número a mano o pedirle una sugerencia a la IA según el tipo de elemento.',
-            style: TextStyle(fontSize: 12, color: context.colors.inkMuted),
+            style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: ReparaSpace.s2),
           Row(
@@ -387,11 +387,14 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
             ],
           ),
           const SizedBox(height: ReparaSpace.s6),
-          FilledButton(
-            onPressed: _guardando ? null : _guardar,
-            child: _guardando
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : Text(editando ? 'Guardar cambios' : 'Guardar elemento'),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: _guardando ? null : _guardar,
+              child: _guardando
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : Text(editando ? 'Guardar cambios' : 'Guardar elemento'),
+            ),
           ),
         ],
       ),

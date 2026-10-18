@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import '../models/casa.dart';
 import '../models/elemento.dart';
 import '../theme/design_tokens.dart';
+import '../widgets/ios_list.dart';
 import 'elemento_detail_screen.dart';
 
 class RevisionesPendientesScreen extends StatelessWidget {
@@ -42,48 +43,26 @@ class RevisionesPendientesScreen extends StatelessWidget {
             )
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-              children: elementos.map((e) {
-                final dias = e.proximoMantenimiento!.difference(DateTime.now()).inDays;
-                final atrasada = dias < 0;
-                final color = atrasada ? context.colors.error : context.colors.brand;
-                final colorTexto = atrasada ? context.colors.errorText : context.colors.inkMuted;
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 9),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(ReparaRadius.md),
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ElementoDetailScreen(casa: casa, elementoId: e.id))),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(ReparaRadius.sm)),
-                            child: Icon(Icons.build_circle_outlined, size: 20, color: color),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(e.nombre, style: Theme.of(context).textTheme.titleMedium),
-                                Text(
-                                  atrasada
-                                      ? 'Atrasada desde el ${DateFormat('d MMMM yyyy', 'es_ES').format(e.proximoMantenimiento!)}'
-                                      : 'Próxima: ${DateFormat('d MMMM yyyy', 'es_ES').format(e.proximoMantenimiento!)}',
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: colorTexto, fontWeight: atrasada ? FontWeight.w600 : FontWeight.w500),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Icon(Icons.chevron_right, color: context.colors.inkMuted),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
+              children: [
+                IosSection(
+                  rows: elementos.map((e) {
+                    final dias = e.proximoMantenimiento!.difference(DateTime.now()).inDays;
+                    final atrasada = dias < 0;
+                    final color = atrasada ? context.colors.error : context.colors.brand;
+                    final colorTexto = atrasada ? context.colors.errorText : null;
+                    return IosRow(
+                      icon: Icons.build_circle_outlined,
+                      iconColor: color,
+                      title: e.nombre,
+                      subtitle: atrasada
+                          ? 'Atrasada desde el ${DateFormat('d MMMM yyyy', 'es_ES').format(e.proximoMantenimiento!)}'
+                          : 'Próxima: ${DateFormat('d MMMM yyyy', 'es_ES').format(e.proximoMantenimiento!)}',
+                      subtitleColor: colorTexto,
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ElementoDetailScreen(casa: casa, elementoId: e.id))),
+                    );
+                  }).toList(),
+                ),
+              ],
             ),
     );
   }

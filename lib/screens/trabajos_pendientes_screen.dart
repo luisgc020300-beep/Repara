@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import '../models/casa.dart';
 import '../models/elemento.dart';
 import '../theme/design_tokens.dart';
+import '../widgets/ios_list.dart';
 import 'elemento_detail_screen.dart';
 
 class TrabajosPendientesScreen extends StatelessWidget {
@@ -42,44 +43,19 @@ class TrabajosPendientesScreen extends StatelessWidget {
             )
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-              children: items
-                  .map((item) => Card(
-                        margin: const EdgeInsets.only(bottom: 9),
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(ReparaRadius.md),
-                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ElementoDetailScreen(casa: casa, elementoId: item.elemento.id))),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 40,
-                                  height: 40,
-                                  decoration: BoxDecoration(color: context.colors.brandTint, borderRadius: BorderRadius.circular(ReparaRadius.sm)),
-                                  child: Icon(Icons.hourglass_top_outlined, size: 20, color: context.colors.brand),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(item.elemento.nombre, style: Theme.of(context).textTheme.titleMedium),
-                                      Text(
-                                        '${item.registroTitulo} · ${DateFormat('d MMM yyyy', 'es_ES').format(item.fecha)}',
-                                        style: Theme.of(context).textTheme.bodySmall,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Icon(Icons.chevron_right, color: context.colors.inkMuted),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ))
-                  .toList(),
+              children: [
+                IosSection(
+                  rows: items
+                      .map((item) => IosRow(
+                            icon: Icons.hourglass_top_outlined,
+                            iconColor: context.colors.brand,
+                            title: item.elemento.nombre,
+                            subtitle: '${item.registroTitulo} · ${DateFormat('d MMM yyyy', 'es_ES').format(item.fecha)}',
+                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ElementoDetailScreen(casa: casa, elementoId: item.elemento.id))),
+                          ))
+                      .toList(),
+                ),
+              ],
             ),
     );
   }
