@@ -21,6 +21,7 @@ import '../services/invitacion_service.dart';
 import '../services/pago_service.dart';
 import '../services/registro_service.dart';
 import '../theme/design_tokens.dart';
+import '../widgets/app_dialog.dart';
 import '../widgets/app_error.dart';
 import '../widgets/progreso_pago.dart';
 import 'cambio_alcance_section.dart';
@@ -36,18 +37,13 @@ class RegistroDetailScreen extends StatelessWidget {
   final String registroId;
 
   Future<void> _finalizar(BuildContext context, Registro registro) async {
-    final confirmar = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Finalizar registro'),
-        content: const Text('Se marcará como terminado y quedará guardado en el historial de la casa.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Finalizar')),
-        ],
-      ),
+    final confirmar = await AppDialog.confirm(
+      context,
+      title: 'Finalizar registro',
+      message: 'Se marcará como terminado y quedará guardado en el historial de la casa.',
+      confirmLabel: 'Finalizar',
     );
-    if (confirmar != true || !context.mounted) return;
+    if (!confirmar || !context.mounted) return;
     await _confirmarFinalizacion(context, registro);
   }
 
@@ -65,21 +61,14 @@ class RegistroDetailScreen extends StatelessWidget {
       final pagado = await PagoService.totalPagado(casa.id, elementoId, registro.id);
       pagadoDelTodo = pagado >= registro.presupuesto!;
       if (!pagadoDelTodo && context.mounted) {
-        final seguir = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('Todavía no está pagado del todo'),
-            content: Text(
-              'Llevas pagado ${pagado.toStringAsFixed(2)} € de ${registro.presupuesto!.toStringAsFixed(2)} €. '
+        final seguir = await AppDialog.confirm(
+          context,
+          title: 'Todavía no está pagado del todo',
+          message: 'Llevas pagado ${pagado.toStringAsFixed(2)} € de ${registro.presupuesto!.toStringAsFixed(2)} €. '
               '¿Quieres finalizar igualmente?',
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-              FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Finalizar igualmente')),
-            ],
-          ),
+          confirmLabel: 'Finalizar igualmente',
         );
-        if (seguir != true) return;
+        if (!seguir) return;
       }
     }
     if (!context.mounted) return;

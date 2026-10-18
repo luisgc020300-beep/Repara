@@ -9,6 +9,7 @@ import '../models/casa.dart';
 import '../models/contacto.dart';
 import '../services/contacto_service.dart';
 import '../theme/design_tokens.dart';
+import '../widgets/app_dialog.dart';
 import '../widgets/app_error.dart';
 import '../widgets/boton_ajustes.dart';
 import 'contacto_acciones.dart';
@@ -88,18 +89,8 @@ class _ContactoCard extends StatelessWidget {
   // es llamar (CEO, octubre 2026). El resto de la tarjeta sigue abriendo ese
   // menú completo (chat, foto, editar...).
   Future<void> _confirmarLlamada(BuildContext context) async {
-    final confirmar = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('¿Llamar a ${contacto.nombre}?'),
-        content: Text(contacto.telefono),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Llamar')),
-        ],
-      ),
-    );
-    if (confirmar != true || !context.mounted) return;
+    final confirmar = await AppDialog.confirm(context, title: '¿Llamar a ${contacto.nombre}?', message: contacto.telefono, confirmLabel: 'Llamar');
+    if (!confirmar || !context.mounted) return;
     final abierto = await launchUrl(Uri(scheme: 'tel', path: contacto.telefono));
     if (!abierto && context.mounted) AppError.show(context, 'No se pudo iniciar la llamada.');
   }

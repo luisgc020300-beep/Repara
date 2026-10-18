@@ -21,6 +21,7 @@ import '../services/elemento_service.dart';
 import '../services/habitacion_service.dart';
 import '../services/registro_service.dart';
 import '../theme/design_tokens.dart';
+import '../widgets/app_dialog.dart';
 import '../widgets/app_error.dart';
 import '../widgets/ios_list.dart';
 import 'nuevo_documento_flow.dart';
@@ -187,18 +188,13 @@ class ElementoDetailScreen extends StatelessWidget {
                 icon: const Icon(Icons.delete_outline),
                 tooltip: 'Eliminar elemento',
                 onPressed: () async {
-                  final confirmar = await showDialog<bool>(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: const Text('¿Eliminar elemento?'),
-                      content: const Text('Se eliminará la ficha, no su historial ya registrado.'),
-                      actions: [
-                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-                        TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Eliminar')),
-                      ],
-                    ),
+                  final confirmar = await AppDialog.confirmText(
+                    context,
+                    title: '¿Eliminar elemento?',
+                    message: 'Se eliminará la ficha, no su historial ya registrado.',
+                    confirmLabel: 'Eliminar',
                   );
-                  if (confirmar == true) {
+                  if (confirmar) {
                     await ElementoService.eliminar(casa.id, elemento.id);
                     if (context.mounted) Navigator.pop(context);
                   }

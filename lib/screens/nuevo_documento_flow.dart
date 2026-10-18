@@ -21,6 +21,7 @@ import '../services/documento_service.dart';
 import '../services/elemento_service.dart';
 import '../services/registro_service.dart';
 import '../theme/design_tokens.dart';
+import '../widgets/app_dialog.dart';
 import '../widgets/app_error.dart';
 import '../widgets/ios_list.dart';
 
@@ -433,18 +434,13 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
           fecha: _fecha,
         );
         if (duplicado && mounted) {
-          final continuar = await showDialog<bool>(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: const Text('Posible documento duplicado'),
-              content: const Text('Ya existe un documento del mismo proveedor, importe y fecha en esta casa. ¿Guardar de todas formas?'),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-                FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Guardar igualmente')),
-              ],
-            ),
+          final continuar = await AppDialog.confirm(
+            context,
+            title: 'Posible documento duplicado',
+            message: 'Ya existe un documento del mismo proveedor, importe y fecha en esta casa. ¿Guardar de todas formas?',
+            confirmLabel: 'Guardar igualmente',
           );
-          if (continuar != true) {
+          if (!continuar) {
             setState(() => _guardando = false);
             return;
           }

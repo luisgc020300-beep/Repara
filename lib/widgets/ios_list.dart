@@ -30,7 +30,7 @@ class IosSection extends StatelessWidget {
               padding: const EdgeInsets.only(left: 6, bottom: 6),
               child: Text(
                 header!.toUpperCase(),
-                style: TextStyle(fontSize: 12, letterSpacing: 0.6, fontWeight: FontWeight.w700, color: context.colors.inkMuted),
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(color: context.colors.inkMuted),
               ),
             ),
           Card(
@@ -84,7 +84,7 @@ class IosValueRow extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
           child: Row(
             children: [
-              Text(label, style: TextStyle(fontSize: 15, color: context.colors.ink)),
+              Text(label, style: Theme.of(context).textTheme.bodyLarge),
               // Expanded (no Spacer + Flexible): con los dos a la vez, el
               // espacio libre se repartía al 50% entre ambos, y el texto del
               // valor -- al ser más corto que esa mitad -- quedaba pegado a
@@ -101,7 +101,10 @@ class IosValueRow extends StatelessWidget {
                   // warningText, no warning -- el ámbar base no llega a
                   // 4.5:1 de contraste como texto (auditoría de
                   // accesibilidad, octubre 2026).
-                  style: TextStyle(fontSize: 15, color: destacado ? context.colors.warningText : context.colors.inkMuted, fontWeight: destacado ? FontWeight.w600 : FontWeight.w400),
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: destacado ? context.colors.warningText : context.colors.inkMuted,
+                        fontWeight: destacado ? FontWeight.w600 : FontWeight.w400,
+                      ),
                 ),
               ),
               if (onTap != null) ...[
@@ -185,7 +188,7 @@ class IosRow extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: TextStyle(fontSize: 15.5, color: titleColor ?? context.colors.ink),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(color: titleColor ?? context.colors.ink),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -193,7 +196,7 @@ class IosRow extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         subtitle!,
-                        style: TextStyle(fontSize: 12, color: context.colors.inkMuted),
+                        style: Theme.of(context).textTheme.bodySmall,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),

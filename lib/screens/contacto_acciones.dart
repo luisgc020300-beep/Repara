@@ -17,6 +17,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../models/contacto.dart';
 import '../theme/design_tokens.dart';
+import '../widgets/app_dialog.dart';
 import '../widgets/app_error.dart';
 import '../widgets/ios_list.dart';
 import 'nuevo_contacto_sheet.dart';
@@ -147,19 +148,13 @@ Future<void> _iniciarReporte(BuildContext context, {required String casaId, requ
   );
   if (foto == null || !context.mounted) return;
 
-  final descripcion = await showDialog<String>(
-    context: context,
-    builder: (ctx) {
-      final ctrl = TextEditingController();
-      return AlertDialog(
-        title: Text('¿Qué le pasa? (para ${contacto.nombre})'),
-        content: TextField(controller: ctrl, autofocus: true, minLines: 2, maxLines: 4, decoration: const InputDecoration(hintText: 'p.ej. Gotea el grifo del baño desde ayer')),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, ctrl.text.trim()), child: const Text('Enviar')),
-        ],
-      );
-    },
+  final descripcion = await AppDialog.promptText(
+    context,
+    title: '¿Qué le pasa? (para ${contacto.nombre})',
+    hint: 'p.ej. Gotea el grifo del baño desde ayer',
+    confirmLabel: 'Enviar',
+    minLines: 2,
+    maxLines: 4,
   );
   if (descripcion == null || descripcion.isEmpty || !context.mounted) return;
 

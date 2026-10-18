@@ -14,6 +14,7 @@ import '../models/pago.dart';
 import '../services/analytics_service.dart';
 import '../services/pago_service.dart';
 import '../theme/design_tokens.dart';
+import '../widgets/app_dialog.dart';
 import '../widgets/app_error.dart';
 
 class PagoDetailScreen extends StatefulWidget {
@@ -129,17 +130,8 @@ class _PagoDetailScreenState extends State<PagoDetailScreen> {
   }
 
   Future<void> _eliminar() async {
-    final confirmar = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('¿Eliminar este pago?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Eliminar')),
-        ],
-      ),
-    );
-    if (confirmar != true) return;
+    final confirmar = await AppDialog.confirmText(context, title: '¿Eliminar este pago?', confirmLabel: 'Eliminar');
+    if (!confirmar) return;
     try {
       await PagoService.eliminar(widget.casaId, widget.elementoId, widget.registroId, widget.pago!.id);
       if (mounted) Navigator.pop(context);

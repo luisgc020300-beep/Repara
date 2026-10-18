@@ -31,6 +31,7 @@ import '../services/security/biometric_service.dart';
 import '../services/security/security_preferences_service.dart';
 import '../theme/design_tokens.dart';
 import '../theme/theme_controller.dart';
+import '../widgets/app_dialog.dart';
 import '../widgets/app_error.dart';
 import '../widgets/ios_list.dart';
 import 'documentos_casa_screen.dart';
@@ -64,21 +65,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _cerrandoTodo = false;
 
   Future<void> _confirmarCerrarSesionEnTodosLosDispositivos() async {
-    final confirmar = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('¿Cerrar sesión en todos los dispositivos?'),
-        content: const Text(
-          'Este dispositivo se cierra al momento. Los demás seguirán abiertos hasta una hora más mientras se '
+    final confirmar = await AppDialog.confirm(
+      context,
+      title: '¿Cerrar sesión en todos los dispositivos?',
+      message: 'Este dispositivo se cierra al momento. Los demás seguirán abiertos hasta una hora más mientras se '
           'renueva su sesión automáticamente -- no es instantáneo en ellos.',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Cerrar en todos')),
-        ],
-      ),
+      confirmLabel: 'Cerrar en todos',
     );
-    if (confirmar != true || !mounted) return;
+    if (!confirmar || !mounted) return;
     setState(() => _cerrandoTodo = true);
     try {
       await CuentaService.cerrarSesionesEnTodosLosDispositivos();
@@ -95,17 +89,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _confirmarCerrarSesion() async {
-    final confirmar = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('¿Cerrar sesión?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Cerrar sesión')),
-        ],
-      ),
-    );
-    if (confirmar != true) return;
+    final confirmar = await AppDialog.confirm(context, title: '¿Cerrar sesión?', confirmLabel: 'Cerrar sesión');
+    if (!confirmar) return;
     await FcmService.olvidarEsteDispositivo();
     await FirebaseAuth.instance.signOut();
     // El StreamBuilder de MaterialApp ya muestra LoginScreen por debajo en
@@ -117,26 +102,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _confirmarEliminarCuenta() async {
-    final confirmar = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('¿Eliminar tu cuenta?'),
-        content: const Text(
-          'Se borra tu perfil y, si eres el único miembro de tu vivienda, también la vivienda entera con su '
+    final confirmar = await AppDialog.confirm(
+      context,
+      title: '¿Eliminar tu cuenta?',
+      message: 'Se borra tu perfil y, si eres el único miembro de tu vivienda, también la vivienda entera con su '
           'historial, documentos y fotos. Si la compartes con alguien más, solo se elimina tu vinculación a ella. '
           'Esta acción no se puede deshacer.',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: context.colors.errorText),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Eliminar cuenta'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Eliminar cuenta',
+      destructive: true,
     );
-    if (confirmar != true || !mounted) return;
+    if (!confirmar || !mounted) return;
 
     setState(() => _eliminandoCuenta = true);
     try {
@@ -173,18 +148,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _renombrarCasa(Casa casa) async {
-    final ctrl = TextEditingController(text: casa.nombre);
-    final nombre = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Nombre de la casa'),
-        content: TextField(controller: ctrl, autofocus: true),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, ctrl.text.trim()), child: const Text('Guardar')),
-        ],
-      ),
-    );
+    final nombre = await AppDialog.promptText(context, title: 'Nombre de la casa', initialValue: casa.nombre);
     if (nombre == null || nombre.isEmpty || nombre == casa.nombre) return;
     try {
       await CasaService.renombrarCasa(casa.id, nombre);
@@ -195,22 +159,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _canjearCodigoTrabajo() async {
-    final ctrl = TextEditingController();
-    final codigo = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Código de invitación'),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          textCapitalization: TextCapitalization.characters,
-          decoration: const InputDecoration(hintText: 'Ej. AB12CD'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, ctrl.text.trim()), child: const Text('Canjear')),
-        ],
-      ),
+    final codigo = await AppDialog.promptText(
+      context,
+      title: 'Código de invitación',
+      hint: 'Ej. AB12CD',
+      confirmLabel: 'Canjear',
+      textCapitalization: TextCapitalization.characters,
     );
     if (codigo == null || codigo.isEmpty || !mounted) return;
     try {
@@ -228,18 +182,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _editarCampoProfesional(String titulo, String? actual, Future<void> Function(String) guardar) async {
-    final ctrl = TextEditingController(text: actual ?? '');
-    final valor = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(titulo),
-        content: TextField(controller: ctrl, autofocus: true),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, ctrl.text.trim()), child: const Text('Guardar')),
-        ],
-      ),
-    );
+    final valor = await AppDialog.promptText(context, title: titulo, initialValue: actual ?? '');
     if (valor == null) return;
     try {
       await guardar(valor);
@@ -603,22 +546,7 @@ class _SeccionTusCasasState extends State<_SeccionTusCasas> {
   }
 
   Future<void> _crearOtraCasa() async {
-    final ctrl = TextEditingController();
-    final nombre = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Nueva casa'),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: 'p.ej. Casa de la playa'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, ctrl.text.trim()), child: const Text('Crear')),
-        ],
-      ),
-    );
+    final nombre = await AppDialog.promptText(context, title: 'Nueva casa', hint: 'p.ej. Casa de la playa', confirmLabel: 'Crear');
     if (nombre == null || nombre.isEmpty || !mounted) return;
     setState(() => _procesando = true);
     try {
@@ -634,22 +562,12 @@ class _SeccionTusCasasState extends State<_SeccionTusCasas> {
   }
 
   Future<void> _unirseAOtraCasa() async {
-    final ctrl = TextEditingController();
-    final codigo = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Código de la casa'),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          textCapitalization: TextCapitalization.characters,
-          decoration: const InputDecoration(hintText: 'Ej. AB12CD'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, ctrl.text.trim()), child: const Text('Unirme')),
-        ],
-      ),
+    final codigo = await AppDialog.promptText(
+      context,
+      title: 'Código de la casa',
+      hint: 'Ej. AB12CD',
+      confirmLabel: 'Unirme',
+      textCapitalization: TextCapitalization.characters,
     );
     if (codigo == null || codigo.isEmpty || !mounted) return;
     setState(() => _procesando = true);

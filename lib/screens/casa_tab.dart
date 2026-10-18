@@ -10,6 +10,7 @@ import '../models/habitacion.dart';
 import '../services/elemento_service.dart';
 import '../services/habitacion_service.dart';
 import '../theme/design_tokens.dart';
+import '../widgets/app_dialog.dart';
 import '../widgets/app_error.dart';
 import '../widgets/boton_ajustes.dart';
 import '../widgets/ios_list.dart';
@@ -22,18 +23,7 @@ class CasaTab extends StatelessWidget {
   final Casa casa;
 
   Future<void> _nuevaHabitacion(BuildContext context, int orden) async {
-    final ctrl = TextEditingController();
-    final nombre = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Nueva habitación'),
-        content: TextField(controller: ctrl, autofocus: true, decoration: const InputDecoration(hintText: 'p.ej. Cocina')),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, ctrl.text.trim()), child: const Text('Crear')),
-        ],
-      ),
-    );
+    final nombre = await AppDialog.promptText(context, title: 'Nueva habitación', hint: 'p.ej. Cocina', confirmLabel: 'Crear');
     if (nombre == null) return;
     if (nombre.isEmpty) {
       if (context.mounted) AppError.show(context, 'Escribe un nombre para la habitación.');
