@@ -23,6 +23,7 @@ import '../services/registro_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_dialog.dart';
 import '../widgets/app_error.dart';
+import '../widgets/ios_list.dart';
 import '../widgets/progreso_pago.dart';
 import 'cambio_alcance_section.dart';
 import 'nuevo_documento_flow.dart';
@@ -97,18 +98,13 @@ class RegistroDetailScreen extends StatelessWidget {
   /// devuelve el registro a como estaba antes de que el profesional lo
   /// marcara, y le avisa para que siga con él.
   Future<void> _rechazarFinalizacion(BuildContext context, Registro registro) async {
-    final confirmar = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('¿Todavía no está terminado?'),
-        content: const Text('Se avisará al profesional para que lo siga revisando.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Todavía no')),
-        ],
-      ),
+    final confirmar = await AppDialog.confirm(
+      context,
+      title: '¿Todavía no está terminado?',
+      message: 'Se avisará al profesional para que lo siga revisando.',
+      confirmLabel: 'Todavía no',
     );
-    if (confirmar != true || !context.mounted) return;
+    if (!confirmar || !context.mounted) return;
     try {
       await RegistroService.rechazarFinalizacionProfesional(casa.id, elementoId, registro.id);
     } catch (e, st) {
@@ -117,20 +113,14 @@ class RegistroDetailScreen extends StatelessWidget {
   }
 
   Future<void> _ofrecerCompartir(BuildContext context, Registro registro) async {
-    final compartir = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('¿Te ha ido bien?'),
-        content: Text(
-          '${registro.profesionalNombre ?? 'Tu profesional'} también puede recibir más clientes como tú a través de Repara.',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Ahora no')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Compartir')),
-        ],
-      ),
+    final compartir = await AppDialog.confirm(
+      context,
+      title: '¿Te ha ido bien?',
+      message: '${registro.profesionalNombre ?? 'Tu profesional'} también puede recibir más clientes como tú a través de Repara.',
+      cancelLabel: 'Ahora no',
+      confirmLabel: 'Compartir',
     );
-    if (compartir != true || !context.mounted) return;
+    if (!compartir || !context.mounted) return;
     try {
       // sharePositionOrigin obligatorio en iOS -- ver nota en
       // contacto_acciones.dart.
@@ -146,17 +136,8 @@ class RegistroDetailScreen extends StatelessWidget {
   }
 
   Future<void> _eliminar(BuildContext context, Registro registro) async {
-    final confirmar = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('¿Eliminar este registro?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Eliminar')),
-        ],
-      ),
-    );
-    if (confirmar != true || !context.mounted) return;
+    final confirmar = await AppDialog.confirmText(context, title: '¿Eliminar este registro?', confirmLabel: 'Eliminar');
+    if (!confirmar || !context.mounted) return;
     try {
       await RegistroService.eliminar(casa.id, elementoId, registro.id);
       if (context.mounted) Navigator.pop(context);
@@ -214,7 +195,7 @@ class RegistroDetailScreen extends StatelessWidget {
                   children: [
                     Text(
                       registro.elementoNombre.toUpperCase(),
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: context.colors.inkMuted),
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 11, color: context.colors.inkMuted),
                     ),
                     Text(registro.titulo, style: Theme.of(context).textTheme.displaySmall),
                     if (registro.esConProfesional) ...[
@@ -321,7 +302,7 @@ class RegistroDetailScreen extends StatelessWidget {
                         const SizedBox(height: 4),
                         Row(
                           children: [
-                            Text('Coste: ', style: TextStyle(color: context.colors.inkMuted)),
+                            Text('Coste: ', style: Theme.of(context).textTheme.bodySmall),
                             Text('${registro.coste!.toStringAsFixed(0)} €', style: ReparaText.amount(context)),
                           ],
                         ),
@@ -330,7 +311,7 @@ class RegistroDetailScreen extends StatelessWidget {
                         const SizedBox(height: 4),
                         Row(
                           children: [
-                            Text('Presupuesto: ', style: TextStyle(color: context.colors.inkMuted)),
+                            Text('Presupuesto: ', style: Theme.of(context).textTheme.bodySmall),
                             Text('${registro.presupuesto!.toStringAsFixed(0)} €', style: ReparaText.amount(context)),
                           ],
                         ),
@@ -388,30 +369,16 @@ class RegistroDetailScreen extends StatelessWidget {
                 builder: (context, snapshot) {
                   final documentos = snapshot.data ?? [];
                   if (documentos.isEmpty) {
-                    return Text('Sin documentos todavía.', style: TextStyle(color: context.colors.inkMuted));
+                    return const EmptyHint(message: 'Sin documentos todavía.', icon: Icons.description_outlined);
                   }
-                  return Column(
-                    children: documentos
-                        .map((d) => Card(
-                              margin: const EdgeInsets.only(bottom: 9),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 40,
-                                      height: 40,
-                                      decoration: BoxDecoration(color: context.colors.brandTint, borderRadius: BorderRadius.circular(ReparaRadius.sm)),
-                                      child: Icon(Icons.insert_drive_file_outlined, size: 20, color: context.colors.brand),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Text(d.proveedor ?? d.nombreArchivo, style: Theme.of(context).textTheme.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
-                                    ),
-                                    if (d.importe != null) Text('${d.importe!.toStringAsFixed(0)} €', style: ReparaText.amount(context)),
-                                  ],
-                                ),
-                              ),
+                  return IosSection(
+                    rows: documentos
+                        .map((d) => IosRow(
+                              icon: Icons.insert_drive_file_outlined,
+                              iconColor: context.colors.brand,
+                              title: d.proveedor ?? d.nombreArchivo,
+                              trailing: d.importe != null ? Text('${d.importe!.toStringAsFixed(0)} €', style: ReparaText.amount(context)) : null,
+                              showChevron: false,
                             ))
                         .toList(),
                   );
@@ -492,18 +459,14 @@ class _SeccionInvitarProfesionalState extends State<_SeccionInvitarProfesional> 
   bool _cancelando = false;
 
   Future<void> _cancelarInvitacion(String invitacionId) async {
-    final confirmar = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('¿Cancelar invitación?'),
-        content: const Text('Podrás invitar a otro profesional para este registro.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Seguir esperando')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Cancelar invitación')),
-        ],
-      ),
+    final confirmar = await AppDialog.confirm(
+      context,
+      title: '¿Cancelar invitación?',
+      message: 'Podrás invitar a otro profesional para este registro.',
+      cancelLabel: 'Seguir esperando',
+      confirmLabel: 'Cancelar invitación',
     );
-    if (confirmar != true || !mounted) return;
+    if (!confirmar || !mounted) return;
     setState(() => _cancelando = true);
     try {
       await InvitacionService.cancelar(invitacionId);
@@ -587,7 +550,7 @@ class _SeccionInvitarProfesionalState extends State<_SeccionInvitarProfesional> 
                   ),
                   Text(
                     'Esa persona no tiene todavía cuenta profesional en Repara. Cuando se registre, introduce este código para vincularse a este registro.',
-                    style: TextStyle(color: context.colors.inkMuted, fontSize: 12),
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
                   const Divider(height: 20),
                 ],
