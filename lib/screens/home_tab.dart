@@ -66,7 +66,7 @@ class _HomeTabState extends State<HomeTab> {
       ),
       body: Column(
         children: [
-          _AccesosRapidos(casa: widget.casa),
+          _ResumenCasa(casa: widget.casa),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
             child: TextField(
@@ -148,9 +148,13 @@ class _HomeTabState extends State<HomeTab> {
                     final nombrePorHabitacion = {for (final h in habSnapshot.data ?? const <Habitacion>[]) h.id: h.nombre};
                     return ListView(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      children: elementos
-                          .map((e) => _ElementoTile(casa: widget.casa, elemento: e, ubicacion: nombrePorHabitacion[e.habitacionId]))
-                          .toList(),
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: ReparaSpace.s2),
+                          child: Text('Tus elementos', style: Theme.of(context).textTheme.headlineSmall),
+                        ),
+                        ...elementos.map((e) => _ElementoTile(casa: widget.casa, elemento: e, ubicacion: nombrePorHabitacion[e.habitacionId])),
+                      ],
                     );
                   },
                 );
@@ -163,20 +167,21 @@ class _HomeTabState extends State<HomeTab> {
   }
 }
 
-/// Tres accesos de un vistazo (octubre 2026, pasada de craft): antes eran
-/// filas con la misma forma que cualquier elemento de la lista de abajo --
-/// nada los distinguía como "resumen" en vez de "contenido". Ahora son
-/// tiles cuadradas con un número grande, igual de rápidas de tocar pero
-/// imposibles de confundir con la lista.
-class _AccesosRapidos extends StatelessWidget {
-  const _AccesosRapidos({required this.casa});
+/// Resumen de Inicio (añadido al adaptar el rediseño "REPARA Professional"
+/// al código real): antes solo estaban las 3 tiles de acceso rápido -- el
+/// maquetado de referencia abre con una tarjeta de estado general y, si
+/// hace falta, un aviso puntual debajo de las tiles. Nunca se inventa el
+/// mensaje "todo en orden" cuando no es cierto: ambas piezas salen de los
+/// mismos datos reales que ya alimentaban las tiles, en una sola consulta.
+class _ResumenCasa extends StatelessWidget {
+  const _ResumenCasa({required this.casa});
 
   final Casa casa;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, ReparaSpace.s6),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, ReparaSpace.s4),
       child: FutureBuilder(
         future: Future.wait([
           ElementoService.conGarantiaProximaAVencer(casa.id),
@@ -187,53 +192,143 @@ class _AccesosRapidos extends StatelessWidget {
           final garantias = (snapshot.data?[0] as List<Elemento>?) ?? const [];
           final revisiones = (snapshot.data?[1] as List<Elemento>?) ?? const [];
           final pendientes = (snapshot.data?[2] as List<({Elemento elemento, String registroTitulo, DateTime fecha})>?) ?? const [];
-          return Row(
+          final todoEnOrden = garantias.isEmpty && revisiones.isEmpty;
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: _Tile(
-                  icon: Icons.shield_outlined,
-                  iconColor: context.colors.warning,
-                  numero: garantias.length,
-                  numeroColor: context.colors.warningText,
-                  etiqueta: 'Garantías',
-                  onTap: () async {
-                    final elementos = await ElementoService.conGarantia(casa.id);
-                    if (context.mounted) {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => GarantiasProximasScreen(casa: casa, elementos: elementos, titulo: 'Todas las garantías')));
-                    }
-                  },
+              Card(
+                margin: EdgeInsets.zero,
+                child: Padding(
+                  padding: const EdgeInsets.all(ReparaSpace.s4),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(color: context.colors.brandTint, shape: BoxShape.circle),
+                        child: Icon(
+                          todoEnOrden ? Icons.home_outlined : Icons.home_repair_service_outlined,
+                          color: context.colors.brand,
+                        ),
+                      ),
+                      const SizedBox(width: ReparaSpace.s3),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              todoEnOrden ? 'Todo en orden' : 'Hay cosas que revisar',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                            ),
+                            Text(
+                              todoEnOrden
+                                  ? 'Tu vivienda, organizada.'
+                                  : 'Garantías o revisiones que necesitan tu atención.',
+                              style: TextStyle(color: context.colors.inkMuted, fontSize: 13),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(width: ReparaSpace.s2 + 2),
-              Expanded(
-                child: _Tile(
-                  icon: Icons.build_circle_outlined,
-                  iconColor: context.colors.brand,
-                  numero: revisiones.length,
-                  numeroColor: context.colors.brand,
-                  etiqueta: 'Revisión',
-                  onTap: () async {
-                    final elementos = await ElementoService.conMantenimientoConfigurado(casa.id);
-                    if (context.mounted) {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => RevisionesPendientesScreen(casa: casa, elementos: elementos, titulo: 'Todo el mantenimiento')));
-                    }
-                  },
-                ),
+              const SizedBox(height: ReparaSpace.s3),
+              Row(
+                children: [
+                  Expanded(
+                    child: _Tile(
+                      icon: Icons.shield_outlined,
+                      iconColor: context.colors.warning,
+                      numero: garantias.length,
+                      numeroColor: context.colors.warningText,
+                      etiqueta: 'Garantías',
+                      onTap: () async {
+                        final elementos = await ElementoService.conGarantia(casa.id);
+                        if (context.mounted) {
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => GarantiasProximasScreen(casa: casa, elementos: elementos, titulo: 'Todas las garantías')));
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: ReparaSpace.s2 + 2),
+                  Expanded(
+                    child: _Tile(
+                      icon: Icons.build_circle_outlined,
+                      iconColor: context.colors.brand,
+                      numero: revisiones.length,
+                      numeroColor: context.colors.brand,
+                      etiqueta: 'Revisión',
+                      onTap: () async {
+                        final elementos = await ElementoService.conMantenimientoConfigurado(casa.id);
+                        if (context.mounted) {
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => RevisionesPendientesScreen(casa: casa, elementos: elementos, titulo: 'Todo el mantenimiento')));
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: ReparaSpace.s2 + 2),
+                  Expanded(
+                    child: _Tile(
+                      icon: Icons.hourglass_top_outlined,
+                      iconColor: context.colors.brand,
+                      numero: pendientes.length,
+                      numeroColor: context.colors.brand,
+                      etiqueta: 'En curso',
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TrabajosPendientesScreen(casa: casa, items: pendientes))),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: ReparaSpace.s2 + 2),
-              Expanded(
-                child: _Tile(
-                  icon: Icons.hourglass_top_outlined,
-                  iconColor: context.colors.brand,
-                  numero: pendientes.length,
-                  numeroColor: context.colors.brand,
-                  etiqueta: 'En curso',
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TrabajosPendientesScreen(casa: casa, items: pendientes))),
-                ),
-              ),
+              if (garantias.isNotEmpty) ...[
+                const SizedBox(height: ReparaSpace.s3),
+                _BannerGarantia(casa: casa, elemento: garantias.first),
+              ],
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+/// Aviso puntual para la garantía más próxima a vencer -- solo aparece si
+/// hay alguna (conGarantiaProximaAVencer ya filtra por la ventana de
+/// aviso), nunca se muestra vacío ni con un mensaje genérico.
+class _BannerGarantia extends StatelessWidget {
+  const _BannerGarantia({required this.casa, required this.elemento});
+
+  final Casa casa;
+  final Elemento elemento;
+
+  @override
+  Widget build(BuildContext context) {
+    final dias = elemento.garantiaHasta!.difference(DateTime.now()).inDays;
+    return Material(
+      color: context.colors.warning.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(ReparaRadius.sm),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(ReparaRadius.sm),
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ElementoDetailScreen(casa: casa, elementoId: elemento.id))),
+        child: Padding(
+          padding: const EdgeInsets.all(ReparaSpace.s3),
+          child: Row(
+            children: [
+              Icon(Icons.verified_outlined, size: 20, color: context.colors.warningText),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  dias <= 0
+                      ? 'La garantía de "${elemento.nombre}" ya ha caducado.'
+                      : 'La garantía de "${elemento.nombre}" termina en $dias días.',
+                  style: TextStyle(color: context.colors.warningText, fontWeight: FontWeight.w600, fontSize: 13),
+                ),
+              ),
+              Icon(Icons.chevron_right, color: context.colors.warningText, size: 18),
+            ],
+          ),
+        ),
       ),
     );
   }
