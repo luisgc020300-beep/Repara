@@ -12,6 +12,7 @@ import '../services/analytics_service.dart';
 import '../services/notificacion_router.dart';
 import '../services/notificacion_service.dart';
 import '../theme/design_tokens.dart';
+import '../widgets/ios_list.dart';
 
 class NotificacionesScreen extends StatelessWidget {
   const NotificacionesScreen({required this.modoPro, super.key});
@@ -49,7 +50,7 @@ class NotificacionesScreen extends StatelessWidget {
                       child: Icon(Icons.notifications_outlined, size: 32, color: context.colors.brand),
                     ),
                     const SizedBox(height: 16),
-                    Text('No tienes notificaciones todavía.', style: TextStyle(color: context.colors.inkMuted)),
+                    Text('No tienes notificaciones todavía.', style: Theme.of(context).textTheme.bodySmall),
                   ],
                 ),
               ),
@@ -57,7 +58,7 @@ class NotificacionesScreen extends StatelessWidget {
           }
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-            children: notificaciones.map((n) => _NotificacionCard(notificacion: n, onTap: () => _abrirTrabajo(context, n))).toList(),
+            children: [IosSection(rows: notificaciones.map((n) => _filaNotificacion(context, n, () => _abrirTrabajo(context, n))).toList())],
           );
         },
       ),
@@ -65,59 +66,28 @@ class NotificacionesScreen extends StatelessWidget {
   }
 }
 
-class _NotificacionCard extends StatelessWidget {
-  const _NotificacionCard({required this.notificacion, required this.onTap});
-
-  final Notificacion notificacion;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final n = notificacion;
-    final color = n.leida ? context.colors.inkMuted : context.colors.brand;
-    return Card(
-      margin: const EdgeInsets.only(bottom: 9),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(ReparaRadius.md),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(ReparaRadius.sm)),
-                child: Icon(_iconoTipo(n.tipo), size: 20, color: color),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(n.titulo, style: Theme.of(context).textTheme.titleMedium?.copyWith(color: n.leida ? context.colors.inkMuted : context.colors.ink)),
-                    Text(n.cuerpo, style: Theme.of(context).textTheme.bodySmall, maxLines: 2, overflow: TextOverflow.ellipsis),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  if (!n.leida) Container(width: 7, height: 7, decoration: BoxDecoration(color: context.colors.brand, shape: BoxShape.circle)),
-                  if (n.createdAt != null) ...[
-                    const SizedBox(height: 4),
-                    Text(DateFormat('d MMM', 'es_ES').format(n.createdAt!), style: TextStyle(color: context.colors.inkMuted, fontSize: 11.5)),
-                  ],
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+Widget _filaNotificacion(BuildContext context, Notificacion n, VoidCallback onTap) {
+  final color = n.leida ? context.colors.inkMuted : context.colors.brand;
+  return IosRow(
+    icon: _iconoTipo(n.tipo),
+    iconColor: color,
+    title: n.titulo,
+    titleColor: n.leida ? context.colors.inkMuted : null,
+    subtitle: n.cuerpo,
+    showChevron: false,
+    trailing: Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (!n.leida) Container(width: 7, height: 7, decoration: BoxDecoration(color: context.colors.brand, shape: BoxShape.circle)),
+        if (n.createdAt != null) ...[
+          const SizedBox(height: 4),
+          Text(DateFormat('d MMM', 'es_ES').format(n.createdAt!), style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 11.5)),
+        ],
+      ],
+    ),
+    onTap: onTap,
+  );
 }
 
 IconData _iconoTipo(String tipo) => switch (tipo) {

@@ -148,23 +148,30 @@ class ExpedienteViviendaScreen extends StatelessWidget {
       children: [
         Text(
           'Un resumen de todo lo que hay registrado en Repara sobre esta vivienda -- útil para vender la casa, renovar el seguro o pedir financiación para una reforma.',
-          style: TextStyle(color: context.colors.inkMuted, fontSize: 13),
+          style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(child: _Estadistica(valor: '${elementos.length}', etiqueta: 'Elementos')),
-            Expanded(child: _Estadistica(valor: '${finalizados.length}', etiqueta: 'Registros')),
-            Expanded(child: _Estadistica(valor: '$conGarantiaVigente', etiqueta: 'Garantías vigentes')),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(child: _Estadistica(valor: '${documentos.length}', etiqueta: 'Documentos')),
-            Expanded(child: _Estadistica(valor: '${costeTotal.toStringAsFixed(0)} €', etiqueta: 'Invertido en registros')),
-            const Expanded(child: SizedBox()),
-          ],
+        // Una sola tarjeta para las 5 cifras -- antes eran 2 filas de Cards
+        // sueltas (mismo defecto que tenía el resumen de Inicio: piezas
+        // independientes en vez de un resumen único).
+        Card(
+          margin: EdgeInsets.zero,
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            children: [
+              _filaEstadisticas(context, [
+                _Estadistica(valor: '${elementos.length}', etiqueta: 'Elementos'),
+                _Estadistica(valor: '${finalizados.length}', etiqueta: 'Registros'),
+                _Estadistica(valor: '$conGarantiaVigente', etiqueta: 'Garantías vigentes'),
+              ]),
+              Divider(height: 1, color: context.colors.border),
+              _filaEstadisticas(context, [
+                _Estadistica(valor: '${documentos.length}', etiqueta: 'Documentos'),
+                _Estadistica(valor: '${costeTotal.toStringAsFixed(0)} €', etiqueta: 'Invertido en registros'),
+                const SizedBox(),
+              ]),
+            ],
+          ),
         ),
         const SizedBox(height: 8),
         if (elementos.isNotEmpty)
@@ -209,16 +216,19 @@ class ExpedienteViviendaScreen extends StatelessWidget {
                 Text(
                   'Todavía no hay suficientes datos para generar un expediente útil.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: context.colors.inkMuted),
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
             ),
           ),
         const SizedBox(height: 8),
-        FilledButton.icon(
-          onPressed: () => _compartir(context, elementos, registros, documentos.length),
-          icon: const Icon(Icons.ios_share_outlined),
-          label: const Text('Compartir resumen'),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: () => _compartir(context, elementos, registros, documentos.length),
+            icon: const Icon(Icons.ios_share_outlined),
+            label: const Text('Compartir resumen'),
+          ),
         ),
       ],
     );
@@ -234,6 +244,21 @@ class ExpedienteViviendaScreen extends StatelessWidget {
       );
 }
 
+/// Una fila de hasta 3 cifras dentro de la tarjeta única de estadísticas,
+/// separadas por VerticalDivider -- mismo patrón que el resumen de Inicio.
+Widget _filaEstadisticas(BuildContext context, List<Widget> celdas) {
+  return IntrinsicHeight(
+    child: Row(
+      children: [
+        for (var i = 0; i < celdas.length; i++) ...[
+          if (i > 0) VerticalDivider(width: 1, thickness: 1, color: context.colors.border),
+          Expanded(child: celdas[i]),
+        ],
+      ],
+    ),
+  );
+}
+
 class _Estadistica extends StatelessWidget {
   const _Estadistica({required this.valor, required this.etiqueta});
 
@@ -242,16 +267,14 @@ class _Estadistica extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        child: Column(
-          children: [
-            Text(valor, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800, color: context.colors.brand)),
-            const SizedBox(height: 2),
-            Text(etiqueta, textAlign: TextAlign.center, style: TextStyle(fontSize: 10.5, color: context.colors.inkMuted)),
-          ],
-        ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      child: Column(
+        children: [
+          Text(valor, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800, color: context.colors.brand)),
+          const SizedBox(height: 2),
+          Text(etiqueta, textAlign: TextAlign.center, style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 10.5, letterSpacing: 0.2, color: context.colors.inkMuted)),
+        ],
       ),
     );
   }
