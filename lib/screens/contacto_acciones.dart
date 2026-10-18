@@ -79,7 +79,7 @@ Future<void> mostrarAccionesContacto(BuildContext context, {required String casa
                 ),
                 IosRow(
                   icon: Icons.camera_alt_outlined,
-                  iconColor: Colors.orange,
+                  iconColor: ctx.colors.brand,
                   title: 'Reportar un problema con foto',
                   subtitle: 'Foto + descripción, listo para enviar por WhatsApp',
                   onTap: () {
@@ -120,7 +120,7 @@ Future<void> _iniciarReporte(BuildContext context, {required String casaId, requ
           rows: [
             IosRow(
               icon: Icons.photo_camera_outlined,
-              iconColor: Colors.blue,
+              iconColor: ctx.colors.brand,
               title: 'Hacer una foto',
               onTap: () async {
                 final navigator = Navigator.of(ctx);
@@ -131,7 +131,7 @@ Future<void> _iniciarReporte(BuildContext context, {required String casaId, requ
             ),
             IosRow(
               icon: Icons.photo_library_outlined,
-              iconColor: Colors.purple,
+              iconColor: ctx.colors.brand,
               title: 'Elegir de la galería',
               onTap: () async {
                 final navigator = Navigator.of(ctx);

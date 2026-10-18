@@ -99,7 +99,7 @@ class ElementoDetailScreen extends StatelessWidget {
             rows: [
               IosRow(
                 icon: Icons.photo_camera_outlined,
-                iconColor: Colors.blue,
+                iconColor: ctx.colors.brand,
                 title: 'Hacer una foto',
                 onTap: () async {
                   final navigator = Navigator.of(ctx);
@@ -110,7 +110,7 @@ class ElementoDetailScreen extends StatelessWidget {
               ),
               IosRow(
                 icon: Icons.photo_library_outlined,
-                iconColor: Colors.purple,
+                iconColor: ctx.colors.brand,
                 title: 'Elegir de la galería',
                 onTap: () async {
                   final navigator = Navigator.of(ctx);
@@ -215,11 +215,13 @@ class ElementoDetailScreen extends StatelessWidget {
             padding: EdgeInsets.zero,
             children: [
               // Sin foto todavía -- un marcador tocable es mejor que fingir
-              // una (auditoría de craft, octubre 2026): el degradado de marca
-              // avisa de que es un hueco, no un dato, y toca para añadirla.
-              // Con foto, tocarla la amplía a pantalla completa -- cambiarla
-              // es el lápiz pequeño de la esquina, no toda el área (CEO,
-              // octubre 2026: "se ve muy poco, que se pueda ampliar").
+              // una (auditoría de craft, octubre 2026): avisa de que es un
+              // hueco, no un dato, y toca para añadirla. Con foto, tocarla
+              // la amplía a pantalla completa -- cambiarla es el lápiz
+              // pequeño de la esquina, no toda el área (CEO, octubre 2026:
+              // "se ve muy poco, que se pueda ampliar"). Relleno plano, no
+              // degradado (briefing "REPARA Professional": sin degradados
+              // decorativos).
               GestureDetector(
                 onTap: () => elemento.fotoUrl == null
                     ? _cambiarFoto(context, elemento)
@@ -228,13 +230,7 @@ class ElementoDetailScreen extends StatelessWidget {
                   height: 220,
                   width: double.infinity,
                   decoration: BoxDecoration(
-                    gradient: elemento.fotoUrl == null
-                        ? LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [context.colors.surfaceMuted, context.colors.sand],
-                          )
-                        : null,
+                    color: elemento.fotoUrl == null ? context.colors.surfaceMuted : null,
                     image: elemento.fotoUrl != null
                         ? DecorationImage(image: NetworkImage(elemento.fotoUrl!), fit: BoxFit.cover)
                         : null,

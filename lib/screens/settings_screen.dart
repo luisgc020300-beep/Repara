@@ -264,7 +264,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               rows: [
                 IosRow(
                   icon: Icons.light_mode_outlined,
-                  iconColor: Colors.orange,
+                  iconColor: context.colors.brand,
                   title: 'Claro',
                   trailing: _check(context, ThemeController.instance.mode == ThemeMode.light),
                   selected: ThemeController.instance.mode == ThemeMode.light,
@@ -272,7 +272,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 IosRow(
                   icon: Icons.dark_mode_outlined,
-                  iconColor: Colors.indigo,
+                  iconColor: context.colors.brand,
                   title: 'Oscuro',
                   trailing: _check(context, ThemeController.instance.mode == ThemeMode.dark),
                   selected: ThemeController.instance.mode == ThemeMode.dark,
@@ -280,7 +280,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 IosRow(
                   icon: Icons.smartphone_outlined,
-                  iconColor: Colors.blueGrey,
+                  iconColor: context.colors.brand,
                   title: 'Igual que el sistema',
                   trailing: _check(context, ThemeController.instance.mode == ThemeMode.system),
                   selected: ThemeController.instance.mode == ThemeMode.system,
@@ -304,14 +304,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   IosRow(
                     icon: Icons.folder_open_outlined,
-                    iconColor: Colors.blue,
+                    iconColor: context.colors.brand,
                     title: 'Documentos',
                     subtitle: 'Facturas, presupuestos y garantías guardados',
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DocumentosCasaScreen(casa: casa))),
                   ),
                   IosRow(
                     icon: Icons.summarize_outlined,
-                    iconColor: Colors.orange,
+                    iconColor: context.colors.brand,
                     title: 'Expediente de la vivienda',
                     subtitle: 'Para vender, asegurar o pedir financiación',
                     onTap: () {
@@ -321,14 +321,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   IosRow(
                     icon: Icons.group_outlined,
-                    iconColor: Colors.teal,
+                    iconColor: context.colors.brand,
                     title: 'Miembros de esta casa',
                     subtitle: casa.memberProfiles.values.map((m) => m.displayName).join(', '),
                   ),
                   if (casa.joinCode != null)
                     IosRow(
                       icon: Icons.key_outlined,
-                      iconColor: Colors.purple,
+                      iconColor: context.colors.brand,
                       title: 'Código para invitar a alguien',
                       subtitle: casa.joinCode!,
                     ),
@@ -340,7 +340,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 rows: [
                   IosRow(
                     icon: Icons.confirmation_number_outlined,
-                    iconColor: Colors.brown,
+                    iconColor: context.colors.brand,
                     title: '¿Tienes un código de invitación?',
                     subtitle: 'Un cliente te lo habrá pasado para un trabajo suyo',
                     onTap: _canjearCodigoTrabajo,
@@ -359,7 +359,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     rows: [
                       IosRow(
                         icon: Icons.badge_outlined,
-                        iconColor: Colors.blue,
+                        iconColor: context.colors.brand,
                         title: perfil?.nombreComercial?.isNotEmpty == true ? perfil!.nombreComercial! : 'Nombre comercial',
                         subtitle: 'Toca para editar',
                         onTap: () => _editarCampoProfesional(
@@ -370,7 +370,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                       IosRow(
                         icon: Icons.category_outlined,
-                        iconColor: Colors.purple,
+                        iconColor: context.colors.brand,
                         title: perfil?.especialidad?.isNotEmpty == true ? perfil!.especialidad! : 'Especialidad',
                         subtitle: 'Toca para editar',
                         onTap: () => _editarCampoProfesional(
@@ -381,7 +381,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                       IosRow(
                         icon: Icons.phone_outlined,
-                        iconColor: Colors.green,
+                        iconColor: context.colors.brand,
                         title: perfil?.telefono?.isNotEmpty == true ? perfil!.telefono! : 'Teléfono de contacto',
                         subtitle: 'Toca para editar',
                         onTap: () => _editarCampoProfesional(
@@ -411,13 +411,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
               rows: [
                 IosRow(
                   icon: Icons.privacy_tip_outlined,
-                  iconColor: Colors.blueGrey,
+                  iconColor: context.colors.brand,
                   title: 'Política de privacidad',
                   onTap: () => _abrirLegal('privacidad'),
                 ),
                 IosRow(
                   icon: Icons.description_outlined,
-                  iconColor: Colors.blueGrey,
+                  iconColor: context.colors.brand,
                   title: 'Términos de servicio',
                   onTap: () => _abrirLegal('terminos'),
                 ),
@@ -539,7 +539,7 @@ class _SeccionSeguridadState extends State<_SeccionSeguridad> {
       rows: [
         IosRow(
           icon: Icons.folder_shared_outlined,
-          iconColor: Colors.deepOrange,
+          iconColor: context.colors.brand,
           title: 'Proteger documentos sensibles',
           subtitle: _biometriaDisponible
               ? 'Pide Face ID/huella antes de abrir una factura o garantía'
@@ -552,7 +552,7 @@ class _SeccionSeguridadState extends State<_SeccionSeguridad> {
         ),
         IosRow(
           icon: Icons.engineering_outlined,
-          iconColor: Colors.indigo,
+          iconColor: context.colors.brand,
           title: 'Proteger el acceso a Repara Pro',
           subtitle: _biometriaDisponible
               ? 'Pide Face ID/huella antes de entrar en modo profesional'
@@ -692,14 +692,14 @@ class _SeccionTusCasasState extends State<_SeccionTusCasas> {
               ),
             IosRow(
               icon: Icons.add_home_outlined,
-              iconColor: Colors.green,
+              iconColor: context.colors.brand,
               title: 'Crear otra casa',
               showChevron: false,
               onTap: _procesando ? null : _crearOtraCasa,
             ),
             IosRow(
               icon: Icons.key_outlined,
-              iconColor: Colors.purple,
+              iconColor: context.colors.brand,
               title: 'Unirme a otra casa con código',
               showChevron: false,
               onTap: _procesando ? null : _unirseAOtraCasa,

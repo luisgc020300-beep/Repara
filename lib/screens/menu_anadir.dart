@@ -31,7 +31,7 @@ Future<void> mostrarMenuAnadir(BuildContext context, {required Casa casa}) {
               rows: [
                 IosRow(
                   icon: Icons.document_scanner_outlined,
-                  iconColor: Colors.blue,
+                  iconColor: ctx.colors.brand,
                   title: 'Escanear factura o documento',
                   subtitle: 'La IA rellena los datos por ti',
                   onTap: () {

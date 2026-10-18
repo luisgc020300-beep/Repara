@@ -207,18 +207,13 @@ class RegistroDetailScreen extends StatelessWidget {
             padding: EdgeInsets.zero,
             children: [
               // Sin foto real todavía -- un marcador es mejor que fingir una
-              // (auditoría de craft, octubre 2026): el degradado de marca
-              // avisa de que es un hueco, no un dato.
+              // (auditoría de craft, octubre 2026): avisa de que es un
+              // hueco, no un dato. Relleno plano, no degradado (briefing
+              // "REPARA Professional": sin degradados decorativos).
               Container(
                 height: 156,
                 width: double.infinity,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [context.colors.surfaceMuted, context.colors.sand],
-                  ),
-                ),
+                decoration: BoxDecoration(color: context.colors.surfaceMuted),
                 child: Center(
                   child: Icon(Icons.image_outlined, size: 34, color: context.colors.inkFaint),
                 ),

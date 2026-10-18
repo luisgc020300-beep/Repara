@@ -129,7 +129,7 @@ Future<List<PaginaDocumento>?> _elegirPaginas(BuildContext context) async {
               rows: [
                 IosRow(
                   icon: Icons.photo_camera_outlined,
-                  iconColor: Colors.blue,
+                  iconColor: ctx.colors.brand,
                   title: 'Hacer una foto',
                   onTap: () async {
                     final navigator = Navigator.of(ctx);
@@ -146,7 +146,7 @@ Future<List<PaginaDocumento>?> _elegirPaginas(BuildContext context) async {
                 ),
                 IosRow(
                   icon: Icons.photo_library_outlined,
-                  iconColor: Colors.purple,
+                  iconColor: ctx.colors.brand,
                   title: 'Elegir de la galería',
                   subtitle: 'Puedes seleccionar varias fotos si el documento tiene varias páginas',
                   onTap: () async {
