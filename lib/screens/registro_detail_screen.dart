@@ -23,6 +23,8 @@ import '../services/registro_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_dialog.dart';
 import '../widgets/app_error.dart';
+import '../widgets/boton_sobre_imagen.dart';
+import '../widgets/estado_registro_chip.dart';
 import '../widgets/ios_list.dart';
 import '../widgets/progreso_pago.dart';
 import 'cambio_alcance_section.dart';
@@ -164,10 +166,10 @@ class RegistroDetailScreen extends StatelessWidget {
           appBar: AppBar(
             backgroundColor: Colors.transparent,
             elevation: 0,
-            leading: _BotonSobreImagen(icon: Icons.arrow_back, tooltip: 'Volver', onPressed: () => Navigator.pop(context)),
+            leading: BotonSobreImagen(icon: Icons.arrow_back, tooltip: 'Volver', onPressed: () => Navigator.pop(context)),
             actions: [
               if (!registro.esConProfesional)
-                _BotonSobreImagen(icon: Icons.delete_outline, tooltip: 'Eliminar registro', onPressed: () => _eliminar(context, registro)),
+                BotonSobreImagen(icon: Icons.delete_outline, tooltip: 'Eliminar registro', onPressed: () => _eliminar(context, registro)),
             ],
           ),
           floatingActionButton: !registro.esConProfesional || _estadoControlado(registro.estado)
@@ -199,7 +201,7 @@ class RegistroDetailScreen extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Icon(_iconoTipoRegistro(registro.tipo), size: 13, color: context.colors.inkMuted),
+                        Icon(iconoTipoRegistro(registro.tipo), size: 13, color: context.colors.inkMuted),
                         const SizedBox(width: 5),
                         Text(
                           '${registro.elementoNombre} · ${nombreTipoRegistro(registro.tipo)}'.toUpperCase(),
@@ -211,7 +213,7 @@ class RegistroDetailScreen extends StatelessWidget {
                     Text(registro.titulo, style: Theme.of(context).textTheme.displaySmall),
                     if (registro.esConProfesional) ...[
                       const SizedBox(height: 10),
-                      _EstadoChip(estado: registro.estado),
+                      EstadoRegistroChip(estado: registro.estado),
                     ],
                   ],
                 ),
@@ -222,9 +224,15 @@ class RegistroDetailScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
               if (registro.esConProfesional && registro.estado == EstadoRegistro.pendienteConfirmacion) ...[
-                _AvisoPendienteConfirmacion(
-                  onRechazar: () => _rechazarFinalizacion(context, registro),
-                  onConfirmar: () => _confirmarFinalizacion(context, registro),
+                AvisoRegistro(
+                  mensaje: 'El profesional dice que ha terminado este registro. ¿Lo confirmas?',
+                  acciones: Row(
+                    children: [
+                      Expanded(child: OutlinedButton(onPressed: () => _rechazarFinalizacion(context, registro), child: const Text('Todavía no'))),
+                      const SizedBox(width: 8),
+                      Expanded(child: FilledButton(onPressed: () => _confirmarFinalizacion(context, registro), child: const Text('Confirmar'))),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 16),
               ],
@@ -259,7 +267,7 @@ class RegistroDetailScreen extends StatelessWidget {
                 DropdownButtonFormField<EstadoRegistro>(
                   initialValue: registro.estado,
                   decoration: const InputDecoration(labelText: 'Estado'),
-                  items: _estadosEditables.map((e) => DropdownMenuItem(value: e, child: Text(_nombreEstado(e)))).toList(),
+                  items: _estadosEditables.map((e) => DropdownMenuItem(value: e, child: Text(nombreEstadoRegistro(e)))).toList(),
                   onChanged: (v) {
                     if (v != null) RegistroService.actualizarEstado(casa.id, elementoId, registro.id, v);
                   },
@@ -546,81 +554,6 @@ class _SeccionInvitarProfesionalState extends State<_SeccionInvitarProfesional> 
   }
 }
 
-/// Icono de respaldo circular para los botones de la AppBar transparente que
-/// flota sobre la cabecera -- sin esto, un icono blanco a secas se vuelve
-/// invisible contra el hueco de foto gris claro (mismo problema, mismo
-/// arreglo, que el lápiz de editar foto en elemento_detail_screen.dart).
-class _BotonSobreImagen extends StatelessWidget {
-  const _BotonSobreImagen({required this.icon, required this.tooltip, required this.onPressed});
-
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(8),
-      child: Material(
-        color: Colors.black.withValues(alpha: 0.45),
-        shape: const CircleBorder(),
-        child: IconButton(
-          icon: Icon(icon, color: Colors.white, size: 20),
-          tooltip: tooltip,
-          onPressed: onPressed,
-        ),
-      ),
-    );
-  }
-}
-
-/// Aviso de que el profesional dice haber terminado -- contenedor con borde
-/// de color en vez de Card (briefing "REPARA Professional": un aviso debe
-/// distinguirse de una tarjeta de contenido normal, no parecer una más).
-class _AvisoPendienteConfirmacion extends StatelessWidget {
-  const _AvisoPendienteConfirmacion({required this.onRechazar, required this.onConfirmar});
-
-  final VoidCallback onRechazar;
-  final VoidCallback onConfirmar;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: context.colors.warning.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(ReparaRadius.md),
-        border: Border.all(color: context.colors.warning.withValues(alpha: 0.35)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.hourglass_top_outlined, color: context.colors.warningText),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'El profesional dice que ha terminado este registro. ¿Lo confirmas?',
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(child: OutlinedButton(onPressed: onRechazar, child: const Text('Todavía no'))),
-              const SizedBox(width: 8),
-              Expanded(child: FilledButton(onPressed: onConfirmar, child: const Text('Confirmar'))),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 /// Resumen económico en una sola tarjeta -- antes el presupuesto, el coste,
 /// el profesional de texto libre y la barra de pago vivían como líneas
 /// sueltas dentro de la misma tarjeta genérica que la descripción y el
@@ -690,47 +623,11 @@ class _ResumenEconomico extends StatelessWidget {
   }
 }
 
-/// Chip de estado en la cabecera (octubre 2026, pasada de craft) -- antes el
-/// estado solo se veía dentro de un TextFormField deshabilitado, igual de
-/// discreto que cualquier otro campo. Ahora es visible de un vistazo sin
-/// leer nada, con el color semántico que le corresponde.
-class _EstadoChip extends StatelessWidget {
-  const _EstadoChip({required this.estado});
-
-  final EstadoRegistro estado;
-
-  @override
-  Widget build(BuildContext context) {
-    final (Color fg, Color bg) = switch (estado) {
-      EstadoRegistro.pendienteConfirmacion => (context.colors.warningText, context.colors.warning.withValues(alpha: 0.12)),
-      EstadoRegistro.terminado || EstadoRegistro.archivado => (context.colors.success, context.colors.success.withValues(alpha: 0.12)),
-      EstadoRegistro.nuevo || EstadoRegistro.presupuestado || EstadoRegistro.enCurso => (context.colors.brand, context.colors.brandTint),
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(ReparaRadius.pill)),
-      child: Text(
-        _nombreEstado(estado).toUpperCase(),
-        style: TextStyle(color: fg, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.5),
-      ),
-    );
-  }
-}
-
 // terminado/archivado/pendienteConfirmacion nunca son editables por esta vía
 // directa -- "Finalizar"/"Confirmar"/"Todavía no" son las únicas puertas
 // (modelo de dos pasos, auditoría de producto, octubre 2026).
 bool _estadoControlado(EstadoRegistro e) =>
     e == EstadoRegistro.terminado || e == EstadoRegistro.archivado || e == EstadoRegistro.pendienteConfirmacion;
-
-String _nombreEstado(EstadoRegistro e) => switch (e) {
-      EstadoRegistro.nuevo => 'Nuevo',
-      EstadoRegistro.presupuestado => 'Presupuestado',
-      EstadoRegistro.enCurso => 'En curso',
-      EstadoRegistro.pendienteConfirmacion => 'Pendiente de confirmación',
-      EstadoRegistro.terminado => 'Terminado',
-      EstadoRegistro.archivado => 'Archivado',
-    };
 
 // Un registro simple (sin profesional) nace directamente "terminado" -- no
 // tiene el ciclo de vida nuevo/presupuestado/en curso, así que aquí solo se
@@ -739,14 +636,3 @@ String _nombreEstado(EstadoRegistro e) => switch (e) {
 String _nombreEstadoSimple(Registro r) => r.estado == EstadoRegistro.archivado ? 'Archivado' : 'Registrado';
 
 const _estadosEditables = [EstadoRegistro.nuevo, EstadoRegistro.presupuestado, EstadoRegistro.enCurso];
-
-IconData _iconoTipoRegistro(TipoRegistro t) => switch (t) {
-      TipoRegistro.compra => Icons.shopping_bag_outlined,
-      TipoRegistro.averia => Icons.report_problem_outlined,
-      TipoRegistro.reparacion => Icons.build_outlined,
-      TipoRegistro.mantenimiento => Icons.build_circle_outlined,
-      TipoRegistro.instalacion => Icons.handyman_outlined,
-      TipoRegistro.reforma => Icons.home_repair_service_outlined,
-      TipoRegistro.sustitucion => Icons.swap_horiz_outlined,
-      TipoRegistro.nota => Icons.notes_outlined,
-    };

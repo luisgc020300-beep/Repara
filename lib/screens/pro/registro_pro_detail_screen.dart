@@ -16,6 +16,8 @@ import '../../services/registro_service.dart';
 import '../../theme/design_tokens.dart';
 import '../../widgets/app_dialog.dart';
 import '../../widgets/app_error.dart';
+import '../../widgets/estado_registro_chip.dart';
+import '../../widgets/ios_list.dart';
 import '../../widgets/progreso_pago.dart';
 import '../cambio_alcance_section.dart';
 import '../nuevo_documento_flow.dart';
@@ -74,14 +76,20 @@ class RegistroProDetailScreen extends StatelessWidget {
         }
         return Scaffold(
           appBar: AppBar(
-            toolbarHeight: 68,
+            toolbarHeight: 72,
             title: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(
-                  registro.elementoNombre.toUpperCase(),
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: context.colors.inkMuted),
+                Row(
+                  children: [
+                    Icon(iconoTipoRegistro(registro.tipo), size: 12, color: context.colors.inkMuted),
+                    const SizedBox(width: 5),
+                    Text(
+                      '${registro.elementoNombre} · ${nombreTipoRegistro(registro.tipo)}'.toUpperCase(),
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 11, color: context.colors.inkMuted),
+                    ),
+                  ],
                 ),
                 Text(registro.titulo, style: Theme.of(context).textTheme.displaySmall?.copyWith(fontSize: 22), maxLines: 1, overflow: TextOverflow.ellipsis),
               ],
@@ -97,85 +105,68 @@ class RegistroProDetailScreen extends StatelessWidget {
           body: ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              EstadoRegistroChip(estado: registro.estado),
+              const SizedBox(height: 16),
               if (registro.estado == EstadoRegistro.pendienteConfirmacion) ...[
+                const AvisoRegistro(mensaje: 'Esperando a que el propietario confirme que está terminado.'),
+                const SizedBox(height: 16),
+              ],
+              if (registro.descripcion != null) ...[
+                Text(registro.descripcion!, style: Theme.of(context).textTheme.bodyLarge),
+                const SizedBox(height: 16),
+              ],
+              // "Terminado"/"Archivado"/"PendienteConfirmacion" nunca son una
+              // opción aquí -- solo se alcanzan a través de "Finalizar"
+              // (auditoría de seguridad, octubre 2026). El servidor ya lo
+              // bloquea aunque se fuerce desde fuera de la app, pero antes el
+              // desplegable seguía mostrando las opciones como tocables en un
+              // registro ya cerrado (auditoría de producto, octubre 2026).
+              // Ahora, si ya está en un estado controlado, el campo se
+              // deshabilita del todo. Autocontenido por el propio
+              // InputDecorationTheme, sin Card envolvente (mismo criterio que
+              // el lado de Hogar).
+              if (_estadoControlado(registro.estado))
+                TextFormField(
+                  key: ValueKey(registro.estado),
+                  initialValue: nombreEstadoRegistro(registro.estado),
+                  enabled: false,
+                  decoration: InputDecoration(
+                    labelText: 'Estado',
+                    helperText: switch (registro.estado) {
+                      EstadoRegistro.pendienteConfirmacion => 'Esperando confirmación del propietario',
+                      _ => 'Ya está finalizado',
+                    },
+                  ),
+                )
+              else
+                DropdownButtonFormField<EstadoRegistro>(
+                  initialValue: registro.estado,
+                  decoration: const InputDecoration(labelText: 'Estado'),
+                  items: _estadosEditables.map((e) => DropdownMenuItem(value: e, child: Text(nombreEstadoRegistro(e)))).toList(),
+                  onChanged: (v) {
+                    if (v != null) RegistroService.actualizarEstado(casaId, elementoId, registroId, v);
+                  },
+                ),
+              if (registro.presupuesto != null) ...[
+                const SizedBox(height: 16),
                 Card(
-                  color: context.colors.warning.withValues(alpha: 0.12),
+                  margin: EdgeInsets.zero,
+                  clipBehavior: Clip.antiAlias,
                   child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Row(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.hourglass_top_outlined, color: context.colors.warning),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'Esperando a que el propietario confirme que está terminado.',
-                            style: TextStyle(color: context.colors.ink, fontWeight: FontWeight.w600),
-                          ),
-                        ),
+                        Text('Presupuesto acordado', style: Theme.of(context).textTheme.labelSmall?.copyWith(color: context.colors.inkMuted)),
+                        const SizedBox(height: 2),
+                        Text('${registro.presupuesto!.toStringAsFixed(0)} €', style: ReparaText.amount(context, large: true)),
+                        const SizedBox(height: 14),
+                        ProgresoPago(casaId: casaId, elementoId: elementoId, registroId: registroId, presupuesto: registro.presupuesto!),
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
               ],
-              if (registro.descripcion != null) ...[
-                Text(registro.descripcion!),
-                const SizedBox(height: 16),
-              ],
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // "Terminado"/"Archivado"/"PendienteConfirmacion" nunca
-                      // son una opción aquí -- solo se alcanzan a través de
-                      // "Finalizar" (auditoría de seguridad, octubre 2026).
-                      // El servidor ya lo bloquea aunque se fuerce desde fuera
-                      // de la app, pero antes el desplegable seguía
-                      // mostrando las opciones como tocables en un registro ya
-                      // cerrado (auditoría de producto, octubre 2026). Ahora,
-                      // si ya está en un estado controlado, el campo se
-                      // deshabilita del todo.
-                      if (_estadoControlado(registro.estado))
-                        TextFormField(
-                          key: ValueKey(registro.estado),
-                          initialValue: _nombreEstado(registro.estado),
-                          enabled: false,
-                          decoration: InputDecoration(
-                            labelText: 'Estado',
-                            helperText: switch (registro.estado) {
-                              EstadoRegistro.pendienteConfirmacion => 'Esperando confirmación del propietario',
-                              _ => 'Ya está finalizado',
-                            },
-                          ),
-                        )
-                      else
-                        DropdownButtonFormField<EstadoRegistro>(
-                          initialValue: registro.estado,
-                          decoration: const InputDecoration(labelText: 'Estado'),
-                          items: _estadosEditables
-                              .map((e) => DropdownMenuItem(value: e, child: Text(_nombreEstado(e))))
-                              .toList(),
-                          onChanged: (v) {
-                            if (v != null) RegistroService.actualizarEstado(casaId, elementoId, registroId, v);
-                          },
-                        ),
-                      if (registro.presupuesto != null) ...[
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Text('Presupuesto acordado: ', style: TextStyle(color: context.colors.inkMuted)),
-                            Text('${registro.presupuesto!.toStringAsFixed(2)} €', style: ReparaText.amount(context)),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        ProgresoPago(casaId: casaId, elementoId: elementoId, registroId: registroId, presupuesto: registro.presupuesto!),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
               const SizedBox(height: 20),
               PresupuestosSection(casaId: casaId, elementoId: elementoId, registroId: registroId, rol: RolEnTrabajo.profesional),
               const SizedBox(height: 20),
@@ -212,30 +203,16 @@ class RegistroProDetailScreen extends StatelessWidget {
                 builder: (context, snapshot) {
                   final documentos = snapshot.data ?? [];
                   if (documentos.isEmpty) {
-                    return Text('Sin documentos todavía.', style: TextStyle(color: context.colors.inkMuted));
+                    return const EmptyHint(message: 'Sin documentos todavía.', icon: Icons.description_outlined);
                   }
-                  return Column(
-                    children: documentos
-                        .map((d) => Card(
-                              margin: const EdgeInsets.only(bottom: 9),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 40,
-                                      height: 40,
-                                      decoration: BoxDecoration(color: context.colors.brandTint, borderRadius: BorderRadius.circular(ReparaRadius.sm)),
-                                      child: Icon(Icons.insert_drive_file_outlined, size: 20, color: context.colors.brand),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Text(d.proveedor ?? d.nombreArchivo, style: Theme.of(context).textTheme.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
-                                    ),
-                                    if (d.importe != null) Text('${d.importe!.toStringAsFixed(0)} €', style: ReparaText.amount(context)),
-                                  ],
-                                ),
-                              ),
+                  return IosSection(
+                    rows: documentos
+                        .map((d) => IosRow(
+                              icon: Icons.insert_drive_file_outlined,
+                              iconColor: context.colors.brand,
+                              title: d.proveedor ?? d.nombreArchivo,
+                              trailing: d.importe != null ? Text('${d.importe!.toStringAsFixed(0)} €', style: ReparaText.amount(context)) : null,
+                              showChevron: false,
                             ))
                         .toList(),
                   );
@@ -244,7 +221,7 @@ class RegistroProDetailScreen extends StatelessWidget {
               const SizedBox(height: 16),
               Text(
                 'Solo ves este registro -- no tienes acceso al resto de la casa ni a su historial completo.',
-                style: TextStyle(color: context.colors.inkMuted, fontSize: 12),
+                style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
           ),
@@ -256,14 +233,5 @@ class RegistroProDetailScreen extends StatelessWidget {
 
 bool _estadoControlado(EstadoRegistro e) =>
     e == EstadoRegistro.terminado || e == EstadoRegistro.archivado || e == EstadoRegistro.pendienteConfirmacion;
-
-String _nombreEstado(EstadoRegistro e) => switch (e) {
-      EstadoRegistro.nuevo => 'Nuevo',
-      EstadoRegistro.presupuestado => 'Presupuestado',
-      EstadoRegistro.enCurso => 'En curso',
-      EstadoRegistro.pendienteConfirmacion => 'Pendiente de confirmación',
-      EstadoRegistro.terminado => 'Terminado',
-      EstadoRegistro.archivado => 'Archivado',
-    };
 
 const _estadosEditables = [EstadoRegistro.nuevo, EstadoRegistro.presupuestado, EstadoRegistro.enCurso];

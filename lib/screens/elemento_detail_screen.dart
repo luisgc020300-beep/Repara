@@ -23,6 +23,7 @@ import '../services/registro_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_dialog.dart';
 import '../widgets/app_error.dart';
+import '../widgets/boton_sobre_imagen.dart';
 import '../widgets/ios_list.dart';
 import 'nuevo_documento_flow.dart';
 import 'nuevo_elemento_screen.dart';
@@ -172,21 +173,24 @@ class ElementoDetailScreen extends StatelessWidget {
         }
         return Scaffold(
           extendBodyBehindAppBar: true,
+          // Respaldo circular oscuro, no iconTheme blanco a secas -- sin
+          // foto, el hueco es gris claro y un icono blanco se vuelve casi
+          // invisible encima (mismo arreglo que registro_detail_screen.dart).
           appBar: AppBar(
             backgroundColor: Colors.transparent,
             elevation: 0,
-            iconTheme: const IconThemeData(color: Colors.white),
+            leading: BotonSobreImagen(icon: Icons.arrow_back, tooltip: 'Volver', onPressed: () => Navigator.pop(context)),
             actions: [
-              IconButton(
-                icon: const Icon(Icons.edit_outlined),
+              BotonSobreImagen(
+                icon: Icons.edit_outlined,
                 tooltip: 'Editar ficha',
                 onPressed: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => NuevoElementoScreen(casa: casa, habitacionIdInicial: elemento.habitacionId, existente: elemento)),
                 ),
               ),
-              IconButton(
-                icon: const Icon(Icons.delete_outline),
+              BotonSobreImagen(
+                icon: Icons.delete_outline,
                 tooltip: 'Eliminar elemento',
                 onPressed: () async {
                   final confirmar = await AppDialog.confirmText(
