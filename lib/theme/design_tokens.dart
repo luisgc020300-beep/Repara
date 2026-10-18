@@ -1,10 +1,10 @@
 // lib/theme/design_tokens.dart
 //
-// Identidad visual de Repara -- azul noche + azul sofisticado + lavanda
-// sobre superficies claras ("niebla"), premium y minimalista (rediseño
-// CEO, octubre 2026: reemplaza la paleta cálida verde/beige anterior).
-// El azul manda, la lavanda da personalidad en acentos puntuales, el
-// resto de colores queda para superficies y estados concretos.
+// Identidad visual de Repara -- "REPARA Professional" (rediseño CEO,
+// octubre 2026): azul marino profesional + fondo cálido neutro + superficies
+// blancas con borde fino, editorial y de gestión -- reemplaza la paleta
+// "niebla azulada + lavanda" anterior. Sin degradados, sin sombras fuertes,
+// sin acentos decorativos: cada color tiene un rol semántico concreto.
 import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 
@@ -14,6 +14,7 @@ class ReparaColors extends ThemeExtension<ReparaColors> {
     required this.surface,
     required this.surfaceMuted,
     required this.surfaceSunken,
+    required this.border,
     required this.ink,
     required this.inkMuted,
     required this.inkFaint,
@@ -30,18 +31,19 @@ class ReparaColors extends ThemeExtension<ReparaColors> {
     required this.overlay,
   });
 
-  final Color background; // fondo general -- niebla azulada clara
+  final Color background; // fondo general -- cálido neutro
   final Color surface; // tarjetas -- blanco
   final Color surfaceMuted; // campos de entrada, filas alternas
   final Color surfaceSunken; // pista vacía de una barra de progreso, separadores gruesos
-  final Color ink; // texto principal -- azul noche
+  final Color border; // borde fino de tarjetas/inputs/divisores -- NUNCA alpha sobre ink
+  final Color ink; // texto principal -- azul marino oscuro
   final Color inkMuted; // texto secundario -- gris azulado
   final Color inkFaint; // texto terciario, iconos en reposo -- NUNCA para texto que haya que leer
-  final Color brand; // azul sofisticado -- botones, navegación activa, enlaces
-  final Color brandStrong; // pressed/activo; texto de marca con más contraste
+  final Color brand; // azul de interacción -- botones secundarios, enlaces, iconos activos
+  final Color brandStrong; // azul marino profundo -- CTA principal, nav activa, pressed
   final Color brandOn; // texto/icono sobre un fondo de marca relleno
-  final Color brandTint; // fondo tenue lavanda: icono circular, chip activo
-  final Color sand; // acento lavanda -- decorativo/secundario, nunca semántico
+  final Color brandTint; // fondo tenue azul: icono circular, chip activo
+  final Color sand; // acento secundario neutro -- decorativo puntual, nunca semántico
   final Color success;
   final Color warning; // SOLO icono o fondo tenue -- como texto no llega a 4.5:1, usa warningText
   final Color warningText; // variante oscurecida de warning para cumplir contraste de texto
@@ -50,18 +52,19 @@ class ReparaColors extends ThemeExtension<ReparaColors> {
   final Color overlay; // scrim bajo una hoja modal o diálogo
 
   static const light = ReparaColors(
-    background: Color(0xFFF4F5F9),
+    background: Color(0xFFF5F3EE),
     surface: Color(0xFFFFFFFF),
-    surfaceMuted: Color(0xFFECEEF5),
-    surfaceSunken: Color(0xFFE2E6EF),
-    ink: Color(0xFF26365B),
-    inkMuted: Color(0xFF64748B),
-    inkFaint: Color(0xFF97A1B5),
-    brand: Color(0xFF5268D9),
-    brandStrong: Color(0xFF3B4FBF),
+    surfaceMuted: Color(0xFFF0EEE7),
+    surfaceSunken: Color(0xFFE8E5DD),
+    border: Color(0xFFE5E3DE),
+    ink: Color(0xFF203044),
+    inkMuted: Color(0xFF687789),
+    inkFaint: Color(0xFF9AA5B1),
+    brand: Color(0xFF42658B),
+    brandStrong: Color(0xFF183650),
     brandOn: Color(0xFFFFFFFF),
-    brandTint: Color(0x24A99AE8),
-    sand: Color(0xFFA99AE8),
+    brandTint: Color(0x1F42658B),
+    sand: Color(0xFF42658B),
     success: Color(0xFF23856D),
     warning: Color(0xFFE5A23B),
     warningText: Color(0xFF8A5A1F),
@@ -70,11 +73,17 @@ class ReparaColors extends ThemeExtension<ReparaColors> {
     overlay: Color(0x26131A2B),
   );
 
+  // Dark mode: no está en el alcance del briefing de "REPARA Professional"
+  // (todas las referencias son de modo claro) -- se mantiene la paleta
+  // anterior, solo con el campo 'border' nuevo añadido para que compile.
+  // Si se quiere un dark mode a juego con la nueva identidad, es una
+  // pasada aparte.
   static const dark = ReparaColors(
     background: Color(0xFF0F1422),
     surface: Color(0xFF1A2235),
     surfaceMuted: Color(0xFF212B42),
     surfaceSunken: Color(0xFF2A3550),
+    border: Color(0x1FEEF1FA),
     ink: Color(0xFFEEF1FA),
     inkMuted: Color(0xFF9AA6C0),
     inkFaint: Color(0xFF6E7996),
@@ -93,7 +102,7 @@ class ReparaColors extends ThemeExtension<ReparaColors> {
 
   @override
   ReparaColors copyWith({
-    Color? background, Color? surface, Color? surfaceMuted, Color? surfaceSunken,
+    Color? background, Color? surface, Color? surfaceMuted, Color? surfaceSunken, Color? border,
     Color? ink, Color? inkMuted, Color? inkFaint,
     Color? brand, Color? brandStrong, Color? brandOn, Color? brandTint,
     Color? sand, Color? success, Color? warning, Color? warningText,
@@ -104,6 +113,7 @@ class ReparaColors extends ThemeExtension<ReparaColors> {
       surface: surface ?? this.surface,
       surfaceMuted: surfaceMuted ?? this.surfaceMuted,
       surfaceSunken: surfaceSunken ?? this.surfaceSunken,
+      border: border ?? this.border,
       ink: ink ?? this.ink,
       inkMuted: inkMuted ?? this.inkMuted,
       inkFaint: inkFaint ?? this.inkFaint,
@@ -242,20 +252,21 @@ ThemeData _buildReparaTheme(Brightness brightness) {
         letterSpacing: -0.2,
       ),
     ),
-    // Borde fino + sombra suave en vez de solo borde plano (octubre 2026,
-    // pasada de craft): una tarjeta solo con borde se ve blanda sobre un
-    // fondo con textura cálida; el borde da nitidez, la sombra da la
-    // profundidad que antes faltaba del todo.
+    // Borde fino como protagonista, sombra casi inexistente (briefing
+    // "REPARA Professional": bordes finos, sombras mínimas) -- antes la
+    // sombra hacía buena parte del trabajo; ahora lo hace el borde de
+    // color explícito (palette.border), la sombra solo da una separación
+    // mínima del fondo.
     cardTheme: CardThemeData(
       color: palette.surface,
-      elevation: 1,
-      shadowColor: palette.ink.withValues(alpha: 0.12),
+      elevation: 0,
+      shadowColor: palette.ink.withValues(alpha: 0.05),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(ReparaRadius.md),
-        side: BorderSide(color: palette.ink.withValues(alpha: 0.05)),
+        side: BorderSide(color: palette.border),
       ),
     ),
-    dividerColor: palette.inkMuted.withValues(alpha: 0.15),
+    dividerColor: palette.border,
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: palette.surfaceMuted,
@@ -265,9 +276,13 @@ ThemeData _buildReparaTheme(Brightness brightness) {
       ),
       hintStyle: TextStyle(color: palette.inkMuted.withValues(alpha: 0.8)),
     ),
+    // CTA principal en el azul marino profundo (brandStrong) -- es el tono
+    // que lleva el botón "Siguiente", el FAB y el chip/nav activos en el
+    // briefing, no el azul de interacción más claro (ese queda para
+    // enlaces y botones secundarios, ver outlinedButtonTheme).
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        backgroundColor: palette.brand,
+        backgroundColor: palette.brandStrong,
         foregroundColor: palette.brandOn,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(ReparaRadius.sm)),
         padding: const EdgeInsets.symmetric(vertical: 14),
@@ -275,8 +290,8 @@ ThemeData _buildReparaTheme(Brightness brightness) {
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        foregroundColor: palette.brand,
-        side: BorderSide(color: palette.brand.withValues(alpha: 0.4)),
+        foregroundColor: palette.brandStrong,
+        side: BorderSide(color: palette.border),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(ReparaRadius.sm)),
       ),
     ),
@@ -284,8 +299,8 @@ ThemeData _buildReparaTheme(Brightness brightness) {
     // patrón de "segmented control" en vez de botones de color plano.
     chipTheme: ChipThemeData(
       backgroundColor: Colors.transparent,
-      selectedColor: palette.brand,
-      side: BorderSide(color: palette.ink.withValues(alpha: 0.12)),
+      selectedColor: palette.brandStrong,
+      side: BorderSide(color: palette.border),
       shape: const StadiumBorder(),
       labelStyle: TextStyle(color: palette.ink, fontSize: 13, fontWeight: FontWeight.w500),
       secondaryLabelStyle: TextStyle(color: palette.brandOn, fontSize: 13, fontWeight: FontWeight.w600),
@@ -293,7 +308,7 @@ ThemeData _buildReparaTheme(Brightness brightness) {
     ),
     bottomNavigationBarTheme: BottomNavigationBarThemeData(
       backgroundColor: palette.surface,
-      selectedItemColor: palette.brand,
+      selectedItemColor: palette.brandStrong,
       unselectedItemColor: palette.inkFaint,
       type: BottomNavigationBarType.fixed,
     ),
