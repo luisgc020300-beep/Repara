@@ -197,89 +197,101 @@ class _ResumenCasa extends StatelessWidget {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Una sola tarjeta para estado + métricas -- antes eran 4
+              // tarjetas sueltas (estado + 3 tiles) apiladas con huecos entre
+              // ellas, que se leían como piezas independientes en vez de un
+              // resumen único (briefing "REPARA Professional": "deben
+              // percibirse como una unidad coherente").
               Card(
                 margin: EdgeInsets.zero,
-                child: Padding(
-                  padding: const EdgeInsets.all(ReparaSpace.s4),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(color: context.colors.brandTint, shape: BoxShape.circle),
-                        child: Icon(
-                          todoEnOrden ? Icons.home_outlined : Icons.home_repair_service_outlined,
-                          color: context.colors.brand,
-                        ),
-                      ),
-                      const SizedBox(width: ReparaSpace.s3),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              todoEnOrden ? 'Todo en orden' : 'Hay cosas que revisar',
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(ReparaSpace.s4),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(color: context.colors.brandTint, shape: BoxShape.circle),
+                            child: Icon(
+                              todoEnOrden ? Icons.home_outlined : Icons.home_repair_service_outlined,
+                              color: context.colors.brand,
                             ),
-                            Text(
-                              todoEnOrden
-                                  ? 'Tu vivienda, organizada.'
-                                  : 'Garantías o revisiones que necesitan tu atención.',
-                              style: TextStyle(color: context.colors.inkMuted, fontSize: 13),
+                          ),
+                          const SizedBox(width: ReparaSpace.s3),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  todoEnOrden ? 'Todo en orden' : 'Hay cosas que revisar',
+                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                                ),
+                                Text(
+                                  todoEnOrden
+                                      ? 'Tu vivienda, organizada.'
+                                      : 'Garantías o revisiones que necesitan tu atención.',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                    Divider(height: 1, color: context.colors.border),
+                    IntrinsicHeight(
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _MetricTile(
+                              icon: Icons.shield_outlined,
+                              iconColor: context.colors.warning,
+                              numero: garantias.length,
+                              numeroColor: context.colors.warningText,
+                              etiqueta: 'Garantías',
+                              onTap: () async {
+                                final elementos = await ElementoService.conGarantia(casa.id);
+                                if (context.mounted) {
+                                  Navigator.push(context, MaterialPageRoute(builder: (_) => GarantiasProximasScreen(casa: casa, elementos: elementos, titulo: 'Todas las garantías')));
+                                }
+                              },
+                            ),
+                          ),
+                          VerticalDivider(width: 1, thickness: 1, color: context.colors.border),
+                          Expanded(
+                            child: _MetricTile(
+                              icon: Icons.build_circle_outlined,
+                              iconColor: context.colors.brand,
+                              numero: revisiones.length,
+                              numeroColor: context.colors.brand,
+                              etiqueta: 'Revisión',
+                              onTap: () async {
+                                final elementos = await ElementoService.conMantenimientoConfigurado(casa.id);
+                                if (context.mounted) {
+                                  Navigator.push(context, MaterialPageRoute(builder: (_) => RevisionesPendientesScreen(casa: casa, elementos: elementos, titulo: 'Todo el mantenimiento')));
+                                }
+                              },
+                            ),
+                          ),
+                          VerticalDivider(width: 1, thickness: 1, color: context.colors.border),
+                          Expanded(
+                            child: _MetricTile(
+                              icon: Icons.hourglass_top_outlined,
+                              iconColor: context.colors.brand,
+                              numero: pendientes.length,
+                              numeroColor: context.colors.brand,
+                              etiqueta: 'En curso',
+                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TrabajosPendientesScreen(casa: casa, items: pendientes))),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: ReparaSpace.s3),
-              Row(
-                children: [
-                  Expanded(
-                    child: _Tile(
-                      icon: Icons.shield_outlined,
-                      iconColor: context.colors.warning,
-                      numero: garantias.length,
-                      numeroColor: context.colors.warningText,
-                      etiqueta: 'Garantías',
-                      onTap: () async {
-                        final elementos = await ElementoService.conGarantia(casa.id);
-                        if (context.mounted) {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => GarantiasProximasScreen(casa: casa, elementos: elementos, titulo: 'Todas las garantías')));
-                        }
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: ReparaSpace.s2 + 2),
-                  Expanded(
-                    child: _Tile(
-                      icon: Icons.build_circle_outlined,
-                      iconColor: context.colors.brand,
-                      numero: revisiones.length,
-                      numeroColor: context.colors.brand,
-                      etiqueta: 'Revisión',
-                      onTap: () async {
-                        final elementos = await ElementoService.conMantenimientoConfigurado(casa.id);
-                        if (context.mounted) {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => RevisionesPendientesScreen(casa: casa, elementos: elementos, titulo: 'Todo el mantenimiento')));
-                        }
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: ReparaSpace.s2 + 2),
-                  Expanded(
-                    child: _Tile(
-                      icon: Icons.hourglass_top_outlined,
-                      iconColor: context.colors.brand,
-                      numero: pendientes.length,
-                      numeroColor: context.colors.brand,
-                      etiqueta: 'En curso',
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TrabajosPendientesScreen(casa: casa, items: pendientes))),
-                    ),
-                  ),
-                ],
               ),
               if (garantias.isNotEmpty) ...[
                 const SizedBox(height: ReparaSpace.s3),
@@ -334,8 +346,12 @@ class _BannerGarantia extends StatelessWidget {
   }
 }
 
-class _Tile extends StatelessWidget {
-  const _Tile({
+/// Un tercio de la fila de métricas dentro de la tarjeta única de resumen --
+/// sin Card ni borde propios (antes cada una era su propia tarjeta); el
+/// InkWell ocupa toda la altura de la fila gracias al IntrinsicHeight del
+/// padre, así el área tocable sigue siendo tan grande como antes.
+class _MetricTile extends StatelessWidget {
+  const _MetricTile({
     required this.icon,
     required this.iconColor,
     required this.numero,
@@ -353,10 +369,9 @@ class _Tile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
+    return Material(
+      color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(ReparaRadius.md),
         onTap: onTap,
         child: Semantics(
           label: '$etiqueta: $numero',
@@ -373,7 +388,7 @@ class _Tile extends StatelessWidget {
                 Text(
                   etiqueta.toUpperCase(),
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 0.4, color: context.colors.inkMuted),
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 10.5, letterSpacing: 0.4, color: context.colors.inkMuted),
                 ),
               ],
             ),
