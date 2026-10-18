@@ -64,7 +64,7 @@ class PresupuestosSection extends StatelessWidget {
               ],
             ),
             if (presupuestos.isEmpty)
-              Text('Sin presupuestos todavía.', style: TextStyle(color: context.colors.inkMuted))
+              const EmptyHint(message: 'Sin presupuestos todavía.', icon: Icons.request_quote_outlined)
             else
               ...presupuestos.map((p) => _PresupuestoCard(casaId: casaId, elementoId: elementoId, registroId: registroId, presupuesto: p, rol: rol)),
           ],
@@ -407,7 +407,7 @@ class _EditorPresupuestoSheetState extends State<_EditorPresupuestoSheet> {
                   Expanded(
                     child: Text(
                       'Rellenado con las líneas de tu último presupuesto -- edítalas o bórralas libremente.',
-                      style: TextStyle(fontSize: 11.5, color: context.colors.inkMuted),
+                      style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ),
                 ],
@@ -491,7 +491,7 @@ class _EditorPresupuestoSheetState extends State<_EditorPresupuestoSheet> {
               crossAxisAlignment: CrossAxisAlignment.baseline,
               textBaseline: TextBaseline.alphabetic,
               children: [
-                Text('Total estimado: ', style: TextStyle(color: context.colors.inkMuted)),
+                Text('Total estimado: ', style: Theme.of(context).textTheme.bodySmall),
                 Text('${_totalEstimado.toStringAsFixed(2)} €', style: ReparaText.amount(context)),
               ],
             ),

@@ -10,6 +10,8 @@ import 'package:intl/intl.dart';
 import '../models/pago.dart';
 import '../services/pago_service.dart';
 import '../theme/design_tokens.dart';
+import '../widgets/app_error.dart';
+import '../widgets/ios_list.dart';
 import 'pago_detail_screen.dart';
 import 'presupuestos_section.dart' show RolEnTrabajo;
 
@@ -67,55 +69,34 @@ class PagosSection extends StatelessWidget {
               ],
             ),
             if (pagos.isEmpty)
-              Text('Sin pagos registrados todavía.', style: TextStyle(color: context.colors.inkMuted))
+              const EmptyHint(message: 'Sin pagos registrados todavía.', icon: Icons.payments_outlined)
             else
-              ...pagos.map((p) => Card(
-                    margin: const EdgeInsets.only(bottom: 9),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(ReparaRadius.md),
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => PagoDetailScreen(
-                            casaId: casaId,
-                            elementoId: elementoId,
-                            registroId: registroId,
-                            registroTitulo: registroTitulo,
-                            presupuesto: presupuesto,
-                            editable: editable,
-                            pago: p,
-                          ),
-                        ),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(color: context.colors.brandTint, borderRadius: BorderRadius.circular(ReparaRadius.sm)),
-                              child: Icon(Icons.payments_outlined, size: 20, color: context.colors.brand),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    p.concepto?.isNotEmpty == true ? p.concepto! : DateFormat('d MMM yyyy', 'es_ES').format(p.fecha),
-                                    style: Theme.of(context).textTheme.titleMedium,
-                                  ),
-                                  if (p.concepto?.isNotEmpty == true) Text(DateFormat('d MMM yyyy', 'es_ES').format(p.fecha), style: Theme.of(context).textTheme.bodySmall),
-                                ],
+              IosSection(
+                rows: pagos
+                    .map((p) => IosRow(
+                          icon: Icons.payments_outlined,
+                          iconColor: context.colors.brand,
+                          title: p.concepto?.isNotEmpty == true ? p.concepto! : DateFormat('d MMM yyyy', 'es_ES').format(p.fecha),
+                          subtitle: p.concepto?.isNotEmpty == true ? DateFormat('d MMM yyyy', 'es_ES').format(p.fecha) : null,
+                          trailing: Text('${p.importe.toStringAsFixed(2)} €', style: ReparaText.amount(context)),
+                          showChevron: false,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => PagoDetailScreen(
+                                casaId: casaId,
+                                elementoId: elementoId,
+                                registroId: registroId,
+                                registroTitulo: registroTitulo,
+                                presupuesto: presupuesto,
+                                editable: editable,
+                                pago: p,
                               ),
                             ),
-                            Text('${p.importe.toStringAsFixed(2)} €', style: ReparaText.amount(context)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  )),
+                          ),
+                        ))
+                    .toList(),
+              ),
           ],
         );
       },
