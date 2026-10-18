@@ -35,7 +35,7 @@ class _TrabajosProTabState extends State<TrabajosProTab> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('MODO PROFESIONAL', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: context.colors.inkMuted)),
+            Text('MODO PROFESIONAL', style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 11, color: context.colors.inkMuted)),
             Text('Trabajos', style: Theme.of(context).textTheme.displayMedium?.copyWith(fontSize: 26)),
           ],
         ),
@@ -115,42 +115,22 @@ class _ListaPorTrabajo extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      children: trabajos
-          .map((t) => Card(
-                margin: const EdgeInsets.only(bottom: 9),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(ReparaRadius.md),
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => RegistroProDetailScreen(casaId: t.casaId, elementoId: t.elementoId, registroId: t.registroId)),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(color: context.colors.brandTint, borderRadius: BorderRadius.circular(ReparaRadius.sm)),
-                          child: Icon(Icons.build_outlined, size: 20, color: context.colors.brand),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(t.registroTitulo, style: Theme.of(context).textTheme.titleMedium),
-                              Text(t.casaNombre, style: Theme.of(context).textTheme.bodySmall),
-                            ],
-                          ),
-                        ),
-                        Icon(Icons.chevron_right, color: context.colors.inkMuted),
-                      ],
+      children: [
+        IosSection(
+          rows: trabajos
+              .map((t) => IosRow(
+                    icon: Icons.build_outlined,
+                    iconColor: context.colors.brand,
+                    title: t.registroTitulo,
+                    subtitle: t.casaNombre,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => RegistroProDetailScreen(casaId: t.casaId, elementoId: t.elementoId, registroId: t.registroId)),
                     ),
-                  ),
-                ),
-              ))
-          .toList(),
+                  ))
+              .toList(),
+        ),
+      ],
     );
   }
 }
