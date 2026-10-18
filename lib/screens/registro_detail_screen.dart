@@ -157,13 +157,17 @@ class RegistroDetailScreen extends StatelessWidget {
         }
         return Scaffold(
           extendBodyBehindAppBar: true,
+          // Botones sobre un fondo propio (no iconTheme blanco a secas): el
+          // hueco de foto es gris claro, así que un icono blanco sin más se
+          // veía prácticamente invisible encima -- mismo respaldo circular
+          // ya usado para el lápiz de editar foto en elemento_detail_screen.
           appBar: AppBar(
             backgroundColor: Colors.transparent,
             elevation: 0,
-            iconTheme: const IconThemeData(color: Colors.white),
+            leading: _BotonSobreImagen(icon: Icons.arrow_back, tooltip: 'Volver', onPressed: () => Navigator.pop(context)),
             actions: [
               if (!registro.esConProfesional)
-                IconButton(icon: const Icon(Icons.delete_outline), tooltip: 'Eliminar registro', onPressed: () => _eliminar(context, registro)),
+                _BotonSobreImagen(icon: Icons.delete_outline, tooltip: 'Eliminar registro', onPressed: () => _eliminar(context, registro)),
             ],
           ),
           floatingActionButton: !registro.esConProfesional || _estadoControlado(registro.estado)
@@ -193,10 +197,17 @@ class RegistroDetailScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      registro.elementoNombre.toUpperCase(),
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 11, color: context.colors.inkMuted),
+                    Row(
+                      children: [
+                        Icon(_iconoTipoRegistro(registro.tipo), size: 13, color: context.colors.inkMuted),
+                        const SizedBox(width: 5),
+                        Text(
+                          '${registro.elementoNombre} · ${nombreTipoRegistro(registro.tipo)}'.toUpperCase(),
+                          style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 11, color: context.colors.inkMuted),
+                        ),
+                      ],
                     ),
+                    const SizedBox(height: 2),
                     Text(registro.titulo, style: Theme.of(context).textTheme.displaySmall),
                     if (registro.esConProfesional) ...[
                       const SizedBox(height: 10),
@@ -211,117 +222,50 @@ class RegistroDetailScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
               if (registro.esConProfesional && registro.estado == EstadoRegistro.pendienteConfirmacion) ...[
-                Card(
-                  color: context.colors.warning.withValues(alpha: 0.12),
-                  child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.hourglass_top_outlined, color: context.colors.warning),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                'El profesional dice que ha terminado este registro. ¿Lo confirmas?',
-                                style: TextStyle(color: context.colors.ink, fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: () => _rechazarFinalizacion(context, registro),
-                                child: const Text('Todavía no'),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: FilledButton(
-                                onPressed: () => _confirmarFinalizacion(context, registro),
-                                child: const Text('Confirmar'),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
+                _AvisoPendienteConfirmacion(
+                  onRechazar: () => _rechazarFinalizacion(context, registro),
+                  onConfirmar: () => _confirmarFinalizacion(context, registro),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
               ],
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (registro.descripcion != null) ...[
-                        Text(registro.descripcion!),
-                        const SizedBox(height: 12),
-                      ],
-                      if (!registro.esConProfesional)
-                        // Registro simple -- sin presupuesto/pagos/invitación,
-                        // igual que una compra o una nota. Sin chip arriba
-                        // (eso es solo para esConProfesional), así que aquí
-                        // sí hace falta mostrar el estado.
-                        TextFormField(
-                          initialValue: _nombreEstadoSimple(registro),
-                          enabled: false,
-                          decoration: const InputDecoration(labelText: 'Estado'),
-                        )
-                      // "Terminado"/"Archivado"/"PendienteConfirmacion" nunca
-                      // son una opción de este desplegable (auditoría de
-                      // seguridad, octubre 2026): "Finalizar" (y, en el modelo
-                      // de dos pasos, "Confirmar"/"Todavía no") son las únicas
-                      // vías, porque además archivan el registro en el
-                      // historial y avisan a los demás. El servidor ya lo
-                      // bloquea aunque se fuerce desde fuera de la app. El
-                      // chip de la cabecera ya muestra el estado en ese caso
-                      // -- este desplegable solo aparece cuando es editable.
-                      else if (!_estadoControlado(registro.estado))
-                        DropdownButtonFormField<EstadoRegistro>(
-                          initialValue: registro.estado,
-                          decoration: const InputDecoration(labelText: 'Estado'),
-                          items: _estadosEditables
-                              .map((e) => DropdownMenuItem(value: e, child: Text(_nombreEstado(e))))
-                              .toList(),
-                          onChanged: (v) {
-                            if (v != null) RegistroService.actualizarEstado(casa.id, elementoId, registro.id, v);
-                          },
-                        ),
-                      if (registro.profesionalNombre != null) ...[
-                        const SizedBox(height: 8),
-                        Text('Profesional: ${registro.profesionalNombre}${registro.profesionalContacto != null ? ' · ${registro.profesionalContacto}' : ''}'),
-                      ],
-                      if (registro.coste != null && !registro.esConProfesional) ...[
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Text('Coste: ', style: Theme.of(context).textTheme.bodySmall),
-                            Text('${registro.coste!.toStringAsFixed(0)} €', style: ReparaText.amount(context)),
-                          ],
-                        ),
-                      ],
-                      if (registro.presupuesto != null) ...[
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Text('Presupuesto: ', style: Theme.of(context).textTheme.bodySmall),
-                            Text('${registro.presupuesto!.toStringAsFixed(0)} €', style: ReparaText.amount(context)),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        ProgresoPago(casaId: casa.id, elementoId: elementoId, registroId: registro.id, presupuesto: registro.presupuesto!),
-                      ],
-                    ],
-                  ),
+              if (registro.descripcion != null) ...[
+                Text(registro.descripcion!, style: Theme.of(context).textTheme.bodyLarge),
+                const SizedBox(height: 16),
+              ],
+              // Campo de estado -- autocontenido por el propio
+              // InputDecorationTheme (fondo + radio ya vienen del tema), no
+              // necesita una Card envolvente alrededor para parecer "un
+              // campo"; antes vivía apretado dentro de la misma tarjeta que
+              // el dinero, sin relación real entre ambos.
+              if (!registro.esConProfesional)
+                // Registro simple -- sin presupuesto/pagos/invitación, igual
+                // que una compra o una nota. Sin chip arriba (eso es solo
+                // para esConProfesional), así que aquí sí hace falta mostrar
+                // el estado.
+                TextFormField(
+                  initialValue: _nombreEstadoSimple(registro),
+                  enabled: false,
+                  decoration: const InputDecoration(labelText: 'Estado'),
+                )
+              // "Terminado"/"Archivado"/"PendienteConfirmacion" nunca son una
+              // opción de este desplegable (auditoría de seguridad, octubre
+              // 2026): "Finalizar" (y, en el modelo de dos pasos, "Confirmar"/
+              // "Todavía no") son las únicas vías, porque además archivan el
+              // registro en el historial y avisan a los demás. El servidor ya
+              // lo bloquea aunque se fuerce desde fuera de la app. El chip de
+              // la cabecera ya muestra el estado en ese caso -- este
+              // desplegable solo aparece cuando es editable.
+              else if (!_estadoControlado(registro.estado))
+                DropdownButtonFormField<EstadoRegistro>(
+                  initialValue: registro.estado,
+                  decoration: const InputDecoration(labelText: 'Estado'),
+                  items: _estadosEditables.map((e) => DropdownMenuItem(value: e, child: Text(_nombreEstado(e)))).toList(),
+                  onChanged: (v) {
+                    if (v != null) RegistroService.actualizarEstado(casa.id, elementoId, registro.id, v);
+                  },
                 ),
-              ),
+              if (!registro.esConProfesional || !_estadoControlado(registro.estado)) const SizedBox(height: 16),
+              _ResumenEconomico(casa: casa, elementoId: elementoId, registro: registro),
               if (registro.esConProfesional) ...[
                 const SizedBox(height: 20),
                 Text('Profesional', style: Theme.of(context).textTheme.headlineSmall),
@@ -496,12 +440,16 @@ class _SeccionInvitarProfesionalState extends State<_SeccionInvitarProfesional> 
   @override
   Widget build(BuildContext context) {
     if (widget.registro.profesionalUid != null) {
-      return Card(
-        child: ListTile(
-          leading: Icon(Icons.verified_user_outlined, color: context.colors.success),
-          title: Text(widget.registro.profesionalNombre ?? 'Profesional vinculado'),
-          subtitle: const Text('Puede ver este registro y actualizar su estado'),
-        ),
+      return IosSection(
+        rows: [
+          IosRow(
+            icon: Icons.verified_user_outlined,
+            iconColor: context.colors.success,
+            title: widget.registro.profesionalNombre ?? 'Profesional vinculado',
+            subtitle: 'Puede ver este registro y actualizar su estado',
+            showChevron: false,
+          ),
+        ],
       );
     }
 
@@ -510,21 +458,23 @@ class _SeccionInvitarProfesionalState extends State<_SeccionInvitarProfesional> 
       builder: (context, snapshot) {
         final invitacion = snapshot.data;
         if (invitacion != null && invitacion.estado == EstadoInvitacion.pendiente) {
-          return Card(
-            child: ListTile(
-              leading: Icon(Icons.hourglass_top_outlined, color: context.colors.warning),
-              title: Text('Invitación enviada a ${invitacion.profesionalEmail}'),
-              subtitle: const Text('Esperando respuesta'),
-              trailing: _cancelando
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                  : TextButton(
-                      onPressed: () => _cancelarInvitacion(invitacion.id),
-                      child: const Text('Cancelar'),
-                    ),
-            ),
+          return IosSection(
+            rows: [
+              IosRow(
+                icon: Icons.hourglass_top_outlined,
+                iconColor: context.colors.warning,
+                title: 'Invitación enviada a ${invitacion.profesionalEmail}',
+                subtitle: 'Esperando respuesta',
+                showChevron: false,
+                trailing: _cancelando
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : TextButton(onPressed: () => _cancelarInvitacion(invitacion.id), child: const Text('Cancelar')),
+              ),
+            ],
           );
         }
         return Card(
+          margin: EdgeInsets.zero,
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -538,7 +488,7 @@ class _SeccionInvitarProfesionalState extends State<_SeccionInvitarProfesional> 
                       Expanded(
                         child: Text(
                           'Código para compartir: $_ultimoCodigoGenerado',
-                          style: const TextStyle(fontWeight: FontWeight.w700, letterSpacing: 1),
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(letterSpacing: 1),
                         ),
                       ),
                       IconButton(
@@ -552,37 +502,190 @@ class _SeccionInvitarProfesionalState extends State<_SeccionInvitarProfesional> 
                     'Esa persona no tiene todavía cuenta profesional en Repara. Cuando se registre, introduce este código para vincularse a este registro.',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
-                  const Divider(height: 20),
+                  Padding(padding: const EdgeInsets.symmetric(vertical: 14), child: Divider(height: 1, color: context.colors.border)),
                 ],
                 if (invitacion != null && invitacion.estado == EstadoInvitacion.rechazada) ...[
-                  Text('${invitacion.profesionalEmail} rechazó la invitación anterior.', style: TextStyle(color: context.colors.errorText)),
+                  Text(
+                    '${invitacion.profesionalEmail} rechazó la invitación anterior.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.colors.errorText),
+                  ),
                   const SizedBox(height: 8),
                 ],
-                const Text('Invita a tu profesional de confianza -- si ya tiene cuenta en Repara, le llega directo; si no, te doy un código para que se lo mandes tú.'),
-                const SizedBox(height: 10),
+                Text(
+                  'Invita a tu profesional de confianza -- si ya tiene cuenta en Repara, le llega directo; si no, te doy un código para que se lo mandes tú.',
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
+                const SizedBox(height: 14),
                 TextField(
                   controller: _emailCtrl,
                   keyboardType: TextInputType.emailAddress,
                   decoration: const InputDecoration(labelText: 'Correo del profesional (opcional)'),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 TextField(
                   controller: _telefonoCtrl,
                   keyboardType: TextInputType.phone,
                   decoration: const InputDecoration(labelText: 'Teléfono (opcional)'),
                 ),
-                const SizedBox(height: 10),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: _enviando
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                      : FilledButton(onPressed: _invitar, child: const Text('Invitar')),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: _enviando ? null : _invitar,
+                    child: _enviando
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Text('Invitar'),
+                  ),
                 ),
               ],
             ),
           ),
         );
       },
+    );
+  }
+}
+
+/// Icono de respaldo circular para los botones de la AppBar transparente que
+/// flota sobre la cabecera -- sin esto, un icono blanco a secas se vuelve
+/// invisible contra el hueco de foto gris claro (mismo problema, mismo
+/// arreglo, que el lápiz de editar foto en elemento_detail_screen.dart).
+class _BotonSobreImagen extends StatelessWidget {
+  const _BotonSobreImagen({required this.icon, required this.tooltip, required this.onPressed});
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(8),
+      child: Material(
+        color: Colors.black.withValues(alpha: 0.45),
+        shape: const CircleBorder(),
+        child: IconButton(
+          icon: Icon(icon, color: Colors.white, size: 20),
+          tooltip: tooltip,
+          onPressed: onPressed,
+        ),
+      ),
+    );
+  }
+}
+
+/// Aviso de que el profesional dice haber terminado -- contenedor con borde
+/// de color en vez de Card (briefing "REPARA Professional": un aviso debe
+/// distinguirse de una tarjeta de contenido normal, no parecer una más).
+class _AvisoPendienteConfirmacion extends StatelessWidget {
+  const _AvisoPendienteConfirmacion({required this.onRechazar, required this.onConfirmar});
+
+  final VoidCallback onRechazar;
+  final VoidCallback onConfirmar;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: context.colors.warning.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(ReparaRadius.md),
+        border: Border.all(color: context.colors.warning.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.hourglass_top_outlined, color: context.colors.warningText),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'El profesional dice que ha terminado este registro. ¿Lo confirmas?',
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(child: OutlinedButton(onPressed: onRechazar, child: const Text('Todavía no'))),
+              const SizedBox(width: 8),
+              Expanded(child: FilledButton(onPressed: onConfirmar, child: const Text('Confirmar'))),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Resumen económico en una sola tarjeta -- antes el presupuesto, el coste,
+/// el profesional de texto libre y la barra de pago vivían como líneas
+/// sueltas dentro de la misma tarjeta genérica que la descripción y el
+/// desplegable de estado, sin relación visual entre ellos. Mismas
+/// condiciones exactas que antes (ningún dato nuevo, ningún saldo inventado):
+/// el profesional de texto libre solo se repite aquí cuando NO hay sección
+/// "Profesional" propia (esConProfesional == false) -- para evitar
+/// duplicarlo con _SeccionInvitarProfesional, que ya lo muestra.
+class _ResumenEconomico extends StatelessWidget {
+  const _ResumenEconomico({required this.casa, required this.elementoId, required this.registro});
+
+  final Casa casa;
+  final String elementoId;
+  final Registro registro;
+
+  @override
+  Widget build(BuildContext context) {
+    final mostrarCoste = registro.coste != null && !registro.esConProfesional;
+    final mostrarPresupuesto = registro.presupuesto != null;
+    final mostrarProfesional = !registro.esConProfesional && registro.profesionalNombre != null;
+    if (!mostrarCoste && !mostrarPresupuesto && !mostrarProfesional) return const SizedBox.shrink();
+
+    Widget divisor() => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          child: Divider(height: 1, color: context.colors.border),
+        );
+
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (mostrarCoste) ...[
+              Text('Coste', style: Theme.of(context).textTheme.labelSmall?.copyWith(color: context.colors.inkMuted)),
+              const SizedBox(height: 2),
+              Text('${registro.coste!.toStringAsFixed(0)} €', style: ReparaText.amount(context, large: true)),
+            ],
+            if (mostrarCoste && (mostrarPresupuesto || mostrarProfesional)) divisor(),
+            if (mostrarPresupuesto) ...[
+              Text('Presupuesto', style: Theme.of(context).textTheme.labelSmall?.copyWith(color: context.colors.inkMuted)),
+              const SizedBox(height: 2),
+              Text('${registro.presupuesto!.toStringAsFixed(0)} €', style: ReparaText.amount(context, large: true)),
+              const SizedBox(height: 14),
+              ProgresoPago(casaId: casa.id, elementoId: elementoId, registroId: registro.id, presupuesto: registro.presupuesto!),
+            ],
+            if (mostrarPresupuesto && mostrarProfesional) divisor(),
+            if (mostrarProfesional)
+              Row(
+                children: [
+                  Icon(Icons.engineering_outlined, size: 18, color: context.colors.brand),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${registro.profesionalNombre}${registro.profesionalContacto != null ? ' · ${registro.profesionalContacto}' : ''}',
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -636,3 +739,14 @@ String _nombreEstado(EstadoRegistro e) => switch (e) {
 String _nombreEstadoSimple(Registro r) => r.estado == EstadoRegistro.archivado ? 'Archivado' : 'Registrado';
 
 const _estadosEditables = [EstadoRegistro.nuevo, EstadoRegistro.presupuestado, EstadoRegistro.enCurso];
+
+IconData _iconoTipoRegistro(TipoRegistro t) => switch (t) {
+      TipoRegistro.compra => Icons.shopping_bag_outlined,
+      TipoRegistro.averia => Icons.report_problem_outlined,
+      TipoRegistro.reparacion => Icons.build_outlined,
+      TipoRegistro.mantenimiento => Icons.build_circle_outlined,
+      TipoRegistro.instalacion => Icons.handyman_outlined,
+      TipoRegistro.reforma => Icons.home_repair_service_outlined,
+      TipoRegistro.sustitucion => Icons.swap_horiz_outlined,
+      TipoRegistro.nota => Icons.notes_outlined,
+    };

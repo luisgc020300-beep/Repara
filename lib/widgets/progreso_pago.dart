@@ -33,24 +33,42 @@ class ProgresoPago extends StatelessWidget {
         final totalPagado = pagos.fold<double>(0, (acc, p) => acc + p.importe);
         final porcentaje = presupuesto <= 0 ? 0.0 : (totalPagado / presupuesto).clamp(0, 1).toDouble();
         final completo = totalPagado >= presupuesto;
-        final colorBarra = completo ? context.colors.success : context.colors.brand;
+        final colorEstado = completo ? context.colors.success : context.colors.brand;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Pagado: ${_formato(totalPagado)} € de ${_formato(presupuesto)} €',
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 4),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: LinearProgressIndicator(value: porcentaje, minHeight: 8, backgroundColor: context.colors.surfaceMuted, color: colorBarra),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text('Pagado', style: Theme.of(context).textTheme.labelSmall?.copyWith(color: context.colors.inkMuted)),
+                const Spacer(),
+                Icon(completo ? Icons.check_circle_outline : Icons.circle_outlined, size: 13, color: colorEstado),
+                const SizedBox(width: 4),
+                Text(
+                  completo ? 'Pagado al completo' : '${(porcentaje * 100).round()} % pagado',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: colorEstado, fontWeight: FontWeight.w600),
+                ),
+              ],
             ),
             const SizedBox(height: 2),
-            Text(
-              completo ? 'Pagado al completo' : '${(porcentaje * 100).round()} % pagado',
-              style: TextStyle(fontSize: 12, color: completo ? context.colors.success : context.colors.inkMuted),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text('${_formato(totalPagado)} €', style: ReparaText.amount(context)),
+                const SizedBox(width: 6),
+                Text('de ${_formato(presupuesto)} €', style: Theme.of(context).textTheme.bodySmall),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // surfaceSunken, no surfaceMuted -- es el token pensado para la
+            // pista vacía de una barra de progreso (ver design_tokens.dart),
+            // antes sin usar aquí.
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: LinearProgressIndicator(value: porcentaje, minHeight: 8, backgroundColor: context.colors.surfaceSunken, color: colorEstado),
             ),
           ],
         );

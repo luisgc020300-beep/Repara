@@ -178,22 +178,32 @@ class _PresupuestoCardState extends State<_PresupuestoCard> {
                 ),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 10),
             ...presupuesto.lineas.map((l) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  padding: const EdgeInsets.symmetric(vertical: 3),
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(child: Text('${l.descripcion} (${l.cantidad.toStringAsFixed(l.cantidad == l.cantidad.roundToDouble() ? 0 : 1)})', style: Theme.of(context).textTheme.bodyLarge)),
-                      Text('${l.importeSinIva.toStringAsFixed(2)} €', style: Theme.of(context).textTheme.bodyLarge),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${l.importeSinIva.toStringAsFixed(2)} €',
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
+                      ),
                     ],
                   ),
                 )),
-            const Divider(height: 16),
+            Padding(padding: const EdgeInsets.symmetric(vertical: 10), child: Divider(height: 1, color: context.colors.border)),
+            Text(
+              'Subtotal ${presupuesto.subtotal.toStringAsFixed(2)} € · IVA ${presupuesto.iva.toStringAsFixed(2)} €',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 2),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(child: Text('Subtotal ${presupuesto.subtotal.toStringAsFixed(2)} € · IVA ${presupuesto.iva.toStringAsFixed(2)} €', style: Theme.of(context).textTheme.bodySmall)),
-                Text('${presupuesto.total.toStringAsFixed(2)} €', style: ReparaText.amount(context)),
+                Text('Total', style: Theme.of(context).textTheme.labelSmall?.copyWith(color: context.colors.inkMuted)),
+                Text('${presupuesto.total.toStringAsFixed(2)} €', style: ReparaText.amount(context, large: true)),
               ],
             ),
             if (presupuesto.estado == EstadoPresupuesto.borrador && widget.rol == RolEnTrabajo.profesional) ...[

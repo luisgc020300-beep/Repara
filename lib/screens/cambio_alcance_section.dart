@@ -62,7 +62,7 @@ class CambiosAlcanceSection extends StatelessWidget {
               ],
             ),
             if (cambios.isEmpty)
-              Text('Sin cambios solicitados.', style: TextStyle(color: context.colors.inkMuted))
+              const EmptyHint(message: 'Sin cambios solicitados.', icon: Icons.rule_outlined)
             else
               ...cambios.map((c) => _CambioCard(
                     casaId: casaId,
@@ -171,8 +171,13 @@ class _CambioCardState extends State<_CambioCard> {
               Text(cambio.descripcion!, style: Theme.of(context).textTheme.bodyLarge),
             ],
             if (cambio.importeAdicional != null) ...[
-              const SizedBox(height: 4),
-              Text('Coste adicional: +${cambio.importeAdicional!.toStringAsFixed(2)} €', style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Text('Coste adicional ', style: Theme.of(context).textTheme.bodySmall),
+                  Text('+${cambio.importeAdicional!.toStringAsFixed(2)} €', style: ReparaText.amount(context)),
+                ],
+              ),
             ],
             if (cambio.fotos.isNotEmpty) ...[
               const SizedBox(height: 10),
