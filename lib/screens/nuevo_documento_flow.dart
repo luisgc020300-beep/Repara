@@ -62,8 +62,9 @@ Future<void> iniciarNuevoDocumento(
   showDialog<void>(
     context: context,
     barrierDismissible: false,
-    builder: (ctx) => const AlertDialog(
-      content: Row(children: [
+    builder: (ctx) => AlertDialog(
+      shape: AppDialog.shape(),
+      content: const Row(children: [
         SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
         SizedBox(width: 16),
         Expanded(child: Text('Analizando documento…')),
@@ -558,7 +559,7 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
             const SizedBox(height: 4),
             Text(
               widget.sugerencia != null ? 'Revisa los datos y corrige lo que haga falta antes de guardar.' : 'Rellena los datos a mano.',
-              style: TextStyle(color: context.colors.inkMuted),
+              style: Theme.of(context).textTheme.bodySmall,
             ),
             if (confianza == 'baja') ...[
               const SizedBox(height: 10),
@@ -691,7 +692,7 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
                         Expanded(
                           child: Text(
                             'La IA no encontró ningún elemento con este nombre. Se creará uno nuevo con los datos de este documento.',
-                            style: TextStyle(fontSize: 12, color: context.colors.inkMuted),
+                            style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ),
                       ],
@@ -734,21 +735,30 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
               ),
             ],
             const SizedBox(height: 24),
-            FilledButton(
-              onPressed: _guardando ? null : () => _guardar(comoBorrador: false),
-              child: _guardando
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Guardar en el historial'),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _guardando ? null : () => _guardar(comoBorrador: false),
+                child: _guardando
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('Guardar en el historial'),
+              ),
             ),
             const SizedBox(height: 8),
-            OutlinedButton(
-              onPressed: _guardando ? null : () => _guardar(comoBorrador: true),
-              child: const Text('Guardar como borrador'),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: _guardando ? null : () => _guardar(comoBorrador: true),
+                child: const Text('Guardar como borrador'),
+              ),
             ),
             const SizedBox(height: 8),
-            TextButton(
-              onPressed: _guardando ? null : () => Navigator.pop(context),
-              child: const Text('Cancelar'),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                onPressed: _guardando ? null : () => Navigator.pop(context),
+                child: const Text('Cancelar'),
+              ),
             ),
           ],
         ),

@@ -15,6 +15,7 @@ import '../services/security/biometric_service.dart';
 import '../services/security/security_preferences_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
+import '../widgets/ios_list.dart';
 import 'elemento_detail_screen.dart';
 import 'nuevo_documento_flow.dart';
 import 'registro_detail_screen.dart';
@@ -60,7 +61,7 @@ class DocumentosCasaScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('CASA', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: context.colors.inkMuted)),
+            Text('CASA', style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 11, color: context.colors.inkMuted)),
             Text('Documentos', style: Theme.of(context).textTheme.displayMedium?.copyWith(fontSize: 26)),
           ],
         ),
@@ -100,51 +101,37 @@ class DocumentosCasaScreen extends StatelessWidget {
           }
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 90),
-            children: documentos
-                .map((d) => Card(
-                      margin: const EdgeInsets.only(bottom: 9),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(ReparaRadius.md),
-                        onTap: () => _abrir(context, d),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-                          child: Row(
+            children: [
+              IosSection(
+                rows: documentos.map((d) {
+                  final borrador = d.estadoIA == EstadoIA.pendiente;
+                  return IosRow(
+                    icon: _iconoTipo(d.tipo),
+                    iconColor: context.colors.brand,
+                    title: d.proveedor ?? d.nombreArchivo,
+                    subtitle: d.fecha != null ? DateFormat('d MMM yyyy', 'es_ES').format(d.fecha!) : null,
+                    showChevron: false,
+                    trailing: borrador || d.importe != null
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Container(
-                                width: 40,
-                                height: 40,
-                                decoration: BoxDecoration(color: context.colors.brandTint, borderRadius: BorderRadius.circular(ReparaRadius.sm)),
-                                child: Icon(_iconoTipo(d.tipo), size: 20, color: context.colors.brand),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(d.proveedor ?? d.nombreArchivo, style: Theme.of(context).textTheme.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
-                                    Row(
-                                      children: [
-                                        if (d.fecha != null) Text(DateFormat('d MMM yyyy', 'es_ES').format(d.fecha!), style: Theme.of(context).textTheme.bodySmall),
-                                        if (d.estadoIA == EstadoIA.pendiente) ...[
-                                          const SizedBox(width: 6),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                            decoration: BoxDecoration(color: context.colors.sand.withValues(alpha: 0.4), borderRadius: BorderRadius.circular(ReparaRadius.pill)),
-                                            child: Text('BORRADOR', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, letterSpacing: 0.4, color: context.colors.ink)),
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                  ],
+                              if (borrador)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(color: context.colors.sand.withValues(alpha: 0.4), borderRadius: BorderRadius.circular(ReparaRadius.pill)),
+                                  child: Text('BORRADOR', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, letterSpacing: 0.4, color: context.colors.ink)),
                                 ),
-                              ),
+                              if (borrador && d.importe != null) const SizedBox(height: 4),
                               if (d.importe != null) Text('${d.importe!.toStringAsFixed(0)} €', style: ReparaText.amount(context)),
                             ],
-                          ),
-                        ),
-                      ),
-                    ))
-                .toList(),
+                          )
+                        : null,
+                    onTap: () => _abrir(context, d),
+                  );
+                }).toList(),
+              ),
+            ],
           );
         },
       ),
