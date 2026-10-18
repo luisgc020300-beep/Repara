@@ -128,6 +128,7 @@ class IosRow extends StatelessWidget {
     this.trailing,
     this.onTap,
     this.titleColor,
+    this.subtitleColor,
     this.showChevron = true,
     this.dense = false,
     this.selected,
@@ -139,6 +140,11 @@ class IosRow extends StatelessWidget {
   final Color iconColor;
   final String title;
   final String? subtitle;
+
+  /// Sobrescribe el color por defecto (inkMuted) del subtítulo -- para
+  /// cuando el propio subtítulo lleva una señal de estado (p.ej. "Termina
+  /// el..." en ámbar frente a "Vigente hasta..." en el azul normal).
+  final Color? subtitleColor;
   final Widget? trailing;
   final VoidCallback? onTap;
   final Color? titleColor;
@@ -196,7 +202,7 @@ class IosRow extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         subtitle!,
-                        style: Theme.of(context).textTheme.bodySmall,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: subtitleColor, fontWeight: subtitleColor != null ? FontWeight.w600 : null),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),

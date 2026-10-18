@@ -43,6 +43,7 @@ class ElementoDetailScreen extends StatelessWidget {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setStateDialog) => AlertDialog(
+          shape: AppDialog.shape(),
           title: const Text('Revisión periódica'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -261,7 +262,7 @@ class ElementoDetailScreen extends StatelessWidget {
                       children: [
                         Text(
                           (nombreHabitacion ?? 'Elemento').toUpperCase(),
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: context.colors.inkMuted),
+                          style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 11, color: context.colors.inkMuted),
                         ),
                         Text(elemento.nombre, style: Theme.of(context).textTheme.displaySmall),
                       ],
@@ -291,42 +292,20 @@ class ElementoDetailScreen extends StatelessWidget {
                       builder: (context, snapshot) {
                         final registros = snapshot.data ?? [];
                         if (registros.isEmpty) {
-                          return Text('Sin registros todavía.', style: TextStyle(color: context.colors.inkMuted));
+                          return const EmptyHint(message: 'Sin registros todavía.', icon: Icons.fact_check_outlined);
                         }
-                        return Column(
-                          children: registros
-                              .map((r) => Card(
-                                    margin: const EdgeInsets.only(bottom: 9),
-                                    child: InkWell(
-                                      borderRadius: BorderRadius.circular(ReparaRadius.md),
-                                      onTap: () => Navigator.push(
-                                        context,
-                                        MaterialPageRoute(builder: (_) => RegistroDetailScreen(casa: casa, elementoId: elemento.id, registroId: r.id)),
-                                      ),
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-                                        child: Row(
-                                          children: [
-                                            Container(
-                                              width: 38,
-                                              height: 38,
-                                              decoration: BoxDecoration(color: context.colors.brandTint, borderRadius: BorderRadius.circular(ReparaRadius.sm)),
-                                              child: Icon(Icons.fact_check_outlined, size: 18, color: context.colors.brand),
-                                            ),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(r.titulo, style: Theme.of(context).textTheme.titleMedium),
-                                                  Text(DateFormat('d MMM yyyy', 'es_ES').format(r.fecha), style: Theme.of(context).textTheme.bodySmall),
-                                                ],
-                                              ),
-                                            ),
-                                            if (r.coste != null) Text('${r.coste!.toStringAsFixed(0)} €', style: ReparaText.amount(context)),
-                                          ],
-                                        ),
-                                      ),
+                        return IosSection(
+                          rows: registros
+                              .map((r) => IosRow(
+                                    icon: Icons.fact_check_outlined,
+                                    iconColor: context.colors.brand,
+                                    title: r.titulo,
+                                    subtitle: DateFormat('d MMM yyyy', 'es_ES').format(r.fecha),
+                                    trailing: r.coste != null ? Text('${r.coste!.toStringAsFixed(0)} €', style: ReparaText.amount(context)) : null,
+                                    showChevron: false,
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (_) => RegistroDetailScreen(casa: casa, elementoId: elemento.id, registroId: r.id)),
                                     ),
                                   ))
                               .toList(),
@@ -356,7 +335,7 @@ class ElementoDetailScreen extends StatelessWidget {
                       builder: (context, snapshot) {
                         final documentos = snapshot.data ?? [];
                         if (documentos.isEmpty) {
-                          return Text('Sin documentos todavía.', style: TextStyle(color: context.colors.inkMuted));
+                          return const EmptyHint(message: 'Sin documentos todavía.', icon: Icons.description_outlined);
                         }
                         return IosSection(rows: documentos.map((d) => _DocumentoTile(documento: d)).toList());
                       },

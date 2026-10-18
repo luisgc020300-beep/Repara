@@ -45,7 +45,7 @@ class CasaTab extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('VIVIENDA', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: context.colors.inkMuted)),
+            Text('VIVIENDA', style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 11, color: context.colors.inkMuted)),
             Text('Tu casa', style: Theme.of(context).textTheme.displayMedium?.copyWith(fontSize: 26)),
           ],
         ),

@@ -14,7 +14,13 @@ import '../theme/design_tokens.dart';
 class AppDialog {
   AppDialog._();
 
-  static ShapeBorder _shape() => RoundedRectangleBorder(borderRadius: BorderRadius.circular(ReparaRadius.md));
+  static ShapeBorder _shape() => shape();
+
+  /// Forma compartida para diálogos con contenido propio (formularios con
+  /// selector de fecha, pasos con estado...) que no encajan en
+  /// confirm/confirmText/promptText pero sí deben tener el mismo borde
+  /// redondeado que el resto.
+  static ShapeBorder shape() => RoundedRectangleBorder(borderRadius: BorderRadius.circular(ReparaRadius.md));
 
   /// Confirmación binaria (Cancelar / acción) con la acción principal en un
   /// botón relleno. [destructive] lo pinta en el rojo de marca -- eliminar

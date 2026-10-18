@@ -2,6 +2,8 @@
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
 
+import '../theme/design_tokens.dart';
+
 /// Feedback de error compartido para acciones de escritura -- sin esto, un
 /// fallo de red deja al usuario sin saber si su acción se guardó o no.
 class AppError {
@@ -32,5 +34,32 @@ class AppError {
         ],
       ),
     ));
+  }
+}
+
+/// Aviso de "todavía no hay nada aquí" para una lista o sección embebida
+/// (pagos, documentos, historial...) -- antes cada pantalla ponía un Text
+/// suelto con un color distinto a mano; esto le da el mismo icono apagado +
+/// texto secundario en todos los sitios donde cabe una línea, no un estado
+/// vacío a pantalla completa (ese ya tiene su propio tratamiento con icono
+/// grande, ver HomeTab/ExpedienteViviendaScreen).
+class EmptyHint extends StatelessWidget {
+  const EmptyHint({required this.message, this.icon = Icons.inbox_outlined, super.key});
+
+  final String message;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          Icon(icon, size: 17, color: context.colors.inkFaint),
+          const SizedBox(width: 8),
+          Expanded(child: Text(message, style: Theme.of(context).textTheme.bodySmall)),
+        ],
+      ),
+    );
   }
 }

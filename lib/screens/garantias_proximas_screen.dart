@@ -13,6 +13,7 @@ import 'package:intl/intl.dart';
 import '../models/casa.dart';
 import '../models/elemento.dart';
 import '../theme/design_tokens.dart';
+import '../widgets/ios_list.dart';
 import 'elemento_detail_screen.dart';
 
 enum _EstadoGarantia { proxima, vigente, caducada }
@@ -67,7 +68,7 @@ class GarantiasProximasScreen extends StatelessWidget {
             )
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-              children: _ordenados.map((e) => _FilaGarantia(casa: casa, elemento: e, estado: _estado(e))).toList(),
+              children: [IosSection(rows: _ordenados.map((e) => _FilaGarantia(casa: casa, elemento: e, estado: _estado(e))).toList())],
             ),
     );
   }
@@ -88,40 +89,13 @@ class _FilaGarantia extends StatelessWidget {
       _EstadoGarantia.caducada => (context.colors.inkMuted, 'Caducó el'),
     };
     final colorInsignia = estado == _EstadoGarantia.proxima ? context.colors.warning : context.colors.brand;
-    return Card(
-      margin: const EdgeInsets.only(bottom: 9),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(ReparaRadius.md),
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ElementoDetailScreen(casa: casa, elementoId: elemento.id))),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(color: colorInsignia.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(ReparaRadius.sm)),
-                child: Icon(Icons.shield_outlined, size: 20, color: colorInsignia),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(elemento.nombre, style: Theme.of(context).textTheme.titleMedium),
-                    if (elemento.garantiaHasta != null)
-                      Text(
-                        '$etiqueta ${DateFormat('d MMMM yyyy', 'es_ES').format(elemento.garantiaHasta!)}',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: color, fontWeight: FontWeight.w600),
-                      ),
-                  ],
-                ),
-              ),
-              Icon(Icons.chevron_right, color: context.colors.inkMuted),
-            ],
-          ),
-        ),
-      ),
+    return IosRow(
+      icon: Icons.shield_outlined,
+      iconColor: colorInsignia,
+      title: elemento.nombre,
+      subtitle: elemento.garantiaHasta != null ? '$etiqueta ${DateFormat('d MMMM yyyy', 'es_ES').format(elemento.garantiaHasta!)}' : null,
+      subtitleColor: elemento.garantiaHasta != null ? color : null,
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ElementoDetailScreen(casa: casa, elementoId: elemento.id))),
     );
   }
 }

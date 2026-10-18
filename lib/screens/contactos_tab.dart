@@ -12,6 +12,7 @@ import '../theme/design_tokens.dart';
 import '../widgets/app_dialog.dart';
 import '../widgets/app_error.dart';
 import '../widgets/boton_ajustes.dart';
+import '../widgets/ios_list.dart';
 import 'contacto_acciones.dart';
 import 'nuevo_contacto_sheet.dart';
 
@@ -29,7 +30,7 @@ class ContactosTab extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('AGENDA', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: context.colors.inkMuted)),
+            Text('AGENDA', style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 11, color: context.colors.inkMuted)),
             Text('Contactos', style: Theme.of(context).textTheme.displayMedium?.copyWith(fontSize: 26)),
           ],
         ),
@@ -70,7 +71,7 @@ class ContactosTab extends StatelessWidget {
           }
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 90),
-            children: contactos.map((c) => _ContactoCard(casa: casa, contacto: c)).toList(),
+            children: [IosSection(rows: contactos.map((c) => _ContactoRow(casa: casa, contacto: c)).toList())],
           );
         },
       ),
@@ -78,8 +79,12 @@ class ContactosTab extends StatelessWidget {
   }
 }
 
-class _ContactoCard extends StatelessWidget {
-  const _ContactoCard({required this.casa, required this.contacto});
+/// Fila de un contacto dentro de la agenda -- no usa IosRow porque el
+/// avatar circular con inicial (en vez de la insignia cuadrada de icono)
+/// es el único rasgo distintivo de una libreta de contactos; agrupadas por
+/// IosSection, no cada una en su propia tarjeta flotante.
+class _ContactoRow extends StatelessWidget {
+  const _ContactoRow({required this.casa, required this.contacto});
 
   final Casa casa;
   final Contacto contacto;
@@ -99,13 +104,12 @@ class _ContactoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final esEmpresa = contacto.tipo == TipoContacto.empresa;
     final inicial = contacto.nombre.isNotEmpty ? contacto.nombre[0].toUpperCase() : '?';
-    return Card(
-      margin: const EdgeInsets.only(bottom: 9),
+    return Material(
+      color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(ReparaRadius.md),
         onTap: () => mostrarAccionesContacto(context, casaId: casa.id, contacto: contacto),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: Row(
             children: [
               Container(
