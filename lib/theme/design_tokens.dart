@@ -73,11 +73,12 @@ class ReparaColors extends ThemeExtension<ReparaColors> {
     overlay: Color(0x26131A2B),
   );
 
-  // Dark mode: no está en el alcance del briefing de "REPARA Professional"
-  // (todas las referencias son de modo claro) -- se mantiene la paleta
-  // anterior, solo con el campo 'border' nuevo añadido para que compile.
-  // Si se quiere un dark mode a juego con la nueva identidad, es una
-  // pasada aparte.
+  // Dark mode "REPARA Professional" (CEO, octubre 2026: "no se ve profesional
+  // ni corporativo"): la paleta anterior era literalmente la de antes del
+  // rediseño -- brand/brandStrong/sand en lavanda/púrpura, sin relación con
+  // el azul marino/tinta que ya define la identidad en claro. Misma familia
+  // de azul acero que en claro, solo aclarada para legibilidad sobre fondo
+  // oscuro -- nunca un tono distinto que parezca "otra marca" de noche.
   static const dark = ReparaColors(
     background: Color(0xFF0F1422),
     surface: Color(0xFF1A2235),
@@ -87,11 +88,11 @@ class ReparaColors extends ThemeExtension<ReparaColors> {
     ink: Color(0xFFEEF1FA),
     inkMuted: Color(0xFF9AA6C0),
     inkFaint: Color(0xFF6E7996),
-    brand: Color(0xFF7C8CEF),
-    brandStrong: Color(0xFF99A6F5),
-    brandOn: Color(0xFF10142A),
-    brandTint: Color(0x33A99AE8),
-    sand: Color(0xFFBFB2F0),
+    brand: Color(0xFF6D93C2),
+    brandStrong: Color(0xFF4F85C4),
+    brandOn: Color(0xFFFFFFFF),
+    brandTint: Color(0x334F85C4),
+    sand: Color(0xFF6D93C2),
     success: Color(0xFF4FB996),
     warning: Color(0xFFF0B860),
     warningText: Color(0xFFF3C88A),
