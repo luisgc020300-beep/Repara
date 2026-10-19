@@ -18,6 +18,7 @@ import '../../theme/design_tokens.dart';
 import '../../widgets/app_error.dart';
 import '../../widgets/boton_ajustes.dart';
 import '../../widgets/boton_notificaciones.dart';
+import '../../widgets/ios_list.dart';
 
 const _mensajeInvitarCliente = 'Llevo el mantenimiento de tus trabajos con Repara -- así queda todo el historial, '
     'presupuestos y fotos organizados en un solo sitio, no perdido entre WhatsApps. '
@@ -35,7 +36,7 @@ class InicioProTab extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('MODO PROFESIONAL', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: context.colors.inkMuted)),
+            Text('MODO PROFESIONAL', style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 11, color: context.colors.inkMuted)),
             Text('Repara Pro', style: Theme.of(context).textTheme.displayMedium?.copyWith(fontSize: 26)),
           ],
         ),
@@ -90,48 +91,26 @@ class InicioProTab extends StatelessWidget {
             builder: (context, snapshot) {
               final invitaciones = snapshot.data ?? [];
               if (invitaciones.isEmpty) {
-                return Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Text('No tienes invitaciones nuevas.', style: TextStyle(color: context.colors.inkMuted)),
-                  ),
-                );
+                return const EmptyHint(message: 'No tienes invitaciones nuevas.', icon: Icons.mail_outline);
               }
               return Column(children: invitaciones.map((i) => _InvitacionCard(invitacion: i)).toList());
             },
           ),
           const SizedBox(height: 20),
-          Card(
-            child: InkWell(
-              borderRadius: BorderRadius.circular(ReparaRadius.md),
-              // sharePositionOrigin obligatorio en iOS -- ver nota en
-              // contacto_acciones.dart.
-              onTap: () => Share.share(_mensajeInvitarCliente, sharePositionOrigin: Offset.zero & MediaQuery.of(context).size),
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(color: context.colors.sand.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(ReparaRadius.sm)),
-                      child: Icon(Icons.person_add_alt_outlined, size: 20, color: context.colors.ink),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Invita a un cliente a Repara', style: Theme.of(context).textTheme.titleMedium),
-                          Text('Para que puedas mandarle presupuestos y avisos desde aquí', style: Theme.of(context).textTheme.bodySmall),
-                        ],
-                      ),
-                    ),
-                    Icon(Icons.share_outlined, size: 18, color: context.colors.inkMuted),
-                  ],
-                ),
+          IosSection(
+            rows: [
+              IosRow(
+                icon: Icons.person_add_alt_outlined,
+                iconColor: context.colors.brand,
+                title: 'Invita a un cliente a Repara',
+                subtitle: 'Para que puedas mandarle presupuestos y avisos desde aquí',
+                trailing: Icon(Icons.share_outlined, size: 18, color: context.colors.inkMuted),
+                showChevron: false,
+                // sharePositionOrigin obligatorio en iOS -- ver nota en
+                // contacto_acciones.dart.
+                onTap: () => Share.share(_mensajeInvitarCliente, sharePositionOrigin: Offset.zero & MediaQuery.of(context).size),
               ),
-            ),
+            ],
           ),
         ],
       ),
@@ -174,7 +153,7 @@ class _InvitacionCardState extends State<_InvitacionCard> {
           children: [
             Text(widget.invitacion.registroTitulo, style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 4),
-            Text('en ${widget.invitacion.casaNombre}', style: TextStyle(color: context.colors.inkMuted)),
+            Text('en ${widget.invitacion.casaNombre}', style: Theme.of(context).textTheme.bodySmall),
             const SizedBox(height: 10),
             _respondiendo
                 ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))

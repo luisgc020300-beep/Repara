@@ -105,7 +105,7 @@ class _PresupuestosProTabState extends State<PresupuestosProTab> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('MODO PROFESIONAL', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: context.colors.inkMuted)),
+            Text('MODO PROFESIONAL', style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 11, color: context.colors.inkMuted)),
             Text('Presupuestos', style: Theme.of(context).textTheme.displayMedium?.copyWith(fontSize: 26)),
           ],
         ),
@@ -130,7 +130,7 @@ class _PresupuestosProTabState extends State<PresupuestosProTab> {
                         Text(
                           'Aquí verás, de un vistazo, el estado de TODOS tus presupuestos (esperando respuesta, aceptados, rechazados...) sin entrar trabajo por trabajo.\nCréalo desde el detalle de un trabajo, en la pestaña Trabajos.',
                           textAlign: TextAlign.center,
-                          style: TextStyle(color: context.colors.inkMuted),
+                          style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ],
                     ),
