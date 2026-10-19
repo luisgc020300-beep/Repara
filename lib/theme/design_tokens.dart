@@ -73,21 +73,25 @@ class ReparaColors extends ThemeExtension<ReparaColors> {
     overlay: Color(0x26131A2B),
   );
 
-  // Dark mode "REPARA Professional" (CEO, octubre 2026: "no se ve profesional
-  // ni corporativo"): la paleta anterior era literalmente la de antes del
-  // rediseño -- brand/brandStrong/sand en lavanda/púrpura, sin relación con
-  // el azul marino/tinta que ya define la identidad en claro. Misma familia
-  // de azul acero que en claro, solo aclarada para legibilidad sobre fondo
-  // oscuro -- nunca un tono distinto que parezca "otra marca" de noche.
+  // Dark mode "REPARA Professional" (CEO, octubre 2026). Primer intento:
+  // solo se corrigió brand/brandStrong/sand (lavanda -> azul acero) pero se
+  // dejaron los fondos/superficies heredados de la paleta anterior, que ya
+  // eran azul marino saturado (0F1422, 1A2235...) -- el resultado seguía
+  // leyéndose "azul", no "negro" (feedback directo: "quiero que el modo
+  // oscuro sea oscuro, negro... sin tanto azul oscuro"). Ahora los fondos y
+  // superficies son prácticamente neutros (negro/carbón, sin matiz azul) --
+  // el azul queda SOLO en brand/brandStrong, como acento de marca sobre un
+  // negro de verdad, igual que el claro reserva el azul para ink/marca y
+  // deja el fondo en un neutro aparte.
   static const dark = ReparaColors(
-    background: Color(0xFF0F1422),
-    surface: Color(0xFF1A2235),
-    surfaceMuted: Color(0xFF212B42),
-    surfaceSunken: Color(0xFF2A3550),
-    border: Color(0x1FEEF1FA),
-    ink: Color(0xFFEEF1FA),
-    inkMuted: Color(0xFF9AA6C0),
-    inkFaint: Color(0xFF6E7996),
+    background: Color(0xFF0A0A0C),
+    surface: Color(0xFF161617),
+    surfaceMuted: Color(0xFF1E1E20),
+    surfaceSunken: Color(0xFF28282B),
+    border: Color(0x14FFFFFF),
+    ink: Color(0xFFF2F2F4),
+    inkMuted: Color(0xFF9C9CA3),
+    inkFaint: Color(0xFF6C6C73),
     brand: Color(0xFF6D93C2),
     brandStrong: Color(0xFF4F85C4),
     brandOn: Color(0xFFFFFFFF),
