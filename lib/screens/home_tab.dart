@@ -64,66 +64,69 @@ class _HomeTabState extends State<HomeTab> {
         icon: const Icon(Icons.add),
         label: const Text('Añadir'),
       ),
-      body: Column(
-        children: [
-          _ResumenCasa(casa: widget.casa),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-            child: TextField(
-              controller: _busquedaCtrl,
-              decoration: InputDecoration(
-                hintText: 'Buscar elemento',
-                prefixIcon: const Icon(Icons.search, size: 20),
-                isDense: true,
-              ),
-              onChanged: (v) => setState(() => _busqueda = v.trim().toLowerCase()),
-            ),
-          ),
-          StreamBuilder<List<Habitacion>>(
-            stream: HabitacionService.streamHabitaciones(widget.casa.id),
+      // Un único ListView, no un Column con el encabezado fijo arriba y el
+      // listado aparte en un Expanded -- antes el resumen, la búsqueda y los
+      // filtros nunca se iban de la pantalla por mucho que hubiera scroll,
+      // quitándole sitio permanente a los elementos (CEO, octubre 2026: con
+      // muchos elementos, la parte de arriba debe desaparecer progresivamente
+      // al hacer scroll). Ahora todo vive en el mismo scroll: cabecera y
+      // elementos suben juntos, igual que el resto de listas de la app.
+      body: StreamBuilder<List<Habitacion>>(
+        stream: HabitacionService.streamHabitaciones(widget.casa.id),
+        builder: (context, habSnapshot) {
+          final habitaciones = habSnapshot.data ?? const <Habitacion>[];
+          final nombrePorHabitacion = {for (final h in habitaciones) h.id: h.nombre};
+          return StreamBuilder<List<Elemento>>(
+            stream: ElementoService.streamElementos(widget.casa.id, habitacionId: _habitacionFiltro),
             builder: (context, snapshot) {
-              final habitaciones = snapshot.data ?? const [];
-              if (habitaciones.isEmpty) return const SizedBox.shrink();
-              return Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      ChoiceChip(
-                        label: const Text('Todo'),
-                        selected: _habitacionFiltro == null,
-                        onSelected: (_) => setState(() => _habitacionFiltro = null),
+              var elementos = snapshot.data ?? [];
+              if (_busqueda.isNotEmpty) {
+                elementos = elementos.where((e) => e.nombre.toLowerCase().contains(_busqueda)).toList();
+              }
+              return ListView(
+                children: [
+                  _ResumenCasa(casa: widget.casa),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                    child: TextField(
+                      controller: _busquedaCtrl,
+                      decoration: InputDecoration(
+                        hintText: 'Buscar elemento',
+                        prefixIcon: const Icon(Icons.search, size: 20),
+                        isDense: true,
                       ),
-                      const SizedBox(width: 8),
-                      ...habitaciones.map((h) => Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: ChoiceChip(
-                              label: Text(h.nombre),
-                              selected: _habitacionFiltro == h.id,
-                              onSelected: (_) => setState(() => _habitacionFiltro = h.id),
-                            ),
-                          )),
-                    ],
+                      onChanged: (v) => setState(() => _busqueda = v.trim().toLowerCase()),
+                    ),
                   ),
-                ),
-              );
-            },
-          ),
-          Expanded(
-            child: StreamBuilder<List<Elemento>>(
-              stream: ElementoService.streamElementos(widget.casa.id, habitacionId: _habitacionFiltro),
-              builder: (context, snapshot) {
-                var elementos = snapshot.data ?? [];
-                if (_busqueda.isNotEmpty) {
-                  elementos = elementos.where((e) => e.nombre.toLowerCase().contains(_busqueda)).toList();
-                }
-                if (elementos.isEmpty) {
-                  return Center(
-                    child: Padding(
+                  if (habitaciones.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            ChoiceChip(
+                              label: const Text('Todo'),
+                              selected: _habitacionFiltro == null,
+                              onSelected: (_) => setState(() => _habitacionFiltro = null),
+                            ),
+                            const SizedBox(width: 8),
+                            ...habitaciones.map((h) => Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: ChoiceChip(
+                                    label: Text(h.nombre),
+                                    selected: _habitacionFiltro == h.id,
+                                    onSelected: (_) => setState(() => _habitacionFiltro = h.id),
+                                  ),
+                                )),
+                          ],
+                        ),
+                      ),
+                    ),
+                  if (elementos.isEmpty)
+                    Padding(
                       padding: const EdgeInsets.all(24),
                       child: Column(
-                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Container(
                             width: 72,
@@ -135,33 +138,30 @@ class _HomeTabState extends State<HomeTab> {
                           Text(
                             'Todavía no hay ningún elemento aquí.\nToca "Añadir" para crear el primero.',
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: context.colors.inkMuted),
+                            style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ],
                       ),
-                    ),
-                  );
-                }
-                return StreamBuilder<List<Habitacion>>(
-                  stream: HabitacionService.streamHabitaciones(widget.casa.id),
-                  builder: (context, habSnapshot) {
-                    final nombrePorHabitacion = {for (final h in habSnapshot.data ?? const <Habitacion>[]) h.id: h.nombre};
-                    return ListView(
+                    )
+                  else
+                    Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: ReparaSpace.s2),
-                          child: Text('Tus elementos', style: Theme.of(context).textTheme.headlineSmall),
-                        ),
-                        ...elementos.map((e) => _ElementoTile(casa: widget.casa, elemento: e, ubicacion: nombrePorHabitacion[e.habitacionId])),
-                      ],
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-        ],
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: ReparaSpace.s2),
+                            child: Text('Tus elementos', style: Theme.of(context).textTheme.headlineSmall),
+                          ),
+                          ...elementos.map((e) => _ElementoTile(casa: widget.casa, elemento: e, ubicacion: nombrePorHabitacion[e.habitacionId])),
+                        ],
+                      ),
+                    ),
+                ],
+              );
+            },
+          );
+        },
       ),
     );
   }
