@@ -314,7 +314,7 @@ class _PagoDetailScreenState extends State<PagoDetailScreen> {
   }
 
   Widget _filaEtiqueta(BuildContext context, String texto) {
-    return Text(texto, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: context.colors.inkMuted, letterSpacing: 0.6));
+    return Text(texto, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: context.colors.inkMuted));
   }
 }
 
