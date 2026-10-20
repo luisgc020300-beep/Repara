@@ -48,6 +48,10 @@ class CambioAlcanceService {
         .conRegistroDeErrores();
   }
 
+  /// [clientRequestId]: generado UNA SOLA VEZ por intento lógico de envío
+  /// (ver lib/core/idempotency.dart) -- un reintento de red que reutilice el
+  /// mismo valor no duplica la solicitud en servidor (DATA-6, auditoría de
+  /// integridad económica, octubre 2026).
   static Future<void> crear({
     required String casaId,
     required String elementoId,
@@ -59,6 +63,7 @@ class CambioAlcanceService {
     double? tiempoAdicionalHoras,
     List<String> fotos = const [],
     String? presupuestoId,
+    String? clientRequestId,
   }) async {
     final callable = FirebaseFunctions.instanceFor(region: _region).httpsCallable('crearCambioAlcance');
     await callable.call<Map<String, dynamic>>({
@@ -72,6 +77,8 @@ class CambioAlcanceService {
       'tiempoAdicionalHoras': tiempoAdicionalHoras,
       'fotos': fotos,
       'presupuestoId': presupuestoId,
+      // ignore: use_null_aware_elements
+      if (clientRequestId != null) 'clientRequestId': clientRequestId,
     });
   }
 

@@ -7,9 +7,11 @@
 // screens/pagos_section.dart para el listado que abre esta pantalla.
 import 'dart:async';
 
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../core/idempotency.dart';
 import '../models/pago.dart';
 import '../services/analytics_service.dart';
 import '../services/pago_service.dart';
@@ -59,6 +61,15 @@ class _PagoDetailScreenState extends State<PagoDetailScreen> {
   late final _descripcionCtrl = TextEditingController(text: widget.pago?.descripcion ?? '');
   late MetodoPago? _metodo = widget.pago?.metodo;
   bool _guardando = false;
+
+  /// Generado una sola vez por instancia de esta pantalla (no en cada tap
+  /// de "Guardar") -- si el guardado falla y el usuario vuelve a intentar
+  /// sobre esta misma pantalla, reutiliza el mismo valor para que un
+  /// reintento de red no pueda duplicar el pago en servidor (ver
+  /// lib/core/idempotency.dart). Solo aplica a pagos nuevos: editar es
+  /// idempotente por naturaleza (reaplicar el mismo importe no duplica
+  /// nada).
+  late final String _clientRequestId = generarIdempotencyKey();
 
   static String _formato(double v) => v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(2);
 
@@ -116,12 +127,18 @@ class _PagoDetailScreenState extends State<PagoDetailScreen> {
     );
     try {
       if (widget.pago == null) {
-        await PagoService.crear(widget.casaId, widget.elementoId, widget.registroId, pago);
+        await PagoService.crear(widget.casaId, widget.elementoId, widget.registroId, pago, clientRequestId: _clientRequestId);
         unawaited(AnalyticsService.paymentCreated(importe: importe));
       } else {
         await PagoService.actualizar(widget.casaId, widget.elementoId, widget.registroId, widget.pago!.id, pago);
       }
       if (mounted) Navigator.pop(context);
+    } on FirebaseFunctionsException catch (e, st) {
+      // 'failed-precondition' aquí casi siempre significa que el servidor
+      // detectó, dentro de su propia transacción, que esto ya supera el
+      // presupuesto -- típicamente porque alguien más registró otro pago
+      // justo entre la comprobación del cliente de arriba y esta llamada.
+      if (mounted) AppError.show(context, e.message ?? 'No se pudo guardar el pago.', error: e, stackTrace: st);
     } catch (e, st) {
       if (mounted) AppError.show(context, 'No se pudo guardar el pago.', error: e, stackTrace: st);
     } finally {

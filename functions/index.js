@@ -661,6 +661,32 @@ function redondear2(n) {
   return Math.round((Number(n) || 0) * 100) / 100;
 }
 
+// Idempotencia por clientRequestId (segunda auditoría de integridad
+// económica, octubre 2026): la primera versión de este fix trataba
+// "already-exists" al crear como éxito idempotente sin más -- eso permitía
+// un falso éxito si alguien reutilizaba el mismo clientRequestId con datos
+// DISTINTOS (p.ej. reintentar tras un timeout habiendo cambiado el importe
+// en el formulario): el servidor respondía "ok" pero lo guardado seguía
+// siendo lo viejo, y el cliente nunca se enteraba del desajuste. Ahora se
+// compara el documento ya existente contra la petición actual, campo a
+// campo, DENTRO de la misma transacción que decidiría crear uno nuevo (ver
+// registrarPago/crearCambioAlcance) -- nunca fuera, para no abrir una
+// carrera entre "comprobar" y "crear". Coincide -> éxito idempotente de
+// verdad. No coincide -> error explícito, nunca un "ok" silencioso.
+function datosCoinciden(existente, nuevo, campos) {
+  return campos.every((campo) => {
+    const a = existente[campo] ?? null;
+    const b = nuevo[campo] ?? null;
+    if (a instanceof Timestamp || b instanceof Timestamp) {
+      return (a && a.toMillis ? a.toMillis() : null) === (b && b.toMillis ? b.toMillis() : null);
+    }
+    if (Array.isArray(a) || Array.isArray(b)) {
+      return JSON.stringify(a || []) === JSON.stringify(b || []);
+    }
+    return a === b;
+  });
+}
+
 function validarLineas(lineas) {
   if (!Array.isArray(lineas) || lineas.length === 0) {
     throw new HttpsError('invalid-argument', 'El presupuesto necesita al menos una línea.');
@@ -884,6 +910,30 @@ exports.responderPresupuesto = onCall({ region: REGION }, async (request) => {
     if (estadoRegistro === 'terminado' || estadoRegistro === 'archivado') {
       throw new HttpsError('failed-precondition', 'Este registro ya está finalizado, no se pueden responder presupuestos.');
     }
+    // DATA-3 (auditoría de integridad económica, octubre 2026): dos
+    // presupuestos distintos para el mismo registro pueden estar ambos en
+    // estado 'enviado' a la vez (crearPresupuesto solo bloqueaba crear uno
+    // NUEVO cuando ya había uno aceptado, no aceptar un segundo que ya
+    // existía de antes). Sin este bloqueo, aceptar el segundo sobrescribía
+    // en silencio regRef.presupuesto y dejaba dos presupuestos en estado
+    // 'aceptado' para el mismo registro.
+    //
+    // Segunda auditoría (octubre 2026): comprobar solo "estado ===
+    // 'presupuestado'" no basta -- "estado" es un campo que el propio
+    // propietario/profesional puede cambiar a mano en cualquier momento
+    // (ver "_estadosEditables" en la UI, un picker legítimo para marcar
+    // progreso), así que un miembro podía resetear "estado" a 'nuevo' y
+    // colarse por aquí para aceptar un segundo presupuesto. La señal real
+    // ahora es "presupuestoAceptadoId": lo fija ESTA función y
+    // firestore.rules impide que cualquier cliente lo toque, directa o
+    // indirectamente (ver match /registros/{rid} -- ni siquiera puede
+    // borrarlo). Se comprueban las dos señales con OR: "estado" protege
+    // los registros ya aceptados antes de que existiera este campo
+    // (datos antiguos sin migrar), "presupuestoAceptadoId" protege todo
+    // lo nuevo pase lo que pase con "estado" a partir de ahora.
+    if (aceptar && (estadoRegistro === 'presupuestado' || registroSnap.data().presupuestoAceptadoId != null)) {
+      throw new HttpsError('failed-precondition', 'Este registro ya tiene un presupuesto aceptado.');
+    }
     if (!snap.exists) throw new HttpsError('not-found', 'El presupuesto no existe.');
     const presupuesto = snap.data();
     // Nunca se permite que quien creó el presupuesto sea también quien lo
@@ -898,7 +948,7 @@ exports.responderPresupuesto = onCall({ region: REGION }, async (request) => {
       respondidoPorUid: uid,
     });
     if (aceptar) {
-      tx.update(regRef, { presupuesto: presupuesto.total, estado: 'presupuestado' });
+      tx.update(regRef, { presupuesto: presupuesto.total, estado: 'presupuestado', presupuestoAceptadoId: presupuestoId });
     }
     registrarHistorial(regRef, {
       tx, actorUid: uid, entidad: 'presupuesto', entidadId: presupuestoId,
@@ -965,7 +1015,7 @@ exports.crearNuevaVersionPresupuesto = onCall({ region: REGION }, async (request
 exports.crearCambioAlcance = onCall({ region: REGION }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
   const uid = request.auth.uid;
-  const { casaId, elementoId, registroId, titulo, descripcion, motivo, importeAdicional, tiempoAdicionalHoras, fotos, presupuestoId } = request.data || {};
+  const { casaId, elementoId, registroId, titulo, descripcion, motivo, importeAdicional, tiempoAdicionalHoras, fotos, presupuestoId, clientRequestId } = request.data || {};
   if (!casaId || !elementoId || !registroId || typeof titulo !== 'string' || !titulo.trim()) {
     throw new HttpsError('invalid-argument', 'Faltan datos.');
   }
@@ -991,7 +1041,7 @@ exports.crearCambioAlcance = onCall({ region: REGION }, async (request) => {
   const importe = importeBruto == null ? null : redondear2(importeBruto);
 
   const motivoLimpio = typeof motivo === 'string' ? motivo.trim().slice(0, 1000) : null;
-  const ref = await regRef.collection('cambiosAlcance').add({
+  const datos = {
     titulo: titulo.trim().slice(0, 120),
     descripcion: typeof descripcion === 'string' ? descripcion.trim().slice(0, 1000) : null,
     motivo: motivoLimpio,
@@ -1002,19 +1052,174 @@ exports.crearCambioAlcance = onCall({ region: REGION }, async (request) => {
     estado: 'pendiente',
     creadoPorUid: uid,
     createdAt: FieldValue.serverTimestamp(),
-  });
-  await registrarHistorial(regRef, {
-    actorUid: uid, entidad: 'cambioAlcance', entidadId: ref.id, accion: 'creado',
-    estadoNuevo: 'pendiente', importe, motivo: motivoLimpio,
+  };
+
+  // DATA-6 (auditoría de integridad económica, octubre 2026): un reintento
+  // de red del mismo intento lógico (mismo clientRequestId, generado una
+  // sola vez en el cliente -- ver cambio_alcance_section.dart) reutiliza el
+  // mismo id de documento. Clientes antiguos que no manden clientRequestId
+  // caen al id aleatorio de siempre, sin protección de idempotencia (igual
+  // que antes de este fix).
+  //
+  // Segunda auditoría (octubre 2026, ver datosCoinciden): no basta con
+  // tratar "already-exists" como éxito -- si el documento ya existente
+  // tiene datos distintos a los de esta petición (p.ej. el profesional
+  // reintentó habiendo cambiado el importe adicional en el formulario),
+  // devolver éxito sería mentirle al cliente. La comprobación va dentro de
+  // una transacción, antes de decidir si crear, para no abrir una carrera
+  // entre "comprobar" y "crear".
+  const cambiosCol = regRef.collection('cambiosAlcance');
+  const tieneClientRequestId = typeof clientRequestId === 'string' && clientRequestId;
+  const ref = tieneClientRequestId ? cambiosCol.doc(clientRequestId) : cambiosCol.doc();
+
+  const resultado = await db.runTransaction(async (tx) => {
+    const existenteSnap = tieneClientRequestId ? await tx.get(ref) : null;
+    if (existenteSnap && existenteSnap.exists) {
+      const existente = existenteSnap.data();
+      const nuevo = { ...datos, creadoPorUid: uid };
+      const camposAComparar = ['titulo', 'descripcion', 'motivo', 'importeAdicional', 'tiempoAdicionalHoras', 'presupuestoId', 'fotos', 'creadoPorUid'];
+      if (datosCoinciden(existente, nuevo, camposAComparar)) {
+        return { ok: true, cambioAlcanceId: ref.id, yaExistia: true };
+      }
+      throw new HttpsError('already-exists', 'Ya se creó una solicitud distinta con este identificador. Recarga la pantalla antes de reintentar.');
+    }
+    tx.create(ref, datos);
+    return { ok: true, cambioAlcanceId: ref.id, yaExistia: false };
   });
 
-  const casaSnap = await db.collection('casas').doc(casaId).get();
-  for (const memberUid of casaSnap.data().members || []) {
-    await crearNotificacion(memberUid, 'cambio_alcance_solicitado',
-      'Cambio de alcance solicitado', `Se ha solicitado un cambio en "${registro.titulo}": ${titulo.trim()}`,
-      { casaId, elementoId, registroId, cambioAlcanceId: ref.id });
+  if (!resultado.yaExistia) {
+    await registrarHistorial(regRef, {
+      actorUid: uid, entidad: 'cambioAlcance', entidadId: ref.id, accion: 'creado',
+      estadoNuevo: 'pendiente', importe, motivo: motivoLimpio,
+    });
+
+    const casaSnap = await db.collection('casas').doc(casaId).get();
+    for (const memberUid of casaSnap.data().members || []) {
+      await crearNotificacion(memberUid, 'cambio_alcance_solicitado',
+        'Cambio de alcance solicitado', `Se ha solicitado un cambio en "${registro.titulo}": ${titulo.trim()}`,
+        { casaId, elementoId, registroId, cambioAlcanceId: ref.id });
+    }
   }
-  return { ok: true, cambioAlcanceId: ref.id };
+  return { ok: true, cambioAlcanceId: ref.id, yaExistia: resultado.yaExistia };
+});
+
+// =============================================================================
+// PAGOS — casas/{cid}/elementos/{eid}/registros/{rid}/pagos/{pgid}
+// DATA-1 (auditoría de integridad económica, octubre 2026): antes se
+// escribían directo desde el cliente (ver pago_service.dart histórico); el
+// propio cliente comprobaba el total pagado contra el presupuesto ANTES de
+// escribir, sin que esa lectura y esa escritura formaran una operación
+// atómica. Dos pagos simultáneos (dos pestañas, dos dispositivos, o un
+// cliente manipulado que se saltara la comprobación de la UI) podían sumar
+// entre los dos más que el presupuesto, porque firestore.rules solo
+// validaba el rango del importe individual, nunca la suma acumulada.
+// Ahora toda escritura que pueda superar el presupuesto pasa por aquí, con
+// la comprobación y la escritura dentro de la misma transacción -- igual
+// que ya hacían presupuestos/cambiosAlcance. tx.get(pagosCol) (lectura de
+// colección completa dentro de la transacción, no solo de documentos
+// sueltos) es lo que hace posible que Firestore detecte el conflicto entre
+// dos transacciones concurrentes que leen la misma colección y una de ellas
+// la modifica -- sin esto, dos transacciones podrían leer el mismo total
+// "viejo" y ninguna se enteraría de la otra.
+// =============================================================================
+
+function validarDatosPago(data) {
+  const importe = redondear2(Number(data?.importe));
+  if (!Number.isFinite(importe) || importe <= 0 || importe > 1000000) {
+    throw new HttpsError('invalid-argument', 'Importe de pago inválido.');
+  }
+  const fechaMillis = Number(data?.fecha);
+  if (!Number.isFinite(fechaMillis)) throw new HttpsError('invalid-argument', 'Fecha de pago inválida.');
+  const opcionales = {};
+  if (typeof data?.concepto === 'string' && data.concepto.trim()) opcionales.concepto = data.concepto.trim().slice(0, 200);
+  if (typeof data?.descripcion === 'string' && data.descripcion.trim()) opcionales.descripcion = data.descripcion.trim().slice(0, 1000);
+  if (typeof data?.metodo === 'string' && data.metodo) opcionales.metodo = data.metodo;
+  return { importe, fecha: Timestamp.fromMillis(fechaMillis), opcionales };
+}
+
+exports.registrarPago = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+  const uid = request.auth.uid;
+  const { casaId, elementoId, registroId, clientRequestId } = request.data || {};
+  if (!casaId || !elementoId || !registroId) throw new HttpsError('invalid-argument', 'Faltan datos.');
+  if (!(await esMiembroCasa(casaId, uid))) throw new HttpsError('permission-denied', 'No perteneces a esa casa.');
+  const { importe, fecha, opcionales } = validarDatosPago(request.data);
+
+  const regRef = registroRef(casaId, elementoId, registroId);
+  const pagosCol = regRef.collection('pagos');
+  // Idempotencia (ver crearCambioAlcance más arriba, mismo criterio):
+  // clientRequestId estable por intento lógico -> id determinista -> un
+  // reintento de red no duplica el pago.
+  const tieneClientRequestId = typeof clientRequestId === 'string' && clientRequestId;
+  const pagoRef = tieneClientRequestId ? pagosCol.doc(clientRequestId) : pagosCol.doc();
+
+  const resultado = await db.runTransaction(async (tx) => {
+    const [registroSnap, existentesSnap, pagoExistenteSnap] = await Promise.all([
+      tx.get(regRef),
+      tx.get(pagosCol),
+      tieneClientRequestId ? tx.get(pagoRef) : Promise.resolve(null),
+    ]);
+    if (!registroSnap.exists) throw new HttpsError('not-found', 'El registro no existe.');
+
+    // Segunda auditoría (octubre 2026, ver datosCoinciden): la comprobación
+    // de "¿ya existe?" va DENTRO de la transacción, antes de decidir si
+    // crear -- nunca un try/catch después de intentar tx.create(), que
+    // dejaba pasar un falso éxito si el contenido no coincidía.
+    if (pagoExistenteSnap && pagoExistenteSnap.exists) {
+      const existente = pagoExistenteSnap.data();
+      const nuevo = { fecha, importe, ...opcionales, createdBy: uid };
+      const coincide = datosCoinciden(existente, nuevo, ['fecha', 'importe', 'concepto', 'descripcion', 'metodo', 'createdBy']);
+      if (coincide) return { ok: true, pagoId: pagoRef.id, yaExistia: true };
+      throw new HttpsError('already-exists', 'Ya se registró un pago distinto con este identificador de solicitud. Recarga la pantalla antes de reintentar.');
+    }
+
+    const presupuesto = registroSnap.data().presupuesto;
+    if (presupuesto != null) {
+      const totalActual = existentesSnap.docs.reduce((acc, d) => acc + (Number(d.data().importe) || 0), 0);
+      if (redondear2(totalActual + importe) > presupuesto + 0.01) {
+        throw new HttpsError('failed-precondition', 'Ese importe supera el presupuesto disponible para este registro.');
+      }
+    }
+    tx.create(pagoRef, { fecha, importe, ...opcionales, createdAt: FieldValue.serverTimestamp(), createdBy: uid });
+    return { ok: true, pagoId: pagoRef.id, yaExistia: false };
+  });
+
+  return resultado;
+});
+
+exports.actualizarPago = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+  const uid = request.auth.uid;
+  const { casaId, elementoId, registroId, pagoId } = request.data || {};
+  if (!casaId || !elementoId || !registroId || !pagoId) throw new HttpsError('invalid-argument', 'Faltan datos.');
+  if (!(await esMiembroCasa(casaId, uid))) throw new HttpsError('permission-denied', 'No perteneces a esa casa.');
+  const { importe, fecha, opcionales } = validarDatosPago(request.data);
+
+  const regRef = registroRef(casaId, elementoId, registroId);
+  const pagosCol = regRef.collection('pagos');
+  const pagoRef = pagosCol.doc(pagoId);
+
+  await db.runTransaction(async (tx) => {
+    const [registroSnap, pagoSnap, existentesSnap] = await Promise.all([tx.get(regRef), tx.get(pagoRef), tx.get(pagosCol)]);
+    if (!registroSnap.exists) throw new HttpsError('not-found', 'El registro no existe.');
+    if (!pagoSnap.exists) throw new HttpsError('not-found', 'El pago no existe.');
+    // Solo quien lo creó puede editarlo -- mismo criterio que ya aplican
+    // firestore.rules para update/delete directo (auditoría de seguridad,
+    // octubre 2026); se repite aquí porque esta ruta ahora pasa por Admin
+    // SDK, que no pasa por firestore.rules.
+    if (pagoSnap.data().createdBy !== uid) throw new HttpsError('permission-denied', 'Solo quien registró el pago puede editarlo.');
+
+    const presupuesto = registroSnap.data().presupuesto;
+    if (presupuesto != null) {
+      const totalSinEste = existentesSnap.docs.reduce((acc, d) => (d.id === pagoId ? acc : acc + (Number(d.data().importe) || 0)), 0);
+      if (redondear2(totalSinEste + importe) > presupuesto + 0.01) {
+        throw new HttpsError('failed-precondition', 'Ese importe supera el presupuesto disponible para este registro.');
+      }
+    }
+    tx.update(pagoRef, { fecha, importe, ...opcionales });
+  });
+
+  return { ok: true };
 });
 
 exports.responderCambioAlcance = onCall({ region: REGION }, async (request) => {

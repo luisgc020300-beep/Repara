@@ -1,28 +1,31 @@
 // lib/services/pago_service.dart
 //
-// Escritura directa a Firestore, no vía Cloud Function: a diferencia de
-// presupuestos/cambiosAlcance (que necesitan impedir que el profesional se
-// autoapruebe), aquí solo escribe el propietario sus propios pagos -- no
-// hay ninguna aprobación entre dos partes que proteger.
+// crear()/actualizar() pasan por Cloud Function (registrarPago/
+// actualizarPago) desde la corrección DATA-1 de integridad económica
+// (octubre 2026): antes se escribía directo a Firestore, comprobando el
+// total pagado contra el presupuesto en el cliente ANTES de escribir --
+// esa lectura y esa escritura nunca eran una operación atómica, así que dos
+// pagos simultáneos podían sumar entre los dos más que el presupuesto. Las
+// Cloud Functions repiten esa comprobación dentro de una transacción en
+// servidor, donde sí es atómica. eliminar() sigue siendo escritura directa
+// -- borrar un pago nunca puede hacer que la suma supere el presupuesto.
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/pago.dart';
 import 'stream_error_logging.dart';
 
 class PagoService {
-  /// Seams de solo test -- nunca se asignan en código de producción. Ver
-  /// casa_service.dart para el criterio general.
+  /// Seam de solo test -- nunca se asigna en código de producción. Ver
+  /// casa_service.dart para el criterio general. crear()/actualizar() no
+  /// tienen seam propio: no hay forma de fakear FirebaseFunctions en este
+  /// repo todavía (mismo criterio que presupuesto_service.dart).
   @visibleForTesting
   static FirebaseFirestore? debugFirestoreOverride;
-  @visibleForTesting
-  static String? debugUidOverride;
 
   static FirebaseFirestore get _db => debugFirestoreOverride ?? FirebaseFirestore.instance;
-  // Ver casa_service.dart: debugFirestoreOverride (no debugUidOverride) es
-  // la señal real de "estamos en test", para poder simular uid null aposta.
-  static String? get _uid => debugFirestoreOverride != null ? debugUidOverride : FirebaseAuth.instance.currentUser?.uid;
+  static const _region = 'europe-west1';
 
   static CollectionReference<Map<String, dynamic>> _col(String casaId, String elementoId, String registroId) => _db
       .collection('casas')
@@ -41,12 +44,38 @@ class PagoService {
         .conRegistroDeErrores();
   }
 
-  static Future<void> crear(String casaId, String elementoId, String registroId, Pago pago) async {
-    await _col(casaId, elementoId, registroId).add({...pago.toMap(), 'createdAt': FieldValue.serverTimestamp(), 'createdBy': _uid});
+  /// [clientRequestId]: generado UNA SOLA VEZ por intento lógico de guardado
+  /// (ver lib/core/idempotency.dart) -- un reintento de red que reutilice el
+  /// mismo valor no duplica el pago en servidor.
+  static Future<void> crear(String casaId, String elementoId, String registroId, Pago pago, {String? clientRequestId}) async {
+    final callable = FirebaseFunctions.instanceFor(region: _region).httpsCallable('registrarPago');
+    await callable.call<Map<String, dynamic>>({
+      'casaId': casaId,
+      'elementoId': elementoId,
+      'registroId': registroId,
+      'importe': pago.importe,
+      'fecha': pago.fecha.millisecondsSinceEpoch,
+      'concepto': pago.concepto,
+      'descripcion': pago.descripcion,
+      'metodo': pago.metodo?.name,
+      // ignore: use_null_aware_elements
+      if (clientRequestId != null) 'clientRequestId': clientRequestId,
+    });
   }
 
   static Future<void> actualizar(String casaId, String elementoId, String registroId, String pagoId, Pago pago) async {
-    await _col(casaId, elementoId, registroId).doc(pagoId).update(pago.toMap());
+    final callable = FirebaseFunctions.instanceFor(region: _region).httpsCallable('actualizarPago');
+    await callable.call<Map<String, dynamic>>({
+      'casaId': casaId,
+      'elementoId': elementoId,
+      'registroId': registroId,
+      'pagoId': pagoId,
+      'importe': pago.importe,
+      'fecha': pago.fecha.millisecondsSinceEpoch,
+      'concepto': pago.concepto,
+      'descripcion': pago.descripcion,
+      'metodo': pago.metodo?.name,
+    });
   }
 
   static Future<void> eliminar(String casaId, String elementoId, String registroId, String pagoId) async {

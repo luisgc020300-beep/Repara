@@ -24,12 +24,6 @@ service cloud.firestore {
     // ya confirmó, ni el propietario pueda saltarse rechazarFinalizacion
     // para "deshacer" la confirmación pendiente sin avisar al profesional.
     function estadoControlado(v) { return v == 'terminado' || v == 'archivado' || v == 'pendienteConfirmacion'; }
-    // Los pagos se escriben directo desde el cliente (ver pago_service.dart),
-    // sin pasar por una Cloud Function -- a diferencia de presupuestos/
-    // cambiosAlcance. Sin esta validación, una llamada directa al SDK (fuera
-    // de la UI, que sí valida) podía crear un pago negativo, a cero, o con
-    // un importe absurdo (auditoría de seguridad, octubre 2026).
-    function importeValido(v) { return v is number && v > 0 && v <= 1000000; }
 
     // ── users ────────────────────────────────────────────────────────────────
     match /users/{uid} {
@@ -98,6 +92,8 @@ service cloud.firestore {
           // octubre 2026).
           allow create: if isAuth() && isMember(cid)
               && !('profesionalUid' in request.resource.data)
+              && !('presupuesto' in request.resource.data)
+              && !('presupuestoAceptadoId' in request.resource.data)
               && !estadoControlado(request.resource.data.estado);
           // profesionalUid NUNCA es escribible por un miembro -- solo
           // responderInvitacion (Cloud Function, Admin SDK, salta estas
@@ -106,20 +102,34 @@ service cloud.firestore {
           // directamente un uid ajeno en este campo y darle acceso al
           // registro sin pasar por invitar/aceptar.
           //
+          // "presupuesto"/"presupuestoAceptadoId" tampoco son escribibles
+          // directamente (segunda auditoría de integridad económica,
+          // octubre 2026) -- antes solo lo decía el comentario, no la
+          // regla: un miembro podía escribir "presupuesto" directo sin
+          // pasar por ninguna Cloud Function, y nada impedía que
+          // responderPresupuesto siguiera aceptando un segundo presupuesto
+          // tras resetear "estado" a 'nuevo' con una escritura directa
+          // (estado SÍ sigue siendo editable a propósito -- ver
+          // "_estadosEditables" en registro_detail_screen.dart/
+          // registro_pro_detail_screen.dart, es una función real para
+          // marcar progreso a mano). Por eso la protección real ya no vive
+          // en "estado" sino en "presupuestoAceptadoId", que
+          // responderPresupuesto fija y que ningún cliente puede tocar ni
+          // para ponerlo ni para borrarlo.
+          //
           // Un miembro puede escribir cualquier otro campo, pero nunca
           // puede hacer que "estado" entre NI salga de un estado
           // controlado por esta vía (si ya estaba ahí y se queda igual, no
           // cuenta como transición -- permite editar otros campos sin
           // tocar estado). El profesional asignado solo puede tocar
-          // "estado" -- nunca "presupuesto" directamente (eso solo lo fija
-          // responderPresupuesto/responderCambioAlcance en servidor) -- y
-          // tampoco puede entrar ni salir de un estado controlado por esta
-          // vía. "estadoPrevioAPendiente" tampoco es escribible por el
+          // "estado" -- nunca "presupuesto" directamente -- y tampoco
+          // puede entrar ni salir de un estado controlado por esta vía.
+          // "estadoPrevioAPendiente" tampoco es escribible por el
           // cliente -- es lo que usa rechazarFinalizacionProfesional para
           // saber a dónde volver.
           allow update: if isAuth() && (
             (isMember(cid) &&
-             !request.resource.data.diff(resource.data).affectedKeys().hasAny(['profesionalUid', 'estadoPrevioAPendiente']) &&
+             !request.resource.data.diff(resource.data).affectedKeys().hasAny(['profesionalUid', 'estadoPrevioAPendiente', 'presupuesto', 'presupuestoAceptadoId']) &&
              (resource.data.estado == request.resource.data.estado ||
               (!estadoControlado(resource.data.estado) && !estadoControlado(request.resource.data.estado)))) ||
             (resource.data.profesionalUid == request.auth.uid &&
@@ -148,19 +158,29 @@ service cloud.firestore {
           }
 
           // Pagos registrados por el propietario contra el presupuesto del
-          // registro. A diferencia de presupuestos/cambiosAlcance, aquí no
-          // hay una aprobación entre dos partes que proteger -- solo el
-          // propietario escribe sus propios pagos, directo desde el
-          // cliente. El profesional asignado los lee con todo el detalle,
-          // pero nunca puede crearlos, editarlos ni borrarlos. Editar/borrar
-          // además se restringe a quien lo creó (createdBy) -- antes
-          // cualquier miembro de la casa podía tocar un pago registrado por
-          // otro miembro, con solo el rango numérico de importeValido como
-          // freno (auditoría de seguridad, octubre 2026).
+          // registro. El profesional asignado los lee con todo el detalle,
+          // pero nunca puede crearlos, editarlos ni borrarlos.
+          //
+          // create/update pasan por Cloud Function (registrarPago/
+          // actualizarPago, Admin SDK) desde la corrección DATA-1 de
+          // integridad económica (octubre 2026) -- antes se escribían
+          // directo desde el cliente, que comprobaba el total pagado contra
+          // el presupuesto ANTES de escribir sin que lectura y escritura
+          // fueran atómicas: dos pagos simultáneos (o un cliente manipulado
+          // que se saltara la comprobación de la UI) podían sumar entre los
+          // dos más que el presupuesto, porque esta regla solo validaba el
+          // rango del importe individual, nunca la suma acumulada. Ahora esa
+          // suma se valida en una transacción en servidor.
+          // delete sigue siendo directo del cliente -- borrar un pago nunca
+          // puede hacer que la suma supere el presupuesto, así que no hay
+          // ninguna validación económica que proteger aquí. Restringido a
+          // quien lo creó (createdBy) desde una corrección anterior (antes
+          // cualquier miembro de la casa podía borrar un pago registrado por
+          // otro miembro).
           match /pagos/{pagoid} {
             allow read: if isAuth() && (isMember(cid) || get(/databases/$(database)/documents/casas/$(cid)/elementos/$(eid)/registros/$(rid)).data.profesionalUid == request.auth.uid);
-            allow create: if isAuth() && isMember(cid) && importeValido(request.resource.data.importe);
-            allow update: if isAuth() && isMember(cid) && resource.data.createdBy == request.auth.uid && importeValido(request.resource.data.importe);
+            allow create: if false;
+            allow update: if false;
             allow delete: if isAuth() && isMember(cid) && resource.data.createdBy == request.auth.uid;
           }
 

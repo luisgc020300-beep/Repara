@@ -11,6 +11,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../core/idempotency.dart';
 import '../models/cambio_alcance.dart';
 import '../screens/presupuestos_section.dart' show RolEnTrabajo;
 import '../services/analytics_service.dart';
@@ -259,6 +260,12 @@ class _FormularioCambioSheetState extends State<_FormularioCambioSheet> {
   final List<_LineaFoto> _fotos = [];
   bool _guardando = false;
 
+  /// Generado una sola vez por instancia de esta hoja (no en cada tap de
+  /// "Enviar") -- si el envío falla y el usuario reintenta sobre esta misma
+  /// hoja, reutiliza el mismo valor para que un reintento de red no pueda
+  /// duplicar la solicitud en servidor (ver lib/core/idempotency.dart).
+  late final String _clientRequestId = generarIdempotencyKey();
+
   @override
   void dispose() {
     _tituloCtrl.dispose();
@@ -323,6 +330,7 @@ class _FormularioCambioSheetState extends State<_FormularioCambioSheet> {
         motivo: _motivoCtrl.text.trim().isEmpty ? null : _motivoCtrl.text.trim(),
         importeAdicional: double.tryParse(_importeCtrl.text.replaceAll(',', '.')),
         fotos: urls,
+        clientRequestId: _clientRequestId,
       );
       unawaited(AnalyticsService.scopeChangeCreated());
       if (mounted) {

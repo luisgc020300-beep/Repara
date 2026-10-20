@@ -1,0 +1,13 @@
+{
+  "name": "repara-functions-integration-tests",
+  "private": true,
+  "description": "Tests de integración de las Cloud Functions de dinero (pagos, presupuestos, cambios de alcance) contra el emulador real de Firestore/Auth/Functions (Firebase Emulator Suite) -- corrección DATA-1/DATA-3/DATA-6, octubre 2026. Nunca se ejecutan contra el proyecto real. Llaman a las funciones callable por HTTP directo (protocolo documentado por Firebase), no con el SDK cliente, para poder lanzar llamadas realmente concurrentes con Promise.all sin depender de una sola app/usuario activo.",
+  "scripts": {
+    "test": "node --test --test-concurrency=1 *.test.js",
+    "test:emulator": "firebase emulators:exec --project repara-test --only firestore,functions,auth \"npm test\" --config ../firebase.json"
+  },
+  "devDependencies": {
+    "firebase-admin": "^13.6.0",
+    "firebase-tools": "^15.34.0"
+  }
+}

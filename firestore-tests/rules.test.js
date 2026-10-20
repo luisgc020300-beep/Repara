@@ -178,6 +178,41 @@ describe('registros -- acceso del propietario y del profesional asignado', () =>
     await assertFails(updateDoc(doc(as(PRO), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros`, REGISTRO_A1), { presupuesto: 999999 }));
   });
 
+  // Segunda auditoría de integridad económica (octubre 2026) -- DATA-3: el
+  // miembro de la casa SÍ podía escribir "presupuesto" directo (el
+  // profesional no, por el hasOnly(['estado']) de su rama, pero el
+  // propietario/miembro no tenía esa restricción). Es el campo que usan
+  // registrarPago/actualizarPago como techo económico -- si un miembro
+  // puede inflarlo a mano, el límite deja de significar nada.
+  it('DENY: un miembro (el propietario) tampoco puede escribir "presupuesto" directamente', async () => {
+    await assertFails(updateDoc(doc(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros`, REGISTRO_A1), { presupuesto: 999999 }));
+  });
+
+  // DATA-3: "presupuestoAceptadoId" es la señal real (inmune a que se
+  // resetee "estado" a mano) de que ya hay un presupuesto aceptado -- si
+  // un miembro pudiera tocarlo, podría tanto borrarla (reabriendo el hueco)
+  // como falsificarla.
+  it('DENY: un miembro no puede escribir "presupuestoAceptadoId" directamente', async () => {
+    await assertFails(updateDoc(doc(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros`, REGISTRO_A1), { presupuestoAceptadoId: 'pres-falso' }));
+  });
+
+  // "estado" SIGUE siendo editable a mano a propósito (ver
+  // _estadosEditables en registro_detail_screen.dart/
+  // registro_pro_detail_screen.dart -- un picker real para marcar
+  // progreso), incluso para sacar un registro de 'presupuestado'. La
+  // protección de DATA-3 no vive aquí: vive en que "presupuesto"/
+  // "presupuestoAceptadoId" sean intocables (ver los dos tests de arriba)
+  // y en que responderPresupuesto compruebe "presupuestoAceptadoId", no
+  // "estado" (ver functions-tests/presupuestos.test.js, test 8, que
+  // reproduce el escenario completo de la auditoría: aceptar A, resetear
+  // estado a mano, intentar aceptar B).
+  it('ALLOW: el propietario SÍ puede sacar un registro de "presupuestado" a mano (picker legítimo)', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros`, REGISTRO_A1), { estado: 'presupuestado' }, { merge: true });
+    });
+    await assertSucceeds(updateDoc(doc(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros`, REGISTRO_A1), { estado: 'nuevo' }));
+  });
+
   it('ALLOW: el profesional SÍ puede mover su registro a un estado no terminal (p.ej. "enCurso")', async () => {
     await assertSucceeds(updateDoc(doc(as(PRO), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros`, REGISTRO_A1), { estado: 'enCurso' }));
   });
@@ -224,6 +259,18 @@ describe('registros -- acceso del propietario y del profesional asignado', () =>
 
   it('DENY: un miembro no puede crear un registro ya "terminado"', async () => {
     await assertFails(addDoc(collection(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros`), { titulo: 'Colado', tipo: 'averia', esConProfesional: false, estado: 'terminado' }));
+  });
+
+  // DATA-3 (segunda auditoría, octubre 2026): mismo criterio que
+  // profesionalUid -- sin esto, un miembro podría crear el registro ya con
+  // un "presupuesto"/"presupuestoAceptadoId" inventados, sin que ninguna
+  // Cloud Function los haya puesto nunca.
+  it('DENY: un miembro no puede crear un registro con "presupuesto" ya puesto', async () => {
+    await assertFails(addDoc(collection(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros`), { titulo: 'Colado', tipo: 'averia', esConProfesional: false, estado: 'nuevo', presupuesto: 500 }));
+  });
+
+  it('DENY: un miembro no puede crear un registro con "presupuestoAceptadoId" ya puesto', async () => {
+    await assertFails(addDoc(collection(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros`), { titulo: 'Colado', tipo: 'averia', esConProfesional: false, estado: 'nuevo', presupuestoAceptadoId: 'pres-falso' }));
   });
 });
 
@@ -306,16 +353,24 @@ describe('historial -- append-only, mismo criterio de lectura que presupuestos/c
   });
 });
 
-describe('pagos -- solo el propietario escribe, el profesional asignado solo lee', () => {
-  it('ALLOW: el propietario registra un pago en su registro', async () => {
-    await assertSucceeds(addDoc(collection(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/pagos`), { importe: 10, fecha: new Date() }));
+describe('pagos -- create/update solo vía Cloud Function, delete directo restringido a quien lo creó', () => {
+  // DATA-1 (auditoría de integridad económica, octubre 2026): create/update
+  // pasaron de ser escritura directa del cliente a exigir Cloud Function
+  // (registrarPago/actualizarPago), que valida el total acumulado contra el
+  // presupuesto dentro de una transacción -- algo que estas reglas, al
+  // evaluarse documento a documento, no pueden comprobar. Por eso ahora son
+  // `if false` sin excepción, pase lo que pase en los datos; la lógica de
+  // "importe válido"/"quien creó puede editar" vive en las propias Cloud
+  // Functions (ver functions-tests/payments.test.js para esos casos).
+  it('DENY: ni siquiera el propietario puede crear un pago directo desde el cliente', async () => {
+    await assertFails(addDoc(collection(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/pagos`), { importe: 10, fecha: new Date() }));
   });
 
   it('ALLOW: el profesional asignado lee los pagos de SU registro', async () => {
     await assertSucceeds(getDoc(doc(as(PRO), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/pagos`, 'pago-a1')));
   });
 
-  it('DENY: el profesional no puede crear ni editar pagos', async () => {
+  it('DENY: el profesional no puede crear pagos', async () => {
     await assertFails(addDoc(collection(as(PRO), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/pagos`), { importe: 10, fecha: new Date() }));
   });
 
@@ -327,37 +382,11 @@ describe('pagos -- solo el propietario escribe, el profesional asignado solo lee
     await assertFails(addDoc(collection(as(EXTRANO), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/pagos`), { importe: 10, fecha: new Date() }));
   });
 
-  // Auditoría de seguridad, octubre 2026: antes no había ninguna validación
-  // server-side de `importe` -- una llamada directa al SDK (fuera de la UI,
-  // que sí valida) podía crear un pago negativo, a cero, o absurdamente alto.
-  it('DENY: el propietario no puede registrar un pago con importe negativo', async () => {
-    await assertFails(addDoc(collection(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/pagos`), { importe: -10, fecha: new Date() }));
+  it('DENY: ni siquiera quien creó el pago puede editarlo directo desde el cliente', async () => {
+    await assertFails(updateDoc(doc(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/pagos`, 'pago-a1'), { concepto: 'Primera parte' }));
   });
 
-  it('DENY: el propietario no puede registrar un pago de importe cero', async () => {
-    await assertFails(addDoc(collection(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/pagos`), { importe: 0, fecha: new Date() }));
-  });
-
-  it('DENY: el propietario no puede registrar un pago con un importe absurdamente alto', async () => {
-    await assertFails(addDoc(collection(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/pagos`), { importe: 50000000, fecha: new Date() }));
-  });
-
-  it('DENY: el propietario no puede editar un pago para ponerle un importe negativo', async () => {
-    await assertFails(updateDoc(doc(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/pagos`, 'pago-a1'), { importe: -5 }));
-  });
-
-  // Auditoría de seguridad, octubre 2026: antes solo se exigía ser miembro
-  // de la casa -- cualquier miembro podía editar o borrar un pago
-  // registrado por OTRO miembro, con solo el rango numérico como freno.
-  it('ALLOW: quien creó el pago sí puede editarlo', async () => {
-    await assertSucceeds(updateDoc(doc(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/pagos`, 'pago-a1'), { concepto: 'Primera parte' }));
-  });
-
-  it('DENY: otro miembro de la misma casa no puede editar un pago que no creó él', async () => {
-    await assertFails(updateDoc(doc(as(MIEMBRO_A2), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/pagos`, 'pago-a1'), { concepto: 'Manipulado' }));
-  });
-
-  it('DENY: otro miembro de la misma casa no puede borrar un pago que no creó él', async () => {
+  it('DENY: otro miembro de la misma casa tampoco puede editar un pago que no creó él', async () => {
     await assertFails(deleteDoc(doc(as(MIEMBRO_A2), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/pagos`, 'pago-a1')));
   });
 
