@@ -7,11 +7,20 @@
 // creado (ver registro_detail_screen.dart). Un registro nunca vive sin
 // elemento (octubre 2026, fusión Elemento/Trabajo/Evento) -- a diferencia
 // del antiguo NuevoEventoSheet, aquí elementoId es obligatorio.
+//
+// Rediseño de fidelidad visual (octubre 2026), misma identidad "REPARA
+// Professional" que nuevo_contacto_sheet.dart/nuevo_elemento_screen.dart:
+// esquinas superiores con ReparaRadius.lg (antes un 20 suelto), espaciados
+// con ReparaSpace, y el mismo eco visual de error en el campo obligatorio
+// (título) que ya usa nuevo_contacto_sheet.dart -- el snackbar de
+// AppError.show ya existía y no era silencioso, pero no se veía reflejado
+// en el propio campo.
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../models/registro.dart';
 import '../services/registro_service.dart';
+import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
 
 Future<void> mostrarNuevoRegistroSheet(
@@ -23,13 +32,25 @@ Future<void> mostrarNuevoRegistroSheet(
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-    builder: (ctx) => _NuevoRegistroForm(casaId: casaId, elementoId: elementoId, elementoNombre: elementoNombre),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(
+        top: Radius.circular(ReparaRadius.lg),
+      ),
+    ),
+    builder: (ctx) => _NuevoRegistroForm(
+      casaId: casaId,
+      elementoId: elementoId,
+      elementoNombre: elementoNombre,
+    ),
   );
 }
 
 class _NuevoRegistroForm extends StatefulWidget {
-  const _NuevoRegistroForm({required this.casaId, required this.elementoId, required this.elementoNombre});
+  const _NuevoRegistroForm({
+    required this.casaId,
+    required this.elementoId,
+    required this.elementoNombre,
+  });
 
   final String casaId;
   final String elementoId;
@@ -48,6 +69,12 @@ class _NuevoRegistroFormState extends State<_NuevoRegistroForm> {
   DateTime _fecha = DateTime.now();
   bool _guardando = false;
 
+  /// Eco visual en el propio campo del mismo error que ya muestra el
+  /// snackbar de [AppError.show] -- mismo criterio que nuevo_contacto_
+  /// sheet.dart: no sustituye ese aviso, hace más fácil ver qué campo
+  /// exacto falta sin tener que recordar el mensaje que acaba de desaparecer.
+  bool _mostrarErrorTitulo = false;
+
   @override
   void dispose() {
     _tituloCtrl.dispose();
@@ -60,6 +87,7 @@ class _NuevoRegistroFormState extends State<_NuevoRegistroForm> {
   Future<void> _guardar() async {
     final titulo = _tituloCtrl.text.trim();
     if (titulo.isEmpty) {
+      setState(() => _mostrarErrorTitulo = true);
       AppError.show(context, 'Escribe un título para el registro.');
       return;
     }
@@ -76,16 +104,27 @@ class _NuevoRegistroFormState extends State<_NuevoRegistroForm> {
           esConProfesional: false,
           titulo: titulo,
           estado: EstadoRegistro.terminado,
-          descripcion: _descripcionCtrl.text.trim().isEmpty ? null : _descripcionCtrl.text.trim(),
+          descripcion: _descripcionCtrl.text.trim().isEmpty
+              ? null
+              : _descripcionCtrl.text.trim(),
           coste: double.tryParse(_costeCtrl.text.replaceAll(',', '.')),
-          profesionalNombre: _profesionalCtrl.text.trim().isEmpty ? null : _profesionalCtrl.text.trim(),
+          profesionalNombre: _profesionalCtrl.text.trim().isEmpty
+              ? null
+              : _profesionalCtrl.text.trim(),
           fecha: _fecha,
         ),
         createdBy: uid,
       );
       if (mounted) Navigator.pop(context);
     } catch (e, st) {
-      if (mounted) AppError.show(context, 'No se pudo guardar el registro.', error: e, stackTrace: st);
+      if (mounted) {
+        AppError.show(
+          context,
+          'No se pudo guardar el registro.',
+          error: e,
+          stackTrace: st,
+        );
+      }
     } finally {
       if (mounted) setState(() => _guardando = false);
     }
@@ -95,18 +134,24 @@ class _NuevoRegistroFormState extends State<_NuevoRegistroForm> {
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.only(
-        left: 20, right: 20, top: 20,
-        bottom: 20 + MediaQuery.of(context).viewInsets.bottom,
+        left: ReparaSpace.s5,
+        right: ReparaSpace.s5,
+        top: ReparaSpace.s5,
+        bottom: ReparaSpace.s5 + MediaQuery.of(context).viewInsets.bottom,
       ),
       child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Añadir registro', style: Theme.of(context).textTheme.displaySmall),
-            const SizedBox(height: 16),
+            Text(
+              'Añadir registro',
+              style: Theme.of(context).textTheme.displaySmall,
+            ),
+            const SizedBox(height: ReparaSpace.s4),
             Wrap(
-              spacing: 8,
+              spacing: ReparaSpace.s2,
+              runSpacing: ReparaSpace.s2,
               children: TipoRegistro.values.map((t) {
                 return ChoiceChip(
                   label: Text(nombreTipoRegistro(t)),
@@ -115,26 +160,41 @@ class _NuevoRegistroFormState extends State<_NuevoRegistroForm> {
                 );
               }).toList(),
             ),
-            const SizedBox(height: 16),
-            TextField(controller: _tituloCtrl, decoration: const InputDecoration(labelText: 'Título (p.ej. Reparación de fuga)')),
-            const SizedBox(height: 12),
+            const SizedBox(height: ReparaSpace.s4),
+            TextField(
+              controller: _tituloCtrl,
+              decoration: InputDecoration(
+                labelText: 'Título (p.ej. Reparación de fuga)',
+                errorText: _mostrarErrorTitulo ? 'Obligatorio' : null,
+              ),
+              onChanged: (_) {
+                if (_mostrarErrorTitulo) {
+                  setState(() => _mostrarErrorTitulo = false);
+                }
+              },
+            ),
+            const SizedBox(height: ReparaSpace.s3),
             TextField(
               controller: _descripcionCtrl,
               minLines: 1,
               maxLines: 4,
-              decoration: const InputDecoration(labelText: 'Descripción (opcional)'),
+              decoration: const InputDecoration(
+                labelText: 'Descripción (opcional)',
+              ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: ReparaSpace.s3),
             Row(
               children: [
                 Expanded(
                   child: TextField(
                     controller: _costeCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     decoration: const InputDecoration(labelText: 'Coste (€)'),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: ReparaSpace.s3),
                 Expanded(
                   child: TextField(
                     controller: _profesionalCtrl,
@@ -143,7 +203,7 @@ class _NuevoRegistroFormState extends State<_NuevoRegistroForm> {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: ReparaSpace.s3),
             OutlinedButton.icon(
               onPressed: () async {
                 final elegida = await showDatePicker(
@@ -157,11 +217,18 @@ class _NuevoRegistroFormState extends State<_NuevoRegistroForm> {
               icon: const Icon(Icons.calendar_today_outlined, size: 18),
               label: Text('${_fecha.day}/${_fecha.month}/${_fecha.year}'),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: ReparaSpace.s5),
             FilledButton(
               onPressed: _guardando ? null : _guardar,
               child: _guardando
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  ? SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: context.colors.brandOn,
+                      ),
+                    )
                   : const Text('Guardar'),
             ),
           ],
