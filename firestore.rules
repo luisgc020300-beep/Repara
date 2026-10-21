@@ -86,15 +86,26 @@ service cloud.firestore {
           allow read: if isAuth() && (isMember(cid) || resource.data.profesionalUid == request.auth.uid);
           // profesionalUid tampoco es escribible EN LA CREACIÓN -- sin esto,
           // un miembro podría crear el registro ya con un profesionalUid
-          // ajeno puesto, dándole acceso sin pasar por invitar/aceptar; ni
-          // con estado ya en uno controlado, saltándose por completo el
-          // flujo de finalizarTrabajoPropietario (auditoría de seguridad,
-          // octubre 2026).
+          // ajeno puesto, dándole acceso sin pasar por invitar/aceptar.
+          //
+          // A propósito NO se bloquea aquí estadoControlado(estado): una
+          // compra o reforma sin profesional (nuevo_elemento_screen.dart)
+          // crea su registro fundacional directamente como "terminado" --
+          // no hay ningún profesional ni flujo de finalización que
+          // saltarse, porque el registro nace y muere en el mismo estado,
+          // sin pasos intermedios. Bloquearlo aquí (como se hizo en la
+          // auditoría de seguridad de octubre 2026) impedía crear CUALQUIER
+          // compra o nota simple -- un efecto secundario no buscado, no el
+          // hueco que esa auditoría perseguía. La protección real sigue
+          // intacta y es independiente de esto: "allow update" de abajo
+          // (línea ~130) ya impide, por su cuenta, que estado ENTRE o SALGA
+          // de un estado controlado en cualquier escritura posterior,
+          // crear con profesionalUid sigue prohibido arriba, y nadie fuera
+          // de isMember(cid) puede tocar nada de esta casa.
           allow create: if isAuth() && isMember(cid)
               && !('profesionalUid' in request.resource.data)
               && !('presupuesto' in request.resource.data)
-              && !('presupuestoAceptadoId' in request.resource.data)
-              && !estadoControlado(request.resource.data.estado);
+              && !('presupuestoAceptadoId' in request.resource.data);
           // profesionalUid NUNCA es escribible por un miembro -- solo
           // responderInvitacion (Cloud Function, Admin SDK, salta estas
           // reglas) lo asigna, tras el apretón de manos de invitación y

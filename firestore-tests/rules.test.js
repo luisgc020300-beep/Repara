@@ -244,11 +244,13 @@ describe('registros -- acceso del propietario y del profesional asignado', () =>
     await assertFails(updateDoc(doc(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros`, REGISTRO_A1), { estadoPrevioAPendiente: 'enCurso' }));
   });
 
-  // Auditoría de seguridad, octubre 2026: profesionalUid y los estados
-  // controlados solo estaban protegidos en `update`, nunca en `create` --
-  // un miembro podía crear el registro YA con esos campos puestos,
-  // saltándose por completo el apretón de manos de invitar/aceptar o el
-  // flujo de finalizarTrabajoPropietario.
+  // Auditoría de seguridad, octubre 2026: profesionalUid solo estaba
+  // protegido en `update`, nunca en `create` -- un miembro podía crear el
+  // registro YA con ese campo puesto, saltándose por completo el apretón
+  // de manos de invitar/aceptar. (El bloqueo de "estado controlado" en
+  // create que esta misma auditoría añadió se revirtió después -- ver el
+  // test más abajo -- por romper la creación legítima de compras/notas
+  // simples sin profesional.)
   it('ALLOW: un miembro crea un registro normal, sin profesionalUid ni estado controlado', async () => {
     await assertSucceeds(addDoc(collection(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros`), { titulo: 'Nuevo', tipo: 'averia', esConProfesional: false, estado: 'nuevo' }));
   });
@@ -257,8 +259,16 @@ describe('registros -- acceso del propietario y del profesional asignado', () =>
     await assertFails(addDoc(collection(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros`), { titulo: 'Colado', tipo: 'averia', esConProfesional: true, estado: 'nuevo', profesionalUid: PRO_AJENO }));
   });
 
-  it('DENY: un miembro no puede crear un registro ya "terminado"', async () => {
-    await assertFails(addDoc(collection(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros`), { titulo: 'Colado', tipo: 'averia', esConProfesional: false, estado: 'terminado' }));
+  // Corregido (octubre 2026): una compra o nota simple sin profesional
+  // (nuevo_elemento_screen.dart) crea su registro fundacional directamente
+  // como "terminado" -- no hay profesional ni flujo de finalización que
+  // saltarse, el registro nace y muere en el mismo estado. Bloquear esto
+  // en "create" rompía esa alta legítima sin cerrar ningún hueco real: la
+  // combinación peligrosa (estado cerrado + profesionalUid) ya está
+  // cubierta por el test de arriba, que bloquea profesionalUid en create
+  // sin importar el estado.
+  it('ALLOW: un miembro crea un registro sin profesional ya "terminado" (compra/nota simple)', async () => {
+    await assertSucceeds(addDoc(collection(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros`), { titulo: 'Freidora nueva', tipo: 'compra', esConProfesional: false, estado: 'terminado' }));
   });
 
   // DATA-3 (segunda auditoría, octubre 2026): mismo criterio que
