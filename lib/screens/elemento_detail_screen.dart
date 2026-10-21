@@ -3,7 +3,12 @@
 // Ficha de un elemento (sección 11 del spec) -- una de las seis pantallas
 // que el spec marca como "estrella" porque representan la propuesta de
 // valor: convertir un aparato suelto en una identidad digital con su propio
-// historial y documentación.
+// historial y documentación. Rediseño de fidelidad visual (octubre 2026),
+// misma identidad "REPARA Professional" que registro_detail_screen.dart,
+// adaptada a que esta ficha trata de un objeto físico: la foto vive dentro
+// de una tarjeta (no detrás de un AppBar transparente) y el mantenimiento
+// tiene su propia tarjeta con acciones, igual que la de registro_detail_
+// screen.dart (que lee estos mismos campos del Elemento).
 import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -23,7 +28,6 @@ import '../services/registro_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_dialog.dart';
 import '../widgets/app_error.dart';
-import '../widgets/boton_sobre_imagen.dart';
 import '../widgets/ios_list.dart';
 import 'nuevo_documento_flow.dart';
 import 'nuevo_elemento_screen.dart';
@@ -31,13 +35,22 @@ import 'nuevo_registro_sheet.dart';
 import 'registro_detail_screen.dart';
 
 class ElementoDetailScreen extends StatelessWidget {
-  const ElementoDetailScreen({required this.casa, required this.elementoId, super.key});
+  const ElementoDetailScreen({
+    required this.casa,
+    required this.elementoId,
+    super.key,
+  });
 
   final Casa casa;
   final String elementoId;
 
-  Future<void> _editarMantenimiento(BuildContext context, Elemento elemento) async {
-    final intervaloCtrl = TextEditingController(text: elemento.intervaloMantenimientoMeses?.toString() ?? '');
+  Future<void> _editarMantenimiento(
+    BuildContext context,
+    Elemento elemento,
+  ) async {
+    final intervaloCtrl = TextEditingController(
+      text: elemento.intervaloMantenimientoMeses?.toString() ?? '',
+    );
     DateTime? proxima = elemento.proximoMantenimiento;
 
     final guardar = await showDialog<bool>(
@@ -53,7 +66,9 @@ class ElementoDetailScreen extends StatelessWidget {
               TextField(
                 controller: intervaloCtrl,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Revisar cada cuántos meses'),
+                decoration: const InputDecoration(
+                  labelText: 'Revisar cada cuántos meses',
+                ),
               ),
               const SizedBox(height: 12),
               OutlinedButton.icon(
@@ -67,13 +82,23 @@ class ElementoDetailScreen extends StatelessWidget {
                   if (elegida != null) setStateDialog(() => proxima = elegida);
                 },
                 icon: const Icon(Icons.calendar_today_outlined, size: 16),
-                label: Text(proxima == null ? 'Próxima revisión' : '${proxima!.day}/${proxima!.month}/${proxima!.year}'),
+                label: Text(
+                  proxima == null
+                      ? 'Próxima revisión'
+                      : '${proxima!.day}/${proxima!.month}/${proxima!.year}',
+                ),
               ),
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Guardar')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Guardar'),
+            ),
           ],
         ),
       ),
@@ -87,7 +112,14 @@ class ElementoDetailScreen extends StatelessWidget {
         proximoMantenimiento: proxima,
       );
     } catch (e, st) {
-      if (context.mounted) AppError.show(context, 'No se pudo guardar la revisión periódica.', error: e, stackTrace: st);
+      if (context.mounted) {
+        AppError.show(
+          context,
+          'No se pudo guardar la revisión periódica.',
+          error: e,
+          stackTrace: st,
+        );
+      }
     }
   }
 
@@ -97,7 +129,12 @@ class ElementoDetailScreen extends StatelessWidget {
       context: context,
       builder: (ctx) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(ReparaSpace.s4, ReparaSpace.s2, ReparaSpace.s4, ReparaSpace.s4),
+          padding: const EdgeInsets.fromLTRB(
+            ReparaSpace.s4,
+            ReparaSpace.s2,
+            ReparaSpace.s4,
+            ReparaSpace.s4,
+          ),
           child: IosSection(
             rows: [
               IosRow(
@@ -106,7 +143,12 @@ class ElementoDetailScreen extends StatelessWidget {
                 title: 'Hacer una foto',
                 onTap: () async {
                   final navigator = Navigator.of(ctx);
-                  final imagen = await picker.pickImage(source: ImageSource.camera, imageQuality: 85, maxWidth: 1600, maxHeight: 1600);
+                  final imagen = await picker.pickImage(
+                    source: ImageSource.camera,
+                    imageQuality: 85,
+                    maxWidth: 1600,
+                    maxHeight: 1600,
+                  );
                   if (!ctx.mounted) return;
                   navigator.pop(imagen);
                 },
@@ -117,7 +159,12 @@ class ElementoDetailScreen extends StatelessWidget {
                 title: 'Elegir de la galería',
                 onTap: () async {
                   final navigator = Navigator.of(ctx);
-                  final imagen = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85, maxWidth: 1600, maxHeight: 1600);
+                  final imagen = await picker.pickImage(
+                    source: ImageSource.gallery,
+                    imageQuality: 85,
+                    maxWidth: 1600,
+                    maxHeight: 1600,
+                  );
                   if (!ctx.mounted) return;
                   navigator.pop(imagen);
                 },
@@ -129,14 +176,28 @@ class ElementoDetailScreen extends StatelessWidget {
     );
     if (foto == null || !context.mounted) return;
     try {
-      final url = await ElementoService.subirFoto(casa.id, elemento.id, File(foto.path));
+      final url = await ElementoService.subirFoto(
+        casa.id,
+        elemento.id,
+        File(foto.path),
+      );
       await ElementoService.actualizarFoto(casa.id, elemento.id, url);
     } catch (e, st) {
-      if (context.mounted) AppError.show(context, 'No se pudo guardar la foto.', error: e, stackTrace: st);
+      if (context.mounted) {
+        AppError.show(
+          context,
+          'No se pudo guardar la foto.',
+          error: e,
+          stackTrace: st,
+        );
+      }
     }
   }
 
-  Future<void> _marcarRevisionHecha(BuildContext context, Elemento elemento) async {
+  Future<void> _marcarRevisionHecha(
+    BuildContext context,
+    Elemento elemento,
+  ) async {
     final intervalo = elemento.intervaloMantenimientoMeses;
     if (intervalo == null) return;
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
@@ -155,11 +216,39 @@ class ElementoDetailScreen extends StatelessWidget {
         ),
         createdBy: uid,
       );
-      await ElementoService.marcarRevisionHecha(casa.id, elemento.id, intervalo);
-      if (context.mounted) AppError.showSuccess(context, 'Revisión registrada. Próxima en $intervalo meses.');
+      await ElementoService.marcarRevisionHecha(
+        casa.id,
+        elemento.id,
+        intervalo,
+      );
+      if (context.mounted) {
+        AppError.showSuccess(
+          context,
+          'Revisión registrada. Próxima en $intervalo meses.',
+        );
+      }
     } catch (e, st) {
-      if (context.mounted) AppError.show(context, 'No se pudo registrar la revisión.', error: e, stackTrace: st);
+      if (context.mounted) {
+        AppError.show(
+          context,
+          'No se pudo registrar la revisión.',
+          error: e,
+          stackTrace: st,
+        );
+      }
     }
+  }
+
+  Future<void> _eliminar(BuildContext context, Elemento elemento) async {
+    final confirmar = await AppDialog.confirmText(
+      context,
+      title: '¿Eliminar elemento?',
+      message: 'Se eliminará la ficha, no su historial ya registrado.',
+      confirmLabel: 'Eliminar',
+    );
+    if (!confirmar || !context.mounted) return;
+    await ElementoService.eliminar(casa.id, elemento.id);
+    if (context.mounted) Navigator.pop(context);
   }
 
   @override
@@ -169,183 +258,215 @@ class ElementoDetailScreen extends StatelessWidget {
       builder: (context, snapshot) {
         final elemento = snapshot.data;
         if (elemento == null) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
         }
         return Scaffold(
-          extendBodyBehindAppBar: true,
-          // Respaldo circular oscuro, no iconTheme blanco a secas -- sin
-          // foto, el hueco es gris claro y un icono blanco se vuelve casi
-          // invisible encima (mismo arreglo que registro_detail_screen.dart).
+          backgroundColor: context.colors.background,
           appBar: AppBar(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            leading: BotonSobreImagen(icon: Icons.arrow_back, tooltip: 'Volver', onPressed: () => Navigator.pop(context)),
+            title: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.home_outlined,
+                  size: 14,
+                  color: context.colors.inkMuted,
+                ),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    casa.nombre,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
             actions: [
-              BotonSobreImagen(
-                icon: Icons.edit_outlined,
+              IconButton(
+                icon: const Icon(Icons.edit_outlined),
                 tooltip: 'Editar ficha',
                 onPressed: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => NuevoElementoScreen(casa: casa, habitacionIdInicial: elemento.habitacionId, existente: elemento)),
+                  MaterialPageRoute(
+                    builder: (_) => NuevoElementoScreen(
+                      casa: casa,
+                      habitacionIdInicial: elemento.habitacionId,
+                      existente: elemento,
+                    ),
+                  ),
                 ),
               ),
-              BotonSobreImagen(
-                icon: Icons.delete_outline,
+              IconButton(
+                icon: Icon(
+                  Icons.delete_outline,
+                  color: context.colors.errorText,
+                ),
                 tooltip: 'Eliminar elemento',
-                onPressed: () async {
-                  final confirmar = await AppDialog.confirmText(
-                    context,
-                    title: '¿Eliminar elemento?',
-                    message: 'Se eliminará la ficha, no su historial ya registrado.',
-                    confirmLabel: 'Eliminar',
-                  );
-                  if (confirmar) {
-                    await ElementoService.eliminar(casa.id, elemento.id);
-                    if (context.mounted) Navigator.pop(context);
-                  }
-                },
+                onPressed: () => _eliminar(context, elemento),
               ),
             ],
           ),
           floatingActionButton: FloatingActionButton.extended(
-            onPressed: () => mostrarNuevoRegistroSheet(context, casaId: casa.id, elementoId: elemento.id, elementoNombre: elemento.nombre),
+            onPressed: () => mostrarNuevoRegistroSheet(
+              context,
+              casaId: casa.id,
+              elementoId: elemento.id,
+              elementoNombre: elemento.nombre,
+            ),
             icon: const Icon(Icons.add),
             label: const Text('Añadir registro'),
           ),
           body: ListView(
-            padding: EdgeInsets.zero,
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
             children: [
-              // Sin foto todavía -- un marcador tocable es mejor que fingir
-              // una (auditoría de craft, octubre 2026): avisa de que es un
-              // hueco, no un dato, y toca para añadirla. Con foto, tocarla
-              // la amplía a pantalla completa -- cambiarla es el lápiz
-              // pequeño de la esquina, no toda el área (CEO, octubre 2026:
-              // "se ve muy poco, que se pueda ampliar"). Relleno plano, no
-              // degradado (briefing "REPARA Professional": sin degradados
-              // decorativos).
-              GestureDetector(
-                onTap: () => elemento.fotoUrl == null
-                    ? _cambiarFoto(context, elemento)
-                    : Navigator.push(context, MaterialPageRoute(builder: (_) => _FotoAmpliadaScreen(url: elemento.fotoUrl!))),
-                child: Container(
-                  height: 220,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: elemento.fotoUrl == null ? context.colors.surfaceMuted : null,
-                    image: elemento.fotoUrl != null
-                        ? DecorationImage(image: NetworkImage(elemento.fotoUrl!), fit: BoxFit.cover)
-                        : null,
-                  ),
-                  child: elemento.fotoUrl == null
-                      ? Center(child: Icon(Icons.add_a_photo_outlined, size: 34, color: context.colors.inkFaint))
-                      : Align(
-                          alignment: Alignment.bottomRight,
-                          child: Padding(
-                            padding: const EdgeInsets.all(ReparaSpace.s2),
-                            child: GestureDetector(
-                              onTap: () => _cambiarFoto(context, elemento),
-                              child: Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.45), shape: BoxShape.circle),
-                                child: const Icon(Icons.edit_outlined, size: 16, color: Colors.white),
+              _FotoElemento(
+                onTap: () => _onTapFoto(context, elemento),
+                fotoUrl: elemento.fotoUrl,
+              ),
+              const SizedBox(height: 14),
+              StreamBuilder<List<Habitacion>>(
+                stream: HabitacionService.streamHabitaciones(casa.id),
+                builder: (context, habSnapshot) {
+                  final coincidencias =
+                      (habSnapshot.data ?? const <Habitacion>[]).where(
+                        (h) => h.id == elemento.habitacionId,
+                      );
+                  final nombreHabitacion = coincidencias.isEmpty
+                      ? null
+                      : coincidencias.first.nombre;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.room_outlined,
+                            size: 12,
+                            color: context.colors.inkMuted,
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            (nombreHabitacion ?? 'Sin habitación asignada')
+                                .toUpperCase(),
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(
+                                  fontSize: 11,
+                                  color: context.colors.inkMuted,
+                                ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        elemento.nombre,
+                        style: Theme.of(context).textTheme.displaySmall,
+                      ),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 20),
+              _TarjetaInformacion(elemento: elemento),
+              const SizedBox(height: 16),
+              _TarjetaMantenimiento(
+                elemento: elemento,
+                onEditar: () => _editarMantenimiento(context, elemento),
+                onMarcarHecha: () => _marcarRevisionHecha(context, elemento),
+              ),
+              const SizedBox(height: 22),
+              Text(
+                'Historial',
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 10),
+              StreamBuilder<List<Registro>>(
+                stream: RegistroService.streamRegistros(casa.id, elemento.id),
+                builder: (context, snapshot) {
+                  final registros = snapshot.data ?? [];
+                  if (registros.isEmpty) {
+                    return const EmptyHint(
+                      message: 'Sin registros todavía.',
+                      icon: Icons.fact_check_outlined,
+                    );
+                  }
+                  return IosSection(
+                    rows: registros
+                        .map(
+                          (r) => IosRow(
+                            icon: Icons.fact_check_outlined,
+                            iconColor: context.colors.brand,
+                            title: r.titulo,
+                            subtitle: DateFormat(
+                              'd MMM yyyy',
+                              'es_ES',
+                            ).format(r.fecha),
+                            trailing: r.coste != null
+                                ? Text(
+                                    '${r.coste!.toStringAsFixed(0)} €',
+                                    style: ReparaText.amount(context),
+                                  )
+                                : null,
+                            showChevron: false,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => RegistroDetailScreen(
+                                  casa: casa,
+                                  elementoId: elemento.id,
+                                  registroId: r.id,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                ),
+                        )
+                        .toList(),
+                  );
+                },
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 18, 20, 4),
-                child: StreamBuilder<List<Habitacion>>(
-                  stream: HabitacionService.streamHabitaciones(casa.id),
-                  builder: (context, habSnapshot) {
-                    final coincidencias = (habSnapshot.data ?? const <Habitacion>[]).where((h) => h.id == elemento.habitacionId);
-                    final nombreHabitacion = coincidencias.isEmpty ? null : coincidencias.first.nombre;
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          (nombreHabitacion ?? 'Elemento').toUpperCase(),
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 11, color: context.colors.inkMuted),
-                        ),
-                        Text(elemento.nombre, style: Theme.of(context).textTheme.displaySmall),
-                      ],
+              const SizedBox(height: 22),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Documentos',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  TextButton.icon(
+                    onPressed: () => iniciarNuevoDocumento(
+                      context,
+                      casaId: casa.id,
+                      elementoId: elemento.id,
+                      habitacionId: elemento.habitacionId,
+                    ),
+                    icon: const Icon(Icons.document_scanner_outlined, size: 18),
+                    label: const Text('Escanear documento'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              StreamBuilder<List<Documento>>(
+                stream: DocumentoService.streamDocumentos(
+                  casa.id,
+                  elementoId: elemento.id,
+                ),
+                builder: (context, snapshot) {
+                  final documentos = snapshot.data ?? [];
+                  if (documentos.isEmpty) {
+                    return const EmptyHint(
+                      message: 'Sin documentos todavía.',
+                      icon: Icons.description_outlined,
                     );
-                  },
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _FichaCard(elemento: elemento, onEditarMantenimiento: () => _editarMantenimiento(context, elemento)),
-                    if (elemento.intervaloMantenimientoMeses != null) ...[
-                      const SizedBox(height: 10),
-                      OutlinedButton.icon(
-                        onPressed: () => _marcarRevisionHecha(context, elemento),
-                        icon: const Icon(Icons.check_circle_outline, size: 18),
-                        label: const Text('Marcar revisión como hecha'),
-                      ),
-                    ],
-                    const SizedBox(height: 22),
-                    Text('Historial', style: Theme.of(context).textTheme.headlineSmall),
-                    const SizedBox(height: 10),
-                    StreamBuilder<List<Registro>>(
-                      stream: RegistroService.streamRegistros(casa.id, elemento.id),
-                      builder: (context, snapshot) {
-                        final registros = snapshot.data ?? [];
-                        if (registros.isEmpty) {
-                          return const EmptyHint(message: 'Sin registros todavía.', icon: Icons.fact_check_outlined);
-                        }
-                        return IosSection(
-                          rows: registros
-                              .map((r) => IosRow(
-                                    icon: Icons.fact_check_outlined,
-                                    iconColor: context.colors.brand,
-                                    title: r.titulo,
-                                    subtitle: DateFormat('d MMM yyyy', 'es_ES').format(r.fecha),
-                                    trailing: r.coste != null ? Text('${r.coste!.toStringAsFixed(0)} €', style: ReparaText.amount(context)) : null,
-                                    showChevron: false,
-                                    onTap: () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(builder: (_) => RegistroDetailScreen(casa: casa, elementoId: elemento.id, registroId: r.id)),
-                                    ),
-                                  ))
-                              .toList(),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 22),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Documentos', style: Theme.of(context).textTheme.headlineSmall),
-                        TextButton.icon(
-                          onPressed: () => iniciarNuevoDocumento(
-                            context,
-                            casaId: casa.id,
-                            elementoId: elemento.id,
-                            habitacionId: elemento.habitacionId,
-                          ),
-                          icon: const Icon(Icons.document_scanner_outlined, size: 18),
-                          label: const Text('Escanear documento'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    StreamBuilder<List<Documento>>(
-                      stream: DocumentoService.streamDocumentos(casa.id, elementoId: elemento.id),
-                      builder: (context, snapshot) {
-                        final documentos = snapshot.data ?? [];
-                        if (documentos.isEmpty) {
-                          return const EmptyHint(message: 'Sin documentos todavía.', icon: Icons.description_outlined);
-                        }
-                        return IosSection(rows: documentos.map((d) => _DocumentoTile(documento: d)).toList());
-                      },
-                    ),
-                  ],
-                ),
+                  }
+                  return IosSection(
+                    rows: documentos
+                        .map((d) => _DocumentoTile(documento: d))
+                        .toList(),
+                  );
+                },
               ),
             ],
           ),
@@ -353,39 +474,225 @@ class ElementoDetailScreen extends StatelessWidget {
       },
     );
   }
+
+  void _onTapFoto(BuildContext context, Elemento elemento) {
+    if (elemento.fotoUrl == null) {
+      _cambiarFoto(context, elemento);
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => _FotoAmpliadaScreen(url: elemento.fotoUrl!),
+        ),
+      );
+    }
+  }
 }
 
-class _FichaCard extends StatelessWidget {
-  const _FichaCard({required this.elemento, required this.onEditarMantenimiento});
+/// Foto del elemento dentro de una tarjeta -- a diferencia del banner a
+/// pantalla completa de antes, vive en el flujo normal del contenido con el
+/// mismo radio/borde que el resto de tarjetas de la app, para que el AppBar
+/// y sus controles de navegación nunca queden detrás de la imagen ni se
+/// pierdan al hacer scroll. Sin foto, un estado vacío que invita a tocar en
+/// vez de fingir una imagen (auditoría de craft, octubre 2026). Con foto,
+/// tocarla la amplía a pantalla completa -- cambiarla es el lápiz pequeño de
+/// la esquina.
+class _FotoElemento extends StatelessWidget {
+  const _FotoElemento({required this.fotoUrl, required this.onTap});
+
+  final String? fotoUrl;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 190,
+        width: double.infinity,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: context.colors.surfaceMuted,
+          borderRadius: BorderRadius.circular(ReparaRadius.lg),
+          border: Border.all(color: context.colors.border),
+        ),
+        child: Stack(
+          children: [
+            if (fotoUrl != null)
+              Positioned.fill(child: Image.network(fotoUrl!, fit: BoxFit.cover))
+            else
+              Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.add_a_photo_outlined,
+                      size: 30,
+                      color: context.colors.inkFaint,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Toca para añadir una foto',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+            if (fotoUrl != null)
+              Positioned(
+                right: 10,
+                bottom: 10,
+                child: Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.45),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.edit_outlined,
+                    size: 16,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Información consolidada en una sola tarjeta -- marca/modelo, instalación,
+/// coste, profesional y garantía. El mantenimiento tiene su propia tarjeta
+/// (ver _TarjetaMantenimiento) porque, a diferencia de estos, lleva acciones
+/// propias. Si no hay ningún dato, IosSection no pinta nada (nunca una
+/// sección vacía sin utilidad real).
+class _TarjetaInformacion extends StatelessWidget {
+  const _TarjetaInformacion({required this.elemento});
 
   final Elemento elemento;
-  final VoidCallback onEditarMantenimiento;
 
   @override
   Widget build(BuildContext context) {
     return IosSection(
       rows: [
         if (elemento.marca != null)
-          IosValueRow(label: 'Marca / modelo', value: '${elemento.marca} ${elemento.modelo ?? ''}'.trim()),
+          IosValueRow(
+            label: 'Marca / modelo',
+            value: '${elemento.marca} ${elemento.modelo ?? ''}'.trim(),
+          ),
         if (elemento.fechaInstalacion != null)
-          IosValueRow(label: 'Instalado', value: DateFormat('d MMMM yyyy', 'es_ES').format(elemento.fechaInstalacion!)),
-        if (elemento.coste != null) IosValueRow(label: 'Coste', value: '${elemento.coste!.toStringAsFixed(0)} €'),
-        if (elemento.profesionalNombre != null) IosValueRow(label: 'Profesional', value: elemento.profesionalNombre!),
+          IosValueRow(
+            label: 'Instalado',
+            value: DateFormat(
+              'd MMMM yyyy',
+              'es_ES',
+            ).format(elemento.fechaInstalacion!),
+          ),
+        if (elemento.coste != null)
+          IosValueRow(
+            label: 'Coste',
+            value: '${elemento.coste!.toStringAsFixed(0)} €',
+          ),
+        if (elemento.profesionalNombre != null)
+          IosValueRow(label: 'Profesional', value: elemento.profesionalNombre!),
         if (elemento.garantiaHasta != null)
           IosValueRow(
             label: 'Garantía hasta',
-            value: DateFormat('d MMMM yyyy', 'es_ES').format(elemento.garantiaHasta!),
+            value: DateFormat(
+              'd MMMM yyyy',
+              'es_ES',
+            ).format(elemento.garantiaHasta!),
             destacado: elemento.garantiaProximaAVencer,
           ),
-        IosValueRow(
-          label: 'Próxima revisión',
-          value: elemento.proximoMantenimiento != null
-              ? DateFormat('d MMMM yyyy', 'es_ES').format(elemento.proximoMantenimiento!)
-              : 'Sin configurar',
-          destacado: elemento.revisionPendiente,
-          onTap: onEditarMantenimiento,
-        ),
       ],
+    );
+  }
+}
+
+/// Mismo lenguaje visual que la tarjeta de mantenimiento de
+/// registro_detail_screen.dart (que lee estos mismos campos del Elemento
+/// padre): icono+texto arriba a todo lo ancho, acciones debajo -- nunca
+/// todo en una sola fila, para que el texto no se apriete contra el botón.
+class _TarjetaMantenimiento extends StatelessWidget {
+  const _TarjetaMantenimiento({
+    required this.elemento,
+    required this.onEditar,
+    required this.onMarcarHecha,
+  });
+
+  final Elemento elemento;
+  final VoidCallback onEditar;
+  final VoidCallback onMarcarHecha;
+
+  @override
+  Widget build(BuildContext context) {
+    final fecha = elemento.proximoMantenimiento;
+    final destacado = elemento.revisionPendiente;
+    final puedeMarcarHecha = elemento.intervaloMantenimientoMeses != null;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        border: Border.all(color: context.colors.border),
+        borderRadius: BorderRadius.circular(ReparaRadius.md),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.schedule_outlined, color: context.colors.brand),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Próxima revisión',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: context.colors.inkMuted,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      fecha != null
+                          ? DateFormat('d MMMM yyyy', 'es_ES').format(fecha)
+                          : 'Sin configurar',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: destacado ? context.colors.warningText : null,
+                        fontWeight: destacado ? FontWeight.w700 : null,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onEditar,
+                  icon: const Icon(Icons.calendar_month_outlined, size: 16),
+                  label: Text(fecha != null ? 'Editar' : 'Configurar'),
+                ),
+              ),
+              if (puedeMarcarHecha) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: onMarcarHecha,
+                    icon: const Icon(Icons.check_circle_outline, size: 16),
+                    label: const Text('Marcar hecha'),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
@@ -396,13 +703,13 @@ class _DocumentoTile extends StatelessWidget {
   final Documento documento;
 
   IconData get _icono => switch (documento.tipo) {
-        TipoDocumento.factura => Icons.receipt_long_outlined,
-        TipoDocumento.presupuesto => Icons.request_quote_outlined,
-        TipoDocumento.garantia => Icons.shield_outlined,
-        TipoDocumento.manual => Icons.menu_book_outlined,
-        TipoDocumento.contrato => Icons.description_outlined,
-        TipoDocumento.otro => Icons.insert_drive_file_outlined,
-      };
+    TipoDocumento.factura => Icons.receipt_long_outlined,
+    TipoDocumento.presupuesto => Icons.request_quote_outlined,
+    TipoDocumento.garantia => Icons.shield_outlined,
+    TipoDocumento.manual => Icons.menu_book_outlined,
+    TipoDocumento.contrato => Icons.description_outlined,
+    TipoDocumento.otro => Icons.insert_drive_file_outlined,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -410,8 +717,15 @@ class _DocumentoTile extends StatelessWidget {
       icon: _icono,
       iconColor: context.colors.brand,
       title: documento.proveedor ?? documento.nombreArchivo,
-      subtitle: documento.fecha != null ? DateFormat('d MMM yyyy', 'es_ES').format(documento.fecha!) : null,
-      trailing: documento.importe != null ? Text('${documento.importe!.toStringAsFixed(0)} €', style: ReparaText.amount(context)) : null,
+      subtitle: documento.fecha != null
+          ? DateFormat('d MMM yyyy', 'es_ES').format(documento.fecha!)
+          : null,
+      trailing: documento.importe != null
+          ? Text(
+              '${documento.importe!.toStringAsFixed(0)} €',
+              style: ReparaText.amount(context),
+            )
+          : null,
       showChevron: false,
     );
   }
