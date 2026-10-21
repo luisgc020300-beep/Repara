@@ -5,6 +5,16 @@
 // como en la de Pro (rol profesional: crear, enviar, versionar). Los totales
 // mostrados aquí son solo para revisión visual -- los que cuentan de verdad
 // son los que calcula el servidor en Cloud Functions.
+//
+// Rediseño de fidelidad visual (octubre 2026), misma identidad "REPARA
+// Professional" que pagos_section.dart/cambio_alcance_section.dart (la
+// pantalla hermana recién revisada): espaciados y radio de la hoja
+// tokenizados, mismo padding de tarjeta (ReparaSpace.s4) que _CambioCard.
+// _PresupuestoCard se mantiene como Card (no IosRow): título+estado,
+// líneas de detalle, divisor, subtotal/IVA/total y botones de enviar o
+// aceptar/rechazar -- mucho más contenido del que un IosRow (icono+título+
+// subtítulo+trailing) puede representar; mismo criterio ya aplicado a
+// _CambioCard en cambio_alcance_section.dart.
 import 'dart:async';
 import 'dart:convert';
 
@@ -28,7 +38,13 @@ const _claveUltimaPlantilla = 'repara_ultima_plantilla_presupuesto';
 enum RolEnTrabajo { propietario, profesional }
 
 class PresupuestosSection extends StatelessWidget {
-  const PresupuestosSection({required this.casaId, required this.elementoId, required this.registroId, required this.rol, super.key});
+  const PresupuestosSection({
+    required this.casaId,
+    required this.elementoId,
+    required this.registroId,
+    required this.rol,
+    super.key,
+  });
 
   final String casaId;
   final String elementoId;
@@ -38,11 +54,16 @@ class PresupuestosSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<Presupuesto>>(
-      stream: PresupuestoService.streamPresupuestos(casaId, elementoId, registroId),
+      stream: PresupuestoService.streamPresupuestos(
+        casaId,
+        elementoId,
+        registroId,
+      ),
       builder: (context, snapshot) {
         final presupuestos = snapshot.data ?? [];
         final ultimo = presupuestos.isEmpty ? null : presupuestos.first;
-        final puedeCrearNuevo = rol == RolEnTrabajo.profesional &&
+        final puedeCrearNuevo =
+            rol == RolEnTrabajo.profesional &&
             (ultimo == null || ultimo.estado == EstadoPresupuesto.rechazado);
 
         return Column(
@@ -51,33 +72,59 @@ class PresupuestosSection extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Presupuestos', style: Theme.of(context).textTheme.headlineSmall),
+                Text(
+                  'Presupuestos',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
                 if (puedeCrearNuevo)
                   TextButton.icon(
                     onPressed: () => _abrirEditor(
                       context,
-                      presupuestoAnteriorId: ultimo?.estado == EstadoPresupuesto.rechazado ? ultimo!.id : null,
+                      presupuestoAnteriorId:
+                          ultimo?.estado == EstadoPresupuesto.rechazado
+                          ? ultimo!.id
+                          : null,
                     ),
                     icon: const Icon(Icons.add, size: 18),
-                    label: Text(ultimo != null ? 'Nueva versión' : 'Crear presupuesto'),
+                    label: Text(
+                      ultimo != null ? 'Nueva versión' : 'Crear presupuesto',
+                    ),
                   ),
               ],
             ),
             if (presupuestos.isEmpty)
-              const EmptyHint(message: 'Sin presupuestos todavía.', icon: Icons.request_quote_outlined)
+              const EmptyHint(
+                message: 'Sin presupuestos todavía.',
+                icon: Icons.request_quote_outlined,
+              )
             else
-              ...presupuestos.map((p) => _PresupuestoCard(casaId: casaId, elementoId: elementoId, registroId: registroId, presupuesto: p, rol: rol)),
+              ...presupuestos.map(
+                (p) => _PresupuestoCard(
+                  casaId: casaId,
+                  elementoId: elementoId,
+                  registroId: registroId,
+                  presupuesto: p,
+                  rol: rol,
+                ),
+              ),
           ],
         );
       },
     );
   }
 
-  Future<void> _abrirEditor(BuildContext context, {String? presupuestoAnteriorId}) async {
+  Future<void> _abrirEditor(
+    BuildContext context, {
+    String? presupuestoAnteriorId,
+  }) async {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(ReparaRadius.lg),
+        ),
+      ),
       builder: (_) => _EditorPresupuestoSheet(
         casaId: casaId,
         elementoId: elementoId,
@@ -89,7 +136,13 @@ class PresupuestosSection extends StatelessWidget {
 }
 
 class _PresupuestoCard extends StatefulWidget {
-  const _PresupuestoCard({required this.casaId, required this.elementoId, required this.registroId, required this.presupuesto, required this.rol});
+  const _PresupuestoCard({
+    required this.casaId,
+    required this.elementoId,
+    required this.registroId,
+    required this.presupuesto,
+    required this.rol,
+  });
 
   final String casaId;
   final String elementoId;
@@ -113,7 +166,8 @@ class _PresupuestoCardState extends State<_PresupuestoCard> {
   // warningText, no warning -- el ámbar base no llega a 4.5:1 de contraste
   // como texto (auditoría de accesibilidad, octubre 2026), solo vale como
   // icono o como fondo tenue.
-  Color _colorEstado(BuildContext context) => switch (widget.presupuesto.estado) {
+  Color _colorEstado(BuildContext context) =>
+      switch (widget.presupuesto.estado) {
         EstadoPresupuesto.borrador => context.colors.inkMuted,
         EstadoPresupuesto.enviado => context.colors.warningText,
         EstadoPresupuesto.aceptado => context.colors.success,
@@ -125,14 +179,35 @@ class _PresupuestoCardState extends State<_PresupuestoCard> {
     setState(() => _procesando = true);
     try {
       await PresupuestoService.responder(
-          casaId: widget.casaId, elementoId: widget.elementoId, registroId: widget.registroId, presupuestoId: widget.presupuesto.id, aceptar: aceptar);
-      unawaited(aceptar ? AnalyticsService.quoteAccepted() : AnalyticsService.quoteRejected());
+        casaId: widget.casaId,
+        elementoId: widget.elementoId,
+        registroId: widget.registroId,
+        presupuestoId: widget.presupuesto.id,
+        aceptar: aceptar,
+      );
+      unawaited(
+        aceptar
+            ? AnalyticsService.quoteAccepted()
+            : AnalyticsService.quoteRejected(),
+      );
     } on FirebaseFunctionsException catch (e, st) {
       if (context.mounted) {
-        AppError.show(context, e.message ?? 'No se pudo responder al presupuesto.', error: e, stackTrace: st);
+        AppError.show(
+          context,
+          e.message ?? 'No se pudo responder al presupuesto.',
+          error: e,
+          stackTrace: st,
+        );
       }
     } catch (e, st) {
-      if (context.mounted) AppError.show(context, 'No se pudo responder al presupuesto.', error: e, stackTrace: st);
+      if (context.mounted) {
+        AppError.show(
+          context,
+          'No se pudo responder al presupuesto.',
+          error: e,
+          stackTrace: st,
+        );
+      }
     } finally {
       if (mounted) setState(() => _procesando = false);
     }
@@ -141,14 +216,33 @@ class _PresupuestoCardState extends State<_PresupuestoCard> {
   Future<void> _enviar(BuildContext context) async {
     setState(() => _procesando = true);
     try {
-      await PresupuestoService.enviar(casaId: widget.casaId, elementoId: widget.elementoId, registroId: widget.registroId, presupuestoId: widget.presupuesto.id);
-      if (context.mounted) AppError.showSuccess(context, 'Presupuesto enviado.');
+      await PresupuestoService.enviar(
+        casaId: widget.casaId,
+        elementoId: widget.elementoId,
+        registroId: widget.registroId,
+        presupuestoId: widget.presupuesto.id,
+      );
+      if (context.mounted) {
+        AppError.showSuccess(context, 'Presupuesto enviado.');
+      }
     } on FirebaseFunctionsException catch (e, st) {
       if (context.mounted) {
-        AppError.show(context, e.message ?? 'No se pudo enviar el presupuesto.', error: e, stackTrace: st);
+        AppError.show(
+          context,
+          e.message ?? 'No se pudo enviar el presupuesto.',
+          error: e,
+          stackTrace: st,
+        );
       }
     } catch (e, st) {
-      if (context.mounted) AppError.show(context, 'No se pudo enviar el presupuesto.', error: e, stackTrace: st);
+      if (context.mounted) {
+        AppError.show(
+          context,
+          'No se pudo enviar el presupuesto.',
+          error: e,
+          stackTrace: st,
+        );
+      }
     } finally {
       if (mounted) setState(() => _procesando = false);
     }
@@ -158,79 +252,131 @@ class _PresupuestoCardState extends State<_PresupuestoCard> {
   Widget build(BuildContext context) {
     final presupuesto = widget.presupuesto;
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: ReparaSpace.s2),
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(ReparaSpace.s4),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Presupuesto #${presupuesto.numero} · v${presupuesto.version}', style: Theme.of(context).textTheme.titleMedium),
+                Text(
+                  'Presupuesto #${presupuesto.numero} · v${presupuesto.version}',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: _colorEstado(context).withValues(alpha: 0.15), borderRadius: BorderRadius.circular(ReparaRadius.pill)),
+                  // Mismas dimensiones (10/4) que la píldora gemela de
+                  // cambio_alcance_section.dart y estado_registro_chip.dart --
+                  // no se tokenizan a propósito para que las tres píldoras
+                  // de estado de la app sigan midiendo exactamente lo mismo.
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _colorEstado(context).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(ReparaRadius.pill),
+                  ),
                   child: Text(
                     _nombreEstado(presupuesto.estado).toUpperCase(),
-                    style: TextStyle(color: _colorEstado(context), fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 0.4),
+                    style: TextStyle(
+                      color: _colorEstado(context),
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.4,
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            ...presupuesto.lineas.map((l) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 3),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(child: Text('${l.descripcion} (${l.cantidad.toStringAsFixed(l.cantidad == l.cantidad.roundToDouble() ? 0 : 1)})', style: Theme.of(context).textTheme.bodyLarge)),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${l.importeSinIva.toStringAsFixed(2)} €',
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
+            const SizedBox(height: ReparaSpace.s3),
+            ...presupuesto.lineas.map(
+              (l) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: ReparaSpace.s1),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${l.descripcion} (${l.cantidad.toStringAsFixed(l.cantidad == l.cantidad.roundToDouble() ? 0 : 1)})',
+                        style: Theme.of(context).textTheme.bodyLarge,
                       ),
-                    ],
-                  ),
-                )),
-            Padding(padding: const EdgeInsets.symmetric(vertical: 10), child: Divider(height: 1, color: context.colors.border)),
+                    ),
+                    const SizedBox(width: ReparaSpace.s2),
+                    Text(
+                      '${l.importeSinIva.toStringAsFixed(2)} €',
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: ReparaSpace.s3),
+              child: Divider(height: 1, color: context.colors.border),
+            ),
             Text(
               'Subtotal ${presupuesto.subtotal.toStringAsFixed(2)} € · IVA ${presupuesto.iva.toStringAsFixed(2)} €',
               style: Theme.of(context).textTheme.bodySmall,
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: ReparaSpace.s1),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Total', style: Theme.of(context).textTheme.labelSmall?.copyWith(color: context.colors.inkMuted)),
-                Text('${presupuesto.total.toStringAsFixed(2)} €', style: ReparaText.amount(context, large: true)),
+                Text(
+                  'Total',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: context.colors.inkMuted,
+                  ),
+                ),
+                Text(
+                  '${presupuesto.total.toStringAsFixed(2)} €',
+                  style: ReparaText.amount(context, large: true),
+                ),
               ],
             ),
-            if (presupuesto.estado == EstadoPresupuesto.borrador && widget.rol == RolEnTrabajo.profesional) ...[
-              const SizedBox(height: 10),
+            if (presupuesto.estado == EstadoPresupuesto.borrador &&
+                widget.rol == RolEnTrabajo.profesional) ...[
+              const SizedBox(height: ReparaSpace.s3),
               FilledButton(
                 onPressed: _procesando ? null : () => _enviar(context),
                 child: _procesando
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
                     : const Text('Enviar al propietario'),
               ),
             ],
-            if (presupuesto.estado == EstadoPresupuesto.enviado && widget.rol == RolEnTrabajo.propietario) ...[
-              const SizedBox(height: 10),
+            if (presupuesto.estado == EstadoPresupuesto.enviado &&
+                widget.rol == RolEnTrabajo.propietario) ...[
+              const SizedBox(height: ReparaSpace.s3),
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: _procesando ? null : () => _responder(context, false),
+                      onPressed: _procesando
+                          ? null
+                          : () => _responder(context, false),
                       child: const Text('Rechazar'),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: ReparaSpace.s2),
                   Expanded(
                     child: FilledButton(
-                      onPressed: _procesando ? null : () => _responder(context, true),
+                      onPressed: _procesando
+                          ? null
+                          : () => _responder(context, true),
                       child: _procesando
-                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
                           : const Text('Aceptar'),
                     ),
                   ),
@@ -245,7 +391,12 @@ class _PresupuestoCardState extends State<_PresupuestoCard> {
 }
 
 class _EditorPresupuestoSheet extends StatefulWidget {
-  const _EditorPresupuestoSheet({required this.casaId, required this.elementoId, required this.registroId, this.presupuestoAnteriorId});
+  const _EditorPresupuestoSheet({
+    required this.casaId,
+    required this.elementoId,
+    required this.registroId,
+    this.presupuestoAnteriorId,
+  });
 
   final String casaId;
   final String elementoId;
@@ -253,7 +404,8 @@ class _EditorPresupuestoSheet extends StatefulWidget {
   final String? presupuestoAnteriorId;
 
   @override
-  State<_EditorPresupuestoSheet> createState() => _EditorPresupuestoSheetState();
+  State<_EditorPresupuestoSheet> createState() =>
+      _EditorPresupuestoSheetState();
 }
 
 class _LineaEnEdicion {
@@ -287,11 +439,15 @@ class _EditorPresupuestoSheetState extends State<_EditorPresupuestoSheet> {
       setState(() {
         _lineas
           ..clear()
-          ..addAll(lineas.map((l) => _LineaEnEdicion()
-            ..descripcionCtrl.text = l['descripcion'] as String? ?? ''
-            ..cantidadCtrl.text = l['cantidad'] as String? ?? '1'
-            ..precioCtrl.text = l['precio'] as String? ?? ''
-            ..ivaCtrl.text = l['iva'] as String? ?? '21'));
+          ..addAll(
+            lineas.map(
+              (l) => _LineaEnEdicion()
+                ..descripcionCtrl.text = l['descripcion'] as String? ?? ''
+                ..cantidadCtrl.text = l['cantidad'] as String? ?? '1'
+                ..precioCtrl.text = l['precio'] as String? ?? ''
+                ..ivaCtrl.text = l['iva'] as String? ?? '21',
+            ),
+          );
         _desdePlantilla = true;
       });
     } catch (e) {
@@ -303,14 +459,18 @@ class _EditorPresupuestoSheetState extends State<_EditorPresupuestoSheet> {
   Future<void> _guardarPlantilla(List<_LineaEnEdicion> lineas) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final json = jsonEncode(lineas
-          .map((l) => {
+      final json = jsonEncode(
+        lineas
+            .map(
+              (l) => {
                 'descripcion': l.descripcionCtrl.text.trim(),
                 'cantidad': l.cantidadCtrl.text.trim(),
                 'precio': l.precioCtrl.text.trim(),
                 'iva': l.ivaCtrl.text.trim(),
-              })
-          .toList());
+              },
+            )
+            .toList(),
+      );
       await prefs.setString(_claveUltimaPlantilla, json);
     } catch (e) {
       // Guardar la plantilla es una comodidad, no algo crítico -- un fallo
@@ -327,8 +487,10 @@ class _EditorPresupuestoSheetState extends State<_EditorPresupuestoSheet> {
   double get _totalEstimado {
     var total = 0.0;
     for (final l in _lineas) {
-      final cantidad = double.tryParse(l.cantidadCtrl.text.replaceAll(',', '.')) ?? 0;
-      final precio = double.tryParse(l.precioCtrl.text.replaceAll(',', '.')) ?? 0;
+      final cantidad =
+          double.tryParse(l.cantidadCtrl.text.replaceAll(',', '.')) ?? 0;
+      final precio =
+          double.tryParse(l.precioCtrl.text.replaceAll(',', '.')) ?? 0;
       final iva = double.tryParse(l.ivaCtrl.text.replaceAll(',', '.')) ?? 0;
       total += cantidad * precio * (1 + iva / 100);
     }
@@ -336,7 +498,9 @@ class _EditorPresupuestoSheetState extends State<_EditorPresupuestoSheet> {
   }
 
   Future<void> _guardarYEnviar() async {
-    final lineasValidas = _lineas.where((l) => l.descripcionCtrl.text.trim().isNotEmpty).toList();
+    final lineasValidas = _lineas
+        .where((l) => l.descripcionCtrl.text.trim().isNotEmpty)
+        .toList();
     if (lineasValidas.isEmpty) {
       AppError.show(context, 'Añade al menos una línea con descripción.');
       return;
@@ -344,12 +508,18 @@ class _EditorPresupuestoSheetState extends State<_EditorPresupuestoSheet> {
     setState(() => _guardando = true);
     try {
       final lineas = lineasValidas
-          .map((l) => (
-                descripcion: l.descripcionCtrl.text.trim(),
-                cantidad: double.tryParse(l.cantidadCtrl.text.replaceAll(',', '.')) ?? 1,
-                precioUnitario: double.tryParse(l.precioCtrl.text.replaceAll(',', '.')) ?? 0,
-                ivaPorcentaje: double.tryParse(l.ivaCtrl.text.replaceAll(',', '.')) ?? 21,
-              ))
+          .map(
+            (l) => (
+              descripcion: l.descripcionCtrl.text.trim(),
+              cantidad:
+                  double.tryParse(l.cantidadCtrl.text.replaceAll(',', '.')) ??
+                  1,
+              precioUnitario:
+                  double.tryParse(l.precioCtrl.text.replaceAll(',', '.')) ?? 0,
+              ivaPorcentaje:
+                  double.tryParse(l.ivaCtrl.text.replaceAll(',', '.')) ?? 21,
+            ),
+          )
           .toList();
       if (widget.presupuestoAnteriorId != null) {
         await PresupuestoService.crearNuevaVersion(
@@ -358,8 +528,14 @@ class _EditorPresupuestoSheetState extends State<_EditorPresupuestoSheet> {
           registroId: widget.registroId,
           presupuestoAnteriorId: widget.presupuestoAnteriorId!,
           lineas: lineas
-              .map((l) => LineaPresupuesto(
-                  descripcion: l.descripcion, cantidad: l.cantidad, precioUnitario: l.precioUnitario, ivaPorcentaje: l.ivaPorcentaje))
+              .map(
+                (l) => LineaPresupuesto(
+                  descripcion: l.descripcion,
+                  cantidad: l.cantidad,
+                  precioUnitario: l.precioUnitario,
+                  ivaPorcentaje: l.ivaPorcentaje,
+                ),
+              )
               .toList(),
           notas: _notasCtrl.text.trim().isEmpty ? null : _notasCtrl.text.trim(),
         );
@@ -369,22 +545,44 @@ class _EditorPresupuestoSheetState extends State<_EditorPresupuestoSheet> {
           elementoId: widget.elementoId,
           registroId: widget.registroId,
           lineas: lineas
-              .map((l) => LineaPresupuesto(
-                  descripcion: l.descripcion, cantidad: l.cantidad, precioUnitario: l.precioUnitario, ivaPorcentaje: l.ivaPorcentaje))
+              .map(
+                (l) => LineaPresupuesto(
+                  descripcion: l.descripcion,
+                  cantidad: l.cantidad,
+                  precioUnitario: l.precioUnitario,
+                  ivaPorcentaje: l.ivaPorcentaje,
+                ),
+              )
               .toList(),
           notas: _notasCtrl.text.trim().isEmpty ? null : _notasCtrl.text.trim(),
         );
       }
       unawaited(AnalyticsService.quoteCreated(numLineas: lineasValidas.length));
-      if (widget.presupuestoAnteriorId == null) await _guardarPlantilla(lineasValidas);
+      if (widget.presupuestoAnteriorId == null) {
+        await _guardarPlantilla(lineasValidas);
+      }
       if (mounted) {
         AppError.showSuccess(context, 'Presupuesto guardado como borrador.');
         Navigator.pop(context);
       }
     } on FirebaseFunctionsException catch (e, st) {
-      if (mounted) AppError.show(context, e.message ?? 'No se pudo guardar el presupuesto.', error: e, stackTrace: st);
+      if (mounted) {
+        AppError.show(
+          context,
+          e.message ?? 'No se pudo guardar el presupuesto.',
+          error: e,
+          stackTrace: st,
+        );
+      }
     } catch (e, st) {
-      if (mounted) AppError.show(context, 'No se pudo guardar el presupuesto.', error: e, stackTrace: st);
+      if (mounted) {
+        AppError.show(
+          context,
+          'No se pudo guardar el presupuesto.',
+          error: e,
+          stackTrace: st,
+        );
+      }
     } finally {
       if (mounted) setState(() => _guardando = false);
     }
@@ -401,129 +599,183 @@ class _EditorPresupuestoSheetState extends State<_EditorPresupuestoSheet> {
       behavior: HitTestBehavior.opaque,
       onTap: () => FocusScope.of(context).unfocus(),
       child: Padding(
-        padding: EdgeInsets.only(left: 20, right: 20, top: 20, bottom: 20 + MediaQuery.of(context).viewInsets.bottom),
+        padding: EdgeInsets.only(
+          left: ReparaSpace.s5,
+          right: ReparaSpace.s5,
+          top: ReparaSpace.s5,
+          bottom: ReparaSpace.s5 + MediaQuery.of(context).viewInsets.bottom,
+        ),
         child: SingleChildScrollView(
           child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('Nuevo presupuesto', style: Theme.of(context).textTheme.displaySmall),
-            if (_desdePlantilla) ...[
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  Icon(Icons.history_outlined, size: 14, color: context.colors.inkMuted),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      'Rellenado con las líneas de tu último presupuesto -- edítalas o bórralas libremente.',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ),
-                ],
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Nuevo presupuesto',
+                style: Theme.of(context).textTheme.displaySmall,
               ),
-            ],
-            const SizedBox(height: 12),
-            ..._lineas.asMap().entries.map((entry) {
-              final i = entry.key;
-              final l = entry.value;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+              if (_desdePlantilla) ...[
+                const SizedBox(height: ReparaSpace.s1),
+                Row(
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: l.descripcionCtrl,
-                            minLines: 1,
-                            maxLines: 3,
-                            decoration: const InputDecoration(labelText: 'Descripción'),
-                          ),
-                        ),
-                        if (_lineas.length > 1)
-                          IconButton(
-                            icon: const Icon(Icons.close, size: 18),
-                            tooltip: 'Quitar línea',
-                            onPressed: () => setState(() => _lineas.removeAt(i)),
-                          ),
-                      ],
+                    Icon(
+                      Icons.history_outlined,
+                      size: 14,
+                      color: context.colors.inkMuted,
                     ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          flex: 2,
-                          child: TextField(
-                            controller: l.cantidadCtrl,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            decoration: const InputDecoration(labelText: 'Cant.', isDense: true),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          flex: 3,
-                          child: TextField(
-                            controller: l.precioCtrl,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            decoration: const InputDecoration(labelText: 'Precio (€)', isDense: true),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          flex: 2,
-                          child: TextField(
-                            controller: l.ivaCtrl,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            decoration: const InputDecoration(labelText: 'IVA %', isDense: true),
-                          ),
-                        ),
-                      ],
+                    const SizedBox(width: ReparaSpace.s1),
+                    Expanded(
+                      child: Text(
+                        'Rellenado con las líneas de tu último presupuesto -- edítalas o bórralas libremente.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
                     ),
                   ],
                 ),
-              );
-            }),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: () => setState(() => _lineas.add(_LineaEnEdicion())),
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Añadir línea'),
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextField(controller: _notasCtrl, minLines: 1, maxLines: 3, decoration: const InputDecoration(labelText: 'Notas (opcional)')),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
-              children: [
-                Text('Total estimado: ', style: Theme.of(context).textTheme.bodySmall),
-                Text('${_totalEstimado.toStringAsFixed(2)} €', style: ReparaText.amount(context)),
               ],
-            ),
-            const SizedBox(height: 16),
-            FilledButton(
-              onPressed: _guardando ? null : _guardarYEnviar,
-              child: _guardando
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Guardar como borrador'),
-            ),
-          ],
+              const SizedBox(height: ReparaSpace.s3),
+              ..._lineas.asMap().entries.map((entry) {
+                final i = entry.key;
+                final l = entry.value;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: ReparaSpace.s3),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: l.descripcionCtrl,
+                              minLines: 1,
+                              maxLines: 3,
+                              decoration: const InputDecoration(
+                                labelText: 'Descripción',
+                              ),
+                            ),
+                          ),
+                          if (_lineas.length > 1)
+                            IconButton(
+                              icon: const Icon(Icons.close, size: 18),
+                              tooltip: 'Quitar línea',
+                              onPressed: () =>
+                                  setState(() => _lineas.removeAt(i)),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: ReparaSpace.s2),
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 2,
+                            child: TextField(
+                              controller: l.cantidadCtrl,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
+                              decoration: const InputDecoration(
+                                labelText: 'Cant.',
+                                isDense: true,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: ReparaSpace.s2),
+                          Expanded(
+                            flex: 3,
+                            child: TextField(
+                              controller: l.precioCtrl,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
+                              decoration: const InputDecoration(
+                                labelText: 'Precio (€)',
+                                isDense: true,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: ReparaSpace.s2),
+                          Expanded(
+                            flex: 2,
+                            child: TextField(
+                              controller: l.ivaCtrl,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
+                              decoration: const InputDecoration(
+                                labelText: 'IVA %',
+                                isDense: true,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              }),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () =>
+                      setState(() => _lineas.add(_LineaEnEdicion())),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Añadir línea'),
+                ),
+              ),
+              const SizedBox(height: ReparaSpace.s2),
+              TextField(
+                controller: _notasCtrl,
+                minLines: 1,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Notas (opcional)',
+                ),
+              ),
+              const SizedBox(height: ReparaSpace.s3),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    'Total estimado: ',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  Text(
+                    '${_totalEstimado.toStringAsFixed(2)} €',
+                    style: ReparaText.amount(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: ReparaSpace.s4),
+              FilledButton(
+                onPressed: _guardando ? null : _guardarYEnviar,
+                child: _guardando
+                    ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: context.colors.brandOn,
+                        ),
+                      )
+                    : const Text('Guardar como borrador'),
+              ),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
 }
 
 String _nombreEstado(EstadoPresupuesto e) => switch (e) {
-      EstadoPresupuesto.borrador => 'Borrador',
-      EstadoPresupuesto.enviado => 'Enviado',
-      EstadoPresupuesto.aceptado => 'Aceptado',
-      EstadoPresupuesto.rechazado => 'Rechazado',
-      EstadoPresupuesto.cancelado => 'Cancelado',
-    };
+  EstadoPresupuesto.borrador => 'Borrador',
+  EstadoPresupuesto.enviado => 'Enviado',
+  EstadoPresupuesto.aceptado => 'Aceptado',
+  EstadoPresupuesto.rechazado => 'Rechazado',
+  EstadoPresupuesto.cancelado => 'Cancelado',
+};
