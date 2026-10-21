@@ -5,6 +5,16 @@
 // exactamente estos mismos datos sin ninguna acción propia (auditoría de
 // producto, octubre 2026): se fusiona aquí como un filtro, no como una
 // pantalla distinta.
+//
+// Rediseño de fidelidad visual (octubre 2026): la vista "Por cliente"
+// (_ListaPorCliente) sigue usando Card+ExpansionTile -- igual que
+// casa_tab.dart con _HabitacionCard (agrupar por un padre expandible con
+// filas IosRow dentro no encaja en IosSection, pensado para una lista
+// plana bajo una única cabecera fija) -- pero ahora tokenizada y alineada
+// con esa misma referencia: margen, radio del icono, indentado y color del
+// divisor idénticos. Se corrige además un divisor que aparecía también
+// ANTES del primer trabajo de cada cliente (sin guarda `i > 0`), visible
+// pegado justo debajo de la cabecera del cliente.
 import 'package:flutter/material.dart';
 
 import '../../models/profesional.dart';
@@ -35,8 +45,19 @@ class _TrabajosProTabState extends State<TrabajosProTab> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('MODO PROFESIONAL', style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 11, color: context.colors.inkMuted)),
-            Text('Trabajos', style: Theme.of(context).textTheme.displayMedium?.copyWith(fontSize: 26)),
+            Text(
+              'MODO PROFESIONAL',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                fontSize: 11,
+                color: context.colors.inkMuted,
+              ),
+            ),
+            Text(
+              'Trabajos',
+              style: Theme.of(
+                context,
+              ).textTheme.displayMedium?.copyWith(fontSize: 26),
+            ),
           ],
         ),
         actions: const [BotonAjustes(modoPro: true)],
@@ -48,21 +69,28 @@ class _TrabajosProTabState extends State<TrabajosProTab> {
           if (trabajos.isEmpty) {
             return Center(
               child: Padding(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(ReparaSpace.s6),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
                       width: 72,
                       height: 72,
-                      decoration: BoxDecoration(color: context.colors.brandTint, shape: BoxShape.circle),
-                      child: Icon(Icons.build_outlined, size: 32, color: context.colors.brand),
+                      decoration: BoxDecoration(
+                        color: context.colors.brandTint,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.build_outlined,
+                        size: 32,
+                        color: context.colors.brand,
+                      ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: ReparaSpace.s4),
                     Text(
                       'Aquí gestionas cada trabajo entero (presupuesto, cambios, pagos, documentos) en cuanto aceptes una invitación.\nPara ver solo el estado de tus presupuestos de todos los trabajos a la vez, ve a la pestaña Presupuestos.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: context.colors.inkMuted),
+                      style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ],
                 ),
@@ -72,22 +100,31 @@ class _TrabajosProTabState extends State<TrabajosProTab> {
           return Column(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                padding: const EdgeInsets.fromLTRB(
+                  ReparaSpace.s4,
+                  ReparaSpace.s3,
+                  ReparaSpace.s4,
+                  ReparaSpace.s1,
+                ),
                 child: Row(
                   children: [
                     Expanded(
                       child: ChoiceChip(
                         label: const Text('Por trabajo'),
                         selected: _vista == _VistaTrabajosPro.porTrabajo,
-                        onSelected: (_) => setState(() => _vista = _VistaTrabajosPro.porTrabajo),
+                        onSelected: (_) => setState(
+                          () => _vista = _VistaTrabajosPro.porTrabajo,
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: ReparaSpace.s2),
                     Expanded(
                       child: ChoiceChip(
                         label: const Text('Por cliente'),
                         selected: _vista == _VistaTrabajosPro.porCliente,
-                        onSelected: (_) => setState(() => _vista = _VistaTrabajosPro.porCliente),
+                        onSelected: (_) => setState(
+                          () => _vista = _VistaTrabajosPro.porCliente,
+                        ),
                       ),
                     ),
                   ],
@@ -114,20 +151,33 @@ class _ListaPorTrabajo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      padding: const EdgeInsets.fromLTRB(
+        ReparaSpace.s4,
+        0,
+        ReparaSpace.s4,
+        ReparaSpace.s4,
+      ),
       children: [
         IosSection(
           rows: trabajos
-              .map((t) => IosRow(
-                    icon: Icons.build_outlined,
-                    iconColor: context.colors.brand,
-                    title: t.registroTitulo,
-                    subtitle: t.casaNombre,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => RegistroProDetailScreen(casaId: t.casaId, elementoId: t.elementoId, registroId: t.registroId)),
+              .map(
+                (t) => IosRow(
+                  icon: Icons.build_outlined,
+                  iconColor: context.colors.brand,
+                  title: t.registroTitulo,
+                  subtitle: t.casaNombre,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => RegistroProDetailScreen(
+                        casaId: t.casaId,
+                        elementoId: t.elementoId,
+                        registroId: t.registroId,
+                      ),
                     ),
-                  ))
+                  ),
+                ),
+              )
               .toList(),
         ),
       ],
@@ -148,13 +198,18 @@ class _ListaPorCliente extends StatelessWidget {
     }
     final casas = porCasa.entries.toList();
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      padding: const EdgeInsets.fromLTRB(
+        ReparaSpace.s4,
+        0,
+        ReparaSpace.s4,
+        ReparaSpace.s4,
+      ),
       itemCount: casas.length,
       itemBuilder: (context, i) {
         final entry = casas[i];
         final trabajosDeEstaCasa = entry.value;
         return Card(
-          margin: const EdgeInsets.only(bottom: 10),
+          margin: const EdgeInsets.only(bottom: ReparaSpace.s2),
           clipBehavior: Clip.antiAlias,
           child: Theme(
             data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
@@ -162,14 +217,33 @@ class _ListaPorCliente extends StatelessWidget {
               leading: Container(
                 width: 36,
                 height: 36,
-                decoration: BoxDecoration(color: context.colors.brandTint, borderRadius: BorderRadius.circular(ReparaRadius.sm)),
-                child: Icon(Icons.house_outlined, size: 19, color: context.colors.brand),
+                decoration: BoxDecoration(
+                  color: context.colors.brandTint,
+                  borderRadius: BorderRadius.circular(ReparaRadius.sm),
+                ),
+                child: Icon(
+                  Icons.house_outlined,
+                  size: 19,
+                  color: context.colors.brand,
+                ),
               ),
-              title: Text(trabajosDeEstaCasa.first.casaNombre, style: Theme.of(context).textTheme.titleMedium),
-              subtitle: Text('${trabajosDeEstaCasa.length} trabajo${trabajosDeEstaCasa.length == 1 ? '' : 's'}', style: Theme.of(context).textTheme.bodySmall),
+              title: Text(
+                trabajosDeEstaCasa.first.casaNombre,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              subtitle: Text(
+                '${trabajosDeEstaCasa.length} trabajo${trabajosDeEstaCasa.length == 1 ? '' : 's'}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              childrenPadding: const EdgeInsets.only(bottom: ReparaSpace.s2),
               children: [
                 for (var i = 0; i < trabajosDeEstaCasa.length; i++) ...[
-                  Divider(height: 1, indent: 56, color: context.colors.inkMuted.withValues(alpha: 0.14)),
+                  if (i > 0)
+                    Divider(
+                      height: 1,
+                      indent: 56,
+                      color: context.colors.inkMuted.withValues(alpha: 0.14),
+                    ),
                   IosRow(
                     icon: Icons.build_outlined,
                     iconColor: context.colors.brand,
@@ -177,10 +251,12 @@ class _ListaPorCliente extends StatelessWidget {
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (_) => RegistroProDetailScreen(
-                              casaId: trabajosDeEstaCasa[i].casaId,
-                              elementoId: trabajosDeEstaCasa[i].elementoId,
-                              registroId: trabajosDeEstaCasa[i].registroId)),
+                        builder: (_) => RegistroProDetailScreen(
+                          casaId: trabajosDeEstaCasa[i].casaId,
+                          elementoId: trabajosDeEstaCasa[i].elementoId,
+                          registroId: trabajosDeEstaCasa[i].registroId,
+                        ),
+                      ),
                     ),
                   ),
                 ],
