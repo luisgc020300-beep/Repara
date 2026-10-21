@@ -1,39 +1,56 @@
 // lib/screens/registro_detail_screen.dart
 //
-// Expediente de un registro (sección 13 del spec, simplificado para v1: sin
-// ScopeGuard/cambios de alcance todavía más allá de lo ya construido). Un
-// registro con profesional (esConProfesional) despliega presupuesto/pagos/
-// invitación igual que el antiguo TrabajoDetailScreen; uno simple (una
-// compra, una nota) solo muestra sus datos con editar/eliminar.
+// Expediente de un registro (sección 13 del spec). Rediseño de fidelidad a
+// referencia visual (octubre 2026): cabecera con miniatura, tarjeta
+// económica de 3 columnas, pestañas Resumen/Cambios/Pagos/Documentos e
+// historial real de la reparación -- ver lib/models/historial_evento.dart.
+// Un registro con profesional (esConProfesional) despliega presupuesto/
+// pagos/cambios/invitación; uno simple (una compra, una nota) solo muestra
+// sus datos con editar/eliminar, con la misma cabecera para que se sienta
+// el mismo producto.
 import 'dart:async';
 
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../models/casa.dart';
 import '../models/documento.dart';
+import '../models/elemento.dart';
+import '../models/historial_evento.dart';
 import '../models/invitacion.dart';
+import '../models/pago.dart';
 import '../models/registro.dart';
 import '../services/analytics_service.dart';
 import '../services/documento_service.dart';
+import '../services/elemento_service.dart';
+import '../services/historial_service.dart';
 import '../services/invitacion_service.dart';
 import '../services/pago_service.dart';
 import '../services/registro_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_dialog.dart';
 import '../widgets/app_error.dart';
-import '../widgets/boton_sobre_imagen.dart';
 import '../widgets/estado_registro_chip.dart';
+import '../widgets/historial_timeline.dart';
 import '../widgets/ios_list.dart';
-import '../widgets/progreso_pago.dart';
 import 'cambio_alcance_section.dart';
+import 'elemento_detail_screen.dart';
 import 'nuevo_documento_flow.dart';
 import 'pagos_section.dart';
 import 'presupuestos_section.dart';
 
+String _formatoImporte(double v) =>
+    v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(2);
+
 class RegistroDetailScreen extends StatelessWidget {
-  const RegistroDetailScreen({required this.casa, required this.elementoId, required this.registroId, super.key});
+  const RegistroDetailScreen({
+    required this.casa,
+    required this.elementoId,
+    required this.registroId,
+    super.key,
+  });
 
   final Casa casa;
   final String elementoId;
@@ -43,7 +60,8 @@ class RegistroDetailScreen extends StatelessWidget {
     final confirmar = await AppDialog.confirm(
       context,
       title: 'Finalizar registro',
-      message: 'Se marcará como terminado y quedará guardado en el historial de la casa.',
+      message:
+          'Se marcará como terminado y quedará guardado en el historial de la casa.',
       confirmLabel: 'Finalizar',
     );
     if (!confirmar || !context.mounted) return;
@@ -55,19 +73,27 @@ class RegistroDetailScreen extends StatelessWidget {
   /// haber hecho el profesional) -- en ambos casos el resultado final es
   /// el mismo, lo único que cambia es si hubo o no un paso previo del
   /// profesional (modelo de dos pasos, auditoría de producto, octubre 2026).
-  Future<void> _confirmarFinalizacion(BuildContext context, Registro registro) async {
+  Future<void> _confirmarFinalizacion(
+    BuildContext context,
+    Registro registro,
+  ) async {
     // Aviso, no bloqueo (decisión del CEO): que falte pago no debe impedir
     // cerrar un registro si el cobro llega más tarde (transferencia,
     // financiación...), pero sí se avisa para no perderlo de vista.
     var pagadoDelTodo = false;
     if (registro.presupuesto != null) {
-      final pagado = await PagoService.totalPagado(casa.id, elementoId, registro.id);
+      final pagado = await PagoService.totalPagado(
+        casa.id,
+        elementoId,
+        registro.id,
+      );
       pagadoDelTodo = pagado >= registro.presupuesto!;
       if (!pagadoDelTodo && context.mounted) {
         final seguir = await AppDialog.confirm(
           context,
           title: 'Todavía no está pagado del todo',
-          message: 'Llevas pagado ${pagado.toStringAsFixed(2)} € de ${registro.presupuesto!.toStringAsFixed(2)} €. '
+          message:
+              'Llevas pagado ${pagado.toStringAsFixed(2)} € de ${registro.presupuesto!.toStringAsFixed(2)} €. '
               '¿Quieres finalizar igualmente?',
           confirmLabel: 'Finalizar igualmente',
         );
@@ -82,7 +108,9 @@ class RegistroDetailScreen extends StatelessWidget {
       // terminado por una escritura directa.
       await RegistroService.finalizar(casa.id, elementoId, registro.id);
       unawaited(AnalyticsService.workCompleted(pagadoDelTodo: pagadoDelTodo));
-      if (context.mounted) AppError.showSuccess(context, 'Registro archivado en el historial.');
+      if (context.mounted) {
+        AppError.showSuccess(context, 'Registro archivado en el historial.');
+      }
 
       // Bucle viral en UN solo momento (auditoría de producto, octubre
       // 2026): justo cuando el registro ha ido bien de verdad -- terminado Y
@@ -92,14 +120,24 @@ class RegistroDetailScreen extends StatelessWidget {
         await _ofrecerCompartir(context, registro);
       }
     } catch (e, st) {
-      if (context.mounted) AppError.show(context, 'No se pudo finalizar el registro.', error: e, stackTrace: st);
+      if (context.mounted) {
+        AppError.show(
+          context,
+          'No se pudo finalizar el registro.',
+          error: e,
+          stackTrace: st,
+        );
+      }
     }
   }
 
   /// El propietario dice que, en realidad, todavía no está terminado --
   /// devuelve el registro a como estaba antes de que el profesional lo
   /// marcara, y le avisa para que siga con él.
-  Future<void> _rechazarFinalizacion(BuildContext context, Registro registro) async {
+  Future<void> _rechazarFinalizacion(
+    BuildContext context,
+    Registro registro,
+  ) async {
     final confirmar = await AppDialog.confirm(
       context,
       title: '¿Todavía no está terminado?',
@@ -108,17 +146,32 @@ class RegistroDetailScreen extends StatelessWidget {
     );
     if (!confirmar || !context.mounted) return;
     try {
-      await RegistroService.rechazarFinalizacionProfesional(casa.id, elementoId, registro.id);
+      await RegistroService.rechazarFinalizacionProfesional(
+        casa.id,
+        elementoId,
+        registro.id,
+      );
     } catch (e, st) {
-      if (context.mounted) AppError.show(context, 'No se pudo actualizar el registro.', error: e, stackTrace: st);
+      if (context.mounted) {
+        AppError.show(
+          context,
+          'No se pudo actualizar el registro.',
+          error: e,
+          stackTrace: st,
+        );
+      }
     }
   }
 
-  Future<void> _ofrecerCompartir(BuildContext context, Registro registro) async {
+  Future<void> _ofrecerCompartir(
+    BuildContext context,
+    Registro registro,
+  ) async {
     final compartir = await AppDialog.confirm(
       context,
       title: '¿Te ha ido bien?',
-      message: '${registro.profesionalNombre ?? 'Tu profesional'} también puede recibir más clientes como tú a través de Repara.',
+      message:
+          '${registro.profesionalNombre ?? 'Tu profesional'} también puede recibir más clientes como tú a través de Repara.',
       cancelLabel: 'Ahora no',
       confirmLabel: 'Compartir',
     );
@@ -138,13 +191,55 @@ class RegistroDetailScreen extends StatelessWidget {
   }
 
   Future<void> _eliminar(BuildContext context, Registro registro) async {
-    final confirmar = await AppDialog.confirmText(context, title: '¿Eliminar este registro?', confirmLabel: 'Eliminar');
+    final confirmar = await AppDialog.confirmText(
+      context,
+      title: '¿Eliminar este registro?',
+      confirmLabel: 'Eliminar',
+    );
     if (!confirmar || !context.mounted) return;
     try {
       await RegistroService.eliminar(casa.id, elementoId, registro.id);
       if (context.mounted) Navigator.pop(context);
     } catch (e, st) {
-      if (context.mounted) AppError.show(context, 'No se pudo eliminar el registro.', error: e, stackTrace: st);
+      if (context.mounted) {
+        AppError.show(
+          context,
+          'No se pudo eliminar el registro.',
+          error: e,
+          stackTrace: st,
+        );
+      }
+    }
+  }
+
+  /// Sustituye al "Descargar expediente (PDF)" de la referencia visual --
+  /// REPARA no genera un PDF real todavía (ver CLAUDE.md: "Exportación del
+  /// Expediente de la vivienda a PDF real... hoy es resumen en pantalla +
+  /// compartir como texto"), así que un botón con esa etiqueta prometería
+  /// algo que no existe. Reutiliza el mismo patrón de Share.share ya usado
+  /// en _ofrecerCompartir, con un resumen de texto real de este registro.
+  Future<void> _compartirResumen(
+    BuildContext context,
+    Registro registro,
+    double? pagado,
+  ) async {
+    final partes = <String>[
+      'Expediente de "${registro.titulo}" -- ${casa.nombre}',
+    ];
+    if (registro.presupuesto != null) {
+      partes.add('Presupuesto: ${_formatoImporte(registro.presupuesto!)} €');
+    }
+    if (pagado != null) partes.add('Pagado: ${_formatoImporte(pagado)} €');
+    partes.add('Estado: ${nombreEstadoRegistro(registro.estado)}');
+    partes.add('Gestionado con Repara.');
+    try {
+      await Share.share(
+        partes.join('\n'),
+        sharePositionOrigin: Offset.zero & MediaQuery.of(context).size,
+      );
+    } catch (e) {
+      // Decorativo -- un fallo del selector de compartir no debe parecer un
+      // error de guardado, no hay nada que guardar aquí.
     }
   }
 
@@ -155,192 +250,987 @@ class RegistroDetailScreen extends StatelessWidget {
       builder: (context, snapshot) {
         final registro = snapshot.data;
         if (registro == null) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
         }
         return Scaffold(
-          extendBodyBehindAppBar: true,
-          // Botones sobre un fondo propio (no iconTheme blanco a secas): el
-          // hueco de foto es gris claro, así que un icono blanco sin más se
-          // veía prácticamente invisible encima -- mismo respaldo circular
-          // ya usado para el lápiz de editar foto en elemento_detail_screen.
+          backgroundColor: context.colors.background,
           appBar: AppBar(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            leading: BotonSobreImagen(icon: Icons.arrow_back, tooltip: 'Volver', onPressed: () => Navigator.pop(context)),
+            title: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.home_outlined,
+                  size: 14,
+                  color: context.colors.inkMuted,
+                ),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    casa.nombre,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
             actions: [
               if (!registro.esConProfesional)
-                BotonSobreImagen(icon: Icons.delete_outline, tooltip: 'Eliminar registro', onPressed: () => _eliminar(context, registro)),
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert),
+                  onSelected: (v) {
+                    if (v == 'eliminar') _eliminar(context, registro);
+                  },
+                  itemBuilder: (_) => [
+                    PopupMenuItem(
+                      value: 'eliminar',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.delete_outline,
+                            size: 18,
+                            color: context.colors.errorText,
+                          ),
+                          const SizedBox(width: 10),
+                          const Text('Eliminar registro'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
             ],
           ),
-          floatingActionButton: !registro.esConProfesional || _estadoControlado(registro.estado)
+          floatingActionButton:
+              !registro.esConProfesional || _estadoControlado(registro.estado)
               ? null
               : FloatingActionButton.extended(
                   onPressed: () => _finalizar(context, registro),
                   icon: const Icon(Icons.check),
                   label: const Text('Finalizar'),
                 ),
-          body: ListView(
-            padding: EdgeInsets.zero,
+          body: registro.esConProfesional
+              ? _CuerpoConProfesional(
+                  casa: casa,
+                  elementoId: elementoId,
+                  registro: registro,
+                  onConfirmarFinalizacion: () =>
+                      _confirmarFinalizacion(context, registro),
+                  onRechazarFinalizacion: () =>
+                      _rechazarFinalizacion(context, registro),
+                  onCompartirResumen: (pagado) =>
+                      _compartirResumen(context, registro, pagado),
+                )
+              : _CuerpoSimple(
+                  casa: casa,
+                  elementoId: elementoId,
+                  registro: registro,
+                ),
+        );
+      },
+    );
+  }
+}
+
+/// Cabecera compartida entre el cuerpo con profesional y el simple -- mismo
+/// producto, mismo lenguaje visual (auditoría de craft, octubre 2026).
+/// [elemento] es opcional porque su stream vive en el widget padre
+/// (compartido con la tarjeta de mantenimiento cuando aplica, para no abrir
+/// dos suscripciones a la misma colección).
+class _CabeceraRegistro extends StatelessWidget {
+  const _CabeceraRegistro({
+    required this.casa,
+    required this.registro,
+    this.elemento,
+  });
+
+  final Casa casa;
+  final Registro registro;
+  final Elemento? elemento;
+
+  @override
+  Widget build(BuildContext context) {
+    final fotoUrl = registro.fotoUrl ?? elemento?.fotoUrl;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      iconoTipoRegistro(registro.tipo),
+                      size: 12,
+                      color: context.colors.inkMuted,
+                    ),
+                    const SizedBox(width: 5),
+                    Expanded(
+                      child: Text(
+                        '${registro.elementoNombre} · ${nombreTipoRegistro(registro.tipo)}'
+                            .toUpperCase(),
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          fontSize: 11,
+                          color: context.colors.inkMuted,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  registro.titulo,
+                  style: Theme.of(context).textTheme.displaySmall,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    EstadoRegistroChip(estado: registro.estado),
+                    const SizedBox(width: 8),
+                    Text(
+                      '· ${DateFormat('d MMM yyyy', 'es_ES').format(registro.fecha)}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 14),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(ReparaRadius.md),
+            child: fotoUrl != null
+                ? Image.network(
+                    fotoUrl,
+                    width: 76,
+                    height: 76,
+                    fit: BoxFit.cover,
+                  )
+                : Container(
+                    width: 76,
+                    height: 76,
+                    color: context.colors.surfaceMuted,
+                    child: Icon(
+                      Icons.image_outlined,
+                      size: 26,
+                      color: context.colors.inkFaint,
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Tarjeta económica de 3 columnas (presupuesto/pagado/saldo o completado) --
+/// combina la composición de la referencia visual con el tratamiento de
+/// importes de pago_detail_screen.dart. Recibe [pagado] ya calculado por el
+/// padre (un único `StreamBuilder<List<Pago>>` compartido con la pestaña de
+/// Pagos -- nunca una segunda suscripción a la misma colección).
+class _TarjetaEconomica extends StatelessWidget {
+  const _TarjetaEconomica({required this.presupuesto, required this.pagado});
+
+  final double presupuesto;
+  final double pagado;
+
+  @override
+  Widget build(BuildContext context) {
+    final saldo = (presupuesto - pagado).clamp(0, double.infinity).toDouble();
+    final completo = pagado >= presupuesto;
+    final porcentaje = presupuesto <= 0
+        ? 0.0
+        : (pagado / presupuesto).clamp(0, 1).toDouble();
+
+    Widget etiqueta(String texto) => Text(
+      texto.toUpperCase(),
+      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+        color: context.colors.inkMuted,
+        fontSize: 10,
+      ),
+    );
+
+    Widget columna(String texto, Widget valor) => Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [etiqueta(texto), const SizedBox(height: 4), valor],
+      ),
+    );
+
+    Widget divisor() => Container(
+      width: 1,
+      height: 34,
+      margin: const EdgeInsets.symmetric(horizontal: 10),
+      color: context.colors.border,
+    );
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: BorderRadius.circular(ReparaRadius.md),
+        border: Border.all(color: context.colors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Sin foto real todavía -- un marcador es mejor que fingir una
-              // (auditoría de craft, octubre 2026): avisa de que es un
-              // hueco, no un dato. Relleno plano, no degradado (briefing
-              // "REPARA Professional": sin degradados decorativos).
-              Container(
-                height: 156,
-                width: double.infinity,
-                decoration: BoxDecoration(color: context.colors.surfaceMuted),
-                child: Center(
-                  child: Icon(Icons.image_outlined, size: 34, color: context.colors.inkFaint),
+              columna(
+                'Presupuesto',
+                Text(
+                  '${_formatoImporte(presupuesto)} €',
+                  style: ReparaText.amount(context),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+              divisor(),
+              columna(
+                'Pagado',
+                Text(
+                  '${_formatoImporte(pagado)} €',
+                  style: ReparaText.amount(
+                    context,
+                  ).copyWith(color: context.colors.success),
+                ),
+              ),
+              divisor(),
+              completo
+                  ? columna(
+                      'Estado',
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.check_circle,
+                            size: 16,
+                            color: context.colors.success,
+                          ),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              'Completado',
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(color: context.colors.success),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : columna(
+                      'Saldo',
+                      Text(
+                        '${_formatoImporte(saldo)} €',
+                        style: ReparaText.amount(context),
+                      ),
+                    ),
+            ],
+          ),
+          if (!completo) ...[
+            const SizedBox(height: 14),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: LinearProgressIndicator(
+                value: porcentaje,
+                minHeight: 6,
+                backgroundColor: context.colors.surfaceSunken,
+                color: context.colors.brand,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Fila de pestañas tipo "pill" (indicador relleno, no subrayado) -- mismo
+/// TabBar/TabBarView de Material, solo con un indicador personalizado; evita
+/// construir un control a medida para algo que el framework ya resuelve.
+const _tabs = ['Resumen', 'Cambios', 'Pagos', 'Documentos'];
+const _tabIcons = [
+  Icons.summarize_outlined,
+  Icons.swap_horiz,
+  Icons.payments_outlined,
+  Icons.description_outlined,
+];
+
+class _CuerpoConProfesional extends StatelessWidget {
+  const _CuerpoConProfesional({
+    required this.casa,
+    required this.elementoId,
+    required this.registro,
+    required this.onConfirmarFinalizacion,
+    required this.onRechazarFinalizacion,
+    required this.onCompartirResumen,
+  });
+
+  final Casa casa;
+  final String elementoId;
+  final Registro registro;
+  final VoidCallback onConfirmarFinalizacion;
+  final VoidCallback onRechazarFinalizacion;
+  final void Function(double? pagado) onCompartirResumen;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<Elemento?>(
+      stream: ElementoService.streamElemento(casa.id, elementoId),
+      builder: (context, elementoSnap) {
+        final elemento = elementoSnap.data;
+        return StreamBuilder<List<Pago>>(
+          stream: PagoService.streamPagos(casa.id, elementoId, registro.id),
+          builder: (context, pagosSnap) {
+            final pagos = pagosSnap.data ?? [];
+            final totalPagado = pagos.fold<double>(
+              0,
+              (acc, p) => acc + p.importe,
+            );
+            return DefaultTabController(
+              length: _tabs.length,
+              child: Column(
+                children: [
+                  _CabeceraRegistro(
+                    casa: casa,
+                    registro: registro,
+                    elemento: elemento,
+                  ),
+                  if (registro.estado == EstadoRegistro.pendienteConfirmacion)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                      child: AvisoRegistro(
+                        mensaje:
+                            'El profesional dice que ha terminado este registro. ¿Lo confirmas?',
+                        acciones: Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: onRechazarFinalizacion,
+                                child: const Text('Todavía no'),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: FilledButton(
+                                onPressed: onConfirmarFinalizacion,
+                                child: const Text('Confirmar'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  if (registro.presupuesto != null)
+                    _TarjetaEconomica(
+                      presupuesto: registro.presupuesto!,
+                      pagado: totalPagado,
+                    ),
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(color: context.colors.border),
+                      ),
+                    ),
+                    child: TabBar(
+                      isScrollable: true,
+                      tabAlignment: TabAlignment.start,
+                      indicator: BoxDecoration(
+                        color: context.colors.brandStrong,
+                        borderRadius: BorderRadius.circular(ReparaRadius.pill),
+                      ),
+                      indicatorSize: TabBarIndicatorSize.label,
+                      indicatorPadding: const EdgeInsets.symmetric(vertical: 6),
+                      dividerColor: Colors.transparent,
+                      labelColor: context.colors.brandOn,
+                      unselectedLabelColor: context.colors.inkMuted,
+                      labelStyle: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      unselectedLabelStyle: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      tabs: [
+                        for (var i = 0; i < _tabs.length; i++)
+                          Tab(
+                            height: 36,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(_tabIcons[i], size: 15),
+                                  const SizedBox(width: 6),
+                                  Text(_tabs[i]),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: TabBarView(
                       children: [
-                        Icon(iconoTipoRegistro(registro.tipo), size: 13, color: context.colors.inkMuted),
-                        const SizedBox(width: 5),
-                        Text(
-                          '${registro.elementoNombre} · ${nombreTipoRegistro(registro.tipo)}'.toUpperCase(),
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 11, color: context.colors.inkMuted),
+                        _ResumenTab(
+                          casa: casa,
+                          elementoId: elementoId,
+                          registro: registro,
+                          elemento: elemento,
+                        ),
+                        SingleChildScrollView(
+                          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                          child: CambiosAlcanceSection(
+                            casaId: casa.id,
+                            elementoId: elementoId,
+                            registroId: registro.id,
+                            rol: RolEnTrabajo.propietario,
+                            registroCerrado:
+                                registro.estado == EstadoRegistro.terminado ||
+                                registro.estado == EstadoRegistro.archivado,
+                          ),
+                        ),
+                        SingleChildScrollView(
+                          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                          child: PagosSection(
+                            casaId: casa.id,
+                            elementoId: elementoId,
+                            registroId: registro.id,
+                            registroTitulo: registro.titulo,
+                            presupuesto: registro.presupuesto,
+                            rol: RolEnTrabajo.propietario,
+                          ),
+                        ),
+                        _DocumentosTab(
+                          casa: casa,
+                          elementoId: elementoId,
+                          registro: registro,
                         ),
                       ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(registro.titulo, style: Theme.of(context).textTheme.displaySmall),
-                    if (registro.esConProfesional) ...[
-                      const SizedBox(height: 10),
-                      EstadoRegistroChip(estado: registro.estado),
-                    ],
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-              if (registro.esConProfesional && registro.estado == EstadoRegistro.pendienteConfirmacion) ...[
-                AvisoRegistro(
-                  mensaje: 'El profesional dice que ha terminado este registro. ¿Lo confirmas?',
-                  acciones: Row(
-                    children: [
-                      Expanded(child: OutlinedButton(onPressed: () => _rechazarFinalizacion(context, registro), child: const Text('Todavía no'))),
-                      const SizedBox(width: 8),
-                      Expanded(child: FilledButton(onPressed: () => _confirmarFinalizacion(context, registro), child: const Text('Confirmar'))),
-                    ],
                   ),
-                ),
-                const SizedBox(height: 16),
-              ],
-              if (registro.descripcion != null) ...[
-                Text(registro.descripcion!, style: Theme.of(context).textTheme.bodyLarge),
-                const SizedBox(height: 16),
-              ],
-              // Campo de estado -- autocontenido por el propio
-              // InputDecorationTheme (fondo + radio ya vienen del tema), no
-              // necesita una Card envolvente alrededor para parecer "un
-              // campo"; antes vivía apretado dentro de la misma tarjeta que
-              // el dinero, sin relación real entre ambos.
-              if (!registro.esConProfesional)
-                // Registro simple -- sin presupuesto/pagos/invitación, igual
-                // que una compra o una nota. Sin chip arriba (eso es solo
-                // para esConProfesional), así que aquí sí hace falta mostrar
-                // el estado.
-                TextFormField(
-                  initialValue: _nombreEstadoSimple(registro),
-                  enabled: false,
-                  decoration: const InputDecoration(labelText: 'Estado'),
-                )
-              // "Terminado"/"Archivado"/"PendienteConfirmacion" nunca son una
-              // opción de este desplegable (auditoría de seguridad, octubre
-              // 2026): "Finalizar" (y, en el modelo de dos pasos, "Confirmar"/
-              // "Todavía no") son las únicas vías, porque además archivan el
-              // registro en el historial y avisan a los demás. El servidor ya
-              // lo bloquea aunque se fuerce desde fuera de la app. El chip de
-              // la cabecera ya muestra el estado en ese caso -- este
-              // desplegable solo aparece cuando es editable.
-              else if (!_estadoControlado(registro.estado))
-                DropdownButtonFormField<EstadoRegistro>(
-                  initialValue: registro.estado,
-                  decoration: const InputDecoration(labelText: 'Estado'),
-                  items: _estadosEditables.map((e) => DropdownMenuItem(value: e, child: Text(nombreEstadoRegistro(e)))).toList(),
-                  onChanged: (v) {
-                    if (v != null) RegistroService.actualizarEstado(casa.id, elementoId, registro.id, v);
-                  },
-                ),
-              if (!registro.esConProfesional || !_estadoControlado(registro.estado)) const SizedBox(height: 16),
-              _ResumenEconomico(casa: casa, elementoId: elementoId, registro: registro),
-              if (registro.esConProfesional) ...[
-                const SizedBox(height: 20),
-                Text('Profesional', style: Theme.of(context).textTheme.headlineSmall),
-                const SizedBox(height: 8),
-                _SeccionInvitarProfesional(casa: casa, elementoId: elementoId, registro: registro),
-                const SizedBox(height: 20),
-                PresupuestosSection(casaId: casa.id, elementoId: elementoId, registroId: registro.id, rol: RolEnTrabajo.propietario),
-                const SizedBox(height: 20),
-                CambiosAlcanceSection(
-                  casaId: casa.id,
-                  elementoId: elementoId,
-                  registroId: registro.id,
-                  rol: RolEnTrabajo.propietario,
-                  registroCerrado: registro.estado == EstadoRegistro.terminado || registro.estado == EstadoRegistro.archivado,
-                ),
-                const SizedBox(height: 20),
-                PagosSection(
-                  casaId: casa.id,
-                  elementoId: elementoId,
-                  registroId: registro.id,
-                  registroTitulo: registro.titulo,
-                  presupuesto: registro.presupuesto,
-                  rol: RolEnTrabajo.propietario,
-                ),
-              ],
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Documentos', style: Theme.of(context).textTheme.headlineSmall),
-                  TextButton.icon(
-                    onPressed: () => iniciarNuevoDocumento(
-                      context,
-                      casaId: casa.id,
-                      elementoId: elementoId,
-                      registroId: registro.id,
+                  SafeArea(
+                    top: false,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: () => onCompartirResumen(
+                            pagos.isEmpty ? null : totalPagado,
+                          ),
+                          icon: const Icon(Icons.ios_share_outlined, size: 18),
+                          label: const Text('Compartir resumen'),
+                        ),
+                      ),
                     ),
-                    icon: const Icon(Icons.document_scanner_outlined, size: 18),
-                    label: const Text('Escanear documento'),
                   ),
                 ],
               ),
-              StreamBuilder<List<Documento>>(
-                stream: DocumentoService.streamDocumentos(casa.id, registroId: registro.id),
-                builder: (context, snapshot) {
-                  final documentos = snapshot.data ?? [];
-                  if (documentos.isEmpty) {
-                    return const EmptyHint(message: 'Sin documentos todavía.', icon: Icons.description_outlined);
-                  }
-                  return IosSection(
-                    rows: documentos
-                        .map((d) => IosRow(
-                              icon: Icons.insert_drive_file_outlined,
-                              iconColor: context.colors.brand,
-                              title: d.proveedor ?? d.nombreArchivo,
-                              trailing: d.importe != null ? Text('${d.importe!.toStringAsFixed(0)} €', style: ReparaText.amount(context)) : null,
-                              showChevron: false,
-                            ))
-                        .toList(),
-                  );
-                },
-              ),
-                  ],
-                ),
-              ),
-            ],
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _ResumenTab extends StatelessWidget {
+  const _ResumenTab({
+    required this.casa,
+    required this.elementoId,
+    required this.registro,
+    this.elemento,
+  });
+
+  final Casa casa;
+  final String elementoId;
+  final Registro registro;
+  final Elemento? elemento;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      children: [
+        // "terminado"/"archivado"/"pendienteConfirmacion" nunca son opción
+        // de este desplegable (auditoría de seguridad, octubre 2026):
+        // "Finalizar"/"Confirmar"/"Todavía no" son las únicas puertas -- el
+        // servidor ya lo bloquea aunque se fuerce desde fuera de la app. El
+        // chip de la cabecera ya muestra el estado en ese caso, así que el
+        // desplegable solo aparece cuando de verdad es editable.
+        if (!_estadoControlado(registro.estado)) ...[
+          DropdownButtonFormField<EstadoRegistro>(
+            initialValue: registro.estado,
+            decoration: const InputDecoration(labelText: 'Estado'),
+            items: _estadosEditables
+                .map(
+                  (e) => DropdownMenuItem(
+                    value: e,
+                    child: Text(nombreEstadoRegistro(e)),
+                  ),
+                )
+                .toList(),
+            onChanged: (v) {
+              if (v != null) {
+                RegistroService.actualizarEstado(
+                  casa.id,
+                  elementoId,
+                  registro.id,
+                  v,
+                );
+              }
+            },
           ),
+          const SizedBox(height: 20),
+        ],
+        if (registro.descripcion != null) ...[
+          Text(
+            registro.descripcion!,
+            style: Theme.of(context).textTheme.bodyLarge,
+          ),
+          const SizedBox(height: 20),
+        ],
+        Text('Profesional', style: Theme.of(context).textTheme.headlineSmall),
+        const SizedBox(height: 8),
+        _SeccionInvitarProfesional(
+          casa: casa,
+          elementoId: elementoId,
+          registro: registro,
+        ),
+        const SizedBox(height: 20),
+        PresupuestosSection(
+          casaId: casa.id,
+          elementoId: elementoId,
+          registroId: registro.id,
+          rol: RolEnTrabajo.propietario,
+        ),
+        const SizedBox(height: 20),
+        _TarjetaMantenimiento(
+          casa: casa,
+          elementoId: elementoId,
+          elemento: elemento,
+        ),
+        const SizedBox(height: 20),
+        _SeccionHistorial(
+          casa: casa,
+          elementoId: elementoId,
+          registro: registro,
+        ),
+      ],
+    );
+  }
+}
+
+/// Tarjeta de mantenimiento del Elemento padre (p.ej. "la caldera"), no del
+/// registro -- el intervalo/próxima revisión es un dato del aparato, vive en
+/// Elemento (ver models/elemento.dart), no se inventa aquí. Reutiliza la
+/// pantalla ya existente para editarlo en vez de duplicar el diálogo de
+/// elemento_detail_screen.dart.
+class _TarjetaMantenimiento extends StatelessWidget {
+  const _TarjetaMantenimiento({
+    required this.casa,
+    required this.elementoId,
+    required this.elemento,
+  });
+
+  final Casa casa;
+  final String elementoId;
+  final Elemento? elemento;
+
+  String? _textoProximaRevision() {
+    final fecha = elemento?.proximoMantenimiento;
+    if (fecha == null) return null;
+    final dias = fecha.difference(DateTime.now()).inDays;
+    if (dias < 0) {
+      return 'Atrasada desde el ${DateFormat('d MMM yyyy', 'es_ES').format(fecha)}';
+    }
+    if (dias < 45) return 'En $dias días';
+    return 'En ${(dias / 30).round()} meses';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (elemento == null) return const SizedBox.shrink();
+    final texto = _textoProximaRevision();
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        border: Border.all(color: context.colors.border),
+        borderRadius: BorderRadius.circular(ReparaRadius.md),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.schedule_outlined, color: context.colors.brand),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Próximo mantenimiento',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: context.colors.inkMuted,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  texto ?? 'Sin recordatorio configurado todavía',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          OutlinedButton.icon(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    ElementoDetailScreen(casa: casa, elementoId: elementoId),
+              ),
+            ),
+            icon: const Icon(Icons.calendar_month_outlined, size: 16),
+            label: Text(texto != null ? 'Editar' : 'Añadir recordatorio'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Historial real de la reparación: combina el único suceso que no tiene
+/// evento propio en Firestore (el cierre del registro -- ver
+/// firestore.rules, "el propio registro es el historial") con los eventos
+/// reales de presupuestos/cambios/pagos (historial_service.dart). El cierre
+/// nunca lleva fecha porque no existe ningún timestamp real de cuándo
+/// ocurrió -- se muestra sin inventar una.
+class _SeccionHistorial extends StatelessWidget {
+  const _SeccionHistorial({
+    required this.casa,
+    required this.elementoId,
+    required this.registro,
+  });
+
+  final Casa casa;
+  final String elementoId;
+  final Registro registro;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.show_chart, size: 16, color: context.colors.inkMuted),
+            const SizedBox(width: 6),
+            Text(
+              'Historial de la reparación',
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        StreamBuilder<List<HistorialEvento>>(
+          stream: HistorialService.streamHistorial(
+            casa.id,
+            elementoId,
+            registro.id,
+          ),
+          builder: (context, snapshot) {
+            final eventos = snapshot.data ?? [];
+            final items = <TimelineItem>[
+              if (registro.estado == EstadoRegistro.terminado ||
+                  registro.estado == EstadoRegistro.archivado)
+                TimelineItem(
+                  titulo: registro.estado == EstadoRegistro.archivado
+                      ? 'Registro archivado'
+                      : 'Trabajo finalizado',
+                  subtitulo: 'Marcado como terminado',
+                  icono: Icons.task_alt,
+                  color: context.colors.success,
+                ),
+              ...eventos.map((e) => _eventoATimelineItem(context, e)),
+            ];
+            if (items.isEmpty) {
+              return const EmptyHint(
+                message: 'Sin actividad registrada todavía.',
+                icon: Icons.show_chart,
+              );
+            }
+            return HistorialTimeline(items: items);
+          },
+        ),
+      ],
+    );
+  }
+
+  TimelineItem _eventoATimelineItem(BuildContext context, HistorialEvento e) {
+    final fecha = e.timestamp != null
+        ? DateFormat('d MMM yyyy · HH:mm', 'es_ES').format(e.timestamp!)
+        : null;
+    final importeTexto = e.importe != null
+        ? '${_formatoImporte(e.importe!)} €'
+        : null;
+    switch (e.entidad) {
+      case EntidadHistorial.presupuesto:
+        final titulo = switch (e.accion) {
+          'aceptado' => 'Presupuesto aceptado',
+          'rechazado' => 'Presupuesto rechazado',
+          'enviado' => 'Presupuesto enviado',
+          'nueva_version' => 'Nueva versión de presupuesto',
+          'editado' => 'Presupuesto editado',
+          _ => 'Presupuesto creado',
+        };
+        return TimelineItem(
+          titulo: titulo,
+          subtitulo: importeTexto,
+          fechaTexto: fecha,
+          icono: Icons.request_quote_outlined,
+          color: e.accion == 'rechazado'
+              ? context.colors.errorText
+              : context.colors.success,
+        );
+      case EntidadHistorial.cambioAlcance:
+        final titulo = switch (e.accion) {
+          'aprobado' => 'Cambio de alcance aprobado',
+          'rechazado' => 'Cambio de alcance rechazado',
+          'cancelado' => 'Cambio de alcance cancelado',
+          _ => 'Cambio de alcance solicitado',
+        };
+        return TimelineItem(
+          titulo: titulo,
+          subtitulo: e.motivo ?? importeTexto,
+          fechaTexto: fecha,
+          icono: Icons.rule_outlined,
+          color: (e.accion == 'rechazado' || e.accion == 'cancelado')
+              ? context.colors.errorText
+              : context.colors.success,
+        );
+      case EntidadHistorial.pago:
+        final titulo = switch (e.accion) {
+          'eliminado' => 'Pago eliminado',
+          'editado' => 'Pago editado',
+          _ => 'Pago registrado',
+        };
+        return TimelineItem(
+          titulo: titulo,
+          subtitulo: importeTexto,
+          fechaTexto: fecha,
+          icono: Icons.payments_outlined,
+          color: e.accion == 'eliminado'
+              ? context.colors.errorText
+              : context.colors.success,
+        );
+      case EntidadHistorial.desconocida:
+        return TimelineItem(
+          titulo: e.accion,
+          fechaTexto: fecha,
+          icono: Icons.circle_outlined,
+          color: context.colors.inkMuted,
+        );
+    }
+  }
+}
+
+class _DocumentosTab extends StatelessWidget {
+  const _DocumentosTab({
+    required this.casa,
+    required this.elementoId,
+    required this.registro,
+  });
+
+  final Casa casa;
+  final String elementoId;
+  final Registro registro;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Documentos',
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
+            TextButton.icon(
+              onPressed: () => iniciarNuevoDocumento(
+                context,
+                casaId: casa.id,
+                elementoId: elementoId,
+                registroId: registro.id,
+              ),
+              icon: const Icon(Icons.document_scanner_outlined, size: 18),
+              label: const Text('Escanear documento'),
+            ),
+          ],
+        ),
+        StreamBuilder<List<Documento>>(
+          stream: DocumentoService.streamDocumentos(
+            casa.id,
+            registroId: registro.id,
+          ),
+          builder: (context, snapshot) {
+            final documentos = snapshot.data ?? [];
+            if (documentos.isEmpty) {
+              return const EmptyHint(
+                message: 'Sin documentos todavía.',
+                icon: Icons.description_outlined,
+              );
+            }
+            return IosSection(
+              rows: documentos
+                  .map(
+                    (d) => IosRow(
+                      icon: Icons.insert_drive_file_outlined,
+                      iconColor: context.colors.brand,
+                      title: d.proveedor ?? d.nombreArchivo,
+                      trailing: d.importe != null
+                          ? Text(
+                              '${d.importe!.toStringAsFixed(0)} €',
+                              style: ReparaText.amount(context),
+                            )
+                          : null,
+                      showChevron: false,
+                    ),
+                  )
+                  .toList(),
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+/// Cuerpo de un registro simple (sin profesional): misma cabecera que el
+/// cuerpo con profesional, sin pestañas ni tarjeta económica de 3 columnas
+/// -- no hay presupuesto, cambios de alcance ni pagos que mostrar aquí.
+class _CuerpoSimple extends StatelessWidget {
+  const _CuerpoSimple({
+    required this.casa,
+    required this.elementoId,
+    required this.registro,
+  });
+
+  final Casa casa;
+  final String elementoId;
+  final Registro registro;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<Elemento?>(
+      stream: ElementoService.streamElemento(casa.id, elementoId),
+      builder: (context, elementoSnap) {
+        return ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            _CabeceraRegistro(
+              casa: casa,
+              registro: registro,
+              elemento: elementoSnap.data,
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextFormField(
+                    initialValue: _nombreEstadoSimple(registro),
+                    enabled: false,
+                    decoration: const InputDecoration(labelText: 'Estado'),
+                  ),
+                  const SizedBox(height: 16),
+                  if (registro.descripcion != null) ...[
+                    Text(
+                      registro.descripcion!,
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  _ResumenEconomico(
+                    casa: casa,
+                    elementoId: elementoId,
+                    registro: registro,
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Documentos',
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
+                      TextButton.icon(
+                        onPressed: () => iniciarNuevoDocumento(
+                          context,
+                          casaId: casa.id,
+                          elementoId: elementoId,
+                          registroId: registro.id,
+                        ),
+                        icon: const Icon(
+                          Icons.document_scanner_outlined,
+                          size: 18,
+                        ),
+                        label: const Text('Escanear documento'),
+                      ),
+                    ],
+                  ),
+                  StreamBuilder<List<Documento>>(
+                    stream: DocumentoService.streamDocumentos(
+                      casa.id,
+                      registroId: registro.id,
+                    ),
+                    builder: (context, snapshot) {
+                      final documentos = snapshot.data ?? [];
+                      if (documentos.isEmpty) {
+                        return const EmptyHint(
+                          message: 'Sin documentos todavía.',
+                          icon: Icons.description_outlined,
+                        );
+                      }
+                      return IosSection(
+                        rows: documentos
+                            .map(
+                              (d) => IosRow(
+                                icon: Icons.insert_drive_file_outlined,
+                                iconColor: context.colors.brand,
+                                title: d.proveedor ?? d.nombreArchivo,
+                                trailing: d.importe != null
+                                    ? Text(
+                                        '${d.importe!.toStringAsFixed(0)} €',
+                                        style: ReparaText.amount(context),
+                                      )
+                                    : null,
+                                showChevron: false,
+                              ),
+                            )
+                            .toList(),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
         );
       },
     );
@@ -351,17 +1241,23 @@ class RegistroDetailScreen extends StatelessWidget {
 /// spec, simplificado a solo email -- ver decisión del CEO). Si ya hay un
 /// profesional vinculado, muestra quién es en vez del formulario.
 class _SeccionInvitarProfesional extends StatefulWidget {
-  const _SeccionInvitarProfesional({required this.casa, required this.elementoId, required this.registro});
+  const _SeccionInvitarProfesional({
+    required this.casa,
+    required this.elementoId,
+    required this.registro,
+  });
 
   final Casa casa;
   final String elementoId;
   final Registro registro;
 
   @override
-  State<_SeccionInvitarProfesional> createState() => _SeccionInvitarProfesionalState();
+  State<_SeccionInvitarProfesional> createState() =>
+      _SeccionInvitarProfesionalState();
 }
 
-class _SeccionInvitarProfesionalState extends State<_SeccionInvitarProfesional> {
+class _SeccionInvitarProfesionalState
+    extends State<_SeccionInvitarProfesional> {
   final _emailCtrl = TextEditingController();
   final _telefonoCtrl = TextEditingController();
   bool _enviando = false;
@@ -392,7 +1288,11 @@ class _SeccionInvitarProfesionalState extends State<_SeccionInvitarProfesional> 
       );
       _emailCtrl.clear();
       _telefonoCtrl.clear();
-      unawaited(AnalyticsService.professionalInvited(metodo: resultado.esDirecta ? 'email' : 'codigo'));
+      unawaited(
+        AnalyticsService.professionalInvited(
+          metodo: resultado.esDirecta ? 'email' : 'codigo',
+        ),
+      );
       if (resultado.esDirecta) {
         if (mounted) AppError.showSuccess(context, 'Invitación enviada.');
       } else if (mounted) {
@@ -400,9 +1300,23 @@ class _SeccionInvitarProfesionalState extends State<_SeccionInvitarProfesional> 
         await _compartirCodigo(resultado.codigo!);
       }
     } on FirebaseFunctionsException catch (e, st) {
-      if (mounted) AppError.show(context, e.message ?? 'No se pudo enviar la invitación.', error: e, stackTrace: st);
+      if (mounted) {
+        AppError.show(
+          context,
+          e.message ?? 'No se pudo enviar la invitación.',
+          error: e,
+          stackTrace: st,
+        );
+      }
     } catch (e, st) {
-      if (mounted) AppError.show(context, 'No se pudo enviar la invitación.', error: e, stackTrace: st);
+      if (mounted) {
+        AppError.show(
+          context,
+          'No se pudo enviar la invitación.',
+          error: e,
+          stackTrace: st,
+        );
+      }
     } finally {
       if (mounted) setState(() => _enviando = false);
     }
@@ -423,22 +1337,40 @@ class _SeccionInvitarProfesionalState extends State<_SeccionInvitarProfesional> 
     try {
       await InvitacionService.cancelar(invitacionId);
     } on FirebaseFunctionsException catch (e, st) {
-      if (mounted) AppError.show(context, e.message ?? 'No se pudo cancelar la invitación.', error: e, stackTrace: st);
+      if (mounted) {
+        AppError.show(
+          context,
+          e.message ?? 'No se pudo cancelar la invitación.',
+          error: e,
+          stackTrace: st,
+        );
+      }
     } catch (e, st) {
-      if (mounted) AppError.show(context, 'No se pudo cancelar la invitación.', error: e, stackTrace: st);
+      if (mounted) {
+        AppError.show(
+          context,
+          'No se pudo cancelar la invitación.',
+          error: e,
+          stackTrace: st,
+        );
+      }
     } finally {
       if (mounted) setState(() => _cancelando = false);
     }
   }
 
   Future<void> _compartirCodigo(String codigo) async {
-    final mensaje = 'Te invito a "${widget.registro.titulo}" en Repara.\n'
+    final mensaje =
+        'Te invito a "${widget.registro.titulo}" en Repara.\n'
         'Descárgate la app, crea tu cuenta y activa el modo profesional, y luego introduce este código de invitación: $codigo';
     if (!mounted) return;
     try {
       // sharePositionOrigin obligatorio en iOS -- ver nota en
       // contacto_acciones.dart.
-      await Share.share(mensaje, sharePositionOrigin: Offset.zero & MediaQuery.of(context).size);
+      await Share.share(
+        mensaje,
+        sharePositionOrigin: Offset.zero & MediaQuery.of(context).size,
+      );
     } catch (e) {
       // El código ya se generó y se muestra en pantalla -- que falle el
       // selector de compartir no debe parecer que la invitación falló.
@@ -465,7 +1397,8 @@ class _SeccionInvitarProfesionalState extends State<_SeccionInvitarProfesional> 
       stream: InvitacionService.streamUltimaInvitacionDe(widget.registro.id),
       builder: (context, snapshot) {
         final invitacion = snapshot.data;
-        if (invitacion != null && invitacion.estado == EstadoInvitacion.pendiente) {
+        if (invitacion != null &&
+            invitacion.estado == EstadoInvitacion.pendiente) {
           return IosSection(
             rows: [
               IosRow(
@@ -475,8 +1408,15 @@ class _SeccionInvitarProfesionalState extends State<_SeccionInvitarProfesional> 
                 subtitle: 'Esperando respuesta',
                 showChevron: false,
                 trailing: _cancelando
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                    : TextButton(onPressed: () => _cancelarInvitacion(invitacion.id), child: const Text('Cancelar')),
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : TextButton(
+                        onPressed: () => _cancelarInvitacion(invitacion.id),
+                        child: const Text('Cancelar'),
+                      ),
               ),
             ],
           );
@@ -491,18 +1431,24 @@ class _SeccionInvitarProfesionalState extends State<_SeccionInvitarProfesional> 
                 if (_ultimoCodigoGenerado != null) ...[
                   Row(
                     children: [
-                      Icon(Icons.qr_code_2_outlined, color: context.colors.brand),
+                      Icon(
+                        Icons.qr_code_2_outlined,
+                        color: context.colors.brand,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           'Código para compartir: $_ultimoCodigoGenerado',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(letterSpacing: 1),
+                          style: Theme.of(
+                            context,
+                          ).textTheme.titleMedium?.copyWith(letterSpacing: 1),
                         ),
                       ),
                       IconButton(
                         icon: const Icon(Icons.share_outlined, size: 20),
                         tooltip: 'Compartir código',
-                        onPressed: () => _compartirCodigo(_ultimoCodigoGenerado!),
+                        onPressed: () =>
+                            _compartirCodigo(_ultimoCodigoGenerado!),
                       ),
                     ],
                   ),
@@ -510,12 +1456,18 @@ class _SeccionInvitarProfesionalState extends State<_SeccionInvitarProfesional> 
                     'Esa persona no tiene todavía cuenta profesional en Repara. Cuando se registre, introduce este código para vincularse a este registro.',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
-                  Padding(padding: const EdgeInsets.symmetric(vertical: 14), child: Divider(height: 1, color: context.colors.border)),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    child: Divider(height: 1, color: context.colors.border),
+                  ),
                 ],
-                if (invitacion != null && invitacion.estado == EstadoInvitacion.rechazada) ...[
+                if (invitacion != null &&
+                    invitacion.estado == EstadoInvitacion.rechazada) ...[
                   Text(
                     '${invitacion.profesionalEmail} rechazó la invitación anterior.',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.colors.errorText),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: context.colors.errorText,
+                    ),
                   ),
                   const SizedBox(height: 8),
                 ],
@@ -527,13 +1479,17 @@ class _SeccionInvitarProfesionalState extends State<_SeccionInvitarProfesional> 
                 TextField(
                   controller: _emailCtrl,
                   keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(labelText: 'Correo del profesional (opcional)'),
+                  decoration: const InputDecoration(
+                    labelText: 'Correo del profesional (opcional)',
+                  ),
                 ),
                 const SizedBox(height: 10),
                 TextField(
                   controller: _telefonoCtrl,
                   keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(labelText: 'Teléfono (opcional)'),
+                  decoration: const InputDecoration(
+                    labelText: 'Teléfono (opcional)',
+                  ),
                 ),
                 const SizedBox(height: 14),
                 SizedBox(
@@ -541,7 +1497,14 @@ class _SeccionInvitarProfesionalState extends State<_SeccionInvitarProfesional> 
                   child: FilledButton(
                     onPressed: _enviando ? null : _invitar,
                     child: _enviando
-                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
                         : const Text('Invitar'),
                   ),
                 ),
@@ -554,16 +1517,17 @@ class _SeccionInvitarProfesionalState extends State<_SeccionInvitarProfesional> 
   }
 }
 
-/// Resumen económico en una sola tarjeta -- antes el presupuesto, el coste,
-/// el profesional de texto libre y la barra de pago vivían como líneas
-/// sueltas dentro de la misma tarjeta genérica que la descripción y el
-/// desplegable de estado, sin relación visual entre ellos. Mismas
-/// condiciones exactas que antes (ningún dato nuevo, ningún saldo inventado):
-/// el profesional de texto libre solo se repite aquí cuando NO hay sección
-/// "Profesional" propia (esConProfesional == false) -- para evitar
-/// duplicarlo con _SeccionInvitarProfesional, que ya lo muestra.
+/// Resumen económico en una sola tarjeta para el registro SIMPLE (sin
+/// profesional) -- el coste de una compra o el profesional de texto libre.
+/// Ningún dato nuevo, ningún saldo inventado: el profesional de texto libre
+/// solo se repite aquí cuando NO hay sección "Profesional" propia
+/// (esConProfesional == false).
 class _ResumenEconomico extends StatelessWidget {
-  const _ResumenEconomico({required this.casa, required this.elementoId, required this.registro});
+  const _ResumenEconomico({
+    required this.casa,
+    required this.elementoId,
+    required this.registro,
+  });
 
   final Casa casa;
   final String elementoId;
@@ -573,13 +1537,16 @@ class _ResumenEconomico extends StatelessWidget {
   Widget build(BuildContext context) {
     final mostrarCoste = registro.coste != null && !registro.esConProfesional;
     final mostrarPresupuesto = registro.presupuesto != null;
-    final mostrarProfesional = !registro.esConProfesional && registro.profesionalNombre != null;
-    if (!mostrarCoste && !mostrarPresupuesto && !mostrarProfesional) return const SizedBox.shrink();
+    final mostrarProfesional =
+        !registro.esConProfesional && registro.profesionalNombre != null;
+    if (!mostrarCoste && !mostrarPresupuesto && !mostrarProfesional) {
+      return const SizedBox.shrink();
+    }
 
     Widget divisor() => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          child: Divider(height: 1, color: context.colors.border),
-        );
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      child: Divider(height: 1, color: context.colors.border),
+    );
 
     return Card(
       margin: EdgeInsets.zero,
@@ -590,23 +1557,42 @@ class _ResumenEconomico extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (mostrarCoste) ...[
-              Text('Coste', style: Theme.of(context).textTheme.labelSmall?.copyWith(color: context.colors.inkMuted)),
+              Text(
+                'Coste',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: context.colors.inkMuted,
+                ),
+              ),
               const SizedBox(height: 2),
-              Text('${registro.coste!.toStringAsFixed(0)} €', style: ReparaText.amount(context, large: true)),
+              Text(
+                '${registro.coste!.toStringAsFixed(0)} €',
+                style: ReparaText.amount(context, large: true),
+              ),
             ],
-            if (mostrarCoste && (mostrarPresupuesto || mostrarProfesional)) divisor(),
+            if (mostrarCoste && (mostrarPresupuesto || mostrarProfesional))
+              divisor(),
             if (mostrarPresupuesto) ...[
-              Text('Presupuesto', style: Theme.of(context).textTheme.labelSmall?.copyWith(color: context.colors.inkMuted)),
+              Text(
+                'Presupuesto',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: context.colors.inkMuted,
+                ),
+              ),
               const SizedBox(height: 2),
-              Text('${registro.presupuesto!.toStringAsFixed(0)} €', style: ReparaText.amount(context, large: true)),
-              const SizedBox(height: 14),
-              ProgresoPago(casaId: casa.id, elementoId: elementoId, registroId: registro.id, presupuesto: registro.presupuesto!),
+              Text(
+                '${registro.presupuesto!.toStringAsFixed(0)} €',
+                style: ReparaText.amount(context, large: true),
+              ),
             ],
             if (mostrarPresupuesto && mostrarProfesional) divisor(),
             if (mostrarProfesional)
               Row(
                 children: [
-                  Icon(Icons.engineering_outlined, size: 18, color: context.colors.brand),
+                  Icon(
+                    Icons.engineering_outlined,
+                    size: 18,
+                    color: context.colors.brand,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -627,12 +1613,19 @@ class _ResumenEconomico extends StatelessWidget {
 // directa -- "Finalizar"/"Confirmar"/"Todavía no" son las únicas puertas
 // (modelo de dos pasos, auditoría de producto, octubre 2026).
 bool _estadoControlado(EstadoRegistro e) =>
-    e == EstadoRegistro.terminado || e == EstadoRegistro.archivado || e == EstadoRegistro.pendienteConfirmacion;
+    e == EstadoRegistro.terminado ||
+    e == EstadoRegistro.archivado ||
+    e == EstadoRegistro.pendienteConfirmacion;
 
 // Un registro simple (sin profesional) nace directamente "terminado" -- no
 // tiene el ciclo de vida nuevo/presupuestado/en curso, así que aquí solo se
 // distingue archivado de "registrado" en vez de reutilizar los nombres del
 // flujo con profesional.
-String _nombreEstadoSimple(Registro r) => r.estado == EstadoRegistro.archivado ? 'Archivado' : 'Registrado';
+String _nombreEstadoSimple(Registro r) =>
+    r.estado == EstadoRegistro.archivado ? 'Archivado' : 'Registrado';
 
-const _estadosEditables = [EstadoRegistro.nuevo, EstadoRegistro.presupuestado, EstadoRegistro.enCurso];
+const _estadosEditables = [
+  EstadoRegistro.nuevo,
+  EstadoRegistro.presupuestado,
+  EstadoRegistro.enCurso,
+];
