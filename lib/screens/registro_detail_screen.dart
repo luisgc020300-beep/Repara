@@ -9,9 +9,11 @@
 // sus datos con editar/eliminar, con la misma cabecera para que se sienta
 // el mismo producto.
 import 'dart:async';
+import 'dart:io';
 
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -303,19 +305,12 @@ class RegistroDetailScreen extends StatelessWidget {
                 ),
             ],
           ),
-          floatingActionButton:
-              !registro.esConProfesional || _estadoControlado(registro.estado)
-              ? null
-              : FloatingActionButton.extended(
-                  onPressed: () => _finalizar(context, registro),
-                  icon: const Icon(Icons.check),
-                  label: const Text('Finalizar'),
-                ),
           body: registro.esConProfesional
               ? _CuerpoConProfesional(
                   casa: casa,
                   elementoId: elementoId,
                   registro: registro,
+                  onFinalizar: () => _finalizar(context, registro),
                   onConfirmarFinalizacion: () =>
                       _confirmarFinalizacion(context, registro),
                   onRechazarFinalizacion: () =>
@@ -342,11 +337,13 @@ class RegistroDetailScreen extends StatelessWidget {
 class _CabeceraRegistro extends StatelessWidget {
   const _CabeceraRegistro({
     required this.casa,
+    required this.elementoId,
     required this.registro,
     this.elemento,
   });
 
   final Casa casa;
+  final String elementoId;
   final Registro registro;
   final Elemento? elemento;
 
@@ -356,7 +353,7 @@ class _CabeceraRegistro extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Expanded(
             child: Column(
@@ -406,29 +403,129 @@ class _CabeceraRegistro extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 14),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(ReparaRadius.md),
-            child: fotoUrl != null
-                ? Image.network(
-                    fotoUrl,
-                    width: 76,
-                    height: 76,
-                    fit: BoxFit.cover,
-                  )
-                : Container(
-                    width: 76,
-                    height: 76,
-                    color: context.colors.surfaceMuted,
-                    child: Icon(
-                      Icons.image_outlined,
-                      size: 26,
-                      color: context.colors.inkFaint,
+          GestureDetector(
+            onTap: () =>
+                _cambiarFotoRegistro(context, casa, elementoId, registro),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(ReparaRadius.md),
+              child: Stack(
+                children: [
+                  fotoUrl != null
+                      ? Image.network(
+                          fotoUrl,
+                          width: 76,
+                          height: 76,
+                          fit: BoxFit.cover,
+                        )
+                      : Container(
+                          width: 76,
+                          height: 76,
+                          color: context.colors.surfaceMuted,
+                          child: Icon(
+                            Icons.add_a_photo_outlined,
+                            size: 24,
+                            color: context.colors.inkFaint,
+                          ),
+                        ),
+                  if (fotoUrl != null)
+                    Positioned(
+                      right: 3,
+                      bottom: 3,
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.45),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.edit_outlined,
+                          size: 11,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
-                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
     );
+  }
+}
+
+/// Mismo flujo que _cambiarFoto en elemento_detail_screen.dart (cámara o
+/// galería), pero escribe en [Registro.fotoUrl] -- nunca toca la foto del
+/// elemento padre, aunque sea la que se esté mostrando como respaldo.
+Future<void> _cambiarFotoRegistro(
+  BuildContext context,
+  Casa casa,
+  String elementoId,
+  Registro registro,
+) async {
+  final picker = ImagePicker();
+  final foto = await showModalBottomSheet<XFile?>(
+    context: context,
+    builder: (ctx) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: IosSection(
+          rows: [
+            IosRow(
+              icon: Icons.photo_camera_outlined,
+              iconColor: ctx.colors.brand,
+              title: 'Hacer una foto',
+              onTap: () async {
+                final navigator = Navigator.of(ctx);
+                final imagen = await picker.pickImage(
+                  source: ImageSource.camera,
+                  imageQuality: 85,
+                  maxWidth: 1600,
+                  maxHeight: 1600,
+                );
+                if (!ctx.mounted) return;
+                navigator.pop(imagen);
+              },
+            ),
+            IosRow(
+              icon: Icons.photo_library_outlined,
+              iconColor: ctx.colors.brand,
+              title: 'Elegir de la galería',
+              onTap: () async {
+                final navigator = Navigator.of(ctx);
+                final imagen = await picker.pickImage(
+                  source: ImageSource.gallery,
+                  imageQuality: 85,
+                  maxWidth: 1600,
+                  maxHeight: 1600,
+                );
+                if (!ctx.mounted) return;
+                navigator.pop(imagen);
+              },
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+  if (foto == null || !context.mounted) return;
+  try {
+    final url = await RegistroService.subirFoto(
+      casa.id,
+      elementoId,
+      registro.id,
+      File(foto.path),
+    );
+    await RegistroService.actualizarFoto(casa.id, elementoId, registro.id, url);
+  } catch (e, st) {
+    if (context.mounted) {
+      AppError.show(
+        context,
+        'No se pudo guardar la foto.',
+        error: e,
+        stackTrace: st,
+      );
+    }
   }
 }
 
@@ -570,6 +667,7 @@ class _CuerpoConProfesional extends StatelessWidget {
     required this.casa,
     required this.elementoId,
     required this.registro,
+    required this.onFinalizar,
     required this.onConfirmarFinalizacion,
     required this.onRechazarFinalizacion,
     required this.onCompartirResumen,
@@ -578,6 +676,7 @@ class _CuerpoConProfesional extends StatelessWidget {
   final Casa casa;
   final String elementoId;
   final Registro registro;
+  final VoidCallback onFinalizar;
   final VoidCallback onConfirmarFinalizacion;
   final VoidCallback onRechazarFinalizacion;
   final void Function(double? pagado) onCompartirResumen;
@@ -602,6 +701,7 @@ class _CuerpoConProfesional extends StatelessWidget {
                 children: [
                   _CabeceraRegistro(
                     casa: casa,
+                    elementoId: elementoId,
                     registro: registro,
                     elemento: elemento,
                   ),
@@ -726,16 +826,45 @@ class _CuerpoConProfesional extends StatelessWidget {
                     top: false,
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: FilledButton.icon(
-                          onPressed: () => onCompartirResumen(
-                            pagos.isEmpty ? null : totalPagado,
-                          ),
-                          icon: const Icon(Icons.ios_share_outlined, size: 18),
-                          label: const Text('Compartir resumen'),
-                        ),
-                      ),
+                      // Antes había además un FloatingActionButton
+                      // "Finalizar" flotando sobre esta misma barra -- se
+                      // solapaban visualmente. Una sola barra con las dos
+                      // acciones evita el choque y mantiene ambas alcanzables.
+                      child: _estadoControlado(registro.estado)
+                          ? SizedBox(
+                              width: double.infinity,
+                              child: FilledButton.icon(
+                                onPressed: () => onCompartirResumen(
+                                  pagos.isEmpty ? null : totalPagado,
+                                ),
+                                icon: const Icon(
+                                  Icons.ios_share_outlined,
+                                  size: 18,
+                                ),
+                                label: const Text('Compartir resumen'),
+                              ),
+                            )
+                          : Row(
+                              children: [
+                                OutlinedButton(
+                                  onPressed: () => onCompartirResumen(
+                                    pagos.isEmpty ? null : totalPagado,
+                                  ),
+                                  child: const Icon(
+                                    Icons.ios_share_outlined,
+                                    size: 18,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: FilledButton.icon(
+                                    onPressed: onFinalizar,
+                                    icon: const Icon(Icons.check, size: 18),
+                                    label: const Text('Finalizar'),
+                                  ),
+                                ),
+                              ],
+                            ),
                     ),
                   ),
                 ],
@@ -873,29 +1002,39 @@ class _TarjetaMantenimiento extends StatelessWidget {
         border: Border.all(color: context.colors.border),
         borderRadius: BorderRadius.circular(ReparaRadius.md),
       ),
-      child: Row(
+      // Fila de icono+texto arriba, botón a todo lo ancho debajo -- en vez de
+      // los tres en una sola fila: con el botón al lado, el texto se quedaba
+      // con tan poco ancho que "Próximo mantenimiento" y el propio valor se
+      // partían palabra a palabra (CEO, octubre 2026: "se ve pegado a la
+      // izquierda, no se ve limpio").
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Icon(Icons.schedule_outlined, color: context.colors.brand),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Próximo mantenimiento',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: context.colors.inkMuted,
-                  ),
+          Row(
+            children: [
+              Icon(Icons.schedule_outlined, color: context.colors.brand),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Próximo mantenimiento',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: context.colors.inkMuted,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      texto ?? 'Sin recordatorio configurado todavía',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  texto ?? 'Sin recordatorio configurado todavía',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
+          const SizedBox(height: 12),
           OutlinedButton.icon(
             onPressed: () => Navigator.push(
               context,
@@ -905,7 +1044,9 @@ class _TarjetaMantenimiento extends StatelessWidget {
               ),
             ),
             icon: const Icon(Icons.calendar_month_outlined, size: 16),
-            label: Text(texto != null ? 'Editar' : 'Añadir recordatorio'),
+            label: Text(
+              texto != null ? 'Editar recordatorio' : 'Añadir recordatorio',
+            ),
           ),
         ],
       ),
@@ -1145,6 +1286,7 @@ class _CuerpoSimple extends StatelessWidget {
           children: [
             _CabeceraRegistro(
               casa: casa,
+              elementoId: elementoId,
               registro: registro,
               elemento: elementoSnap.data,
             ),
