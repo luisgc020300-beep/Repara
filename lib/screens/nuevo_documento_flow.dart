@@ -37,7 +37,9 @@ Future<void> iniciarNuevoDocumento(
 
   final confirmadas = await Navigator.push<List<PaginaDocumento>>(
     context,
-    MaterialPageRoute(builder: (_) => _VistaPreviaScreen(paginasIniciales: paginas)),
+    MaterialPageRoute(
+      builder: (_) => _VistaPreviaScreen(paginasIniciales: paginas),
+    ),
   );
   if (confirmadas == null || confirmadas.isEmpty || !context.mounted) return;
 
@@ -64,11 +66,17 @@ Future<void> iniciarNuevoDocumento(
     barrierDismissible: false,
     builder: (ctx) => AlertDialog(
       shape: AppDialog.shape(),
-      content: const Row(children: [
-        SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
-        SizedBox(width: 16),
-        Expanded(child: Text('Analizando documento…')),
-      ]),
+      content: const Row(
+        children: [
+          SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          SizedBox(width: 16),
+          Expanded(child: Text('Analizando documento…')),
+        ],
+      ),
     ),
   );
   try {
@@ -83,11 +91,17 @@ Future<void> iniciarNuevoDocumento(
         ? (e.message ?? 'Has alcanzado el límite diario de análisis con IA.')
         : 'No se pudo contactar con el servicio de IA. Puedes rellenar los datos a mano.';
   } catch (e) {
-    errorIA = 'No se pudo contactar con el servicio de IA. Puedes rellenar los datos a mano.';
+    errorIA =
+        'No se pudo contactar con el servicio de IA. Puedes rellenar los datos a mano.';
   } finally {
     if (context.mounted) Navigator.pop(context);
   }
-  unawaited(AnalyticsService.documentAiExtractionCompleted(exito: errorIA == null, confianza: sugerencia?.confianza));
+  unawaited(
+    AnalyticsService.documentAiExtractionCompleted(
+      exito: errorIA == null,
+      confianza: sugerencia?.confianza,
+    ),
+  );
 
   if (!context.mounted) return;
   if (errorIA != null) AppError.show(context, errorIA);
@@ -125,7 +139,10 @@ Future<List<PaginaDocumento>?> _elegirPaginas(BuildContext context) async {
               width: 36,
               height: 4,
               margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(color: ctx.colors.inkMuted.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(2)),
+              decoration: BoxDecoration(
+                color: ctx.colors.inkMuted.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
             IosSection(
               rows: [
@@ -150,10 +167,15 @@ Future<List<PaginaDocumento>?> _elegirPaginas(BuildContext context) async {
                   icon: Icons.photo_library_outlined,
                   iconColor: ctx.colors.brand,
                   title: 'Elegir de la galería',
-                  subtitle: 'Puedes seleccionar varias fotos si el documento tiene varias páginas',
+                  subtitle:
+                      'Puedes seleccionar varias fotos si el documento tiene varias páginas',
                   onTap: () async {
                     final navigator = Navigator.of(ctx);
-                    final fotos = await picker.pickMultiImage(imageQuality: 85, maxWidth: 1600, maxHeight: 1600);
+                    final fotos = await picker.pickMultiImage(
+                      imageQuality: 85,
+                      maxWidth: 1600,
+                      maxHeight: 1600,
+                    );
                     if (!ctx.mounted) return;
                     if (fotos.isEmpty) return navigator.pop(null);
                     navigator.pop(fotos.map(_paginaDesdeXFile).toList());
@@ -171,7 +193,12 @@ Future<List<PaginaDocumento>?> _elegirPaginas(BuildContext context) async {
                       allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
                     );
                     if (!ctx.mounted) return;
-                    final paths = resultado?.files.where((f) => f.path != null).map((f) => f.path!).toList() ?? [];
+                    final paths =
+                        resultado?.files
+                            .where((f) => f.path != null)
+                            .map((f) => f.path!)
+                            .toList() ??
+                        [];
                     if (paths.isEmpty) return navigator.pop(null);
                     navigator.pop(paths.map(_paginaDesdeRuta).toList());
                   },
@@ -186,10 +213,12 @@ Future<List<PaginaDocumento>?> _elegirPaginas(BuildContext context) async {
 }
 
 PaginaDocumento _paginaDesdeXFile(XFile foto) => PaginaDocumento(
-      archivo: File(foto.path),
-      mediaType: foto.path.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg',
-      nombre: foto.name,
-    );
+  archivo: File(foto.path),
+  mediaType: foto.path.toLowerCase().endsWith('.png')
+      ? 'image/png'
+      : 'image/jpeg',
+  nombre: foto.name,
+);
 
 PaginaDocumento _paginaDesdeRuta(String ruta) {
   final extension = ruta.toLowerCase().split('.').last;
@@ -198,7 +227,11 @@ PaginaDocumento _paginaDesdeRuta(String ruta) {
     'png' => 'image/png',
     _ => 'image/jpeg',
   };
-  return PaginaDocumento(archivo: File(ruta), mediaType: mediaType, nombre: ruta.split(Platform.pathSeparator).last);
+  return PaginaDocumento(
+    archivo: File(ruta),
+    mediaType: mediaType,
+    nombre: ruta.split(Platform.pathSeparator).last,
+  );
 }
 
 bool _esPdf(PaginaDocumento p) => p.mediaType == 'application/pdf';
@@ -227,36 +260,69 @@ class _VistaPreviaScreenState extends State<_VistaPreviaScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(_paginas.length > 1 ? '${_paginas.length} páginas' : 'Vista previa')),
+      appBar: AppBar(
+        title: Text(
+          _paginas.length > 1 ? '${_paginas.length} páginas' : 'Vista previa',
+        ),
+      ),
       body: _paginas.isEmpty
-          ? Center(child: Text('No queda ninguna página.', style: TextStyle(color: context.colors.inkMuted)))
+          ? Center(
+              child: Text(
+                'No queda ninguna página.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            )
           : GridView.builder(
-              padding: const EdgeInsets.all(16),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, mainAxisSpacing: 12, crossAxisSpacing: 12),
+              padding: const EdgeInsets.all(ReparaSpace.s4),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                mainAxisSpacing: ReparaSpace.s3,
+                crossAxisSpacing: ReparaSpace.s3,
+              ),
               itemCount: _paginas.length,
               itemBuilder: (context, i) {
                 final p = _paginas[i];
                 return Stack(
                   children: [
                     Positioned.fill(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        clipBehavior: Clip.antiAlias,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(ReparaRadius.md),
+                          border: Border.all(color: context.colors.border),
+                        ),
                         child: _esPdf(p)
                             ? Container(
                                 color: context.colors.surfaceMuted,
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(Icons.picture_as_pdf_outlined, size: 40, color: context.colors.inkMuted),
-                                    const SizedBox(height: 4),
+                                    Icon(
+                                      Icons.picture_as_pdf_outlined,
+                                      size: 40,
+                                      color: context.colors.inkMuted,
+                                    ),
+                                    const SizedBox(height: ReparaSpace.s1),
                                     Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                                      child: Text(p.nombre, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: ReparaSpace.s2,
+                                      ),
+                                      child: Text(
+                                        p.nombre,
+                                        textAlign: TextAlign.center,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
                                     ),
                                   ],
                                 ),
                               )
-                            : Image.file(p.archivo, fit: BoxFit.cover, width: double.infinity, height: double.infinity),
+                            : Image.file(
+                                p.archivo,
+                                fit: BoxFit.cover,
+                                width: double.infinity,
+                                height: double.infinity,
+                              ),
                       ),
                     ),
                     Positioned(
@@ -267,7 +333,11 @@ class _VistaPreviaScreenState extends State<_VistaPreviaScreen> {
                         child: CircleAvatar(
                           radius: 14,
                           backgroundColor: Colors.black54,
-                          child: const Icon(Icons.close, size: 16, color: Colors.white),
+                          child: const Icon(
+                            Icons.close,
+                            size: 16,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ),
@@ -278,7 +348,13 @@ class _VistaPreviaScreenState extends State<_VistaPreviaScreen> {
                         child: CircleAvatar(
                           radius: 11,
                           backgroundColor: context.colors.brand,
-                          child: Text('${i + 1}', style: const TextStyle(color: Colors.white, fontSize: 11)),
+                          child: Text(
+                            '${i + 1}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                            ),
+                          ),
                         ),
                       ),
                   ],
@@ -287,7 +363,7 @@ class _VistaPreviaScreenState extends State<_VistaPreviaScreen> {
             ),
       bottomNavigationBar: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(ReparaSpace.s4),
           child: Row(
             children: [
               Expanded(
@@ -297,10 +373,12 @@ class _VistaPreviaScreenState extends State<_VistaPreviaScreen> {
                   label: const Text('Añadir más'),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: ReparaSpace.s3),
               Expanded(
                 child: FilledButton(
-                  onPressed: _paginas.isEmpty ? null : () => Navigator.pop(context, _paginas),
+                  onPressed: _paginas.isEmpty
+                      ? null
+                      : () => Navigator.pop(context, _paginas),
                   child: const Text('Continuar'),
                 ),
               ),
@@ -335,24 +413,47 @@ class _RevisionDocumentoScreen extends StatefulWidget {
   final String? habitacionIdInicial;
 
   @override
-  State<_RevisionDocumentoScreen> createState() => _RevisionDocumentoScreenState();
+  State<_RevisionDocumentoScreen> createState() =>
+      _RevisionDocumentoScreenState();
 }
 
 class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
   late TipoDocumento _tipo = widget.sugerencia?.tipo ?? TipoDocumento.otro;
-  late TipoRegistro _tipoRegistro = _tipoRegistroPorDefecto(widget.sugerencia?.tipo);
-  late final _proveedorCtrl = TextEditingController(text: widget.sugerencia?.proveedor ?? '');
-  late final _nifCtrl = TextEditingController(text: widget.sugerencia?.nifCif ?? '');
-  late final _numeroCtrl = TextEditingController(text: widget.sugerencia?.numeroReferencia ?? '');
-  late final _importeCtrl = TextEditingController(text: _formatoImporte(widget.sugerencia?.importe));
-  late final _baseCtrl = TextEditingController(text: _formatoImporte(widget.sugerencia?.baseImponible));
-  late final _impuestosCtrl = TextEditingController(text: _formatoImporte(widget.sugerencia?.impuestos));
-  late final _descripcionCtrl = TextEditingController(text: widget.sugerencia?.descripcionTrabajo ?? '');
-  late final _garantiaCtrl = TextEditingController(text: widget.sugerencia?.garantiaTexto ?? '');
-  late final _observacionesCtrl = TextEditingController(text: widget.sugerencia?.observaciones ?? '');
+  late TipoRegistro _tipoRegistro = _tipoRegistroPorDefecto(
+    widget.sugerencia?.tipo,
+  );
+  late final _proveedorCtrl = TextEditingController(
+    text: widget.sugerencia?.proveedor ?? '',
+  );
+  late final _nifCtrl = TextEditingController(
+    text: widget.sugerencia?.nifCif ?? '',
+  );
+  late final _numeroCtrl = TextEditingController(
+    text: widget.sugerencia?.numeroReferencia ?? '',
+  );
+  late final _importeCtrl = TextEditingController(
+    text: _formatoImporte(widget.sugerencia?.importe),
+  );
+  late final _baseCtrl = TextEditingController(
+    text: _formatoImporte(widget.sugerencia?.baseImponible),
+  );
+  late final _impuestosCtrl = TextEditingController(
+    text: _formatoImporte(widget.sugerencia?.impuestos),
+  );
+  late final _descripcionCtrl = TextEditingController(
+    text: widget.sugerencia?.descripcionTrabajo ?? '',
+  );
+  late final _garantiaCtrl = TextEditingController(
+    text: widget.sugerencia?.garantiaTexto ?? '',
+  );
+  late final _observacionesCtrl = TextEditingController(
+    text: widget.sugerencia?.observaciones ?? '',
+  );
   late DateTime? _fecha = widget.sugerencia?.fecha;
   late DateTime? _fechaVencimiento = widget.sugerencia?.fechaVencimiento;
-  late String? _elementoId = widget.elementoIdInicial ?? _buscarIdPorNombre(widget.elementos, widget.sugerencia?.elementoSugerido);
+  late String? _elementoId =
+      widget.elementoIdInicial ??
+      _buscarIdPorNombre(widget.elementos, widget.sugerencia?.elementoSugerido);
   late final String? _registroId = widget.registroIdInicial;
   bool _guardando = false;
 
@@ -360,12 +461,16 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
   // detecta un elemento que no existe todavía en la casa, en vez de perder
   // esa sugerencia se ofrece crearlo ya con los datos que ya se han
   // extraído del documento -- un documento nunca debe quedar aislado.
-  late bool _crearElementoNuevo = widget.elementoIdInicial == null &&
+  late bool _crearElementoNuevo =
+      widget.elementoIdInicial == null &&
       widget.sugerencia?.elementoSugerido != null &&
       _elementoId == null;
-  late final _nuevoElementoNombreCtrl = TextEditingController(text: widget.sugerencia?.elementoSugerido ?? '');
+  late final _nuevoElementoNombreCtrl = TextEditingController(
+    text: widget.sugerencia?.elementoSugerido ?? '',
+  );
 
-  static String _formatoImporte(double? v) => v == null ? '' : v.toStringAsFixed(2);
+  static String _formatoImporte(double? v) =>
+      v == null ? '' : v.toStringAsFixed(2);
 
   static String? _buscarIdPorNombre(List<Elemento> lista, String? nombre) {
     if (nombre == null) return null;
@@ -376,9 +481,10 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
   }
 
   static TipoRegistro _tipoRegistroPorDefecto(TipoDocumento? t) => switch (t) {
-        TipoDocumento.factura || TipoDocumento.presupuesto => TipoRegistro.reparacion,
-        _ => TipoRegistro.nota,
-      };
+    TipoDocumento.factura ||
+    TipoDocumento.presupuesto => TipoRegistro.reparacion,
+    _ => TipoRegistro.nota,
+  };
 
   String _nombreElementoParaRegistro() {
     if (_crearElementoNuevo) return _nuevoElementoNombreCtrl.text.trim();
@@ -420,8 +526,10 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
     });
   }
 
-  double? get _importe => double.tryParse(_importeCtrl.text.replaceAll(',', '.'));
-  String? get _proveedor => _proveedorCtrl.text.trim().isEmpty ? null : _proveedorCtrl.text.trim();
+  double? get _importe =>
+      double.tryParse(_importeCtrl.text.replaceAll(',', '.'));
+  String? get _proveedor =>
+      _proveedorCtrl.text.trim().isEmpty ? null : _proveedorCtrl.text.trim();
 
   Future<void> _guardar({required bool comoBorrador}) async {
     if (_guardando) return;
@@ -438,7 +546,8 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
           final continuar = await AppDialog.confirm(
             context,
             title: 'Posible documento duplicado',
-            message: 'Ya existe un documento del mismo proveedor, importe y fecha en esta casa. ¿Guardar de todas formas?',
+            message:
+                'Ya existe un documento del mismo proveedor, importe y fecha en esta casa. ¿Guardar de todas formas?',
             confirmLabel: 'Guardar igualmente',
           );
           if (!continuar) {
@@ -448,7 +557,8 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
         }
       }
 
-      if (_crearElementoNuevo && _nuevoElementoNombreCtrl.text.trim().isNotEmpty) {
+      if (_crearElementoNuevo &&
+          _nuevoElementoNombreCtrl.text.trim().isNotEmpty) {
         _elementoId = await ElementoService.crear(
           widget.casaId,
           Elemento(
@@ -465,7 +575,15 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
 
       final urls = <String>[];
       for (final p in widget.paginas) {
-        urls.add(await DocumentoService.subirArchivo(widget.casaId, p.archivo, p.nombre, elementoId: _elementoId, registroId: _registroId));
+        urls.add(
+          await DocumentoService.subirArchivo(
+            widget.casaId,
+            p.archivo,
+            p.nombre,
+            elementoId: _elementoId,
+            registroId: _registroId,
+          ),
+        );
       }
       final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
@@ -476,7 +594,8 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
       // Elemento/Trabajo/Evento). Un documento sin elemento sigue sin tener
       // registro -- se archiva igualmente en Documentos, sin historial.
       String? registroId = _registroId;
-      final crearRegistroNuevo = !comoBorrador && registroId == null && _elementoId != null;
+      final crearRegistroNuevo =
+          !comoBorrador && registroId == null && _elementoId != null;
       if (crearRegistroNuevo) {
         registroId = await RegistroService.crear(
           widget.casaId,
@@ -491,7 +610,9 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
                 : _nombreTipoDoc(_tipo),
             estado: EstadoRegistro.terminado,
             fecha: _fecha ?? DateTime.now(),
-            descripcion: _descripcionCtrl.text.trim().isEmpty ? null : _descripcionCtrl.text.trim(),
+            descripcion: _descripcionCtrl.text.trim().isEmpty
+                ? null
+                : _descripcionCtrl.text.trim(),
             garantiaHasta: _fechaVencimiento,
             coste: _importe,
             profesionalNombre: _proveedor,
@@ -508,14 +629,22 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
         fecha: _fecha,
         proveedor: _proveedor,
         importe: _importe,
-        numeroReferencia: _numeroCtrl.text.trim().isEmpty ? null : _numeroCtrl.text.trim(),
+        numeroReferencia: _numeroCtrl.text.trim().isEmpty
+            ? null
+            : _numeroCtrl.text.trim(),
         fechaVencimiento: _fechaVencimiento,
         nifCif: _nifCtrl.text.trim().isEmpty ? null : _nifCtrl.text.trim(),
         baseImponible: double.tryParse(_baseCtrl.text.replaceAll(',', '.')),
         impuestos: double.tryParse(_impuestosCtrl.text.replaceAll(',', '.')),
-        descripcionTrabajo: _descripcionCtrl.text.trim().isEmpty ? null : _descripcionCtrl.text.trim(),
-        garantiaTexto: _garantiaCtrl.text.trim().isEmpty ? null : _garantiaCtrl.text.trim(),
-        observaciones: _observacionesCtrl.text.trim().isEmpty ? null : _observacionesCtrl.text.trim(),
+        descripcionTrabajo: _descripcionCtrl.text.trim().isEmpty
+            ? null
+            : _descripcionCtrl.text.trim(),
+        garantiaTexto: _garantiaCtrl.text.trim().isEmpty
+            ? null
+            : _garantiaCtrl.text.trim(),
+        observaciones: _observacionesCtrl.text.trim().isEmpty
+            ? null
+            : _observacionesCtrl.text.trim(),
         archivosAdicionales: urls.skip(1).toList(),
         elementoId: _elementoId,
         registroId: registroId,
@@ -524,20 +653,43 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
         creadoPorIA: widget.sugerencia != null,
       );
 
-      final documentoId = await DocumentoService.crear(widget.casaId, documento, createdBy: uid);
+      final documentoId = await DocumentoService.crear(
+        widget.casaId,
+        documento,
+        createdBy: uid,
+      );
       unawaited(AnalyticsService.firstDocumentUploaded());
       unawaited(AnalyticsService.documentConfirmed(comoBorrador: comoBorrador));
 
       if (crearRegistroNuevo) {
-        await RegistroService.actualizar(widget.casaId, _elementoId!, registroId!, {'documentoIds': [documentoId]});
+        await RegistroService.actualizar(
+          widget.casaId,
+          _elementoId!,
+          registroId!,
+          {
+            'documentoIds': [documentoId],
+          },
+        );
       }
 
       if (mounted) {
-        AppError.showSuccess(context, comoBorrador ? 'Guardado como borrador.' : 'Documento archivado en el historial.');
+        AppError.showSuccess(
+          context,
+          comoBorrador
+              ? 'Guardado como borrador.'
+              : 'Documento archivado en el historial.',
+        );
         Navigator.pop(context);
       }
     } catch (e, st) {
-      if (mounted) AppError.show(context, 'No se pudo guardar el documento. Inténtalo de nuevo.', error: e, stackTrace: st);
+      if (mounted) {
+        AppError.show(
+          context,
+          'No se pudo guardar el documento. Inténtalo de nuevo.',
+          error: e,
+          stackTrace: st,
+        );
+      }
     } finally {
       if (mounted) setState(() => _guardando = false);
     }
@@ -550,209 +702,372 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
       appBar: AppBar(title: const Text('Revisar documento')),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(ReparaSpace.s4),
           children: [
             Text(
-              widget.sugerencia != null ? 'Hemos preparado el registro de tu documento' : 'No hemos podido leer el documento automáticamente',
+              widget.sugerencia != null
+                  ? 'Hemos preparado el registro de tu documento'
+                  : 'No hemos podido leer el documento automáticamente',
               style: Theme.of(context).textTheme.displaySmall,
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: ReparaSpace.s1),
             Text(
-              widget.sugerencia != null ? 'Revisa los datos y corrige lo que haga falta antes de guardar.' : 'Rellena los datos a mano.',
+              widget.sugerencia != null
+                  ? 'Revisa los datos y corrige lo que haga falta antes de guardar.'
+                  : 'Rellena los datos a mano.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             if (confianza == 'baja') ...[
-              const SizedBox(height: 10),
+              const SizedBox(height: ReparaSpace.s3),
               Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: context.colors.warning.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.all(ReparaSpace.s3),
+                decoration: BoxDecoration(
+                  color: context.colors.warning.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(ReparaRadius.sm),
+                ),
                 child: Row(
                   children: [
-                    Icon(Icons.info_outline, size: 18, color: context.colors.warning),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text('La IA no está muy segura de estos datos -- revísalos con más cuidado.', style: TextStyle(color: context.colors.ink))),
-                  ],
-                ),
-              ),
-            ],
-            const SizedBox(height: 16),
-            _seccion(context, 'Documento original'),
-            SizedBox(
-              height: 90,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: widget.paginas.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 8),
-                itemBuilder: (context, i) {
-                  final p = widget.paginas[i];
-                  return ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: _esPdf(p)
-                        ? Container(width: 70, color: context.colors.surfaceMuted, child: const Icon(Icons.picture_as_pdf_outlined))
-                        : Image.file(p.archivo, width: 70, height: 90, fit: BoxFit.cover),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 20),
-            _seccion(context, 'Información del documento'),
-            DropdownButtonFormField<TipoDocumento>(
-              initialValue: _tipo,
-              decoration: const InputDecoration(labelText: 'Tipo'),
-              items: TipoDocumento.values.map((t) => DropdownMenuItem(value: t, child: Text(_nombreTipoDoc(t)))).toList(),
-              onChanged: (v) => setState(() => _tipo = v ?? _tipo),
-            ),
-            const SizedBox(height: 12),
-            TextField(controller: _numeroCtrl, decoration: const InputDecoration(labelText: 'Número de factura/referencia')),
-            const SizedBox(height: 12),
-            Row(children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _elegirFecha(vencimiento: false),
-                  icon: const Icon(Icons.calendar_today_outlined, size: 16),
-                  label: Text(_fecha == null ? 'Fecha' : '${_fecha!.day}/${_fecha!.month}/${_fecha!.year}'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _elegirFecha(vencimiento: true),
-                  icon: const Icon(Icons.event_outlined, size: 16),
-                  label: Text(_fechaVencimiento == null ? 'Vencimiento' : '${_fechaVencimiento!.day}/${_fechaVencimiento!.month}/${_fechaVencimiento!.year}'),
-                ),
-              ),
-            ]),
-            const SizedBox(height: 12),
-            TextField(controller: _proveedorCtrl, decoration: const InputDecoration(labelText: 'Profesional / empresa emisora')),
-            const SizedBox(height: 12),
-            TextField(controller: _nifCtrl, decoration: const InputDecoration(labelText: 'NIF/CIF (opcional)')),
-            const SizedBox(height: 20),
-            _seccion(context, 'Información económica'),
-            Row(children: [
-              Expanded(
-                child: TextField(
-                  controller: _baseCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: 'Base imponible (€)'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextField(
-                  controller: _impuestosCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: 'Impuestos (€)'),
-                ),
-              ),
-            ]),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _importeCtrl,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              style: const TextStyle(fontWeight: FontWeight.w700),
-              decoration: const InputDecoration(labelText: 'Importe total (€)'),
-            ),
-            const SizedBox(height: 20),
-            _seccion(context, 'Información del trabajo'),
-            TextField(
-              controller: _descripcionCtrl,
-              minLines: 1,
-              maxLines: 3,
-              decoration: const InputDecoration(labelText: 'Descripción del servicio/reparación'),
-            ),
-            const SizedBox(height: 12),
-            TextField(controller: _garantiaCtrl, decoration: const InputDecoration(labelText: 'Garantía indicada (opcional)')),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _observacionesCtrl,
-              minLines: 1,
-              maxLines: 3,
-              decoration: const InputDecoration(labelText: 'Observaciones'),
-            ),
-            const SizedBox(height: 20),
-            _seccion(context, 'Relación con tu casa'),
-            // Si ya se abrió el escáner desde la ficha de un elemento/registro
-            // concreto (widget.*Inicial), ese vínculo queda fijo -- no se
-            // ofrece un desplegable que además, para un profesional sin
-            // permiso para listar TODOS los elementos de la casa, ni
-            // siquiera podría rellenarse con opciones.
-            if (widget.elementoIdInicial != null)
-              _VinculoFijo(icono: Icons.category_outlined, texto: _tituloElemento(widget.elementos, widget.elementoIdInicial!))
-            else if (_crearElementoNuevo)
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: context.colors.brand.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(12)),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.auto_awesome_outlined, size: 18, color: context.colors.brand),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'La IA no encontró ningún elemento con este nombre. Se creará uno nuevo con los datos de este documento.',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
+                    Icon(
+                      Icons.info_outline,
+                      size: 18,
+                      color: context.colors.warning,
+                    ),
+                    const SizedBox(width: ReparaSpace.s2),
+                    Expanded(
+                      child: Text(
+                        'La IA no está muy segura de estos datos -- revísalos con más cuidado.',
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: context.colors.ink,
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: _nuevoElementoNombreCtrl,
-                      decoration: const InputDecoration(labelText: 'Nombre del elemento nuevo', isDense: true),
-                    ),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: TextButton(
-                        onPressed: () => setState(() => _crearElementoNuevo = false),
-                        child: const Text('No crear, elegir uno que ya existe'),
                       ),
                     ),
                   ],
                 ),
-              )
-            else
-              DropdownButtonFormField<String?>(
-                initialValue: _elementoId,
-                decoration: const InputDecoration(labelText: 'Elemento relacionado (opcional)'),
-                items: [
-                  const DropdownMenuItem(value: null, child: Text('Sin elemento específico')),
-                  ...widget.elementos.map((e) => DropdownMenuItem(value: e.id, child: Text(e.nombre))),
-                ],
-                onChanged: (v) => setState(() => _elementoId = v),
-              ),
-            if (widget.registroIdInicial != null) ...[
-              const SizedBox(height: 12),
-              const _VinculoFijo(icono: Icons.build_outlined, texto: 'Este registro'),
-            ] else if (_elementoId != null) ...[
-              const SizedBox(height: 12),
-              DropdownButtonFormField<TipoRegistro>(
-                initialValue: _tipoRegistro,
-                decoration: const InputDecoration(labelText: 'Aparecerá en el historial del elemento como'),
-                items: TipoRegistro.values.map((t) => DropdownMenuItem(value: t, child: Text(nombreTipoRegistro(t)))).toList(),
-                onChanged: (v) => setState(() => _tipoRegistro = v ?? _tipoRegistro),
               ),
             ],
-            const SizedBox(height: 24),
+            const SizedBox(height: ReparaSpace.s4),
+            _SeccionRevision(
+              titulo: 'Documento original',
+              children: [
+                SizedBox(
+                  height: 90,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: widget.paginas.length,
+                    separatorBuilder: (_, _) =>
+                        const SizedBox(width: ReparaSpace.s2),
+                    itemBuilder: (context, i) {
+                      final p = widget.paginas[i];
+                      return Container(
+                        width: 70,
+                        clipBehavior: Clip.antiAlias,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(ReparaRadius.sm),
+                          border: Border.all(color: context.colors.border),
+                        ),
+                        child: _esPdf(p)
+                            ? Container(
+                                color: context.colors.surfaceMuted,
+                                child: const Icon(
+                                  Icons.picture_as_pdf_outlined,
+                                ),
+                              )
+                            : Image.file(
+                                p.archivo,
+                                width: 70,
+                                height: 90,
+                                fit: BoxFit.cover,
+                              ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: ReparaSpace.s4),
+            _SeccionRevision(
+              titulo: 'Información del documento',
+              children: [
+                DropdownButtonFormField<TipoDocumento>(
+                  initialValue: _tipo,
+                  decoration: const InputDecoration(labelText: 'Tipo'),
+                  items: TipoDocumento.values
+                      .map(
+                        (t) => DropdownMenuItem(
+                          value: t,
+                          child: Text(_nombreTipoDoc(t)),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) => setState(() => _tipo = v ?? _tipo),
+                ),
+                const SizedBox(height: ReparaSpace.s3),
+                TextField(
+                  controller: _numeroCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Número de factura/referencia',
+                  ),
+                ),
+                const SizedBox(height: ReparaSpace.s3),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => _elegirFecha(vencimiento: false),
+                        icon: const Icon(
+                          Icons.calendar_today_outlined,
+                          size: 16,
+                        ),
+                        label: Text(
+                          _fecha == null
+                              ? 'Fecha'
+                              : '${_fecha!.day}/${_fecha!.month}/${_fecha!.year}',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: ReparaSpace.s3),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => _elegirFecha(vencimiento: true),
+                        icon: const Icon(Icons.event_outlined, size: 16),
+                        label: Text(
+                          _fechaVencimiento == null
+                              ? 'Vencimiento'
+                              : '${_fechaVencimiento!.day}/${_fechaVencimiento!.month}/${_fechaVencimiento!.year}',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: ReparaSpace.s3),
+                TextField(
+                  controller: _proveedorCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Profesional / empresa emisora',
+                  ),
+                ),
+                const SizedBox(height: ReparaSpace.s3),
+                TextField(
+                  controller: _nifCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'NIF/CIF (opcional)',
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: ReparaSpace.s4),
+            _SeccionRevision(
+              titulo: 'Información económica',
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _baseCtrl,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: 'Base imponible (€)',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: ReparaSpace.s3),
+                    Expanded(
+                      child: TextField(
+                        controller: _impuestosCtrl,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: 'Impuestos (€)',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: ReparaSpace.s3),
+                TextField(
+                  controller: _importeCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                  decoration: const InputDecoration(
+                    labelText: 'Importe total (€)',
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: ReparaSpace.s4),
+            _SeccionRevision(
+              titulo: 'Información del trabajo',
+              children: [
+                TextField(
+                  controller: _descripcionCtrl,
+                  minLines: 1,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Descripción del servicio/reparación',
+                  ),
+                ),
+                const SizedBox(height: ReparaSpace.s3),
+                TextField(
+                  controller: _garantiaCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Garantía indicada (opcional)',
+                  ),
+                ),
+                const SizedBox(height: ReparaSpace.s3),
+                TextField(
+                  controller: _observacionesCtrl,
+                  minLines: 1,
+                  maxLines: 3,
+                  decoration: const InputDecoration(labelText: 'Observaciones'),
+                ),
+              ],
+            ),
+            const SizedBox(height: ReparaSpace.s4),
+            _SeccionRevision(
+              titulo: 'Relación con tu casa',
+              children: [
+                // Si ya se abrió el escáner desde la ficha de un elemento/registro
+                // concreto (widget.*Inicial), ese vínculo queda fijo -- no se
+                // ofrece un desplegable que además, para un profesional sin
+                // permiso para listar TODOS los elementos de la casa, ni
+                // siquiera podría rellenarse con opciones.
+                if (widget.elementoIdInicial != null)
+                  _VinculoFijo(
+                    icono: Icons.category_outlined,
+                    texto: _tituloElemento(
+                      widget.elementos,
+                      widget.elementoIdInicial!,
+                    ),
+                  )
+                else if (_crearElementoNuevo)
+                  Container(
+                    padding: const EdgeInsets.all(ReparaSpace.s3),
+                    decoration: BoxDecoration(
+                      color: context.colors.brand.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(ReparaRadius.md),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.auto_awesome_outlined,
+                              size: 18,
+                              color: context.colors.brand,
+                            ),
+                            const SizedBox(width: ReparaSpace.s2),
+                            Expanded(
+                              child: Text(
+                                'La IA no encontró ningún elemento con este nombre. Se creará uno nuevo con los datos de este documento.',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: ReparaSpace.s2),
+                        TextField(
+                          controller: _nuevoElementoNombreCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Nombre del elemento nuevo',
+                            isDense: true,
+                          ),
+                        ),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton(
+                            onPressed: () =>
+                                setState(() => _crearElementoNuevo = false),
+                            child: const Text(
+                              'No crear, elegir uno que ya existe',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  DropdownButtonFormField<String?>(
+                    initialValue: _elementoId,
+                    decoration: const InputDecoration(
+                      labelText: 'Elemento relacionado (opcional)',
+                    ),
+                    items: [
+                      const DropdownMenuItem(
+                        value: null,
+                        child: Text('Sin elemento específico'),
+                      ),
+                      ...widget.elementos.map(
+                        (e) => DropdownMenuItem(
+                          value: e.id,
+                          child: Text(e.nombre),
+                        ),
+                      ),
+                    ],
+                    onChanged: (v) => setState(() => _elementoId = v),
+                  ),
+                if (widget.registroIdInicial != null) ...[
+                  const SizedBox(height: ReparaSpace.s3),
+                  const _VinculoFijo(
+                    icono: Icons.build_outlined,
+                    texto: 'Este registro',
+                  ),
+                ] else if (_elementoId != null) ...[
+                  const SizedBox(height: ReparaSpace.s3),
+                  DropdownButtonFormField<TipoRegistro>(
+                    initialValue: _tipoRegistro,
+                    decoration: const InputDecoration(
+                      labelText: 'Aparecerá en el historial del elemento como',
+                    ),
+                    items: TipoRegistro.values
+                        .map(
+                          (t) => DropdownMenuItem(
+                            value: t,
+                            child: Text(nombreTipoRegistro(t)),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) =>
+                        setState(() => _tipoRegistro = v ?? _tipoRegistro),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: ReparaSpace.s6),
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: _guardando ? null : () => _guardar(comoBorrador: false),
+                onPressed: _guardando
+                    ? null
+                    : () => _guardar(comoBorrador: false),
                 child: _guardando
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
                     : const Text('Guardar en el historial'),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: ReparaSpace.s2),
             SizedBox(
               width: double.infinity,
               child: OutlinedButton(
-                onPressed: _guardando ? null : () => _guardar(comoBorrador: true),
+                onPressed: _guardando
+                    ? null
+                    : () => _guardar(comoBorrador: true),
                 child: const Text('Guardar como borrador'),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: ReparaSpace.s2),
             SizedBox(
               width: double.infinity,
               child: TextButton(
@@ -776,9 +1091,23 @@ class _VinculoFijo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-      decoration: BoxDecoration(color: context.colors.surfaceMuted, borderRadius: BorderRadius.circular(12)),
-      child: Row(children: [Icon(icono, size: 18, color: context.colors.inkMuted), const SizedBox(width: 8), Text(texto)]),
+      padding: const EdgeInsets.symmetric(
+        horizontal: ReparaSpace.s3,
+        vertical: ReparaSpace.s3,
+      ),
+      decoration: BoxDecoration(
+        color: context.colors.surfaceMuted,
+        borderRadius: BorderRadius.circular(ReparaRadius.md),
+      ),
+      child: Row(
+        children: [
+          Icon(icono, size: 18, color: context.colors.inkMuted),
+          const SizedBox(width: ReparaSpace.s2),
+          Expanded(
+            child: Text(texto, style: Theme.of(context).textTheme.bodyLarge),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -790,16 +1119,47 @@ String _tituloElemento(List<Elemento> elementos, String id) {
   return 'Elemento de esta ficha';
 }
 
-Widget _seccion(BuildContext context, String titulo) => Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Text(titulo, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700, color: context.colors.brand)),
+/// Agrupa un bloque lógico de la revisión en una tarjeta con cabecera --
+/// mismo contenedor con borde fino que usan registro_detail_screen.dart/
+/// elemento_detail_screen.dart/home_tab.dart/casa_tab.dart/nuevo_elemento_
+/// screen.dart, aplicado aquí a los campos de revisión del documento en vez
+/// de a la antigua cabecera suelta sin agrupar.
+class _SeccionRevision extends StatelessWidget {
+  const _SeccionRevision({required this.titulo, required this.children});
+
+  final String titulo;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(ReparaSpace.s4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              titulo,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: context.colors.brand,
+              ),
+            ),
+            const SizedBox(height: ReparaSpace.s3),
+            ...children,
+          ],
+        ),
+      ),
     );
+  }
+}
 
 String _nombreTipoDoc(TipoDocumento t) => switch (t) {
-      TipoDocumento.factura => 'Factura',
-      TipoDocumento.presupuesto => 'Presupuesto',
-      TipoDocumento.garantia => 'Garantía',
-      TipoDocumento.manual => 'Manual',
-      TipoDocumento.contrato => 'Contrato',
-      TipoDocumento.otro => 'Otro',
-    };
+  TipoDocumento.factura => 'Factura',
+  TipoDocumento.presupuesto => 'Presupuesto',
+  TipoDocumento.garantia => 'Garantía',
+  TipoDocumento.manual => 'Manual',
+  TipoDocumento.contrato => 'Contrato',
+  TipoDocumento.otro => 'Otro',
+};
