@@ -18,11 +18,24 @@ import '../services/registro_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/boton_ajustes.dart';
 import '../widgets/boton_notificaciones.dart';
+import '../widgets/ios_list.dart';
 import 'elemento_detail_screen.dart';
 import 'garantias_proximas_screen.dart';
 import 'menu_anadir.dart';
 import 'revisiones_pendientes_screen.dart';
 import 'trabajos_pendientes_screen.dart';
+
+// Saludo según la hora del dispositivo -- sin dato nuevo, nada que no supiera
+// ya el propio teléfono; da a Inicio el tono de "bienvenida" que no tiene
+// sentido repetir en el resto de fichas (CEO, octubre 2026: "personalidad
+// propia, pero que se reconozca como la misma app").
+String _saludo() {
+  final hora = DateTime.now().hour;
+  if (hora < 6) return 'Buenas noches';
+  if (hora < 13) return 'Buenos días';
+  if (hora < 20) return 'Buenas tardes';
+  return 'Buenas noches';
+}
 
 class HomeTab extends StatefulWidget {
   const HomeTab({required this.casa, super.key});
@@ -53,11 +66,25 @@ class _HomeTabState extends State<HomeTab> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('TU CASA', style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 11, color: context.colors.inkMuted)),
-            Text(widget.casa.nombre, style: Theme.of(context).textTheme.displayMedium?.copyWith(fontSize: 26)),
+            Text(
+              _saludo(),
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                fontSize: 11,
+                color: context.colors.inkMuted,
+              ),
+            ),
+            Text(
+              widget.casa.nombre,
+              style: Theme.of(
+                context,
+              ).textTheme.displayMedium?.copyWith(fontSize: 26),
+            ),
           ],
         ),
-        actions: [const BotonNotificaciones(modoPro: false), BotonAjustes(casa: widget.casa)],
+        actions: [
+          const BotonNotificaciones(modoPro: false),
+          BotonAjustes(casa: widget.casa),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => mostrarMenuAnadir(context, casa: widget.casa),
@@ -75,13 +102,20 @@ class _HomeTabState extends State<HomeTab> {
         stream: HabitacionService.streamHabitaciones(widget.casa.id),
         builder: (context, habSnapshot) {
           final habitaciones = habSnapshot.data ?? const <Habitacion>[];
-          final nombrePorHabitacion = {for (final h in habitaciones) h.id: h.nombre};
+          final nombrePorHabitacion = {
+            for (final h in habitaciones) h.id: h.nombre,
+          };
           return StreamBuilder<List<Elemento>>(
-            stream: ElementoService.streamElementos(widget.casa.id, habitacionId: _habitacionFiltro),
+            stream: ElementoService.streamElementos(
+              widget.casa.id,
+              habitacionId: _habitacionFiltro,
+            ),
             builder: (context, snapshot) {
               var elementos = snapshot.data ?? [];
               if (_busqueda.isNotEmpty) {
-                elementos = elementos.where((e) => e.nombre.toLowerCase().contains(_busqueda)).toList();
+                elementos = elementos
+                    .where((e) => e.nombre.toLowerCase().contains(_busqueda))
+                    .toList();
               }
               return ListView(
                 children: [
@@ -95,7 +129,8 @@ class _HomeTabState extends State<HomeTab> {
                         prefixIcon: const Icon(Icons.search, size: 20),
                         isDense: true,
                       ),
-                      onChanged: (v) => setState(() => _busqueda = v.trim().toLowerCase()),
+                      onChanged: (v) =>
+                          setState(() => _busqueda = v.trim().toLowerCase()),
                     ),
                   ),
                   if (habitaciones.isNotEmpty)
@@ -108,17 +143,21 @@ class _HomeTabState extends State<HomeTab> {
                             ChoiceChip(
                               label: const Text('Todo'),
                               selected: _habitacionFiltro == null,
-                              onSelected: (_) => setState(() => _habitacionFiltro = null),
+                              onSelected: (_) =>
+                                  setState(() => _habitacionFiltro = null),
                             ),
                             const SizedBox(width: 8),
-                            ...habitaciones.map((h) => Padding(
-                                  padding: const EdgeInsets.only(right: 8),
-                                  child: ChoiceChip(
-                                    label: Text(h.nombre),
-                                    selected: _habitacionFiltro == h.id,
-                                    onSelected: (_) => setState(() => _habitacionFiltro = h.id),
-                                  ),
-                                )),
+                            ...habitaciones.map(
+                              (h) => Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: ChoiceChip(
+                                  label: Text(h.nombre),
+                                  selected: _habitacionFiltro == h.id,
+                                  onSelected: (_) =>
+                                      setState(() => _habitacionFiltro = h.id),
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -131,8 +170,15 @@ class _HomeTabState extends State<HomeTab> {
                           Container(
                             width: 72,
                             height: 72,
-                            decoration: BoxDecoration(color: context.colors.brandTint, shape: BoxShape.circle),
-                            child: Icon(Icons.inventory_2_outlined, size: 32, color: context.colors.brand),
+                            decoration: BoxDecoration(
+                              color: context.colors.brandTint,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.inventory_2_outlined,
+                              size: 32,
+                              color: context.colors.brand,
+                            ),
                           ),
                           const SizedBox(height: 16),
                           Text(
@@ -150,10 +196,32 @@ class _HomeTabState extends State<HomeTab> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Padding(
-                            padding: const EdgeInsets.symmetric(vertical: ReparaSpace.s2),
-                            child: Text('Tus elementos', style: Theme.of(context).textTheme.headlineSmall),
+                            padding: const EdgeInsets.symmetric(
+                              vertical: ReparaSpace.s2,
+                            ),
+                            child: Text(
+                              'Tus elementos',
+                              style: Theme.of(context).textTheme.headlineSmall,
+                            ),
                           ),
-                          ...elementos.map((e) => _ElementoTile(casa: widget.casa, elemento: e, ubicacion: nombrePorHabitacion[e.habitacionId])),
+                          const SizedBox(height: 4),
+                          // Un único contenedor con filas internas, no una
+                          // Card por elemento (CEO: "evita acumular
+                          // tarjetas") -- mismo patrón que Historial/
+                          // Documentos en registro_detail_screen.dart y
+                          // elemento_detail_screen.dart.
+                          IosSection(
+                            rows: elementos
+                                .map(
+                                  (e) => _ElementoRow(
+                                    casa: widget.casa,
+                                    elemento: e,
+                                    ubicacion:
+                                        nombrePorHabitacion[e.habitacionId],
+                                  ),
+                                )
+                                .toList(),
+                          ),
                         ],
                       ),
                     ),
@@ -165,6 +233,45 @@ class _HomeTabState extends State<HomeTab> {
       ),
     );
   }
+}
+
+enum _TipoAviso { garantia, revision }
+
+/// Un único aviso puntual a mostrar -- nunca más de uno, para no convertir
+/// Inicio en una lista de alertas (CEO: "destacar lo que de verdad necesita
+/// atención, sin convertir todo en alerta").
+class _Aviso {
+  const _Aviso({
+    required this.tipo,
+    required this.elemento,
+    required this.dias,
+  });
+  final _TipoAviso tipo;
+  final Elemento elemento;
+  final int dias;
+}
+
+/// Elige el aviso más urgente entre garantías y revisiones -- ninguna de las
+/// dos listas llega ordenada desde ElementoService (son solo un `where`, sin
+/// orderBy), así que se ordena aquí mismo, en memoria, sin ninguna consulta
+/// nueva. "Más urgente" = menos días quedan (o más días de retraso si ya
+/// pasó la fecha).
+_Aviso? _avisoMasUrgente(List<Elemento> garantias, List<Elemento> revisiones) {
+  final ahora = DateTime.now();
+  _Aviso? mejor;
+  for (final e in garantias) {
+    final dias = e.garantiaHasta!.difference(ahora).inDays;
+    if (mejor == null || dias < mejor.dias) {
+      mejor = _Aviso(tipo: _TipoAviso.garantia, elemento: e, dias: dias);
+    }
+  }
+  for (final e in revisiones) {
+    final dias = e.proximoMantenimiento!.difference(ahora).inDays;
+    if (mejor == null || dias < mejor.dias) {
+      mejor = _Aviso(tipo: _TipoAviso.revision, elemento: e, dias: dias);
+    }
+  }
+  return mejor;
 }
 
 /// Resumen de Inicio (añadido al adaptar el rediseño "REPARA Professional"
@@ -191,8 +298,14 @@ class _ResumenCasa extends StatelessWidget {
         builder: (context, snapshot) {
           final garantias = (snapshot.data?[0] as List<Elemento>?) ?? const [];
           final revisiones = (snapshot.data?[1] as List<Elemento>?) ?? const [];
-          final pendientes = (snapshot.data?[2] as List<({Elemento elemento, String registroTitulo, DateTime fecha})>?) ?? const [];
+          final pendientes =
+              (snapshot.data?[2]
+                  as List<
+                    ({Elemento elemento, String registroTitulo, DateTime fecha})
+                  >?) ??
+              const [];
           final todoEnOrden = garantias.isEmpty && revisiones.isEmpty;
+          final avisoMasUrgente = _avisoMasUrgente(garantias, revisiones);
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -214,9 +327,14 @@ class _ResumenCasa extends StatelessWidget {
                           Container(
                             width: 44,
                             height: 44,
-                            decoration: BoxDecoration(color: context.colors.brandTint, shape: BoxShape.circle),
+                            decoration: BoxDecoration(
+                              color: context.colors.brandTint,
+                              shape: BoxShape.circle,
+                            ),
                             child: Icon(
-                              todoEnOrden ? Icons.home_outlined : Icons.home_repair_service_outlined,
+                              todoEnOrden
+                                  ? Icons.home_outlined
+                                  : Icons.home_repair_service_outlined,
                               color: context.colors.brand,
                             ),
                           ),
@@ -226,8 +344,11 @@ class _ResumenCasa extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  todoEnOrden ? 'Todo en orden' : 'Hay cosas que revisar',
-                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                                  todoEnOrden
+                                      ? 'Todo en orden'
+                                      : 'Hay cosas que revisar',
+                                  style: Theme.of(context).textTheme.titleMedium
+                                      ?.copyWith(fontWeight: FontWeight.w700),
                                 ),
                                 Text(
                                   todoEnOrden
@@ -253,14 +374,28 @@ class _ResumenCasa extends StatelessWidget {
                               numeroColor: context.colors.warningText,
                               etiqueta: 'Garantías',
                               onTap: () async {
-                                final elementos = await ElementoService.conGarantia(casa.id);
+                                final elementos =
+                                    await ElementoService.conGarantia(casa.id);
                                 if (context.mounted) {
-                                  Navigator.push(context, MaterialPageRoute(builder: (_) => GarantiasProximasScreen(casa: casa, elementos: elementos, titulo: 'Todas las garantías')));
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => GarantiasProximasScreen(
+                                        casa: casa,
+                                        elementos: elementos,
+                                        titulo: 'Todas las garantías',
+                                      ),
+                                    ),
+                                  );
                                 }
                               },
                             ),
                           ),
-                          VerticalDivider(width: 1, thickness: 1, color: context.colors.border),
+                          VerticalDivider(
+                            width: 1,
+                            thickness: 1,
+                            color: context.colors.border,
+                          ),
                           Expanded(
                             child: _MetricTile(
                               icon: Icons.build_circle_outlined,
@@ -269,14 +404,31 @@ class _ResumenCasa extends StatelessWidget {
                               numeroColor: context.colors.brand,
                               etiqueta: 'Revisión',
                               onTap: () async {
-                                final elementos = await ElementoService.conMantenimientoConfigurado(casa.id);
+                                final elementos =
+                                    await ElementoService.conMantenimientoConfigurado(
+                                      casa.id,
+                                    );
                                 if (context.mounted) {
-                                  Navigator.push(context, MaterialPageRoute(builder: (_) => RevisionesPendientesScreen(casa: casa, elementos: elementos, titulo: 'Todo el mantenimiento')));
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          RevisionesPendientesScreen(
+                                            casa: casa,
+                                            elementos: elementos,
+                                            titulo: 'Todo el mantenimiento',
+                                          ),
+                                    ),
+                                  );
                                 }
                               },
                             ),
                           ),
-                          VerticalDivider(width: 1, thickness: 1, color: context.colors.border),
+                          VerticalDivider(
+                            width: 1,
+                            thickness: 1,
+                            color: context.colors.border,
+                          ),
                           Expanded(
                             child: _MetricTile(
                               icon: Icons.hourglass_top_outlined,
@@ -284,7 +436,15 @@ class _ResumenCasa extends StatelessWidget {
                               numero: pendientes.length,
                               numeroColor: context.colors.brand,
                               etiqueta: 'En curso',
-                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TrabajosPendientesScreen(casa: casa, items: pendientes))),
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => TrabajosPendientesScreen(
+                                    casa: casa,
+                                    items: pendientes,
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                         ],
@@ -293,9 +453,9 @@ class _ResumenCasa extends StatelessWidget {
                   ],
                 ),
               ),
-              if (garantias.isNotEmpty) ...[
+              if (avisoMasUrgente != null) ...[
                 const SizedBox(height: ReparaSpace.s3),
-                _BannerGarantia(casa: casa, elemento: garantias.first),
+                _BannerAviso(casa: casa, aviso: avisoMasUrgente),
               ],
             ],
           );
@@ -305,39 +465,67 @@ class _ResumenCasa extends StatelessWidget {
   }
 }
 
-/// Aviso puntual para la garantía más próxima a vencer -- solo aparece si
-/// hay alguna (conGarantiaProximaAVencer ya filtra por la ventana de
-/// aviso), nunca se muestra vacío ni con un mensaje genérico.
-class _BannerGarantia extends StatelessWidget {
-  const _BannerGarantia({required this.casa, required this.elemento});
+/// Aviso puntual para lo más urgente de la casa -- garantía o revisión,
+/// cualquiera que esté más cerca (o más atrasada). Solo aparece si hay algo
+/// real que avisar (_avisoMasUrgente ya filtra por la ventana de aviso),
+/// nunca se muestra vacío ni con un mensaje genérico.
+class _BannerAviso extends StatelessWidget {
+  const _BannerAviso({required this.casa, required this.aviso});
 
   final Casa casa;
-  final Elemento elemento;
+  final _Aviso aviso;
 
   @override
   Widget build(BuildContext context) {
-    final dias = elemento.garantiaHasta!.difference(DateTime.now()).inDays;
+    final elemento = aviso.elemento;
+    final dias = aviso.dias;
+    final (icono, mensaje) = switch (aviso.tipo) {
+      _TipoAviso.garantia => (
+        Icons.verified_outlined,
+        dias <= 0
+            ? 'La garantía de "${elemento.nombre}" ya ha caducado.'
+            : 'La garantía de "${elemento.nombre}" termina en $dias días.',
+      ),
+      _TipoAviso.revision => (
+        Icons.build_circle_outlined,
+        dias <= 0
+            ? 'La revisión de "${elemento.nombre}" está atrasada.'
+            : 'Toca revisar "${elemento.nombre}" en $dias días.',
+      ),
+    };
     return Material(
       color: context.colors.warning.withValues(alpha: 0.12),
       borderRadius: BorderRadius.circular(ReparaRadius.sm),
       child: InkWell(
         borderRadius: BorderRadius.circular(ReparaRadius.sm),
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ElementoDetailScreen(casa: casa, elementoId: elemento.id))),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) =>
+                ElementoDetailScreen(casa: casa, elementoId: elemento.id),
+          ),
+        ),
         child: Padding(
           padding: const EdgeInsets.all(ReparaSpace.s3),
           child: Row(
             children: [
-              Icon(Icons.verified_outlined, size: 20, color: context.colors.warningText),
+              Icon(icono, size: 20, color: context.colors.warningText),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  dias <= 0
-                      ? 'La garantía de "${elemento.nombre}" ya ha caducado.'
-                      : 'La garantía de "${elemento.nombre}" termina en $dias días.',
-                  style: TextStyle(color: context.colors.warningText, fontWeight: FontWeight.w600, fontSize: 13),
+                  mensaje,
+                  style: TextStyle(
+                    color: context.colors.warningText,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
                 ),
               ),
-              Icon(Icons.chevron_right, color: context.colors.warningText, size: 18),
+              Icon(
+                Icons.chevron_right,
+                color: context.colors.warningText,
+                size: 18,
+              ),
             ],
           ),
         ),
@@ -383,12 +571,23 @@ class _MetricTile extends StatelessWidget {
               children: [
                 Icon(icon, size: 19, color: iconColor),
                 const SizedBox(height: 6),
-                Text('$numero', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontSize: 25, color: numeroColor, height: 1)),
+                Text(
+                  '$numero',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontSize: 25,
+                    color: numeroColor,
+                    height: 1,
+                  ),
+                ),
                 const SizedBox(height: 6),
                 Text(
                   etiqueta.toUpperCase(),
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 10.5, letterSpacing: 0.4, color: context.colors.inkMuted),
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    fontSize: 10.5,
+                    letterSpacing: 0.4,
+                    color: context.colors.inkMuted,
+                  ),
                 ),
               ],
             ),
@@ -399,8 +598,17 @@ class _MetricTile extends StatelessWidget {
   }
 }
 
-class _ElementoTile extends StatelessWidget {
-  const _ElementoTile({required this.casa, required this.elemento, this.ubicacion});
+/// Fila de un elemento dentro del listado agrupado -- sin Card ni borde
+/// propios (antes cada elemento era su propia tarjeta suelta); vive dentro
+/// de un IosSection, que ya pone el contenedor único y los divisores. El
+/// aviso (ámbar) cubre tanto garantía como revisión próximas, igual que el
+/// banner de arriba -- antes solo se destacaba la garantía.
+class _ElementoRow extends StatelessWidget {
+  const _ElementoRow({
+    required this.casa,
+    required this.elemento,
+    this.ubicacion,
+  });
 
   final Casa casa;
   final Elemento elemento;
@@ -408,51 +616,86 @@ class _ElementoTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final avisado = elemento.garantiaProximaAVencer;
+    final avisado =
+        elemento.garantiaProximaAVencer || elemento.revisionPendiente;
     final subtitulo = [
       ?ubicacion,
-      if (avisado) 'garantía termina pronto' else if (elemento.profesionalNombre != null) elemento.profesionalNombre!,
-      if (elemento.fechaInstalacion != null) DateFormat('d MMM yyyy', 'es_ES').format(elemento.fechaInstalacion!),
+      if (elemento.garantiaProximaAVencer)
+        'garantía termina pronto'
+      else if (elemento.revisionPendiente)
+        'revisión pendiente'
+      else if (elemento.profesionalNombre != null)
+        elemento.profesionalNombre!,
+      if (elemento.fechaInstalacion != null)
+        DateFormat('d MMM yyyy', 'es_ES').format(elemento.fechaInstalacion!),
     ].join(' · ');
-    return Card(
-      margin: const EdgeInsets.only(bottom: 9),
+    return Material(
+      color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(ReparaRadius.md),
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ElementoDetailScreen(casa: casa, elementoId: elemento.id))),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) =>
+                ElementoDetailScreen(casa: casa, elementoId: elemento.id),
+          ),
+        ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           child: Row(
             children: [
               Container(
-                width: 40,
-                height: 40,
+                width: 46,
+                height: 46,
                 clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
-                  color: avisado ? context.colors.warning.withValues(alpha: 0.12) : context.colors.brandTint,
+                  color: avisado
+                      ? context.colors.warning.withValues(alpha: 0.12)
+                      : context.colors.brandTint,
                   borderRadius: BorderRadius.circular(ReparaRadius.sm),
                 ),
                 child: elemento.fotoUrl != null
                     ? Image.network(elemento.fotoUrl!, fit: BoxFit.cover)
-                    : Icon(Icons.category_outlined, size: 20, color: avisado ? context.colors.warning : context.colors.brand),
+                    : Icon(
+                        Icons.category_outlined,
+                        size: 21,
+                        color: avisado
+                            ? context.colors.warning
+                            : context.colors.brand,
+                      ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(elemento.nombre, style: Theme.of(context).textTheme.titleMedium),
+                    Text(
+                      elemento.nombre,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
                     if (subtitulo.isNotEmpty)
                       Text(
                         subtitulo,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: avisado ? context.colors.warningText : context.colors.inkMuted,
-                              fontWeight: avisado ? FontWeight.w600 : FontWeight.w500,
-                            ),
+                          color: avisado
+                              ? context.colors.warningText
+                              : context.colors.inkMuted,
+                          fontWeight: avisado
+                              ? FontWeight.w600
+                              : FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                   ],
                 ),
               ),
-              if (elemento.coste != null) Text('${elemento.coste!.toStringAsFixed(0)} €', style: ReparaText.amount(context)),
+              if (elemento.coste != null) ...[
+                const SizedBox(width: 8),
+                Text(
+                  '${elemento.coste!.toStringAsFixed(0)} €',
+                  style: ReparaText.amount(context),
+                ),
+              ],
             ],
           ),
         ),
