@@ -301,7 +301,12 @@ class _ResumenCasa extends StatelessWidget {
           final pendientes =
               (snapshot.data?[2]
                   as List<
-                    ({Elemento elemento, String registroTitulo, DateTime fecha})
+                    ({
+                      Elemento elemento,
+                      String registroId,
+                      String registroTitulo,
+                      DateTime fecha,
+                    })
                   >?) ??
               const [];
           final todoEnOrden = garantias.isEmpty && revisiones.isEmpty;

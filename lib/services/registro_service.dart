@@ -211,12 +211,26 @@ class RegistroService {
   /// patrón que ExpedienteViviendaScreen._todosLosRegistros). Ordenado por
   /// fecha ascendente: el que lleva más tiempo esperando sale primero.
   static Future<
-    List<({Elemento elemento, String registroTitulo, DateTime fecha})>
+    List<
+      ({
+        Elemento elemento,
+        String registroId,
+        String registroTitulo,
+        DateTime fecha,
+      })
+    >
   >
   elementosConTrabajoPendiente(String casaId) async {
     final elementos = await ElementoService.streamElementos(casaId).first;
     final resultado =
-        <({Elemento elemento, String registroTitulo, DateTime fecha})>[];
+        <
+          ({
+            Elemento elemento,
+            String registroId,
+            String registroTitulo,
+            DateTime fecha,
+          })
+        >[];
     for (final elemento in elementos) {
       final registros = await streamRegistros(casaId, elemento.id).first;
       final pendientes =
@@ -232,6 +246,7 @@ class RegistroService {
       if (pendientes.isEmpty) continue;
       resultado.add((
         elemento: elemento,
+        registroId: pendientes.first.id,
         registroTitulo: pendientes.first.titulo,
         fecha: pendientes.first.fecha,
       ));
