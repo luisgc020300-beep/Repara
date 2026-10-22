@@ -27,7 +27,8 @@ import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
 import '../widgets/ios_list.dart';
 
-double? _costeRegistro(Registro r) => r.esConProfesional ? r.presupuesto : r.coste;
+double? _costeRegistro(Registro r) =>
+    r.esConProfesional ? r.presupuesto : r.coste;
 
 class ExpedienteViviendaScreen extends StatelessWidget {
   const ExpedienteViviendaScreen({required this.casa, super.key});
@@ -40,14 +41,25 @@ class ExpedienteViviendaScreen extends StatelessWidget {
   /// (ver firestore.rules: esa vía quedó descartada por limitaciones reales
   /// del propio Firestore, no solo de sintaxis).
   Future<List<Registro>> _todosLosRegistros(List<Elemento> elementos) async {
-    final porElemento = await Future.wait(elementos.map((e) => RegistroService.streamRegistros(casa.id, e.id).first));
+    final porElemento = await Future.wait(
+      elementos.map(
+        (e) => RegistroService.streamRegistros(casa.id, e.id).first,
+      ),
+    );
     return porElemento.expand((lista) => lista).toList();
   }
 
-  Future<void> _compartir(BuildContext context, List<Elemento> elementos, List<Registro> registros, int numDocumentos) async {
+  Future<void> _compartir(
+    BuildContext context,
+    List<Elemento> elementos,
+    List<Registro> registros,
+    int numDocumentos,
+  ) async {
     final buffer = StringBuffer()
       ..writeln('EXPEDIENTE DE LA VIVIENDA · ${casa.nombre}')
-      ..writeln('Generado el ${DateFormat('d MMMM yyyy', 'es_ES').format(DateTime.now())}')
+      ..writeln(
+        'Generado el ${DateFormat('d MMMM yyyy', 'es_ES').format(DateTime.now())}',
+      )
       ..writeln();
 
     if (elementos.isNotEmpty) {
@@ -55,11 +67,15 @@ class ExpedienteViviendaScreen extends StatelessWidget {
       for (final e in elementos) {
         final detalle = [
           if (e.marca != null) '${e.marca} ${e.modelo ?? ''}'.trim(),
-          if (e.fechaInstalacion != null) 'instalado ${DateFormat('MM/yyyy').format(e.fechaInstalacion!)}',
-          if (e.garantiaHasta != null) 'garantía hasta ${DateFormat('MM/yyyy').format(e.garantiaHasta!)}',
+          if (e.fechaInstalacion != null)
+            'instalado ${DateFormat('MM/yyyy').format(e.fechaInstalacion!)}',
+          if (e.garantiaHasta != null)
+            'garantía hasta ${DateFormat('MM/yyyy').format(e.garantiaHasta!)}',
           if (e.coste != null) '${e.coste!.toStringAsFixed(0)} €',
         ].join(' · ');
-        buffer.writeln('- ${e.nombre}${detalle.isNotEmpty ? ' ($detalle)' : ''}');
+        buffer.writeln(
+          '- ${e.nombre}${detalle.isNotEmpty ? ' ($detalle)' : ''}',
+        );
       }
       buffer.writeln();
     }
@@ -73,7 +89,9 @@ class ExpedienteViviendaScreen extends StatelessWidget {
           if (r.profesionalNombre != null) r.profesionalNombre!,
           if (coste != null) '${coste.toStringAsFixed(0)} €',
         ].join(' · ');
-        buffer.writeln('- ${r.titulo}${detalle.isNotEmpty ? ' ($detalle)' : ''}');
+        buffer.writeln(
+          '- ${r.titulo}${detalle.isNotEmpty ? ' ($detalle)' : ''}',
+        );
       }
       buffer.writeln();
     }
@@ -97,16 +115,28 @@ class ExpedienteViviendaScreen extends StatelessWidget {
       // cada el uso normal donde esa información no está disponible.
       // sharePositionOrigin obligatorio en iOS -- ver nota en
       // contacto_acciones.dart (mismo fallo, mismo arreglo).
-      await Share.share(buffer.toString(), subject: 'Expediente de ${casa.nombre}', sharePositionOrigin: Offset.zero & MediaQuery.of(context).size);
+      await Share.share(
+        buffer.toString(),
+        subject: 'Expediente de ${casa.nombre}',
+        sharePositionOrigin: Offset.zero & MediaQuery.of(context).size,
+      );
       unawaited(AnalyticsService.householdRecordShared());
     } catch (e, st) {
       await FirebaseCrashlytics.instance.recordError(e, st);
-      if (context.mounted) AppError.show(context, 'No se pudo abrir el selector para compartir.');
+      if (context.mounted) {
+        AppError.show(context, 'No se pudo abrir el selector para compartir.');
+      }
     }
   }
 
-  List<Registro> _finalizados(List<Registro> registros) =>
-      registros.where((r) => !r.esConProfesional || r.estado == EstadoRegistro.terminado || r.estado == EstadoRegistro.archivado).toList();
+  List<Registro> _finalizados(List<Registro> registros) => registros
+      .where(
+        (r) =>
+            !r.esConProfesional ||
+            r.estado == EstadoRegistro.terminado ||
+            r.estado == EstadoRegistro.archivado,
+      )
+      .toList();
 
   @override
   Widget build(BuildContext context) {
@@ -115,18 +145,42 @@ class ExpedienteViviendaScreen extends StatelessWidget {
       body: FutureBuilder<List<Elemento>>(
         future: ElementoService.streamElementos(casa.id).first,
         builder: (context, elementosSnapshot) {
-          if (!elementosSnapshot.hasData) return const Center(child: CircularProgressIndicator());
+          if (!elementosSnapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
           final elementos = elementosSnapshot.data!;
           return FutureBuilder(
-            future: Future.wait([_todosLosRegistros(elementos), DocumentoService.streamTodos(casa.id).first]),
+            future: Future.wait([
+              _todosLosRegistros(elementos),
+              DocumentoService.streamTodos(casa.id).first,
+            ]),
             builder: (context, snapshot) {
-              if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+              if (!snapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
               final registros = snapshot.data![0] as List<Registro>;
               final documentos = snapshot.data![1] as List<Documento>;
               final finalizados = _finalizados(registros);
-              final conGarantiaVigente = elementos.where((e) => e.garantiaHasta != null && e.garantiaHasta!.isAfter(DateTime.now())).length;
-              final costeTotal = finalizados.fold<double>(0, (acc, r) => acc + (_costeRegistro(r) ?? 0));
-              return _cuerpo(context, elementos, finalizados, documentos, conGarantiaVigente, costeTotal, registros);
+              final conGarantiaVigente = elementos
+                  .where(
+                    (e) =>
+                        e.garantiaHasta != null &&
+                        e.garantiaHasta!.isAfter(DateTime.now()),
+                  )
+                  .length;
+              final costeTotal = finalizados.fold<double>(
+                0,
+                (acc, r) => acc + (_costeRegistro(r) ?? 0),
+              );
+              return _cuerpo(
+                context,
+                elementos,
+                finalizados,
+                documentos,
+                conGarantiaVigente,
+                costeTotal,
+                registros,
+              );
             },
           );
         },
@@ -160,14 +214,29 @@ class ExpedienteViviendaScreen extends StatelessWidget {
           child: Column(
             children: [
               _filaEstadisticas(context, [
-                _Estadistica(valor: '${elementos.length}', etiqueta: 'Elementos'),
-                _Estadistica(valor: '${finalizados.length}', etiqueta: 'Registros'),
-                _Estadistica(valor: '$conGarantiaVigente', etiqueta: 'Garantías vigentes'),
+                _Estadistica(
+                  valor: '${elementos.length}',
+                  etiqueta: 'Elementos',
+                ),
+                _Estadistica(
+                  valor: '${finalizados.length}',
+                  etiqueta: 'Eventos',
+                ),
+                _Estadistica(
+                  valor: '$conGarantiaVigente',
+                  etiqueta: 'Garantías vigentes',
+                ),
               ]),
               Divider(height: 1, color: context.colors.border),
               _filaEstadisticas(context, [
-                _Estadistica(valor: '${documentos.length}', etiqueta: 'Documentos'),
-                _Estadistica(valor: '${costeTotal.toStringAsFixed(0)} €', etiqueta: 'Invertido en registros'),
+                _Estadistica(
+                  valor: '${documentos.length}',
+                  etiqueta: 'Documentos',
+                ),
+                _Estadistica(
+                  valor: '${costeTotal.toStringAsFixed(0)} €',
+                  etiqueta: 'Invertido en eventos',
+                ),
                 const SizedBox(),
               ]),
             ],
@@ -178,27 +247,37 @@ class ExpedienteViviendaScreen extends StatelessWidget {
           IosSection(
             header: 'Elementos',
             rows: elementos
-                .map((e) => _filaResumen(
-                      context,
-                      titulo: e.nombre,
-                      subtitulo: [
-                        if (e.marca != null) '${e.marca} ${e.modelo ?? ''}'.trim(),
-                        if (e.garantiaHasta != null) 'garantía hasta ${DateFormat('MM/yyyy').format(e.garantiaHasta!)}',
-                      ].where((s) => s.isNotEmpty).join(' · '),
-                      valor: e.coste != null ? '${e.coste!.toStringAsFixed(0)} €' : null,
-                    ))
+                .map(
+                  (e) => _filaResumen(
+                    context,
+                    titulo: e.nombre,
+                    subtitulo: [
+                      if (e.marca != null)
+                        '${e.marca} ${e.modelo ?? ''}'.trim(),
+                      if (e.garantiaHasta != null)
+                        'garantía hasta ${DateFormat('MM/yyyy').format(e.garantiaHasta!)}',
+                    ].where((s) => s.isNotEmpty).join(' · '),
+                    valor: e.coste != null
+                        ? '${e.coste!.toStringAsFixed(0)} €'
+                        : null,
+                  ),
+                )
                 .toList(),
           ),
         if (finalizados.isNotEmpty)
           IosSection(
-            header: 'Registros',
+            header: 'Eventos',
             rows: finalizados
-                .map((r) => _filaResumen(
-                      context,
-                      titulo: r.titulo,
-                      subtitulo: r.profesionalNombre ?? '',
-                      valor: _costeRegistro(r) != null ? '${_costeRegistro(r)!.toStringAsFixed(0)} €' : null,
-                    ))
+                .map(
+                  (r) => _filaResumen(
+                    context,
+                    titulo: r.titulo,
+                    subtitulo: r.profesionalNombre ?? '',
+                    valor: _costeRegistro(r) != null
+                        ? '${_costeRegistro(r)!.toStringAsFixed(0)} €'
+                        : null,
+                  ),
+                )
                 .toList(),
           ),
         if (elementos.isEmpty && finalizados.isEmpty)
@@ -209,8 +288,15 @@ class ExpedienteViviendaScreen extends StatelessWidget {
                 Container(
                   width: 56,
                   height: 56,
-                  decoration: BoxDecoration(color: context.colors.brandTint, shape: BoxShape.circle),
-                  child: Icon(Icons.summarize_outlined, size: 26, color: context.colors.brand),
+                  decoration: BoxDecoration(
+                    color: context.colors.brandTint,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.summarize_outlined,
+                    size: 26,
+                    color: context.colors.brand,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -225,7 +311,8 @@ class ExpedienteViviendaScreen extends StatelessWidget {
         SizedBox(
           width: double.infinity,
           child: FilledButton.icon(
-            onPressed: () => _compartir(context, elementos, registros, documentos.length),
+            onPressed: () =>
+                _compartir(context, elementos, registros, documentos.length),
             icon: const Icon(Icons.ios_share_outlined),
             label: const Text('Compartir resumen'),
           ),
@@ -234,14 +321,21 @@ class ExpedienteViviendaScreen extends StatelessWidget {
     );
   }
 
-  Widget _filaResumen(BuildContext context, {required String titulo, required String subtitulo, String? valor}) => IosRow(
-        icon: Icons.description_outlined,
-        iconColor: context.colors.brand,
-        title: titulo,
-        subtitle: subtitulo,
-        dense: true,
-        trailing: valor != null ? Text(valor, style: const TextStyle(fontWeight: FontWeight.w700)) : null,
-      );
+  Widget _filaResumen(
+    BuildContext context, {
+    required String titulo,
+    required String subtitulo,
+    String? valor,
+  }) => IosRow(
+    icon: Icons.description_outlined,
+    iconColor: context.colors.brand,
+    title: titulo,
+    subtitle: subtitulo,
+    dense: true,
+    trailing: valor != null
+        ? Text(valor, style: const TextStyle(fontWeight: FontWeight.w700))
+        : null,
+  );
 }
 
 /// Una fila de hasta 3 cifras dentro de la tarjeta única de estadísticas,
@@ -251,7 +345,12 @@ Widget _filaEstadisticas(BuildContext context, List<Widget> celdas) {
     child: Row(
       children: [
         for (var i = 0; i < celdas.length; i++) ...[
-          if (i > 0) VerticalDivider(width: 1, thickness: 1, color: context.colors.border),
+          if (i > 0)
+            VerticalDivider(
+              width: 1,
+              thickness: 1,
+              color: context.colors.border,
+            ),
           Expanded(child: celdas[i]),
         ],
       ],
@@ -271,9 +370,23 @@ class _Estadistica extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 14),
       child: Column(
         children: [
-          Text(valor, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800, color: context.colors.brand)),
+          Text(
+            valor,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: context.colors.brand,
+            ),
+          ),
           const SizedBox(height: 2),
-          Text(etiqueta, textAlign: TextAlign.center, style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 10.5, letterSpacing: 0.2, color: context.colors.inkMuted)),
+          Text(
+            etiqueta,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              fontSize: 10.5,
+              letterSpacing: 0.2,
+              color: context.colors.inkMuted,
+            ),
+          ),
         ],
       ),
     );

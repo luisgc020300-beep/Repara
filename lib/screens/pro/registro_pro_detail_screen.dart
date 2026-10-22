@@ -42,7 +42,7 @@ class RegistroProDetailScreen extends StatelessWidget {
       context,
       title: 'Marcar como finalizado',
       message:
-          'Se le pedirá al propietario que confirme que el registro está terminado -- todavía no se cierra hasta que lo haga.',
+          'Se le pedirá al propietario que confirme que el evento está terminado -- todavía no se cierra hasta que lo haga.',
       confirmLabel: 'Marcar como finalizado',
     );
     if (!confirmar) return;
@@ -85,7 +85,7 @@ class RegistroProDetailScreen extends StatelessWidget {
       if (context.mounted) {
         AppError.show(
           context,
-          'No se pudo marcar el registro como finalizado.',
+          'No se pudo marcar el evento como finalizado.',
           error: e,
           stackTrace: st,
         );
@@ -341,7 +341,7 @@ class RegistroProDetailScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                'Solo ves este registro -- no tienes acceso al resto de la casa ni a su historial completo.',
+                'Solo ves este evento -- no tienes acceso al resto de la casa ni a su historial completo.',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],

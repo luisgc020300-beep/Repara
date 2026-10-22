@@ -72,7 +72,7 @@ class CambiosAlcanceSection extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Cambios del registro',
+                  'Cambios del evento',
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 if (rol == RolEnTrabajo.profesional && !registroCerrado)
@@ -536,7 +536,7 @@ class _FormularioCambioSheetState extends State<_FormularioCambioSheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Solicitar cambio del registro',
+              'Solicitar cambio del evento',
               style: Theme.of(context).textTheme.displaySmall,
             ),
             const SizedBox(height: ReparaSpace.s4),

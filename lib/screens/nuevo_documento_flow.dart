@@ -706,7 +706,7 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
           children: [
             Text(
               widget.sugerencia != null
-                  ? 'Hemos preparado el registro de tu documento'
+                  ? 'Hemos preparado el evento de tu documento'
                   : 'No hemos podido leer el documento automáticamente',
               style: Theme.of(context).textTheme.displaySmall,
             ),
@@ -1015,7 +1015,7 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
                   const SizedBox(height: ReparaSpace.s3),
                   const _VinculoFijo(
                     icono: Icons.build_outlined,
-                    texto: 'Este registro',
+                    texto: 'Este evento',
                   ),
                 ] else if (_elementoId != null) ...[
                   const SizedBox(height: ReparaSpace.s3),

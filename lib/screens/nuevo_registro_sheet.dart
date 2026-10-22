@@ -88,7 +88,7 @@ class _NuevoRegistroFormState extends State<_NuevoRegistroForm> {
     final titulo = _tituloCtrl.text.trim();
     if (titulo.isEmpty) {
       setState(() => _mostrarErrorTitulo = true);
-      AppError.show(context, 'Escribe un título para el registro.');
+      AppError.show(context, 'Escribe un título para el evento.');
       return;
     }
     setState(() => _guardando = true);
@@ -120,7 +120,7 @@ class _NuevoRegistroFormState extends State<_NuevoRegistroForm> {
       if (mounted) {
         AppError.show(
           context,
-          'No se pudo guardar el registro.',
+          'No se pudo guardar el evento.',
           error: e,
           stackTrace: st,
         );
@@ -145,7 +145,7 @@ class _NuevoRegistroFormState extends State<_NuevoRegistroForm> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Añadir registro',
+              'Añadir evento',
               style: Theme.of(context).textTheme.displaySmall,
             ),
             const SizedBox(height: ReparaSpace.s4),

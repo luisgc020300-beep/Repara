@@ -351,7 +351,7 @@ class ElementoDetailScreen extends StatelessWidget {
               elementoNombre: elemento.nombre,
             ),
             icon: const Icon(Icons.add),
-            label: const Text('Añadir registro'),
+            label: const Text('Añadir evento'),
           ),
           body: ListView(
             padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
@@ -423,7 +423,7 @@ class ElementoDetailScreen extends StatelessWidget {
                   final registros = snapshot.data ?? [];
                   if (registros.isEmpty) {
                     return const EmptyHint(
-                      message: 'Sin registros todavía.',
+                      message: 'Sin eventos todavía.',
                       icon: Icons.fact_check_outlined,
                     );
                   }

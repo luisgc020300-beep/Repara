@@ -61,7 +61,7 @@ class RegistroDetailScreen extends StatelessWidget {
   Future<void> _finalizar(BuildContext context, Registro registro) async {
     final confirmar = await AppDialog.confirm(
       context,
-      title: 'Finalizar registro',
+      title: 'Finalizar evento',
       message:
           'Se marcará como terminado y quedará guardado en el historial de la casa.',
       confirmLabel: 'Finalizar',
@@ -111,7 +111,7 @@ class RegistroDetailScreen extends StatelessWidget {
       await RegistroService.finalizar(casa.id, elementoId, registro.id);
       unawaited(AnalyticsService.workCompleted(pagadoDelTodo: pagadoDelTodo));
       if (context.mounted) {
-        AppError.showSuccess(context, 'Registro archivado en el historial.');
+        AppError.showSuccess(context, 'Evento archivado en el historial.');
       }
 
       // Bucle viral en UN solo momento (auditoría de producto, octubre
@@ -125,7 +125,7 @@ class RegistroDetailScreen extends StatelessWidget {
       if (context.mounted) {
         AppError.show(
           context,
-          'No se pudo finalizar el registro.',
+          'No se pudo finalizar el evento.',
           error: e,
           stackTrace: st,
         );
@@ -157,7 +157,7 @@ class RegistroDetailScreen extends StatelessWidget {
       if (context.mounted) {
         AppError.show(
           context,
-          'No se pudo actualizar el registro.',
+          'No se pudo actualizar el evento.',
           error: e,
           stackTrace: st,
         );
@@ -195,7 +195,7 @@ class RegistroDetailScreen extends StatelessWidget {
   Future<void> _eliminar(BuildContext context, Registro registro) async {
     final confirmar = await AppDialog.confirmText(
       context,
-      title: '¿Eliminar este registro?',
+      title: '¿Eliminar este evento?',
       confirmLabel: 'Eliminar',
     );
     if (!confirmar || !context.mounted) return;
@@ -206,7 +206,7 @@ class RegistroDetailScreen extends StatelessWidget {
       if (context.mounted) {
         AppError.show(
           context,
-          'No se pudo eliminar el registro.',
+          'No se pudo eliminar el evento.',
           error: e,
           stackTrace: st,
         );
@@ -297,7 +297,7 @@ class RegistroDetailScreen extends StatelessWidget {
                             color: context.colors.errorText,
                           ),
                           const SizedBox(width: 10),
-                          const Text('Eliminar registro'),
+                          const Text('Eliminar evento'),
                         ],
                       ),
                     ),
@@ -723,7 +723,7 @@ class _CuerpoConProfesional extends StatelessWidget {
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
                       child: AvisoRegistro(
                         mensaje:
-                            'El profesional dice que ha terminado este registro. ¿Lo confirmas?',
+                            'El profesional dice que ha terminado este evento. ¿Lo confirmas?',
                         acciones: Row(
                           children: [
                             Expanded(
@@ -1113,7 +1113,7 @@ class _SeccionHistorial extends StatelessWidget {
                   registro.estado == EstadoRegistro.archivado)
                 TimelineItem(
                   titulo: registro.estado == EstadoRegistro.archivado
-                      ? 'Registro archivado'
+                      ? 'Evento archivado'
                       : 'Trabajo finalizado',
                   subtitulo: 'Marcado como terminado',
                   icono: Icons.task_alt,
@@ -1483,7 +1483,7 @@ class _SeccionInvitarProfesionalState
     final confirmar = await AppDialog.confirm(
       context,
       title: '¿Cancelar invitación?',
-      message: 'Podrás invitar a otro profesional para este registro.',
+      message: 'Podrás invitar a otro profesional para este evento.',
       cancelLabel: 'Seguir esperando',
       confirmLabel: 'Cancelar invitación',
     );
@@ -1541,7 +1541,7 @@ class _SeccionInvitarProfesionalState
             icon: Icons.verified_user_outlined,
             iconColor: context.colors.success,
             title: widget.registro.profesionalNombre ?? 'Profesional vinculado',
-            subtitle: 'Puede ver este registro y actualizar su estado',
+            subtitle: 'Puede ver este evento y actualizar su estado',
             showChevron: false,
           ),
         ],
@@ -1608,7 +1608,7 @@ class _SeccionInvitarProfesionalState
                     ],
                   ),
                   Text(
-                    'Esa persona no tiene todavía cuenta profesional en Repara. Cuando se registre, introduce este código para vincularse a este registro.',
+                    'Esa persona no tiene todavía cuenta profesional en Repara. Cuando se registre, introduce este código para vincularse a este evento.',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   Padding(
