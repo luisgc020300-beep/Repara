@@ -30,7 +30,9 @@ class IosSection extends StatelessWidget {
               padding: const EdgeInsets.only(left: 6, bottom: 6),
               child: Text(
                 header!.toUpperCase(),
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(color: context.colors.inkMuted),
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: context.colors.inkMuted,
+                ),
               ),
             ),
           Card(
@@ -39,7 +41,12 @@ class IosSection extends StatelessWidget {
             child: Column(
               children: [
                 for (var i = 0; i < rows.length; i++) ...[
-                  if (i > 0) Divider(height: 1, indent: 56, color: context.colors.inkMuted.withValues(alpha: 0.14)),
+                  if (i > 0)
+                    Divider(
+                      height: 1,
+                      indent: 56,
+                      color: context.colors.inkMuted.withValues(alpha: 0.14),
+                    ),
                   rows[i],
                 ],
               ],
@@ -48,7 +55,13 @@ class IosSection extends StatelessWidget {
           if (footer != null)
             Padding(
               padding: const EdgeInsets.only(left: 6, top: 6),
-              child: Text(footer!, style: TextStyle(fontSize: 12.5, color: context.colors.inkMuted)),
+              child: Text(
+                footer!,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: context.colors.inkMuted,
+                ),
+              ),
             ),
         ],
       ),
@@ -102,14 +115,20 @@ class IosValueRow extends StatelessWidget {
                   // 4.5:1 de contraste como texto (auditoría de
                   // accesibilidad, octubre 2026).
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: destacado ? context.colors.warningText : context.colors.inkMuted,
-                        fontWeight: destacado ? FontWeight.w600 : FontWeight.w400,
-                      ),
+                    color: destacado
+                        ? context.colors.warningText
+                        : context.colors.inkMuted,
+                    fontWeight: destacado ? FontWeight.w600 : FontWeight.w400,
+                  ),
                 ),
               ),
               if (onTap != null) ...[
                 const SizedBox(width: 6),
-                Icon(Icons.edit_outlined, size: 15, color: context.colors.inkMuted),
+                Icon(
+                  Icons.edit_outlined,
+                  size: 15,
+                  color: context.colors.inkMuted,
+                ),
               ],
             ],
           ),
@@ -177,15 +196,33 @@ class IosRow extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 12, vertical: dense ? 7 : 11),
+          padding: EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: dense ? 7 : 11,
+          ),
           child: Row(
             children: [
               Container(
                 width: 29,
                 height: 29,
                 clipBehavior: Clip.antiAlias,
-                decoration: BoxDecoration(color: iconColor, borderRadius: BorderRadius.circular(7)),
-                child: imageUrl != null ? Image.network(imageUrl!, fit: BoxFit.cover) : Icon(icon, color: Colors.white, size: 17),
+                decoration: BoxDecoration(
+                  color: iconColor,
+                  borderRadius: BorderRadius.circular(7),
+                ),
+                child: imageUrl != null
+                    ? Image.network(
+                        imageUrl!,
+                        fit: BoxFit.cover,
+                        // Sin esto, una foto con URL rota (p.ej. el archivo
+                        // de Storage se borró o cambió) dejaba un hueco en
+                        // blanco en vez de caer al mismo icono que se ve
+                        // cuando nunca hubo foto (CEO, octubre 2026: "la
+                        // única que no se ve es la del sofá").
+                        errorBuilder: (context, error, stackTrace) =>
+                            Icon(icon, color: Colors.white, size: 17),
+                      )
+                    : Icon(icon, color: Colors.white, size: 17),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -194,7 +231,9 @@ class IosRow extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(color: titleColor ?? context.colors.ink),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: titleColor ?? context.colors.ink,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -202,7 +241,12 @@ class IosRow extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         subtitle!,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: subtitleColor, fontWeight: subtitleColor != null ? FontWeight.w600 : null),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: subtitleColor,
+                          fontWeight: subtitleColor != null
+                              ? FontWeight.w600
+                              : null,
+                        ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -214,7 +258,11 @@ class IosRow extends StatelessWidget {
               if (trailing != null)
                 trailing!
               else if (onTap != null && showChevron)
-                Icon(Icons.chevron_right, color: context.colors.inkMuted, size: 20),
+                Icon(
+                  Icons.chevron_right,
+                  color: context.colors.inkMuted,
+                  size: 20,
+                ),
             ],
           ),
         ),

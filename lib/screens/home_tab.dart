@@ -654,7 +654,20 @@ class _ElementoRow extends StatelessWidget {
                   borderRadius: BorderRadius.circular(ReparaRadius.sm),
                 ),
                 child: elemento.fotoUrl != null
-                    ? Image.network(elemento.fotoUrl!, fit: BoxFit.cover)
+                    ? Image.network(
+                        elemento.fotoUrl!,
+                        fit: BoxFit.cover,
+                        // Igual que en ios_list.dart: una URL de foto rota
+                        // no debe dejar un hueco en blanco, cae al mismo
+                        // icono que el estado sin foto.
+                        errorBuilder: (context, error, stackTrace) => Icon(
+                          Icons.category_outlined,
+                          size: 21,
+                          color: avisado
+                              ? context.colors.warning
+                              : context.colors.brand,
+                        ),
+                      )
                     : Icon(
                         Icons.category_outlined,
                         size: 21,

@@ -416,6 +416,19 @@ class _CabeceraRegistro extends StatelessWidget {
                           width: 76,
                           height: 76,
                           fit: BoxFit.cover,
+                          // URL de foto rota -- cae a un icono claro en vez
+                          // de dejar un hueco en blanco.
+                          errorBuilder: (context, error, stackTrace) =>
+                              Container(
+                                width: 76,
+                                height: 76,
+                                color: context.colors.surfaceMuted,
+                                child: Icon(
+                                  Icons.broken_image_outlined,
+                                  size: 24,
+                                  color: context.colors.inkFaint,
+                                ),
+                              ),
                         )
                       : Container(
                           width: 76,
