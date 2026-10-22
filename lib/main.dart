@@ -23,6 +23,7 @@ import 'services/casa_service.dart';
 import 'services/notificacion_router.dart';
 import 'theme/design_tokens.dart';
 import 'theme/theme_controller.dart';
+import 'widgets/keyboard_dismiss_bar.dart';
 
 final navigatorKey = GlobalKey<NavigatorState>();
 
@@ -75,8 +76,12 @@ void main() async {
   // Play Store/TestFlight (los builds de prueba se sideloadean).
   if (!kIsWeb) {
     await FirebaseAppCheck.instance.activate(
-      providerAndroid: kDebugMode ? const AndroidDebugProvider() : const AndroidPlayIntegrityProvider(),
-      providerApple: kDebugMode ? const AppleDebugProvider() : const AppleAppAttestProvider(),
+      providerAndroid: kDebugMode
+          ? const AndroidDebugProvider()
+          : const AndroidPlayIntegrityProvider(),
+      providerApple: kDebugMode
+          ? const AppleDebugProvider()
+          : const AppleAppAttestProvider(),
     );
   }
 
@@ -91,7 +96,9 @@ void main() async {
       FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
       return true;
     };
-    await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(!kDebugMode);
+    await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(
+      !kDebugMode,
+    );
   }
 
   await setupLocator();
@@ -139,11 +146,14 @@ class ReparaApp extends StatelessWidget {
         theme: buildReparaLightTheme(),
         darkTheme: buildReparaDarkTheme(),
         navigatorObservers: [AnalyticsService.observer],
+        builder: (context, child) => KeyboardDismissBar(child: child!),
         home: StreamBuilder<User?>(
           stream: FirebaseAuth.instance.authStateChanges(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Scaffold(body: Center(child: CircularProgressIndicator()));
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
             }
             if (snapshot.hasData) return const CasaGateScreen();
             return const LoginScreen();
