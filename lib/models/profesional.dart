@@ -45,6 +45,7 @@ class RegistroProRef {
     required this.registroId,
     required this.registroTitulo,
     required this.casaNombre,
+    this.fotoUrl,
   });
 
   final String casaId;
@@ -54,12 +55,19 @@ class RegistroProRef {
   final String registroTitulo;
   final String casaNombre;
 
+  /// Foto del registro, o si no tiene, la del elemento -- ya resuelta en
+  /// servidor al aceptar la invitación (ver invitarProfesional/
+  /// responderInvitacion en functions/index.js). Null en trabajos aceptados
+  /// antes de que existiera este campo.
+  final String? fotoUrl;
+
   factory RegistroProRef.fromMap(Map<String, dynamic> map) => RegistroProRef(
-        casaId: map['casaId'] as String? ?? '',
-        elementoId: map['elementoId'] as String? ?? '',
-        elementoNombre: map['elementoNombre'] as String? ?? '',
-        registroId: map['registroId'] as String? ?? '',
-        registroTitulo: map['registroTitulo'] as String? ?? '',
-        casaNombre: map['casaNombre'] as String? ?? '',
-      );
+    casaId: map['casaId'] as String? ?? '',
+    elementoId: map['elementoId'] as String? ?? '',
+    elementoNombre: map['elementoNombre'] as String? ?? '',
+    registroId: map['registroId'] as String? ?? '',
+    registroTitulo: map['registroTitulo'] as String? ?? '',
+    casaNombre: map['casaNombre'] as String? ?? '',
+    fotoUrl: map['fotoUrl'] as String?,
+  );
 }

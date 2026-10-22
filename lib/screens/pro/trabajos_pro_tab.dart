@@ -164,6 +164,7 @@ class _ListaPorTrabajo extends StatelessWidget {
                 (t) => IosRow(
                   icon: Icons.build_outlined,
                   iconColor: context.colors.brand,
+                  imageUrl: t.fotoUrl,
                   title: t.registroTitulo,
                   subtitle: t.casaNombre,
                   onTap: () => Navigator.push(
@@ -247,6 +248,7 @@ class _ListaPorCliente extends StatelessWidget {
                   IosRow(
                     icon: Icons.build_outlined,
                     iconColor: context.colors.brand,
+                    imageUrl: trabajosDeEstaCasa[i].fotoUrl,
                     title: trabajosDeEstaCasa[i].registroTitulo,
                     onTap: () => Navigator.push(
                       context,

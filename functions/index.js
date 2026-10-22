@@ -317,12 +317,18 @@ exports.invitarProfesional = onCall({ region: REGION }, async (request) => {
 
   const casaRef = db.collection('casas').doc(casaId);
   const regRef = registroRef(casaId, elementoId, registroId);
-  const [casaSnap, registroSnap] = await Promise.all([casaRef.get(), regRef.get()]);
+  const elementoRef = db.collection('casas').doc(casaId).collection('elementos').doc(elementoId);
+  const [casaSnap, registroSnap, elementoSnap] = await Promise.all([casaRef.get(), regRef.get(), elementoRef.get()]);
   if (!casaSnap.exists || !(casaSnap.data().members || []).includes(propietarioUid)) {
     throw new HttpsError('permission-denied', 'No perteneces a esa casa.');
   }
   if (!registroSnap.exists) throw new HttpsError('not-found', 'El registro no existe.');
   const registro = registroSnap.data();
+  // Igual criterio que registro_detail_screen.dart en el cliente: la foto
+  // propia del registro manda, y si no tiene, cae a la del elemento -- así
+  // el profesional ve algo reconocible (la vitrocerámica, el calentador...)
+  // aunque ese registro en concreto nunca tuviera su propia foto.
+  const fotoUrl = registro.fotoUrl || (elementoSnap.exists ? elementoSnap.data().fotoUrl : null) || null;
 
   let profesionalUid = null;
   if (email) {
@@ -351,6 +357,7 @@ exports.invitarProfesional = onCall({ region: REGION }, async (request) => {
       registroId,
       registroTitulo: registro.titulo || '',
       casaNombre: casaSnap.data().nombre || 'Una casa',
+      fotoUrl,
       propietarioUid,
       profesionalUid,
       profesionalEmail: email,
@@ -371,6 +378,7 @@ exports.invitarProfesional = onCall({ region: REGION }, async (request) => {
     registroId,
     registroTitulo: registro.titulo || '',
     casaNombre: casaSnap.data().nombre || 'Una casa',
+    fotoUrl,
     propietarioUid,
     contactoEmail: email || null,
     contactoTelefono: telefono || null,
@@ -420,6 +428,7 @@ exports.canjearCodigoInvitacion = onCall({ region: REGION }, async (request) => 
       registroId: inv.registroId,
       registroTitulo: inv.registroTitulo,
       casaNombre: inv.casaNombre,
+      fotoUrl: inv.fotoUrl || null,
       propietarioUid: inv.propietarioUid,
       profesionalUid: uid,
       profesionalEmail: inv.contactoEmail || '',
@@ -488,6 +497,7 @@ exports.responderInvitacion = onCall({ region: REGION }, async (request) => {
           registroId: inv.registroId,
           registroTitulo: inv.registroTitulo,
           casaNombre: inv.casaNombre,
+          fotoUrl: inv.fotoUrl || null,
         }),
       }, { merge: true });
     }
