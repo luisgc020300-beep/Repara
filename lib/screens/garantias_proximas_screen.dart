@@ -19,7 +19,12 @@ import 'elemento_detail_screen.dart';
 enum _EstadoGarantia { proxima, vigente, caducada }
 
 class GarantiasProximasScreen extends StatelessWidget {
-  const GarantiasProximasScreen({required this.casa, required this.elementos, this.titulo = 'Garantías a punto de terminar', super.key});
+  const GarantiasProximasScreen({
+    required this.casa,
+    required this.elementos,
+    this.titulo = 'Garantías a punto de terminar',
+    super.key,
+  });
 
   final Casa casa;
   final List<Elemento> elementos;
@@ -27,7 +32,9 @@ class GarantiasProximasScreen extends StatelessWidget {
 
   static _EstadoGarantia _estado(Elemento e) {
     if (e.garantiaProximaAVencer) return _EstadoGarantia.proxima;
-    if (e.garantiaHasta != null && e.garantiaHasta!.isBefore(DateTime.now())) return _EstadoGarantia.caducada;
+    if (e.garantiaHasta != null && e.garantiaHasta!.isBefore(DateTime.now())) {
+      return _EstadoGarantia.caducada;
+    }
     return _EstadoGarantia.vigente;
   }
 
@@ -46,7 +53,9 @@ class GarantiasProximasScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(titulo, style: Theme.of(context).textTheme.displaySmall)),
+      appBar: AppBar(
+        title: Text(titulo, style: Theme.of(context).textTheme.displaySmall),
+      ),
       body: elementos.isEmpty
           ? Center(
               child: Padding(
@@ -57,25 +66,52 @@ class GarantiasProximasScreen extends StatelessWidget {
                     Container(
                       width: 72,
                       height: 72,
-                      decoration: BoxDecoration(color: context.colors.warning.withValues(alpha: 0.12), shape: BoxShape.circle),
-                      child: Icon(Icons.shield_outlined, size: 32, color: context.colors.warning),
+                      decoration: BoxDecoration(
+                        color: context.colors.warning.withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.shield_outlined,
+                        size: 32,
+                        color: context.colors.warning,
+                      ),
                     ),
                     const SizedBox(height: 16),
-                    Text('Ningún elemento tiene una garantía guardada todavía.', textAlign: TextAlign.center, style: TextStyle(color: context.colors.inkMuted)),
+                    Text(
+                      'Ningún elemento tiene una garantía guardada todavía.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: context.colors.inkMuted),
+                    ),
                   ],
                 ),
               ),
             )
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-              children: [IosSection(rows: _ordenados.map((e) => _FilaGarantia(casa: casa, elemento: e, estado: _estado(e))).toList())],
+              children: [
+                IosSection(
+                  rows: _ordenados
+                      .map(
+                        (e) => _FilaGarantia(
+                          casa: casa,
+                          elemento: e,
+                          estado: _estado(e),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ],
             ),
     );
   }
 }
 
 class _FilaGarantia extends StatelessWidget {
-  const _FilaGarantia({required this.casa, required this.elemento, required this.estado});
+  const _FilaGarantia({
+    required this.casa,
+    required this.elemento,
+    required this.estado,
+  });
 
   final Casa casa;
   final Elemento elemento;
@@ -88,14 +124,25 @@ class _FilaGarantia extends StatelessWidget {
       _EstadoGarantia.vigente => (context.colors.brand, 'Vigente hasta'),
       _EstadoGarantia.caducada => (context.colors.inkMuted, 'Caducó el'),
     };
-    final colorInsignia = estado == _EstadoGarantia.proxima ? context.colors.warning : context.colors.brand;
+    final colorInsignia = estado == _EstadoGarantia.proxima
+        ? context.colors.warning
+        : context.colors.brand;
     return IosRow(
       icon: Icons.shield_outlined,
       iconColor: colorInsignia,
+      imageUrl: elemento.fotoUrl,
       title: elemento.nombre,
-      subtitle: elemento.garantiaHasta != null ? '$etiqueta ${DateFormat('d MMMM yyyy', 'es_ES').format(elemento.garantiaHasta!)}' : null,
+      subtitle: elemento.garantiaHasta != null
+          ? '$etiqueta ${DateFormat('d MMMM yyyy', 'es_ES').format(elemento.garantiaHasta!)}'
+          : null,
       subtitleColor: elemento.garantiaHasta != null ? color : null,
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ElementoDetailScreen(casa: casa, elementoId: elemento.id))),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) =>
+              ElementoDetailScreen(casa: casa, elementoId: elemento.id),
+        ),
+      ),
     );
   }
 }

@@ -12,7 +12,12 @@ import '../widgets/ios_list.dart';
 import 'elemento_detail_screen.dart';
 
 class RevisionesPendientesScreen extends StatelessWidget {
-  const RevisionesPendientesScreen({required this.casa, required this.elementos, this.titulo = 'Revisiones pendientes', super.key});
+  const RevisionesPendientesScreen({
+    required this.casa,
+    required this.elementos,
+    this.titulo = 'Revisiones pendientes',
+    super.key,
+  });
 
   final Casa casa;
   final List<Elemento> elementos;
@@ -21,7 +26,9 @@ class RevisionesPendientesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(titulo, style: Theme.of(context).textTheme.displaySmall)),
+      appBar: AppBar(
+        title: Text(titulo, style: Theme.of(context).textTheme.displaySmall),
+      ),
       body: elementos.isEmpty
           ? Center(
               child: Padding(
@@ -32,11 +39,22 @@ class RevisionesPendientesScreen extends StatelessWidget {
                     Container(
                       width: 72,
                       height: 72,
-                      decoration: BoxDecoration(color: context.colors.brandTint, shape: BoxShape.circle),
-                      child: Icon(Icons.build_circle_outlined, size: 32, color: context.colors.brand),
+                      decoration: BoxDecoration(
+                        color: context.colors.brandTint,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.build_circle_outlined,
+                        size: 32,
+                        color: context.colors.brand,
+                      ),
                     ),
                     const SizedBox(height: 16),
-                    Text('Ningún elemento tiene un calendario de mantenimiento configurado todavía.', textAlign: TextAlign.center, style: TextStyle(color: context.colors.inkMuted)),
+                    Text(
+                      'Ningún elemento tiene un calendario de mantenimiento configurado todavía.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: context.colors.inkMuted),
+                    ),
                   ],
                 ),
               ),
@@ -46,19 +64,34 @@ class RevisionesPendientesScreen extends StatelessWidget {
               children: [
                 IosSection(
                   rows: elementos.map((e) {
-                    final dias = e.proximoMantenimiento!.difference(DateTime.now()).inDays;
+                    final dias = e.proximoMantenimiento!
+                        .difference(DateTime.now())
+                        .inDays;
                     final atrasada = dias < 0;
-                    final color = atrasada ? context.colors.error : context.colors.brand;
-                    final colorTexto = atrasada ? context.colors.errorText : null;
+                    final color = atrasada
+                        ? context.colors.error
+                        : context.colors.brand;
+                    final colorTexto = atrasada
+                        ? context.colors.errorText
+                        : null;
                     return IosRow(
                       icon: Icons.build_circle_outlined,
                       iconColor: color,
+                      imageUrl: e.fotoUrl,
                       title: e.nombre,
                       subtitle: atrasada
                           ? 'Atrasada desde el ${DateFormat('d MMMM yyyy', 'es_ES').format(e.proximoMantenimiento!)}'
                           : 'Próxima: ${DateFormat('d MMMM yyyy', 'es_ES').format(e.proximoMantenimiento!)}',
                       subtitleColor: colorTexto,
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ElementoDetailScreen(casa: casa, elementoId: e.id))),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ElementoDetailScreen(
+                            casa: casa,
+                            elementoId: e.id,
+                          ),
+                        ),
+                      ),
                     );
                   }).toList(),
                 ),
