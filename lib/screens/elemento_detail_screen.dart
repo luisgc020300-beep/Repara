@@ -169,6 +169,18 @@ class ElementoDetailScreen extends StatelessWidget {
                   navigator.pop(imagen);
                 },
               ),
+              if (elemento.fotoUrl != null)
+                IosRow(
+                  icon: Icons.delete_outline,
+                  iconColor: ctx.colors.errorText,
+                  titleColor: ctx.colors.errorText,
+                  title: 'Eliminar foto',
+                  showChevron: false,
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    _eliminarFoto(context, elemento);
+                  },
+                ),
             ],
           ),
         ),
@@ -187,6 +199,27 @@ class ElementoDetailScreen extends StatelessWidget {
         AppError.show(
           context,
           'No se pudo guardar la foto.',
+          error: e,
+          stackTrace: st,
+        );
+      }
+    }
+  }
+
+  Future<void> _eliminarFoto(BuildContext context, Elemento elemento) async {
+    final confirmar = await AppDialog.confirmText(
+      context,
+      title: '¿Eliminar la foto?',
+      confirmLabel: 'Eliminar',
+    );
+    if (!confirmar || !context.mounted) return;
+    try {
+      await ElementoService.actualizarFoto(casa.id, elemento.id, null);
+    } catch (e, st) {
+      if (context.mounted) {
+        AppError.show(
+          context,
+          'No se pudo eliminar la foto.',
           error: e,
           stackTrace: st,
         );
@@ -325,6 +358,7 @@ class ElementoDetailScreen extends StatelessWidget {
             children: [
               _FotoElemento(
                 onTap: () => _onTapFoto(context, elemento),
+                onEditar: () => _cambiarFoto(context, elemento),
                 fotoUrl: elemento.fotoUrl,
               ),
               const SizedBox(height: 14),
@@ -498,10 +532,21 @@ class ElementoDetailScreen extends StatelessWidget {
 /// tocarla la amplía a pantalla completa -- cambiarla es el lápiz pequeño de
 /// la esquina.
 class _FotoElemento extends StatelessWidget {
-  const _FotoElemento({required this.fotoUrl, required this.onTap});
+  const _FotoElemento({
+    required this.fotoUrl,
+    required this.onTap,
+    required this.onEditar,
+  });
 
   final String? fotoUrl;
   final VoidCallback onTap;
+
+  /// Toca del lápiz, separado de [onTap] -- antes compartían el mismo
+  /// GestureDetector del Stack entero, así que con foto, tocar el lápiz
+  /// hacía lo mismo que tocar cualquier otro punto de la imagen (ampliarla),
+  /// nunca abría el selector de cámara/galería (CEO, octubre 2026: "el
+  /// botón de abajo a la derecha... no funciona").
+  final VoidCallback onEditar;
 
   @override
   Widget build(BuildContext context) {
@@ -519,7 +564,30 @@ class _FotoElemento extends StatelessWidget {
         child: Stack(
           children: [
             if (fotoUrl != null)
-              Positioned.fill(child: Image.network(fotoUrl!, fit: BoxFit.cover))
+              Positioned.fill(
+                child: Image.network(
+                  fotoUrl!,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.broken_image_outlined,
+                          size: 30,
+                          color: context.colors.inkFaint,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'No se pudo cargar la foto. Toca el lápiz para cambiarla.',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              )
             else
               Center(
                 child: Column(
@@ -542,16 +610,19 @@ class _FotoElemento extends StatelessWidget {
               Positioned(
                 right: 10,
                 bottom: 10,
-                child: Container(
-                  padding: const EdgeInsets.all(7),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.45),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.edit_outlined,
-                    size: 16,
-                    color: Colors.white,
+                child: GestureDetector(
+                  onTap: onEditar,
+                  child: Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.45),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.edit_outlined,
+                      size: 16,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),

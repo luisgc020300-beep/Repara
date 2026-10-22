@@ -16,7 +16,8 @@ class ElementoService {
   @visibleForTesting
   static FirebaseFirestore? debugFirestoreOverride;
 
-  static FirebaseFirestore get _db => debugFirestoreOverride ?? FirebaseFirestore.instance;
+  static FirebaseFirestore get _db =>
+      debugFirestoreOverride ?? FirebaseFirestore.instance;
   static const _region = 'europe-west1';
 
   static CollectionReference<Map<String, dynamic>> _col(String casaId) =>
@@ -26,10 +27,20 @@ class ElementoService {
   // devuelve los documentos en un orden interno no garantizado -- no es el
   // orden de creación -- así que un elemento recién añadido podía aparecer
   // en cualquier sitio de la lista, no arriba).
-  static Stream<List<Elemento>> streamElementos(String casaId, {String? habitacionId}) {
-    Query<Map<String, dynamic>> q = _col(casaId).orderBy('createdAt', descending: true);
-    if (habitacionId != null) q = q.where('habitacionId', isEqualTo: habitacionId);
-    return q.snapshots().map((s) => s.docs.map(Elemento.fromDoc).toList()).conRegistroDeErrores();
+  static Stream<List<Elemento>> streamElementos(
+    String casaId, {
+    String? habitacionId,
+  }) {
+    Query<Map<String, dynamic>> q = _col(
+      casaId,
+    ).orderBy('createdAt', descending: true);
+    if (habitacionId != null) {
+      q = q.where('habitacionId', isEqualTo: habitacionId);
+    }
+    return q
+        .snapshots()
+        .map((s) => s.docs.map(Elemento.fromDoc).toList())
+        .conRegistroDeErrores();
   }
 
   static Stream<Elemento?> streamElemento(String casaId, String elementoId) {
@@ -41,10 +52,9 @@ class ElementoService {
   }
 
   static Future<String> crear(String casaId, Elemento elemento) async {
-    final ref = await _col(casaId).add({
-      ...elemento.toMap(),
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+    final ref = await _col(
+      casaId,
+    ).add({...elemento.toMap(), 'createdAt': FieldValue.serverTimestamp()});
     return ref.id;
   }
 
@@ -55,18 +65,28 @@ class ElementoService {
   /// `.update()` nunca toca una clave que no se le pase (auditoría de
   /// producto, octubre 2026). `fotoUrl` queda fuera a propósito: ningún
   /// formulario lo edita todavía, así que nunca debe tocarse aquí.
-  static Future<void> actualizar(String casaId, String elementoId, Elemento elemento) async {
+  static Future<void> actualizar(
+    String casaId,
+    String elementoId,
+    Elemento elemento,
+  ) async {
     await _col(casaId).doc(elementoId).update({
       'nombre': elemento.nombre,
       'habitacionId': elemento.habitacionId,
       'marca': elemento.marca,
       'modelo': elemento.modelo,
-      'fechaInstalacion': elemento.fechaInstalacion != null ? Timestamp.fromDate(elemento.fechaInstalacion!) : null,
+      'fechaInstalacion': elemento.fechaInstalacion != null
+          ? Timestamp.fromDate(elemento.fechaInstalacion!)
+          : null,
       'coste': elemento.coste,
       'profesionalNombre': elemento.profesionalNombre,
-      'garantiaHasta': elemento.garantiaHasta != null ? Timestamp.fromDate(elemento.garantiaHasta!) : null,
+      'garantiaHasta': elemento.garantiaHasta != null
+          ? Timestamp.fromDate(elemento.garantiaHasta!)
+          : null,
       'intervaloMantenimientoMeses': elemento.intervaloMantenimientoMeses,
-      'proximoMantenimiento': elemento.proximoMantenimiento != null ? Timestamp.fromDate(elemento.proximoMantenimiento!) : null,
+      'proximoMantenimiento': elemento.proximoMantenimiento != null
+          ? Timestamp.fromDate(elemento.proximoMantenimiento!)
+          : null,
     });
   }
 
@@ -80,13 +100,27 @@ class ElementoService {
   /// creación -- muchas veces la foto se hace después, no al crear el
   /// elemento). Nombre de archivo fijo ("foto") en vez de con timestamp: una
   /// foto nueva sustituye a la anterior, nunca se acumulan fotos sueltas.
-  static Future<String> subirFoto(String casaId, String elementoId, File archivo) async {
-    final ref = FirebaseStorage.instance.ref().child('casas/$casaId/elementos/$elementoId/foto');
+  static Future<String> subirFoto(
+    String casaId,
+    String elementoId,
+    File archivo,
+  ) async {
+    final ref = FirebaseStorage.instance.ref().child(
+      'casas/$casaId/elementos/$elementoId/foto',
+    );
     await ref.putFile(archivo);
     return ref.getDownloadURL();
   }
 
-  static Future<void> actualizarFoto(String casaId, String elementoId, String fotoUrl) async {
+  /// [fotoUrl] null borra la foto (no el archivo en Storage, solo la
+  /// referencia -- mismo criterio de limpieza que el resto de la app, ver
+  /// nota en subirFoto: una foto nueva ya sustituye a la anterior en el
+  /// mismo nombre de archivo, así que no se acumula basura en Storage).
+  static Future<void> actualizarFoto(
+    String casaId,
+    String elementoId,
+    String? fotoUrl,
+  ) async {
     await _col(casaId).doc(elementoId).update({'fotoUrl': fotoUrl});
   }
 
@@ -97,7 +131,8 @@ class ElementoService {
   /// hace falta una transacción: no hay ninguna condición de carrera entre
   /// crear el elemento y su primer registro) para que nunca quede un
   /// elemento huérfano sin ningún registro si algo falla a medias.
-  static Future<({String elementoId, String registroId})> crearConRegistroFundacional({
+  static Future<({String elementoId, String registroId})>
+  crearConRegistroFundacional({
     required String casaId,
     required Elemento elemento,
     required Registro registroFundacional,
@@ -106,7 +141,10 @@ class ElementoService {
     final elementoRef = _col(casaId).doc();
     final registroRef = elementoRef.collection('registros').doc();
     final batch = _db.batch();
-    batch.set(elementoRef, {...elemento.toMap(), 'createdAt': FieldValue.serverTimestamp()});
+    batch.set(elementoRef, {
+      ...elemento.toMap(),
+      'createdAt': FieldValue.serverTimestamp(),
+    });
     batch.set(registroRef, {
       ...registroFundacional.toMap(),
       'elementoNombre': elemento.nombre,
@@ -121,14 +159,20 @@ class ElementoService {
   /// Inicio (sección 25 del spec: avisar de garantías próximas a vencer).
   static Future<List<Elemento>> conGarantiaProximaAVencer(String casaId) async {
     final snap = await _col(casaId).get();
-    return snap.docs.map(Elemento.fromDoc).where((e) => e.garantiaProximaAVencer).toList();
+    return snap.docs
+        .map(Elemento.fromDoc)
+        .where((e) => e.garantiaProximaAVencer)
+        .toList();
   }
 
   /// Elementos con revisión periódica próxima o ya atrasada -- calendario
   /// de mantenimiento autogenerado, mismo dashboard de Inicio.
   static Future<List<Elemento>> conRevisionPendiente(String casaId) async {
     final snap = await _col(casaId).get();
-    return snap.docs.map(Elemento.fromDoc).where((e) => e.revisionPendiente).toList();
+    return snap.docs
+        .map(Elemento.fromDoc)
+        .where((e) => e.revisionPendiente)
+        .toList();
   }
 
   /// TODOS los elementos con una fecha de garantía guardada, pendiente o no
@@ -137,7 +181,10 @@ class ElementoService {
   /// consultar también las que vencen más adelante, no solo las que aprietan.
   static Future<List<Elemento>> conGarantia(String casaId) async {
     final snap = await _col(casaId).get();
-    final elementos = snap.docs.map(Elemento.fromDoc).where((e) => e.garantiaHasta != null).toList();
+    final elementos = snap.docs
+        .map(Elemento.fromDoc)
+        .where((e) => e.garantiaHasta != null)
+        .toList();
     elementos.sort((a, b) => a.garantiaHasta!.compareTo(b.garantiaHasta!));
     return elementos;
   }
@@ -145,20 +192,37 @@ class ElementoService {
   /// TODOS los elementos con un calendario de mantenimiento configurado,
   /// pendiente o no -- mismo motivo que [conGarantia]: "ver qué mantenimiento
   /// está pendiente" no debe depender de que ya esté a punto de vencer.
-  static Future<List<Elemento>> conMantenimientoConfigurado(String casaId) async {
+  static Future<List<Elemento>> conMantenimientoConfigurado(
+    String casaId,
+  ) async {
     final snap = await _col(casaId).get();
-    final elementos = snap.docs.map(Elemento.fromDoc).where((e) => e.proximoMantenimiento != null).toList();
-    elementos.sort((a, b) => a.proximoMantenimiento!.compareTo(b.proximoMantenimiento!));
+    final elementos = snap.docs
+        .map(Elemento.fromDoc)
+        .where((e) => e.proximoMantenimiento != null)
+        .toList();
+    elementos.sort(
+      (a, b) => a.proximoMantenimiento!.compareTo(b.proximoMantenimiento!),
+    );
     return elementos;
   }
 
   /// Avanza la próxima revisión [intervaloMeses] meses desde HOY (no desde
   /// la fecha antigua) -- si estaba muy atrasada, no tiene sentido arrastrar
   /// ese retraso para siempre.
-  static Future<void> marcarRevisionHecha(String casaId, String elementoId, int intervaloMeses) async {
+  static Future<void> marcarRevisionHecha(
+    String casaId,
+    String elementoId,
+    int intervaloMeses,
+  ) async {
     final ahora = DateTime.now();
-    final proxima = DateTime(ahora.year, ahora.month + intervaloMeses, ahora.day);
-    await _col(casaId).doc(elementoId).update({'proximoMantenimiento': Timestamp.fromDate(proxima)});
+    final proxima = DateTime(
+      ahora.year,
+      ahora.month + intervaloMeses,
+      ahora.day,
+    );
+    await _col(casaId).doc(elementoId).update({
+      'proximoMantenimiento': Timestamp.fromDate(proxima),
+    });
   }
 
   /// Edición manual del calendario de mantenimiento -- por si la sugerencia
@@ -172,20 +236,29 @@ class ElementoService {
   }) async {
     await _col(casaId).doc(elementoId).update({
       'intervaloMantenimientoMeses': intervaloMeses,
-      'proximoMantenimiento': proximoMantenimiento != null ? Timestamp.fromDate(proximoMantenimiento) : null,
+      'proximoMantenimiento': proximoMantenimiento != null
+          ? Timestamp.fromDate(proximoMantenimiento)
+          : null,
     });
   }
 
   /// Pide a la IA un intervalo típico de revisión según el tipo de
   /// elemento -- solo SUGIERE, nunca se guarda sin que el propietario lo
   /// confirme (mismo principio que DocumentoService.clasificarConIA).
-  static Future<({int? intervaloMeses, String? motivo})> sugerirIntervaloMantenimiento({
+  static Future<({int? intervaloMeses, String? motivo})>
+  sugerirIntervaloMantenimiento({
     required String nombre,
     String? marca,
     String? modelo,
   }) async {
-    final callable = FirebaseFunctions.instanceFor(region: _region).httpsCallable('sugerirIntervaloMantenimiento');
-    final result = await callable.call<Map<String, dynamic>>({'nombre': nombre, 'marca': marca, 'modelo': modelo});
+    final callable = FirebaseFunctions.instanceFor(
+      region: _region,
+    ).httpsCallable('sugerirIntervaloMantenimiento');
+    final result = await callable.call<Map<String, dynamic>>({
+      'nombre': nombre,
+      'marca': marca,
+      'modelo': modelo,
+    });
     return (
       intervaloMeses: (result.data['intervaloMeses'] as num?)?.toInt(),
       motivo: result.data['motivo'] as String?,
