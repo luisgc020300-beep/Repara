@@ -16,6 +16,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/contacto.dart';
+import '../services/contacto_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_dialog.dart';
 import '../widgets/app_error.dart';
@@ -103,11 +104,43 @@ Future<void> mostrarAccionesContacto(BuildContext context, {required String casa
                 ),
               ],
             ),
+            IosSection(
+              rows: [
+                IosRow(
+                  icon: Icons.delete_outline,
+                  iconColor: ctx.colors.errorText,
+                  title: 'Eliminar contacto',
+                  titleColor: ctx.colors.errorText,
+                  showChevron: false,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _eliminarContacto(context, casaId: casaId, contacto: contacto);
+                  },
+                ),
+              ],
+            ),
           ],
         ),
       ),
     ),
   );
+}
+
+Future<void> _eliminarContacto(BuildContext context, {required String casaId, required Contacto contacto}) async {
+  final confirmar = await AppDialog.confirmText(
+    context,
+    title: '¿Eliminar a ${contacto.nombre}?',
+    message: 'Se borrará de tu lista de contactos. No afecta a los registros ni documentos ya guardados.',
+    confirmLabel: 'Eliminar',
+  );
+  if (!confirmar || !context.mounted) return;
+  try {
+    await ContactoService.eliminar(casaId, contacto.id);
+  } catch (e, st) {
+    if (context.mounted) {
+      AppError.show(context, 'No se pudo eliminar el contacto.', error: e, stackTrace: st);
+    }
+  }
 }
 
 Future<void> _iniciarReporte(BuildContext context, {required String casaId, required Contacto contacto}) async {
