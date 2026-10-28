@@ -7,8 +7,12 @@
 // esa lectura y esa escritura nunca eran una operación atómica, así que dos
 // pagos simultáneos podían sumar entre los dos más que el presupuesto. Las
 // Cloud Functions repiten esa comprobación dentro de una transacción en
-// servidor, donde sí es atómica. eliminar() sigue siendo escritura directa
-// -- borrar un pago nunca puede hacer que la suma supere el presupuesto.
+// servidor, donde sí es atómica. eliminar() pasó a Cloud Function
+// (eliminarPago) en la auditoría R8 (octubre 2026, hallazgo H4): el
+// supuesto de que "borrar un pago nunca puede hacer que la suma supere el
+// presupuesto" dejó de ser cierto en cuanto existió el archivado de
+// elementos -- borrar un pago SÍ puede dejar un saldo pendiente en un
+// elemento que se archivó con el saldo cubierto.
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
@@ -79,7 +83,13 @@ class PagoService {
   }
 
   static Future<void> eliminar(String casaId, String elementoId, String registroId, String pagoId) async {
-    await _col(casaId, elementoId, registroId).doc(pagoId).delete();
+    final callable = FirebaseFunctions.instanceFor(region: _region).httpsCallable('eliminarPago');
+    await callable.call<Map<String, dynamic>>({
+      'casaId': casaId,
+      'elementoId': elementoId,
+      'registroId': registroId,
+      'pagoId': pagoId,
+    });
   }
 
   /// Lectura puntual (no stream) usada antes de finalizar un registro, para

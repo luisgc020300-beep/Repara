@@ -30,6 +30,7 @@ import '../screens/presupuestos_section.dart' show RolEnTrabajo;
 import '../services/analytics_service.dart';
 import '../services/cambio_alcance_service.dart';
 import '../theme/design_tokens.dart';
+import '../widgets/app_dialog.dart';
 import '../widgets/app_error.dart';
 import '../widgets/ios_list.dart';
 
@@ -198,6 +199,56 @@ class _CambioCardState extends State<_CambioCard> {
     }
   }
 
+  /// El servidor (`cancelarCambioAlcance`) es quien de verdad decide quién
+  /// puede cancelar y en qué estado -- exige `creadoPorUid === uid` (solo
+  /// quien lo solicitó) y `estado === 'pendiente'` (nada ya respondido). La
+  /// UI no repite esa comprobación de autoría porque el modelo no expone un
+  /// "uid actual" aquí (mismo criterio que presupuestos_section.dart para
+  /// "Nueva versión": se confía en el rol -- solo el profesional ve este
+  /// botón, y el servidor rechaza con `permission-denied` si de verdad no es
+  /// quien lo creó).
+  Future<void> _cancelar(BuildContext context) async {
+    final confirmar = await AppDialog.confirmText(
+      context,
+      title: '¿Cancelar esta solicitud?',
+      message: 'El propietario ya no podrá aprobarla ni rechazarla.',
+      confirmLabel: 'Cancelar solicitud',
+    );
+    if (!confirmar || !context.mounted) return;
+    setState(() => _procesando = true);
+    try {
+      await CambioAlcanceService.cancelar(
+        casaId: widget.casaId,
+        elementoId: widget.elementoId,
+        registroId: widget.registroId,
+        cambioAlcanceId: widget.cambio.id,
+      );
+      if (context.mounted) {
+        AppError.showSuccess(context, 'Solicitud cancelada.');
+      }
+    } on FirebaseFunctionsException catch (e, st) {
+      if (context.mounted) {
+        AppError.show(
+          context,
+          e.message ?? 'No se pudo cancelar la solicitud.',
+          error: e,
+          stackTrace: st,
+        );
+      }
+    } catch (e, st) {
+      if (context.mounted) {
+        AppError.show(
+          context,
+          'No se pudo cancelar la solicitud.',
+          error: e,
+          stackTrace: st,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _procesando = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final cambio = widget.cambio;
@@ -319,6 +370,31 @@ class _CambioCardState extends State<_CambioCard> {
                     ),
                   ),
                 ],
+              ),
+            ],
+            if (cambio.estado == EstadoCambioAlcance.pendiente &&
+                widget.rol == RolEnTrabajo.profesional &&
+                !widget.registroCerrado) ...[
+              const SizedBox(height: ReparaSpace.s3),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: _procesando ? null : () => _cancelar(context),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: context.colors.errorText,
+                    side: BorderSide(color: context.colors.errorText),
+                  ),
+                  child: _procesando
+                      ? SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: context.colors.errorText,
+                          ),
+                        )
+                      : const Text('Cancelar solicitud'),
+                ),
               ),
             ],
           ],

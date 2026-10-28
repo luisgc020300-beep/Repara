@@ -22,6 +22,9 @@ class Elemento {
     this.intervaloMantenimientoMeses,
     this.proximoMantenimiento,
     this.createdAt,
+    this.archivado = false,
+    this.archivadoAt,
+    this.archivadoPorUid,
   });
 
   final String id;
@@ -34,6 +37,16 @@ class Elemento {
   final String? profesionalNombre;
   final DateTime? garantiaHasta;
   final String? fotoUrl;
+  // Archivado (auditoría R5, octubre 2026): un elemento archivado conserva
+  // intactos sus registros, pagos, presupuestos, documentos e historial --
+  // solo deja de aparecer en los listados de activos. Campo ausente en
+  // documentos antiguos == false (ver fromDoc), así que no hace falta
+  // ninguna migración: todo lo que ya existe se sigue interpretando como
+  // activo. Solo lo escriben archivarElemento/restaurarElemento (Cloud
+  // Functions, ver firestore.rules) -- nunca una escritura directa.
+  final bool archivado;
+  final DateTime? archivadoAt;
+  final String? archivadoPorUid;
   // Calendario de mantenimiento autogenerado (idea para diferenciarse de
   // Dwellin): la IA sugiere este intervalo al crear el elemento según su
   // tipo, pero es libremente editable y puede dejarse en blanco -- nunca es
@@ -73,6 +86,9 @@ class Elemento {
       intervaloMantenimientoMeses: (data['intervaloMantenimientoMeses'] as num?)?.toInt(),
       proximoMantenimiento: (data['proximoMantenimiento'] as Timestamp?)?.toDate(),
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
+      archivado: data['archivado'] as bool? ?? false,
+      archivadoAt: (data['archivadoAt'] as Timestamp?)?.toDate(),
+      archivadoPorUid: data['archivadoPorUid'] as String?,
     );
   }
 

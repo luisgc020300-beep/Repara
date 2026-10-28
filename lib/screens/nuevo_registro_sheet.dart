@@ -15,10 +15,13 @@
 // (título) que ya usa nuevo_contacto_sheet.dart -- el snackbar de
 // AppError.show ya existía y no era silencioso, pero no se veía reflejado
 // en el propio campo.
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../models/registro.dart';
+import '../services/analytics_service.dart';
 import '../services/registro_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
@@ -115,6 +118,10 @@ class _NuevoRegistroFormState extends State<_NuevoRegistroForm> {
         ),
         createdBy: uid,
       );
+      // Solo tras confirmar que la creación salió bien -- nunca si falla o
+      // si el usuario cancela antes de llegar aquí. _guardando ya impide que
+      // un doble toque dispare esta rama dos veces (ver onPressed más abajo).
+      unawaited(AnalyticsService.workCreated(tipo: _tipo.name));
       if (mounted) Navigator.pop(context);
     } catch (e, st) {
       if (mounted) {

@@ -154,3 +154,65 @@ test('8. resetear "estado" a mano tras aceptar A no reabre el hueco para aceptar
   assert.equal(final.presupuesto, 500, 'el total no debe haber cambiado a pesar del reset y el segundo intento');
   assert.equal(final.presupuestoAceptadoId, presA);
 });
+
+// ── Registro cerrado bloquea nuevos presupuestos (auditoría R7, octubre 2026) ──
+
+const _LINEAS_VALIDAS = [{ descripcion: 'Mano de obra', cantidad: 1, precioUnitario: 100 }];
+
+test('9. se bloquea crear un presupuesto nuevo sobre un registro ya terminado', async () => {
+  const owner = await crearUsuario();
+  const { casaId, elementoId, registroId } = await sembrarRegistro({ ownerUid: owner.uid, estado: 'terminado' });
+
+  const { error } = await llamar('crearPresupuesto', owner.idToken, {
+    casaId, elementoId, registroId, lineas: _LINEAS_VALIDAS,
+  });
+  assert.equal(error?.status, 'FAILED_PRECONDITION');
+});
+
+test('10. se bloquea enviar un presupuesto si el registro se cerró después de crear el borrador', async () => {
+  const owner = await crearUsuario();
+  const pro = await crearUsuario();
+  const { casaId, elementoId, registroId } = await sembrarRegistro({ ownerUid: owner.uid, estado: 'nuevo', profesionalUid: pro.uid });
+  const presupuestoId = await sembrarPresupuesto(casaId, elementoId, registroId, { creadoPorUid: pro.uid, total: 500, estado: 'borrador' });
+
+  await db.collection('casas').doc(casaId).collection('elementos').doc(elementoId)
+    .collection('registros').doc(registroId).update({ estado: 'terminado' });
+
+  const { error } = await llamar('enviarPresupuesto', pro.idToken, { casaId, elementoId, registroId, presupuestoId });
+  assert.equal(error?.status, 'FAILED_PRECONDITION');
+});
+
+test('11. se bloquea crear una nueva versión de un presupuesto rechazado si el registro ya está cerrado', async () => {
+  const owner = await crearUsuario();
+  const pro = await crearUsuario();
+  const { casaId, elementoId, registroId } = await sembrarRegistro({ ownerUid: owner.uid, estado: 'nuevo', profesionalUid: pro.uid });
+  const presupuestoAnteriorId = await sembrarPresupuesto(casaId, elementoId, registroId, { creadoPorUid: pro.uid, total: 500, estado: 'rechazado' });
+
+  await db.collection('casas').doc(casaId).collection('elementos').doc(elementoId)
+    .collection('registros').doc(registroId).update({ estado: 'terminado' });
+
+  const { error } = await llamar('crearNuevaVersionPresupuesto', pro.idToken, {
+    casaId, elementoId, registroId, presupuestoAnteriorId, lineas: _LINEAS_VALIDAS,
+  });
+  assert.equal(error?.status, 'FAILED_PRECONDITION');
+});
+
+test('12. crear, enviar y una nueva versión de un presupuesto siguen funcionando con el registro abierto', async () => {
+  const owner = await crearUsuario();
+  const pro = await crearUsuario();
+  const { casaId, elementoId, registroId } = await sembrarRegistro({ ownerUid: owner.uid, estado: 'nuevo', profesionalUid: pro.uid });
+
+  const crear = await llamar('crearPresupuesto', pro.idToken, { casaId, elementoId, registroId, lineas: _LINEAS_VALIDAS });
+  assert.equal(crear.error, undefined);
+
+  const enviar = await llamar('enviarPresupuesto', pro.idToken, { casaId, elementoId, registroId, presupuestoId: crear.result.presupuestoId });
+  assert.equal(enviar.error, undefined);
+
+  const rechazo = await llamar('responderPresupuesto', owner.idToken, { casaId, elementoId, registroId, presupuestoId: crear.result.presupuestoId, aceptar: false });
+  assert.equal(rechazo.error, undefined);
+
+  const nuevaVersion = await llamar('crearNuevaVersionPresupuesto', pro.idToken, {
+    casaId, elementoId, registroId, presupuestoAnteriorId: crear.result.presupuestoId, lineas: _LINEAS_VALIDAS,
+  });
+  assert.equal(nuevaVersion.error, undefined);
+});

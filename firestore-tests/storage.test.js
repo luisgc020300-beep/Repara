@@ -33,7 +33,8 @@ before(async () => {
     storage: {
       rules: fs.readFileSync(path.resolve(__dirname, '..', 'storage.rules'), 'utf8'),
       host: '127.0.0.1',
-      port: 9199,
+      // Overridable, mismo motivo que rules.test.js de este mismo directorio.
+      port: Number(process.env.REPARA_TEST_STORAGE_PORT || 9199),
     },
   });
 });

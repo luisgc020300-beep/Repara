@@ -98,10 +98,31 @@ class RegistroProDetailScreen extends StatelessWidget {
     return StreamBuilder<Registro?>(
       stream: RegistroService.streamRegistro(casaId, elementoId, registroId),
       builder: (context, snapshot) {
-        final registro = snapshot.data;
-        if (registro == null) {
+        // Mismo fix que elemento_detail_screen.dart/registro_detail_screen.
+        // dart (auditoría R3/R4, octubre 2026) -- ver el comentario completo
+        // en registro_detail_screen.dart. Aquí importa igual o más: el
+        // profesional pierde el acceso de lectura (permission-denied) en
+        // cuanto esMiembroCasa/profesionalUid deja de cumplirse (p.ej. si el
+        // propietario revoca la asignación), y eso no debe confundirse con
+        // "el registro ya no existe".
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (snapshot.hasError) {
+          return Scaffold(
+            appBar: AppBar(),
+            body: const Center(
+              child: Text('No se pudo cargar este evento.'),
+            ),
+          );
+        }
+        final registro = snapshot.data;
+        if (registro == null) {
+          return Scaffold(
+            appBar: AppBar(),
+            body: const Center(child: Text('Este evento ya no existe.')),
           );
         }
         return Scaffold(

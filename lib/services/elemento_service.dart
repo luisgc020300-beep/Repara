@@ -27,9 +27,20 @@ class ElementoService {
   // devuelve los documentos en un orden interno no garantizado -- no es el
   // orden de creación -- así que un elemento recién añadido podía aparecer
   // en cualquier sitio de la lista, no arriba).
+  //
+  // [incluirArchivados] false por defecto (auditoría R5, octubre 2026): el
+  // filtro se hace en el cliente, nunca con un .where('archivado', ...) de
+  // Firestore -- una query de igualdad de Firestore NO encuentra los
+  // documentos a los que les falta el campo, así que filtrar en servidor
+  // habría escondido de golpe TODOS los elementos antiguos (antes de esta
+  // iteración, ninguno tiene este campo). Filtrando aquí, con
+  // Elemento.archivado ya resuelto a false por fromDoc cuando el campo no
+  // existe, un elemento antiguo se sigue viendo como activo sin ninguna
+  // migración.
   static Stream<List<Elemento>> streamElementos(
     String casaId, {
     String? habitacionId,
+    bool incluirArchivados = false,
   }) {
     Query<Map<String, dynamic>> q = _col(
       casaId,
@@ -40,7 +51,52 @@ class ElementoService {
     return q
         .snapshots()
         .map((s) => s.docs.map(Elemento.fromDoc).toList())
+        .map(
+          (lista) => incluirArchivados
+              ? lista
+              : lista.where((e) => !e.archivado).toList(),
+        )
         .conRegistroDeErrores();
+  }
+
+  /// Solo los archivados -- para la pantalla dedicada a verlos (nunca
+  /// mezclados con los activos, ver streamElementos). Mismo motivo de filtro
+  /// en cliente que arriba.
+  static Stream<List<Elemento>> streamElementosArchivados(String casaId) {
+    return _col(casaId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map(
+          (s) => s.docs
+              .map(Elemento.fromDoc)
+              .where((e) => e.archivado)
+              .toList(),
+        )
+        .conRegistroDeErrores();
+  }
+
+  /// Bloquea en servidor si tiene trabajo profesional activo o pendiente, o
+  /// si ya está archivado -- la UI puede (y debe) evitar ofrecer el botón en
+  /// esos casos, pero la decisión real es de archivarElemento (Cloud
+  /// Function), nunca de este método ni de ningún botón deshabilitado.
+  static Future<void> archivar(String casaId, String elementoId) async {
+    final callable = FirebaseFunctions.instanceFor(
+      region: _region,
+    ).httpsCallable('archivarElemento');
+    await callable.call<Map<String, dynamic>>({
+      'casaId': casaId,
+      'elementoId': elementoId,
+    });
+  }
+
+  static Future<void> restaurar(String casaId, String elementoId) async {
+    final callable = FirebaseFunctions.instanceFor(
+      region: _region,
+    ).httpsCallable('restaurarElemento');
+    await callable.call<Map<String, dynamic>>({
+      'casaId': casaId,
+      'elementoId': elementoId,
+    });
   }
 
   static Stream<Elemento?> streamElemento(String casaId, String elementoId) {
@@ -90,6 +146,15 @@ class ElementoService {
     });
   }
 
+  /// DESHABILITADA en servidor (auditoría R6, octubre 2026): borra solo este
+  /// documento, nunca sus subcolecciones ni los archivos de Storage
+  /// asociados -- firestore.rules ya bloquea este `delete` con
+  /// `allow delete: if false`, así que llamar a este método ahora falla
+  /// siempre con `permission-denied`. Ningún código de la app lo llama (ver
+  /// informe de R6) -- se mantiene sin borrar para no perder el historial de
+  /// por qué `allow delete` está bloqueado, no porque tenga ningún uso
+  /// legítimo pendiente. No lo reactives sin una limpieza segura de
+  /// subcolecciones/Storage detrás.
   static Future<void> eliminar(String casaId, String elementoId) async {
     await _col(casaId).doc(elementoId).delete();
   }

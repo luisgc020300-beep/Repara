@@ -143,7 +143,14 @@ class ExpedienteViviendaScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Expediente de la vivienda')),
       body: FutureBuilder<List<Elemento>>(
-        future: ElementoService.streamElementos(casa.id).first,
+        // incluirArchivados: true (auditoría R5, octubre 2026) -- este
+        // expediente es precisamente el resumen histórico/económico
+        // completo de la vivienda; archivar un elemento no debe hacer que
+        // desaparezca de aquí, solo de los listados de "activos".
+        future: ElementoService.streamElementos(
+          casa.id,
+          incluirArchivados: true,
+        ).first,
         builder: (context, elementosSnapshot) {
           if (!elementosSnapshot.hasData) {
             return const Center(child: CircularProgressIndicator());

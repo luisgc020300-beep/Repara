@@ -72,7 +72,34 @@ service cloud.firestore {
       // abajo), nunca al elemento padre -- por eso Registro denormaliza
       // elementoNombre, para que el lado Pro no necesite leer este doc.
       match /elementos/{eid} {
-        allow read, write: if isAuth() && isMember(cid);
+        allow read: if isAuth() && isMember(cid);
+        // Archivar/restaurar (auditoría R5, octubre 2026) pasa por las
+        // Cloud Functions archivarElemento/restaurarElemento porque decidir
+        // si se puede archivar exige recorrer la subcolección de registros
+        // de este elemento (¿hay trabajo profesional activo?), algo que
+        // estas reglas no pueden comprobar -- igual que registrarPago, que
+        // también pasó a Cloud Function por el mismo motivo (tener que leer
+        // una colección entera, no solo un documento). El cliente puede
+        // escribir cualquier otro campo del elemento directamente, pero
+        // nunca estos tres -- igual que profesionalUid/presupuesto en
+        // registros, abajo.
+        allow create: if isAuth() && isMember(cid)
+            && !('archivado' in request.resource.data)
+            && !('archivadoAt' in request.resource.data)
+            && !('archivadoPorUid' in request.resource.data);
+        allow update: if isAuth() && isMember(cid)
+            && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['archivado', 'archivadoAt', 'archivadoPorUid']);
+        // Eliminación directa DESHABILITADA (auditoría R6, octubre 2026):
+        // borrar este documento nunca limpiaba sus subcolecciones
+        // (registros, cambiosAlcance, presupuestos, pagos, historial) ni los
+        // archivos de Storage asociados -- confirmado en R3/R4. El botón de
+        // Flutter que la usaba ya no la llama (ver elemento_detail_screen.
+        // dart), pero bloquearla aquí también es necesario: sin esto, una
+        // llamada directa del cliente (saltándose la UI) seguiría pudiendo
+        // borrar el documento igual que antes. Nunca se ha relajado ninguna
+        // otra regla para compensar esto -- queda bloqueada hasta que exista
+        // un proceso de eliminación seguro (ver informe de R4/R5/R6).
+        allow delete: if false;
 
         // Un registro es cada suceso de un elemento -- fusión de lo que
         // antes eran Trabajo y Evento. Visible/editable por los miembros de
@@ -102,10 +129,17 @@ service cloud.firestore {
           // de un estado controlado en cualquier escritura posterior,
           // crear con profesionalUid sigue prohibido arriba, y nadie fuera
           // de isMember(cid) puede tocar nada de esta casa.
+          // "Un elemento archivado no debe iniciar trabajo nuevo sin
+          // restaurarse primero" (auditoría R5): un elemento solo se puede
+          // archivar si ninguno de sus registros tiene trabajo profesional
+          // activo (lo exige archivarElemento en servidor), así que, una vez
+          // archivado, ya no debería poder nacer un registro nuevo bajo él
+          // sin pasar primero por restaurarElemento.
           allow create: if isAuth() && isMember(cid)
               && !('profesionalUid' in request.resource.data)
               && !('presupuesto' in request.resource.data)
-              && !('presupuestoAceptadoId' in request.resource.data);
+              && !('presupuestoAceptadoId' in request.resource.data)
+              && get(/databases/$(database)/documents/casas/$(cid)/elementos/$(eid)).data.get('archivado', false) != true;
           // profesionalUid NUNCA es escribible por un miembro -- solo
           // responderInvitacion (Cloud Function, Admin SDK, salta estas
           // reglas) lo asigna, tras el apretón de manos de invitación y
@@ -148,7 +182,19 @@ service cloud.firestore {
              (resource.data.estado == request.resource.data.estado ||
               (!estadoControlado(resource.data.estado) && !estadoControlado(request.resource.data.estado))))
           );
-          allow delete: if isAuth() && isMember(cid);
+          // Eliminación directa DESHABILITADA (auditoría R8, octubre 2026):
+          // mismo motivo que elementos/{eid} más arriba (R6) -- borrar este
+          // documento nunca limpiaba su propia foto en Storage ni los
+          // documentos (ni sus archivos) que lo referencian por registroId.
+          // El menú de Flutter que la usaba ya no la llama (ver
+          // registro_detail_screen.dart), pero bloquearla aquí también es
+          // necesario: sin esto, una llamada directa del cliente
+          // (saltándose la UI) seguiría pudiendo borrar el documento igual
+          // que antes. eliminarCuenta sigue pudiendo borrar un registro
+          // como parte de un recursiveDelete de la casa entera (Admin SDK,
+          // salta estas reglas) -- confirmado que no hay ningún otro
+          // consumidor legítimo de un borrado directo.
+          allow delete: if false;
 
           // Presupuestos formales (sección 15 del spec) -- toda escritura
           // pasa por Cloud Functions (crearPresupuesto, enviarPresupuesto,
@@ -182,17 +228,22 @@ service cloud.firestore {
           // dos más que el presupuesto, porque esta regla solo validaba el
           // rango del importe individual, nunca la suma acumulada. Ahora esa
           // suma se valida en una transacción en servidor.
-          // delete sigue siendo directo del cliente -- borrar un pago nunca
-          // puede hacer que la suma supere el presupuesto, así que no hay
-          // ninguna validación económica que proteger aquí. Restringido a
-          // quien lo creó (createdBy) desde una corrección anterior (antes
-          // cualquier miembro de la casa podía borrar un pago registrado por
-          // otro miembro).
+          // delete pasó a Cloud Function (eliminarPago) en la auditoría R8
+          // (octubre 2026, hallazgo H4): el supuesto de que "borrar un pago
+          // nunca puede hacer que la suma supere el presupuesto" dejó de ser
+          // cierto en cuanto existió el archivado -- archivar exige que el
+          // saldo esté cubierto EN ESE MOMENTO, y borrar un pago después
+          // podía deshacer esa garantía en silencio, dejando un elemento
+          // archivado con una deuda real. Firestore.rules no puede comprobar
+          // eso (exige leer el presupuesto del registro, sumar el resto de
+          // pagos y el estado archivado del elemento -- una agregación que
+          // estas reglas no pueden hacer), así que, igual que
+          // registrarPago/actualizarPago, esto necesitaba una Cloud
+          // Function. Mismo criterio de autorización que tenía la regla
+          // directa que sustituye (solo quien creó el pago puede borrarlo).
           match /pagos/{pagoid} {
             allow read: if isAuth() && (isMember(cid) || get(/databases/$(database)/documents/casas/$(cid)/elementos/$(eid)/registros/$(rid)).data.profesionalUid == request.auth.uid);
-            allow create: if false;
-            allow update: if false;
-            allow delete: if isAuth() && isMember(cid) && resource.data.createdBy == request.auth.uid;
+            allow write: if false;
           }
 
           // Historial append-only de presupuestos/cambiosAlcance/pagos

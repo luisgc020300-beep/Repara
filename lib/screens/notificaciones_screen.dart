@@ -1,7 +1,11 @@
 // lib/screens/notificaciones_screen.dart
 //
-// Notificaciones internas persistentes (sección 29 del spec) -- sin push
-// real todavía, se consultan dentro de la app.
+// Notificaciones internas persistentes (sección 29 del spec): se consultan
+// dentro de la app, y complementan -- no sustituyen -- al push real por FCM
+// (ver fcm_service.dart, que sí envía notificaciones push de verdad). Pendiente
+// de verificar en dispositivo real y de configurar la clave APNs en consola
+// para iOS (ver CLAUDE.md) -- pero la infraestructura de envío, recepción y
+// enrutamiento ya existe y funciona, no es solo esta pantalla.
 import 'dart:async';
 
 import 'package:flutter/material.dart';

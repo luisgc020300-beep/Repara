@@ -13,6 +13,7 @@ import 'package:flutter/foundation.dart';
 import '../models/elemento.dart';
 import '../models/registro.dart';
 import 'elemento_service.dart';
+import 'pago_service.dart';
 import 'stream_error_logging.dart';
 
 class RegistroService {
@@ -56,6 +57,47 @@ class RegistroService {
         .snapshots()
         .map((d) => d.exists ? Registro.fromDoc(d) : null)
         .conRegistroDeErrores();
+  }
+
+  /// Un registro con profesional asignado que todavía no está terminado ni
+  /// archivado -- "trabajo activo o pendiente" en el sentido de sección 25
+  /// del spec (aviso de Inicio) y, desde la auditoría R5 (octubre 2026),
+  /// también el criterio que bloquea archivar un elemento. Mismo criterio,
+  /// repetido server-side en functions/index.js (tieneTrabajoActivo) porque
+  /// la decisión de bloquear el archivado tiene que tomarse en servidor, no
+  /// solo aquí -- esta función de aquí es solo para que la UI pueda mostrar
+  /// u ocultar el botón sin tener que llamar a la Cloud Function a ciegas.
+  static bool esTrabajoActivo(Registro r) =>
+      r.esConProfesional &&
+      r.estado != EstadoRegistro.terminado &&
+      r.estado != EstadoRegistro.archivado;
+
+  /// Mismo criterio y MISMA tolerancia (0.01) que ya usa el servidor para
+  /// bloquear el archivado por saldo sin cobrar (tieneSaldoPendiente en
+  /// functions/index.js) -- repetido aquí SOLO como ayuda visual para
+  /// deshabilitar el botón de archivar, nunca como autoridad: la Cloud
+  /// Function vuelve a comprobarlo de cero en su propia transacción.
+  /// presupuesto == null nunca cuenta como saldo pendiente (mismo criterio
+  /// que registrarPago: "sin presupuesto fijado, se deja pagar libremente").
+  /// Se evalúa en TODOS los registros, no solo los activos -- un trabajo ya
+  /// terminado con un saldo sin cobrar sigue siendo una deuda real.
+  static Future<bool> tieneSaldoPendiente(
+    String casaId,
+    String elementoId,
+    List<Registro> registros,
+  ) async {
+    for (final r in registros) {
+      final presupuesto = r.presupuesto;
+      if (presupuesto == null) continue;
+      final totalPagado = await PagoService.totalPagado(
+        casaId,
+        elementoId,
+        r.id,
+      );
+      final saldo = ((presupuesto - totalPagado) * 100).round() / 100;
+      if (saldo > 0.01) return true;
+    }
+    return false;
   }
 
   /// `casaId` se guarda también como campo (no solo en la ruta) porque el
@@ -121,6 +163,16 @@ class RegistroService {
     await _col(casaId, elementoId).doc(registroId).update(cambios);
   }
 
+  /// DESHABILITADA en servidor (auditoría R8, octubre 2026): borra solo este
+  /// documento, nunca su propia foto en Storage ni los documentos (ni sus
+  /// archivos) que lo referencian por registroId -- firestore.rules ya
+  /// bloquea este `delete` con `allow delete: if false`, así que llamar a
+  /// este método ahora falla siempre con `permission-denied`. Ningún código
+  /// de la app lo llama (ver informe de R8) -- se mantiene sin borrar para
+  /// no perder el historial de por qué `allow delete` está bloqueado, no
+  /// porque tenga ningún uso legítimo pendiente. No lo reactives sin una
+  /// limpieza segura de documentos/Storage detrás. Mismo criterio que
+  /// ElementoService.eliminar() (R6).
   static Future<void> eliminar(
     String casaId,
     String elementoId,
@@ -234,14 +286,7 @@ class RegistroService {
     for (final elemento in elementos) {
       final registros = await streamRegistros(casaId, elemento.id).first;
       final pendientes =
-          registros
-              .where(
-                (r) =>
-                    r.esConProfesional &&
-                    r.estado != EstadoRegistro.terminado &&
-                    r.estado != EstadoRegistro.archivado,
-              )
-              .toList()
+          registros.where(esTrabajoActivo).toList()
             ..sort((a, b) => a.fecha.compareTo(b.fecha));
       if (pendientes.isEmpty) continue;
       resultado.add((

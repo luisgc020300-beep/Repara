@@ -41,6 +41,7 @@ const ELEMENTO_B1 = 'elemento-b1';
 const REGISTRO_A1 = 'registro-a1'; // asignado a PRO
 const REGISTRO_A2 = 'registro-a2'; // sin profesional asignado, solo de OWNER_A
 const REGISTRO_B1 = 'registro-b1'; // de la casa B, sin relación con PRO
+const ELEMENTO_ARCHIVADO = 'elemento-archivado'; // archivado (auditoría R5)
 
 before(async () => {
   testEnv = await initializeTestEnvironment({
@@ -48,7 +49,10 @@ before(async () => {
     firestore: {
       rules: fs.readFileSync(path.resolve(__dirname, '..', 'firestore.rules'), 'utf8'),
       host: '127.0.0.1',
-      port: 8080,
+      // Overridable (auditoría R5, octubre 2026) -- mismo motivo que
+      // functions-tests/helpers.js: un proceso del emulador que no termina
+      // limpio deja el puerto por defecto ocupado para el siguiente intento.
+      port: Number(process.env.REPARA_TEST_FIRESTORE_PORT || 8080),
     },
   });
 });
@@ -72,6 +76,9 @@ beforeEach(async () => {
     });
     await setDoc(doc(db, `casas/${CASA_A}/elementos`, ELEMENTO_A1), { nombre: 'Elemento A1' });
     await setDoc(doc(db, `casas/${CASA_B}/elementos`, ELEMENTO_B1), { nombre: 'Elemento B1' });
+    await setDoc(doc(db, `casas/${CASA_A}/elementos`, ELEMENTO_ARCHIVADO), {
+      nombre: 'Elemento archivado', archivado: true, archivadoAt: new Date(), archivadoPorUid: OWNER_A,
+    });
     await setDoc(doc(db, `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros`, REGISTRO_A1), {
       casaId: CASA_A, titulo: 'Registro A1', tipo: 'averia', esConProfesional: true, estado: 'nuevo', profesionalUid: PRO, presupuesto: 100,
     });
@@ -244,6 +251,17 @@ describe('registros -- acceso del propietario y del profesional asignado', () =>
     await assertFails(updateDoc(doc(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros`, REGISTRO_A1), { estadoPrevioAPendiente: 'enCurso' }));
   });
 
+  // Eliminación directa DESHABILITADA (auditoría R8, octubre 2026, H3):
+  // borrar este documento nunca limpiaba su propia foto en Storage ni los
+  // documentos (ni sus archivos) que lo referencian por registroId -- el
+  // menú de Flutter que la usaba ya no la llama (ver
+  // registro_detail_screen.dart), pero esta regla es lo que de verdad
+  // impide que una llamada directa del cliente (saltándose la UI) siga
+  // pudiendo borrar el documento igual que antes.
+  it('DENY: nadie puede borrar un registro directamente, ni siquiera el propietario', async () => {
+    await assertFails(deleteDoc(doc(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros`, REGISTRO_A2)));
+  });
+
   // Auditoría de seguridad, octubre 2026: profesionalUid solo estaba
   // protegido en `update`, nunca en `create` -- un miembro podía crear el
   // registro YA con ese campo puesto, saltándose por completo el apretón
@@ -281,6 +299,13 @@ describe('registros -- acceso del propietario y del profesional asignado', () =>
 
   it('DENY: un miembro no puede crear un registro con "presupuestoAceptadoId" ya puesto', async () => {
     await assertFails(addDoc(collection(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros`), { titulo: 'Colado', tipo: 'averia', esConProfesional: false, estado: 'nuevo', presupuestoAceptadoId: 'pres-falso' }));
+  });
+
+  // Auditoría R5 (octubre 2026): "un elemento archivado no debe iniciar
+  // trabajo nuevo sin restaurarse primero" -- comprobado aquí en servidor,
+  // no solo en la UI de Flutter.
+  it('DENY: no se puede crear ningún registro nuevo bajo un elemento archivado', async () => {
+    await assertFails(addDoc(collection(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_ARCHIVADO}/registros`), { titulo: 'Intento sobre archivado', tipo: 'averia', esConProfesional: false, estado: 'terminado' }));
   });
 });
 
@@ -363,15 +388,20 @@ describe('historial -- append-only, mismo criterio de lectura que presupuestos/c
   });
 });
 
-describe('pagos -- create/update solo vía Cloud Function, delete directo restringido a quien lo creó', () => {
+describe('pagos -- create/update/delete solo vía Cloud Function', () => {
   // DATA-1 (auditoría de integridad económica, octubre 2026): create/update
   // pasaron de ser escritura directa del cliente a exigir Cloud Function
   // (registrarPago/actualizarPago), que valida el total acumulado contra el
   // presupuesto dentro de una transacción -- algo que estas reglas, al
-  // evaluarse documento a documento, no pueden comprobar. Por eso ahora son
-  // `if false` sin excepción, pase lo que pase en los datos; la lógica de
-  // "importe válido"/"quien creó puede editar" vive en las propias Cloud
-  // Functions (ver functions-tests/payments.test.js para esos casos).
+  // evaluarse documento a documento, no pueden comprobar. delete se unió al
+  // mismo criterio en la auditoría R8 (octubre 2026, hallazgo H4): borrar un
+  // pago podía dejar un saldo pendiente en un elemento ya archivado, algo
+  // que tampoco se puede comprobar documento a documento (exige leer el
+  // presupuesto del registro, sumar el resto de pagos y el estado archivado
+  // del elemento). Las tres son ahora `if false` sin excepción, pase lo que
+  // pase en los datos; la lógica de "importe válido"/"quien creó puede
+  // editar o borrar"/"el elemento está archivado" vive en las propias
+  // Cloud Functions (ver functions-tests/payments.test.js para esos casos).
   it('DENY: ni siquiera el propietario puede crear un pago directo desde el cliente', async () => {
     await assertFails(addDoc(collection(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/pagos`), { importe: 10, fecha: new Date() }));
   });
@@ -396,12 +426,16 @@ describe('pagos -- create/update solo vía Cloud Function, delete directo restri
     await assertFails(updateDoc(doc(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/pagos`, 'pago-a1'), { concepto: 'Primera parte' }));
   });
 
-  it('DENY: otro miembro de la misma casa tampoco puede editar un pago que no creó él', async () => {
+  it('DENY: otro miembro de la misma casa tampoco puede borrar un pago que no creó él', async () => {
     await assertFails(deleteDoc(doc(as(MIEMBRO_A2), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/pagos`, 'pago-a1')));
   });
 
-  it('ALLOW: quien creó el pago sí puede borrarlo', async () => {
-    await assertSucceeds(deleteDoc(doc(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/pagos`, 'pago-a1')));
+  // Auditoría R8 (octubre 2026, H4): antes de esto, quien creó el pago SÍ
+  // podía borrarlo directamente -- ya no, ni siquiera él, porque decidir si
+  // es seguro borrarlo (¿el elemento está archivado? ¿sigue cubriendo el
+  // presupuesto sin este pago?) exige una Cloud Function (eliminarPago).
+  it('DENY: ni siquiera quien creó el pago puede borrarlo directo desde el cliente', async () => {
+    await assertFails(deleteDoc(doc(as(OWNER_A), `casas/${CASA_A}/elementos/${ELEMENTO_A1}/registros/${REGISTRO_A1}/pagos`, 'pago-a1')));
   });
 });
 
@@ -555,5 +589,45 @@ describe('habitaciones, elementos y contactos -- solo miembros de la casa', () =
       await setDoc(doc(ctx.firestore(), `casas/${CASA_A}/contactos`, 'c1'), { nombre: 'Fontanero', telefono: '600' });
     });
     await assertFails(getDoc(doc(as(EXTRANO), `casas/${CASA_A}/contactos`, 'c1')));
+  });
+
+  // Archivado/eliminación de elementos (auditoría R5, octubre 2026): solo
+  // archivarElemento/restaurarElemento (Cloud Functions, Admin SDK, saltan
+  // estas reglas) pueden tocar estos campos -- el cliente nunca directamente,
+  // ni siquiera un miembro legítimo de la casa.
+  it('DENY: un miembro no puede crear un elemento ya con "archivado" puesto', async () => {
+    await assertFails(addDoc(collection(as(OWNER_A), `casas/${CASA_A}/elementos`), { nombre: 'Colado', archivado: true }));
+  });
+
+  it('DENY: un miembro no puede archivar un elemento con una escritura directa', async () => {
+    await assertFails(updateDoc(doc(as(OWNER_A), `casas/${CASA_A}/elementos`, ELEMENTO_A1), { archivado: true }));
+  });
+
+  it('DENY: un miembro no puede restaurar un elemento archivado con una escritura directa', async () => {
+    await assertFails(updateDoc(doc(as(OWNER_A), `casas/${CASA_A}/elementos`, ELEMENTO_ARCHIVADO), { archivado: false }));
+  });
+
+  it('DENY: un miembro no puede borrar "archivadoAt"/"archivadoPorUid" con una escritura directa', async () => {
+    await assertFails(updateDoc(doc(as(OWNER_A), `casas/${CASA_A}/elementos`, ELEMENTO_ARCHIVADO), { archivadoPorUid: MIEMBRO_A2 }));
+  });
+
+  it('ALLOW: un miembro sí puede editar otros campos de un elemento archivado (p.ej. renombrarlo)', async () => {
+    await assertSucceeds(updateDoc(doc(as(OWNER_A), `casas/${CASA_A}/elementos`, ELEMENTO_ARCHIVADO), { nombre: 'Elemento archivado (renombrado)' }));
+  });
+
+  it('ALLOW: el propietario sigue pudiendo leer un elemento archivado (su historial no se bloquea)', async () => {
+    await assertSucceeds(getDoc(doc(as(OWNER_A), `casas/${CASA_A}/elementos`, ELEMENTO_ARCHIVADO)));
+  });
+
+  // Eliminación directa deshabilitada (auditoría R6, octubre 2026): el
+  // botón de Flutter ya no llama a esto, pero esta regla es lo que de
+  // verdad impide que una llamada directa del cliente (saltándose la UI)
+  // siga borrando el documento igual que antes de esta iteración.
+  it('DENY: nadie puede borrar un elemento directamente, ni siquiera el propietario', async () => {
+    await assertFails(deleteDoc(doc(as(OWNER_A), `casas/${CASA_A}/elementos`, ELEMENTO_A1)));
+  });
+
+  it('DENY: tampoco se puede borrar un elemento ya archivado directamente', async () => {
+    await assertFails(deleteDoc(doc(as(OWNER_A), `casas/${CASA_A}/elementos`, ELEMENTO_ARCHIVADO)));
   });
 });

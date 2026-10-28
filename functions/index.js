@@ -18,6 +18,19 @@ const db = getFirestore();
 const REGION = 'europe-west1';
 const MAX_MIEMBROS_CASA = 10;
 
+// Coordinación eliminarCuenta <-> joinCasa (auditoría R12, octubre 2026):
+// ver el comentario junto a eliminarCuenta para el diseño completo. 2
+// minutos es mucho más que cualquier duración real observada para la fase
+// destructiva de una sola casa (decenas de ms a ~3s en las pruebas de R10/
+// R11, incluso con Storage real de por medio) y lo bastante corto para que
+// un intento abandonado no bloquee la casa de forma indefinida.
+const TTL_BLOQUEO_ELIMINACION_MS = 2 * 60 * 1000;
+
+function bloqueoEliminacionActivo(casa) {
+  if (!casa.eliminandoDesde) return false;
+  return Date.now() - casa.eliminandoDesde.toMillis() < TTL_BLOQUEO_ELIMINACION_MS;
+}
+
 // Secreto propio de Repara -- nunca se reutiliza el de RiskRunner/Convive,
 // aunque los tres proyectos usen el mismo patrón de proxy a Anthropic.
 const _anthropicKey = defineSecret('ANTHROPIC_API_KEY');
@@ -175,12 +188,38 @@ exports.joinCasa = onCall({ region: REGION }, async (request) => {
     if (!casaSnap.exists) throw new HttpsError('not-found', 'La casa ya no existe.');
     const data = casaSnap.data();
     if (!(data.members || []).includes(uid)) {
+      // Coordinación con eliminarCuenta (auditoría R12): si el propietario
+      // está borrando esta casa AHORA MISMO (ver marcarCasaParaEliminar),
+      // no se incorpora a nadie nuevo -- hacerlo justo entre la relectura
+      // de eliminarCuenta y su recursiveDelete() dejaría a este miembro
+      // huérfano de una casa que desaparece de todas formas. La detección
+      // real de la carrera no depende de este `if`: tx.get() ya puso el
+      // documento de la casa en el conjunto de lectura de ESTA transacción,
+      // así que si marcarCasaParaEliminar comete su escritura entre este
+      // punto y el commit de aquí, Firestore aborta y reintenta esta
+      // transacción automáticamente (lo mismo que ya demuestra
+      // concurrencia_transacciones.test.js) -- el reintento vuelve a leer
+      // el flag ya puesto y lo rechaza aquí, no hay ninguna ventana sin
+      // cubrir. bloqueoEliminacionActivo() ignora el flag si es más viejo
+      // que TTL_BLOQUEO_ELIMINACION_MS -- un intento abandonado nunca deja
+      // la casa bloqueada para unirse de forma permanente.
+      if (bloqueoEliminacionActivo(data)) {
+        throw new HttpsError(
+          'failed-precondition',
+          'Esta casa está siendo eliminada por su propietario justo ahora. Inténtalo de nuevo en unos minutos.',
+        );
+      }
       if ((data.members || []).length >= MAX_MIEMBROS_CASA) {
         throw new HttpsError('failed-precondition', 'Esta casa ya tiene el máximo de miembros.');
       }
       tx.update(casaRef, {
         members: FieldValue.arrayUnion(uid),
         [`memberProfiles.${uid}`]: { displayName },
+        // Limpieza oportunista de un flag ya caducado (ver cabecera) -- si
+        // seguía ahí de un intento de eliminarCuenta abandonado, no debe
+        // quedar colgando confundiendo una lectura futura. delete() sobre
+        // un campo que no existe no hace nada.
+        eliminandoDesde: FieldValue.delete(),
       });
     }
     tx.set(db.collection('users').doc(uid), {
@@ -324,6 +363,20 @@ exports.invitarProfesional = onCall({ region: REGION }, async (request) => {
   }
   if (!registroSnap.exists) throw new HttpsError('not-found', 'El registro no existe.');
   const registro = registroSnap.data();
+  // Auditoría R7 (octubre 2026): mismo criterio que crearCambioAlcance/
+  // crearPresupuesto -- sin esto, se podía invitar a un profesional sobre un
+  // registro ya cerrado (o, por construcción, de un elemento ya archivado:
+  // archivarElemento exige que TODOS sus registros estén ya terminado/
+  // archivado, así que bloquear esto aquí basta para cubrir también ese
+  // caso, sin tener que leer el elemento aparte). Antes de esta corrección,
+  // la invitación se creaba igual y responderInvitacion llegaba a asignar
+  // profesionalUid sobre un trabajo ya cerrado -- no reabría el trabajo
+  // (estado sigue protegido aparte), pero sí le daba a un profesional acceso
+  // de lectura permanente a un registro que ya no debería poder vincular a
+  // nadie nuevo.
+  if (registro.estado === 'terminado' || registro.estado === 'archivado' || registro.estado === 'pendienteConfirmacion') {
+    throw new HttpsError('failed-precondition', 'Este evento ya está cerrado -- no se puede invitar a un profesional.');
+  }
   // Igual criterio que registro_detail_screen.dart en el cliente: la foto
   // propia del registro manda, y si no tiene, cae a la del elemento -- así
   // el profesional ve algo reconocible (la vitrocerámica, el calentador...)
@@ -476,7 +529,21 @@ exports.responderInvitacion = onCall({ region: REGION }, async (request) => {
     }
 
     let nombreProfesional = null;
+    const regRef = registroRef(inv.casaId, inv.elementoId, inv.registroId);
     if (aceptar) {
+      // Auditoría R7 (octubre 2026): el registro puede haberse cerrado (o
+      // su elemento haberse archivado) ENTRE que se envió la invitación y
+      // que el profesional la acepta -- repetir aquí la misma comprobación
+      // de invitarProfesional, no solo al crearla, por la misma razón que
+      // responderCambioAlcance/responderPresupuesto vuelven a comprobar el
+      // estado del registro en el momento de responder, no solo al crear la
+      // solicitud.
+      const regSnap = await tx.get(regRef);
+      if (!regSnap.exists) throw new HttpsError('not-found', 'El registro ya no existe.');
+      const estadoRegistro = regSnap.data().estado;
+      if (estadoRegistro === 'terminado' || estadoRegistro === 'archivado' || estadoRegistro === 'pendienteConfirmacion') {
+        throw new HttpsError('failed-precondition', 'Este evento ya está cerrado -- no se puede aceptar la invitación.');
+      }
       const userSnap = await tx.get(db.collection('users').doc(uid));
       nombreProfesional = userSnap.exists ? (userSnap.data().displayName || null) : null;
     }
@@ -484,7 +551,6 @@ exports.responderInvitacion = onCall({ region: REGION }, async (request) => {
     tx.update(invitacionRef, { estado: aceptar ? 'aceptada' : 'rechazada' });
 
     if (aceptar) {
-      const regRef = registroRef(inv.casaId, inv.elementoId, inv.registroId);
       tx.update(regRef, {
         profesionalUid: uid,
         ...(nombreProfesional ? { profesionalNombre: nombreProfesional } : {}),
@@ -543,7 +609,127 @@ exports.cancelarInvitacion = onCall({ region: REGION }, async (request) => {
 // vez de borrar en silencio los datos de esos otros miembros -- todavía no
 // hay un flujo de "transferir propiedad" o "expulsar miembro" en la app, y
 // construirlo no es parte de este cambio.
+//
+// Rediseño R10 (octubre 2026, cierre de R9-H1): la versión anterior
+// comprobaba "¿eres propietario único?" casa por casa, DENTRO del mismo
+// bucle que ya borraba. Si el usuario era propietario único de la primera
+// casa de la lista (que se borraba sin problema, de forma irreversible) y
+// propietario compartido de la segunda, la función lanzaba el error al
+// llegar a la segunda -- dejando la cuenta a medias: una casa ya borrada
+// para siempre, la cuenta de Authentication todavía viva, y ningún registro
+// de qué había quedado a mitad de camino. No se puede envolver todo esto en
+// una única transacción de Firestore (recursiveDelete, Storage y
+// Authentication no comparten ninguna transacción entre sí -- no existe esa
+// primitiva), así que la solución es un diseño en dos fases más operaciones
+// idempotentes, no una transacción imposible:
+//
+// Fase 0 (solo lectura, SIN ningún efecto secundario): valida TODAS las
+// casas antes de borrar NINGUNA. Si alguna bloquea la eliminación, el
+// usuario se entera sin haber perdido ningún dato todavía.
+//
+// Fase 1 (destructiva, pero cada paso es idempotente a propósito): si una
+// ejecución se interrumpe a mitad y el cliente vuelve a llamar a esta misma
+// función, retomar es seguro -- lo ya borrado se encuentra "ya no existe" y
+// se salta sin error (recursiveDelete/deleteFiles/.delete() sobre algo que
+// ya no existe no son operaciones destructivas nuevas), y lo que falta se
+// completa igual que en el primer intento. Dentro de esta fase se repite la
+// misma comprobación de "¿sigues siendo propietario único?" por si alguien
+// se unió a una casa justo en la ventana entre la Fase 0 y este punto --
+// ese caso nunca borra la casa en disputa, pero tampoco aborta el resto: se
+// deja intacta, se sigue con las demás, y se informa al final (ver más
+// abajo) en vez de repetir el defecto original con las casas que SÍ se
+// llegaron a procesar antes.
+//
+// Cerrado en R12 (octubre 2026, cierre del riesgo residual documentado en
+// R11): la relectura de members.length de la Fase 1 iba seguida de TRES
+// operaciones con await real (Storage, joinCode, recursiveDelete) sin
+// ninguna protección -- la ventana no era "casi cero", duraba lo que
+// tardaran esas tres llamadas de red (cientos de ms a varios segundos en
+// las propias pruebas de R10/R11). Si joinCasa añadía un miembro justo en
+// esa ventana, recursiveDelete lo borraba igual: no está condicionado a
+// ninguna lectura previa, así que nada detectaba el cambio.
+//
+// La solución (marcarCasaParaEliminarSiEsSeguro, más abajo) NO es un lock
+// nuevo por fuera de Firestore -- es una transacción que lee el mismo
+// documento que YA lee la transacción de joinCasa. Eso es suficiente:
+// Firestore aborta y reintenta automáticamente cualquier transacción cuyo
+// conjunto de lectura cambió antes de su commit (lo prueba, para este
+// mismo proyecto, concurrencia_transacciones.test.js desde R7). Da igual
+// qué transacción "gane" la carrera -- la que pierda se reintenta y, en el
+// reintento, ve el estado que la otra ya dejó:
+//   - Si marcarCasaParaEliminarSiEsSeguro comete primero (pone
+//     eliminandoDesde): el reintento de joinCasa ve el flag y rechaza
+//     unirse -- nunca llega a incorporar al miembro.
+//   - Si joinCasa comete primero (members.length pasa a 2): el reintento
+//     de marcarCasaParaEliminarSiEsSeguro ve members.length>1 y devuelve
+//     "compartida" en vez de poner el flag -- eliminarCuenta nunca borra
+//     esa casa.
+// Ningún entrelazado posible deja la casa borrada con dos miembros, ni deja
+// a un miembro nuevo huérfano de una casa que desaparece bajo él.
+//
+// El flag en sí (eliminandoDesde) caduca solo (TTL_BLOQUEO_ELIMINACION_MS,
+// ver cabecera del archivo): si eliminarCuenta pone el flag y luego falla
+// de verdad (Storage caído, por ejemplo) y el usuario nunca reintenta, la
+// casa NO queda bloqueada para unirse de forma permanente -- joinCasa
+// ignora un flag más viejo que el TTL y lo limpia al unir a alguien. Un
+// reintento de eliminarCuenta dentro del TTL simplemente refresca el
+// mismo flag y sigue -- no hace falta ningún paso explícito de "liberar"
+// el bloqueo aparte de que caduque o de que la casa se borre entera.
+//
+// Endurecido en R11 (octubre 2026, cierre de riesgos residuales de R10):
+// R10 ya evitaba el defecto de R9-H1 (casas a medias entre sí), pero DENTRO
+// de una misma casa seguía teniendo dos fallos:
+//
+//   1. El borrado de Storage estaba envuelto en un try/catch que SOLO hacía
+//      console.error y seguía adelante como si nada -- un fallo real (red,
+//      permisos, bucket mal configurado) se confundía con "ya no había nada
+//      que borrar". deleteFiles({prefix}) NUNCA lanza por "cero
+//      coincidencias" (eso se resuelve sin error), así que cualquier
+//      excepción de esa llamada es un fallo genuino que antes se tragaba en
+//      silencio y la función igualmente devolvía { ok: true }.
+//
+//   2. El orden era recursiveDelete(casa) -> borrar joinCode -> borrar
+//      Storage. Si Storage fallaba, el documento de la casa YA no existía
+//      -- así que un reintento posterior encontraba casaSnap.exists===false
+//      y se saltaba esa casa (`continue`) sin volver a intentar la limpieza
+//      de Storage nunca más. La limpieza pendiente quedaba huérfana para
+//      siempre, sin ninguna vía de recuperación.
+//
+// La solución es invertir el orden: Storage y el joinCode se borran ANTES
+// de recursiveDelete. recursiveDelete es el único paso de los tres que es
+// trivialmente idempotente sin ningún matiz (borrar un subárbol que ya no
+// existe no hace nada), así que es el que debe ir último y hacer de
+// "marcador" de qué queda pendiente. Si Storage o el joinCode fallan de
+// verdad, el documento de la casa se deja intacto a propósito: un
+// reintento vuelve a encontrar casaSnap.exists===true y repite los tres
+// pasos desde el principio -- sin necesitar ningún registro de progreso
+// aparte, y sin que el fallo se oculte: la función ya NO devuelve
+// { ok: true } ni borra el perfil/la cuenta de Authentication mientras
+// quede alguna casa con limpieza pendiente (ver fallosDeLimpieza más
+// abajo) -- si se borrara la cuenta de Authentication en ese momento, el
+// usuario perdería la única vía (volver a llamar a esta función
+// autenticado) para completar la limpieza.
 // -----------------------------------------------------------------------------
+
+// Transacción que lee el MISMO documento que lee joinCasa -- es eso, y no
+// ningún mecanismo nuevo, lo que hace segura la coordinación (ver cabecera
+// de eliminarCuenta). Devuelve 'ok' (flag puesto, seguro proceder a borrar),
+// 'compartida' (hay más de un miembro -- de verdad, no es un flag caducado)
+// o 'ya-no-existe' (alguien más ya la borró, por ejemplo en un reintento
+// concurrente del propio usuario).
+async function marcarCasaParaEliminarSiEsSeguro(casaRef, uid) {
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(casaRef);
+    if (!snap.exists) return { resultado: 'ya-no-existe' };
+    const casa = snap.data();
+    if (casa.ownerUid !== uid) return { resultado: 'ya-no-existe' };
+    const members = casa.members || [];
+    if (members.length > 1) return { resultado: 'compartida', nombre: casa.nombre };
+    tx.update(casaRef, { eliminandoDesde: FieldValue.serverTimestamp() });
+    return { resultado: 'ok', casa };
+  });
+}
+
 exports.eliminarCuenta = onCall({ region: REGION }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
   const uid = request.auth.uid;
@@ -552,28 +738,61 @@ exports.eliminarCuenta = onCall({ region: REGION }, async (request) => {
   const userSnap = await userRef.get();
   const casaIds = userSnap.exists ? (userSnap.data().casaIds || []) : [];
 
+  // Fase 0 -- validación completa antes de tocar nada.
+  const casasLeidas = await Promise.all(
+    casaIds.map(async (casaId) => ({ casaId, snap: await db.collection('casas').doc(casaId).get() })),
+  );
+  const bloqueantesDeAntemano = casasLeidas
+    .filter(({ snap }) => snap.exists)
+    .filter(({ snap }) => snap.data().ownerUid === uid && (snap.data().members || []).length > 1)
+    .map(({ snap }) => snap.data().nombre || 'una de tus casas');
+  if (bloqueantesDeAntemano.length > 0) {
+    throw new HttpsError(
+      'failed-precondition',
+      `No puedes eliminar tu cuenta mientras seas propietario de estas casas y tengan otros miembros: ${bloqueantesDeAntemano.join(', ')}. Sal de esas casas o contacta con soporte primero.`,
+    );
+  }
+
+  // Fase 1 -- destructiva, con defensa en profundidad y pasos idempotentes.
+  const bloqueadasEnElMomento = [];
+  const fallosDeLimpieza = [];
   for (const casaId of casaIds) {
     const casaRef = db.collection('casas').doc(casaId);
     const casaSnap = await casaRef.get();
     if (!casaSnap.exists) continue;
-    const casa = casaSnap.data();
-    const members = casa.members || [];
+    const casaPrevia = casaSnap.data();
 
-    if (casa.ownerUid === uid) {
-      if (members.length > 1) {
-        throw new HttpsError(
-          'failed-precondition',
-          `No puedes eliminar tu cuenta mientras seas propietario de "${casa.nombre}" y tenga otros miembros. Sal de esa casa o contacta con soporte primero.`,
-        );
+    if (casaPrevia.ownerUid === uid) {
+      // Coordinación R12 con joinCasa -- ver cabecera. La comprobación que
+      // de verdad decide si es seguro borrar ya NO es esta lectura plana:
+      // es la transacción de marcarCasaParaEliminarSiEsSeguro, que lee el
+      // mismo documento que lee joinCasa y por eso Firestore puede
+      // serializar ambas de verdad, no solo reducir la ventana.
+      const { resultado, nombre, casa } = await marcarCasaParaEliminarSiEsSeguro(casaRef, uid);
+      if (resultado === 'ya-no-existe') continue;
+      if (resultado === 'compartida') {
+        // Hay más de un miembro de verdad (no un flag caducado) -- se unió
+        // alguien entre la Fase 0 y este punto, o entre dos reintentos. No
+        // se borra, pero tampoco se aborta todo lo demás (ver cabecera).
+        bloqueadasEnElMomento.push(nombre || casaId);
+        continue;
       }
-      await db.recursiveDelete(casaRef);
-      if (casa.joinCode) await db.collection('joinCodes').doc(casa.joinCode).delete().catch(() => {});
       try {
+        // Orden R11 -- Storage y joinCode ANTES de recursiveDelete (ver
+        // cabecera): si cualquiera de estos dos falla de verdad, la casa se
+        // queda intacta (con el flag puesto, ver cabecera R12 -- caduca
+        // solo) y un reintento repite los tres pasos.
         await getStorage().bucket().deleteFiles({ prefix: `casas/${casaId}/` });
+        if (casa.joinCode) await db.collection('joinCodes').doc(casa.joinCode).delete();
+        await db.recursiveDelete(casaRef);
       } catch (e) {
-        // Los documentos/fotos huérfanos en Storage no bloquean el borrado
-        // de la cuenta -- es limpieza, no el derecho de supresión en sí.
-        console.error('eliminarCuenta: fallo al borrar Storage de', casaId, e);
+        // Fallo real -- NO "ya no existe" (ver cabecera: deleteFiles por
+        // prefijo no lanza por cero coincidencias, y Firestore.delete() no
+        // lanza sobre un documento que ya no existe). Se documenta y NO se
+        // informa de éxito más abajo.
+        console.error('eliminarCuenta: fallo al limpiar la casa', casaId, e);
+        fallosDeLimpieza.push(casa.nombre || casaId);
+        continue;
       }
     } else {
       await casaRef.update({
@@ -582,8 +801,23 @@ exports.eliminarCuenta = onCall({ region: REGION }, async (request) => {
       });
     }
   }
+  if (bloqueadasEnElMomento.length > 0) {
+    throw new HttpsError(
+      'failed-precondition',
+      `Alguien se unió a estas casas justo ahora, así que no se han eliminado: ${bloqueadasEnElMomento.join(', ')}. El resto de tu cuenta ya se ha limpiado -- vuelve a intentarlo cuando lo resuelvas.`,
+    );
+  }
+  if (fallosDeLimpieza.length > 0) {
+    // No se borra ni el perfil ni la cuenta de Authentication -- si se
+    // hiciera, el usuario perdería la única vía (volver a llamar a esta
+    // función autenticado) para completar la limpieza pendiente.
+    throw new HttpsError(
+      'internal',
+      `No se ha podido completar la limpieza de estas casas por un fallo técnico (no por otros miembros): ${fallosDeLimpieza.join(', ')}. Tu cuenta NO se ha eliminado todavía -- vuelve a intentarlo en unos minutos.`,
+    );
+  }
 
-  await db.collection('profesionales').doc(uid).delete().catch(() => {});
+  await db.collection('profesionales').doc(uid).delete();
 
   const notifsSnap = await db.collection('notificaciones').where('uid', '==', uid).get();
   if (!notifsSnap.empty) {
@@ -592,8 +826,20 @@ exports.eliminarCuenta = onCall({ region: REGION }, async (request) => {
     await batch.commit();
   }
 
-  await userRef.delete().catch(() => {});
-  await getAuth().deleteUser(uid);
+  await userRef.delete();
+  // Idempotente a propósito (auditoría R10): si una ejecución anterior ya
+  // llegó hasta aquí y solo falló este último paso, un reintento encontraría
+  // la cuenta de Authentication ya borrada -- deleteUser() lanzaría
+  // "auth/user-not-found" en vez de completar con éxito. Tratarlo como
+  // éxito es correcto: el estado final deseado (la cuenta ya no existe) ya
+  // se cumple. Este es el ÚNICO punto de toda la función donde "el recurso
+  // ya no existe" y "la operación fue un éxito" son legítimamente lo mismo
+  // -- en la Fase 1 (ver cabecera, R11) deliberadamente NO lo son.
+  try {
+    await getAuth().deleteUser(uid);
+  } catch (e) {
+    if (e.code !== 'auth/user-not-found') throw e;
+  }
 
   return { ok: true };
 });
@@ -803,6 +1049,14 @@ exports.crearPresupuesto = onCall({ region: REGION }, async (request) => {
   if (!esProfesionalAsignado && !(await esMiembroCasa(casaId, uid))) {
     throw new HttpsError('permission-denied', 'No tienes acceso a este registro.');
   }
+  // Auditoría R7 (octubre 2026): mismo criterio que crearCambioAlcance --
+  // sin esto se podía crear (y, peor, enviar -- ver enviarPresupuesto) un
+  // presupuesto nuevo sobre un registro ya cerrado, o de un elemento ya
+  // archivado (que exige tener todos sus registros ya terminado/archivado
+  // para poder archivarse, así que bloquear esto aquí ya cubre ese caso).
+  if (registro.estado === 'terminado' || registro.estado === 'archivado' || registro.estado === 'pendienteConfirmacion') {
+    throw new HttpsError('failed-precondition', 'Este evento ya está finalizado o pendiente de confirmación, no se pueden crear presupuestos nuevos.');
+  }
 
   const totales = calcularTotales(lineas);
   const presupuestosCol = regRef.collection('presupuestos');
@@ -875,6 +1129,14 @@ exports.enviarPresupuesto = onCall({ region: REGION }, async (request) => {
   const p = snap.data();
   if (p.creadoPorUid !== uid) throw new HttpsError('permission-denied', 'Solo quien lo creó puede enviarlo.');
   if (p.estado !== 'borrador') throw new HttpsError('failed-precondition', 'Este presupuesto ya se envió.');
+  // Auditoría R7 (octubre 2026): el registro puede haberse cerrado DESPUÉS
+  // de crear el borrador (crearPresupuesto ya lo comprueba al crear, no al
+  // enviar) -- mismo motivo que responderInvitacion vuelve a comprobar el
+  // estado en el momento de aceptar, no solo al invitar.
+  const estadoRegistro = registroSnap.data().estado;
+  if (estadoRegistro === 'terminado' || estadoRegistro === 'archivado' || estadoRegistro === 'pendienteConfirmacion') {
+    throw new HttpsError('failed-precondition', 'Este evento ya está finalizado o pendiente de confirmación, no se puede enviar el presupuesto.');
+  }
 
   await ref.update({ estado: 'enviado', fechaEnvio: FieldValue.serverTimestamp() });
   await registrarHistorial(regRef, {
@@ -995,6 +1257,16 @@ exports.crearNuevaVersionPresupuesto = onCall({ region: REGION }, async (request
   // reescribe uno enviado o aceptado (sección 17: "no debe sobrescribirse
   // destructivamente después de haber sido enviado").
   if (anterior.estado !== 'rechazado') throw new HttpsError('failed-precondition', 'Solo se puede crear una nueva versión de un presupuesto rechazado.');
+  // Auditoría R7 (octubre 2026): mismo criterio que crearPresupuesto/
+  // enviarPresupuesto, por consistencia -- sin esto, esta era la única de
+  // las cuatro funciones de presupuestos que no comprobaba si el registro
+  // ya se había cerrado entre tanto.
+  const registroSnap = await regRef.get();
+  if (!registroSnap.exists) throw new HttpsError('not-found', 'El registro no existe.');
+  const estadoRegistro = registroSnap.data().estado;
+  if (estadoRegistro === 'terminado' || estadoRegistro === 'archivado' || estadoRegistro === 'pendienteConfirmacion') {
+    throw new HttpsError('failed-precondition', 'Este evento ya está finalizado o pendiente de confirmación, no se pueden crear presupuestos nuevos.');
+  }
 
   const totales = calcularTotales(lineas);
   const ref = await regRef.collection('presupuestos').add({
@@ -1208,9 +1480,12 @@ exports.actualizarPago = onCall({ region: REGION }, async (request) => {
   const regRef = registroRef(casaId, elementoId, registroId);
   const pagosCol = regRef.collection('pagos');
   const pagoRef = pagosCol.doc(pagoId);
+  const elRef = elementoRef(casaId, elementoId);
 
   await db.runTransaction(async (tx) => {
-    const [registroSnap, pagoSnap, existentesSnap] = await Promise.all([tx.get(regRef), tx.get(pagoRef), tx.get(pagosCol)]);
+    const [registroSnap, pagoSnap, existentesSnap, elSnap] = await Promise.all([
+      tx.get(regRef), tx.get(pagoRef), tx.get(pagosCol), tx.get(elRef),
+    ]);
     if (!registroSnap.exists) throw new HttpsError('not-found', 'El registro no existe.');
     if (!pagoSnap.exists) throw new HttpsError('not-found', 'El pago no existe.');
     // Solo quien lo creó puede editarlo -- mismo criterio que ya aplican
@@ -1222,11 +1497,67 @@ exports.actualizarPago = onCall({ region: REGION }, async (request) => {
     const presupuesto = registroSnap.data().presupuesto;
     if (presupuesto != null) {
       const totalSinEste = existentesSnap.docs.reduce((acc, d) => (d.id === pagoId ? acc : acc + (Number(d.data().importe) || 0)), 0);
-      if (redondear2(totalSinEste + importe) > presupuesto + 0.01) {
+      const nuevoTotal = redondear2(totalSinEste + importe);
+      if (nuevoTotal > presupuesto + 0.01) {
         throw new HttpsError('failed-precondition', 'Ese importe supera el presupuesto disponible para este registro.');
+      }
+      // Auditoría R8 (octubre 2026, H4): archivar un elemento exige que su
+      // saldo esté cubierto EN ESE MOMENTO (ver tieneSaldoPendiente) -- sin
+      // esto, reducir el importe de un pago después podía deshacer esa
+      // garantía en silencio, dejando un elemento archivado con deuda. No
+      // desarchiva nada ni toca el resto de pagos -- solo bloquea ESTA
+      // edición concreta si dejaría un saldo pendiente real.
+      if (elSnap.exists && elSnap.data().archivado === true && redondear2(presupuesto - nuevoTotal) > 0.01) {
+        throw new HttpsError('failed-precondition', 'Este elemento está archivado -- esta edición dejaría un saldo pendiente de pago.');
       }
     }
     tx.update(pagoRef, { fecha, importe, ...opcionales });
+  });
+
+  return { ok: true };
+});
+
+// Auditoría R8 (octubre 2026, H4): antes de esto, borrar un pago era una
+// escritura directa del cliente (firestore.rules: allow delete: if
+// resource.data.createdBy == uid) -- correcto mientras el supuesto de
+// partida fuera cierto ("borrar un pago nunca puede hacer que la suma
+// supere el presupuesto", comentario original de pago_service.dart), pero
+// ese supuesto deja de cumplirse para un elemento ARCHIVADO: archivar exige
+// que el saldo esté cubierto en ese momento, y borrar un pago después puede
+// deshacer esa garantía en silencio. Decidir "¿se puede borrar esto?" exige
+// conocer el presupuesto del registro, la suma del resto de pagos y si el
+// elemento está archivado -- tres lecturas que firestore.rules no puede
+// combinar (solo lee documentos concretos, nunca agrega una colección),
+// mismo motivo por el que registrarPago/actualizarPago ya son Cloud
+// Functions. Mantiene el mismo criterio de autorización que la regla
+// directa sustituida (solo quien creó el pago puede borrarlo).
+exports.eliminarPago = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+  const uid = request.auth.uid;
+  const { casaId, elementoId, registroId, pagoId } = request.data || {};
+  if (!casaId || !elementoId || !registroId || !pagoId) throw new HttpsError('invalid-argument', 'Faltan datos.');
+  if (!(await esMiembroCasa(casaId, uid))) throw new HttpsError('permission-denied', 'No perteneces a esa casa.');
+
+  const regRef = registroRef(casaId, elementoId, registroId);
+  const pagosCol = regRef.collection('pagos');
+  const pagoRef = pagosCol.doc(pagoId);
+  const elRef = elementoRef(casaId, elementoId);
+
+  await db.runTransaction(async (tx) => {
+    const [pagoSnap, registroSnap, elSnap, existentesSnap] = await Promise.all([
+      tx.get(pagoRef), tx.get(regRef), tx.get(elRef), tx.get(pagosCol),
+    ]);
+    if (!pagoSnap.exists) throw new HttpsError('not-found', 'El pago no existe.');
+    if (pagoSnap.data().createdBy !== uid) throw new HttpsError('permission-denied', 'Solo quien registró el pago puede borrarlo.');
+
+    const presupuesto = registroSnap.exists ? registroSnap.data().presupuesto : null;
+    if (elSnap.exists && elSnap.data().archivado === true && presupuesto != null) {
+      const totalSinEste = existentesSnap.docs.reduce((acc, d) => (d.id === pagoId ? acc : acc + (Number(d.data().importe) || 0)), 0);
+      if (redondear2(presupuesto - totalSinEste) > 0.01) {
+        throw new HttpsError('failed-precondition', 'Este elemento está archivado -- borrar este pago dejaría un saldo pendiente de pago.');
+      }
+    }
+    tx.delete(pagoRef);
   });
 
   return { ok: true };
@@ -1301,14 +1632,143 @@ exports.cancelarCambioAlcance = onCall({ region: REGION }, async (request) => {
 
   const regRef = registroRef(casaId, elementoId, registroId);
   const ref = regRef.collection('cambiosAlcance').doc(cambioAlcanceId);
-  const snap = await ref.get();
-  if (!snap.exists) throw new HttpsError('not-found', 'No existe.');
-  if (snap.data().creadoPorUid !== uid) throw new HttpsError('permission-denied', 'Solo quien lo creó puede cancelarlo.');
-  if (snap.data().estado !== 'pendiente') throw new HttpsError('failed-precondition', 'Ya se respondió a esta solicitud.');
-  await ref.update({ estado: 'cancelado' });
-  await registrarHistorial(regRef, {
-    actorUid: uid, entidad: 'cambioAlcance', entidadId: cambioAlcanceId, accion: 'cancelado',
-    estadoAnterior: 'pendiente', estadoNuevo: 'cancelado', importe: snap.data().importeAdicional,
+
+  // Transacción (auditoría R3, octubre 2026): antes esto era un get() +
+  // update() sueltos, a diferencia de responderCambioAlcance (unas líneas
+  // más arriba), que sí comprueba el estado dentro de la misma transacción
+  // que escribe. Sin eso, cancelar podía ganarle la carrera a una
+  // aprobación/rechazo simultáneo del propietario (o a otra cancelación
+  // duplicada desde dos dispositivos): ambos leían 'pendiente' antes de que
+  // ninguno hubiera escrito, y el documento podía acabar en 'cancelado'
+  // aunque el presupuesto ya se hubiera incrementado por la aprobación que
+  // "perdió" la carrera. También faltaba el mismo bloqueo de registro
+  // cerrado que responderCambioAlcance ya aplica -- sin él, se podía
+  // cancelar una solicitud pendiente sobre un registro ya finalizado (la UI
+  // ya lo evita con registroCerrado, pero el servidor no lo exigía).
+  await db.runTransaction(async (tx) => {
+    const [registroSnap, snap] = await Promise.all([tx.get(regRef), tx.get(ref)]);
+    const estadoRegistro = registroSnap.exists ? registroSnap.data().estado : null;
+    if (estadoRegistro === 'terminado' || estadoRegistro === 'archivado') {
+      throw new HttpsError('failed-precondition', 'Este registro ya está finalizado, no se puede cancelar la solicitud.');
+    }
+    if (!snap.exists) throw new HttpsError('not-found', 'No existe.');
+    const cambio = snap.data();
+    if (cambio.creadoPorUid !== uid) throw new HttpsError('permission-denied', 'Solo quien lo creó puede cancelarlo.');
+    if (cambio.estado !== 'pendiente') throw new HttpsError('failed-precondition', 'Ya se respondió a esta solicitud.');
+    tx.update(ref, { estado: 'cancelado' });
+    registrarHistorial(regRef, {
+      tx, actorUid: uid, entidad: 'cambioAlcance', entidadId: cambioAlcanceId, accion: 'cancelado',
+      estadoAnterior: 'pendiente', estadoNuevo: 'cancelado', importe: cambio.importeAdicional,
+    });
+  });
+  return { ok: true };
+});
+
+// =============================================================================
+// ARCHIVAR / RESTAURAR ELEMENTO (auditoría R5, octubre 2026). Archivar NO es
+// eliminar: el elemento, sus registros, pagos, presupuestos, documentos e
+// historial siguen existiendo exactamente igual -- solo deja de aparecer en
+// los listados de activos (ver ElementoService.streamElementos). Server-side
+// porque "¿tiene este elemento algún trabajo profesional activo?" exige
+// recorrer su subcolección de registros, algo que firestore.rules no puede
+// comprobar (solo lee documentos concretos por ruta, nunca colecciones
+// enteras) -- mismo motivo por el que registrarPago ya es Cloud Function.
+// =============================================================================
+function elementoRef(casaId, elementoId) {
+  return db.collection('casas').doc(casaId).collection('elementos').doc(elementoId);
+}
+
+// Mismo criterio que elementosConTrabajoPendiente() en registro_service.dart
+// (lado cliente, ya usado hoy para el aviso de Inicio): un registro con
+// profesional asignado que todavía no está terminado ni archivado es
+// "trabajo activo". Repetido aquí porque la decisión de bloquear el
+// archivado tiene que tomarse en servidor, no solo confiar en la UI.
+function tieneTrabajoActivo(registrosSnap) {
+  return registrosSnap.docs.some((d) => {
+    const r = d.data();
+    return r.esConProfesional === true && r.estado !== 'terminado' && r.estado !== 'archivado';
+  });
+}
+
+// Saldo pendiente (auditoría R6, octubre 2026): un registro con presupuesto
+// fijado cuya suma de pagos todavía no lo cubre. MISMA fórmula y MISMA
+// tolerancia (0.01) que ya usan registrarPago/actualizarPago para decidir si
+// un pago nuevo cabe en el presupuesto restante (ver más arriba) -- no se
+// inventa un segundo criterio que pudiera divergir de ese. presupuesto ==
+// null significa "sin seguimiento de presupuesto para este registro" (el
+// propio registrarPago ya trata ese caso como "se deja pagar libremente",
+// test 6 de payments.test.js); nunca cuenta como saldo pendiente. Se
+// comprueba en TODOS los registros, no solo los no terminados -- un trabajo
+// ya terminado con un saldo sin cobrar sigue siendo una deuda real.
+//
+// [tx] opcional, mismo motivo que registrarHistorial: si se pasa (desde
+// archivarElemento), las lecturas de "pagos" quedan dentro de la misma
+// transacción -- así, si alguien registra un pago nuevo justo durante el
+// archivado, Firestore detecta el conflicto de lectura en ESA subcolección
+// concreta y reintenta la transacción, igual que ya hace con la de
+// registros.
+async function tieneSaldoPendiente(registrosSnap, tx) {
+  const pendientes = await Promise.all(
+    registrosSnap.docs.map(async (d) => {
+      const presupuesto = d.data().presupuesto;
+      if (presupuesto == null) return false;
+      const pagosRef = d.ref.collection('pagos');
+      const pagosSnap = tx ? await tx.get(pagosRef) : await pagosRef.get();
+      const totalPagado = pagosSnap.docs.reduce((acc, p) => acc + (Number(p.data().importe) || 0), 0);
+      return redondear2(presupuesto - totalPagado) > 0.01;
+    }),
+  );
+  return pendientes.some(Boolean);
+}
+
+exports.archivarElemento = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+  const uid = request.auth.uid;
+  const { casaId, elementoId } = request.data || {};
+  if (!casaId || !elementoId) throw new HttpsError('invalid-argument', 'Faltan datos.');
+  if (!(await esMiembroCasa(casaId, uid))) throw new HttpsError('permission-denied', 'No perteneces a esa casa.');
+
+  const elRef = elementoRef(casaId, elementoId);
+  // Transacción (mismo patrón que registrarPago/responderCambioAlcance):
+  // tx.get() sobre TODA la subcolección de registros (y, ahora, sobre cada
+  // una de sus subcolecciones de pagos con saldo que comprobar) hace que, si
+  // alguien crea un registro con profesional o registra un pago justo
+  // durante este archivado, Firestore detecte el conflicto de lectura y
+  // reintente la transacción en vez de dejar pasar las dos operaciones a la
+  // vez.
+  await db.runTransaction(async (tx) => {
+    const [elSnap, registrosSnap] = await Promise.all([
+      tx.get(elRef),
+      tx.get(elRef.collection('registros')),
+    ]);
+    if (!elSnap.exists) throw new HttpsError('not-found', 'El elemento no existe.');
+    if (elSnap.data().archivado === true) throw new HttpsError('failed-precondition', 'Este elemento ya está archivado.');
+    if (tieneTrabajoActivo(registrosSnap)) {
+      throw new HttpsError('failed-precondition', 'Este elemento tiene un trabajo profesional activo o pendiente -- no se puede archivar todavía.');
+    }
+    if (await tieneSaldoPendiente(registrosSnap, tx)) {
+      throw new HttpsError('failed-precondition', 'Este elemento tiene un saldo pendiente de pago -- no se puede archivar todavía.');
+    }
+    tx.update(elRef, { archivado: true, archivadoAt: FieldValue.serverTimestamp(), archivadoPorUid: uid });
+  });
+  return { ok: true };
+});
+
+exports.restaurarElemento = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+  const uid = request.auth.uid;
+  const { casaId, elementoId } = request.data || {};
+  if (!casaId || !elementoId) throw new HttpsError('invalid-argument', 'Faltan datos.');
+  if (!(await esMiembroCasa(casaId, uid))) throw new HttpsError('permission-denied', 'No perteneces a esa casa.');
+
+  const elRef = elementoRef(casaId, elementoId);
+  const elSnap = await elRef.get();
+  if (!elSnap.exists) throw new HttpsError('not-found', 'El elemento no existe.');
+  if (elSnap.data().archivado !== true) throw new HttpsError('failed-precondition', 'Este elemento no está archivado.');
+  await elRef.update({
+    archivado: false,
+    archivadoAt: FieldValue.delete(),
+    archivadoPorUid: FieldValue.delete(),
   });
   return { ok: true };
 });

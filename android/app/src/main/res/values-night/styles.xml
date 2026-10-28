@@ -2,7 +2,7 @@
 <resources>
     <!-- Theme applied to the Android Window while the process is starting when the OS's Dark Mode setting is on -->
     <!-- parent=Theme.AppCompat.DayNight (antes Theme.Black.NoTitleBar a
-         secas) -- mismo motivo que en values/styles.xml. -->
+         secas) — mismo motivo que en values/styles.xml. -->
     <style name="LaunchTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
         <!-- Show a splash screen on the activity. Automatically removed when
              the Flutter engine draws its first frame -->

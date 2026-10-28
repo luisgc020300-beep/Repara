@@ -11,6 +11,7 @@
 // screen.dart (que lee estos mismos campos del Elemento).
 import 'dart:io';
 
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -272,27 +273,46 @@ class ElementoDetailScreen extends StatelessWidget {
     }
   }
 
-  Future<void> _eliminar(BuildContext context, Elemento elemento) async {
-    final confirmar = await AppDialog.confirmText(
-      context,
-      title: '¿Eliminar elemento?',
-      message: 'Se eliminará la ficha, no su historial ya registrado.',
-      confirmLabel: 'Eliminar',
-    );
-    if (!confirmar || !context.mounted) return;
-    await ElementoService.eliminar(casa.id, elemento.id);
-    if (context.mounted) Navigator.pop(context);
-  }
-
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<Elemento?>(
       stream: ElementoService.streamElemento(casa.id, elementoId),
       builder: (context, snapshot) {
-        final elemento = snapshot.data;
-        if (elemento == null) {
+        // snapshot.data == null es ambiguo por sí solo: puede significar
+        // "todavía no ha llegado el primer snapshot" (connectionState.
+        // waiting) o "el documento ya no existe" (connectionState.active con
+        // dato null -- p.ej. este elemento se acaba de borrar, desde este
+        // mismo dispositivo o desde otro). Auditoría R3, octubre 2026: sin
+        // distinguir los dos casos, el segundo se quedaba enseñando el
+        // spinner para siempre (nunca "active" + no-null), una pantalla
+        // muerta sin botón de volver -- alcanzable de verdad abriendo un
+        // documento de la ficha de la casa cuyo elemento ya fue eliminado.
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        // Retrocorrección R4, octubre 2026: el fix de R3 de arriba distinguía
+        // "cargando" de "data == null", pero no de "el stream terminó en
+        // error" -- streamElemento() relanza (conRegistroDeErrores) cualquier
+        // fallo de lectura, incluido permission-denied si, p.ej., dejas de
+        // ser miembro de la casa mientras tienes esta ficha abierta. Sin este
+        // caso aparte, ese error también caía en la rama de abajo y mostraba
+        // "ya no existe" para algo que en realidad es "no tienes acceso" --
+        // exactamente la confusión que esta iteración pide evitar.
+        if (snapshot.hasError) {
+          return Scaffold(
+            appBar: AppBar(),
+            body: const Center(
+              child: Text('No se pudo cargar este elemento.'),
+            ),
+          );
+        }
+        final elemento = snapshot.data;
+        if (elemento == null) {
+          return Scaffold(
+            appBar: AppBar(),
+            body: const Center(child: Text('Este elemento ya no existe.')),
           );
         }
         return Scaffold(
@@ -333,29 +353,59 @@ class ElementoDetailScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              IconButton(
-                icon: Icon(
-                  Icons.delete_outline,
-                  color: context.colors.errorText,
-                ),
-                tooltip: 'Eliminar elemento',
-                onPressed: () => _eliminar(context, elemento),
-              ),
+              _ArchivarElementoButton(casaId: casa.id, elemento: elemento),
+              const _EliminarElementoButton(),
             ],
           ),
-          floatingActionButton: FloatingActionButton.extended(
-            onPressed: () => mostrarNuevoRegistroSheet(
-              context,
-              casaId: casa.id,
-              elementoId: elemento.id,
-              elementoNombre: elemento.nombre,
-            ),
-            icon: const Icon(Icons.add),
-            label: const Text('Añadir evento'),
-          ),
+          // null cuando está archivado (auditoría R5, octubre 2026): la
+          // autoridad real es firestore.rules (bloquea crear registros bajo
+          // un elemento archivado), esto solo evita mostrar una acción que
+          // terminaría en un error evitable -- "no confíes únicamente en
+          // botones deshabilitados", pero tampoco hay que omitirlos.
+          floatingActionButton: elemento.archivado
+              ? null
+              : FloatingActionButton.extended(
+                  onPressed: () => mostrarNuevoRegistroSheet(
+                    context,
+                    casaId: casa.id,
+                    elementoId: elemento.id,
+                    elementoNombre: elemento.nombre,
+                  ),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Añadir evento'),
+                ),
           body: ListView(
             padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
             children: [
+              // Archivado (auditoría R5, octubre 2026): nunca oculta nada de
+              // lo que ya se ve más abajo (foto, mantenimiento, registros,
+              // documentos, económico) -- solo avisa de que este elemento ya
+              // no aparece en los listados activos.
+              if (elemento.archivado)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 14),
+                  padding: const EdgeInsets.all(ReparaSpace.s3),
+                  decoration: BoxDecoration(
+                    color: context.colors.inkMuted.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(ReparaRadius.sm),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.archive_outlined,
+                        size: 18,
+                        color: context.colors.inkMuted,
+                      ),
+                      const SizedBox(width: ReparaSpace.s2),
+                      Expanded(
+                        child: Text(
+                          'Elemento archivado. Su historial, documentos y datos económicos siguen disponibles.',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               _FotoElemento(
                 onTap: () => _onTapFoto(context, elemento),
                 onEditar: () => _cambiarFoto(context, elemento),
@@ -520,6 +570,183 @@ class ElementoDetailScreen extends StatelessWidget {
         ),
       );
     }
+  }
+}
+
+/// Archivar/restaurar (auditoría R5, octubre 2026) -- mismo motivo que
+/// _EliminarElementoButton para ser su propio StatefulWidget. El botón
+/// decide SOLO la visibilidad/habilitación a partir de si hay trabajo
+/// profesional activo (RegistroService.esTrabajoActivo, el mismo criterio
+/// que ya usa el aviso de Inicio); la autoridad real es
+/// archivarElemento/restaurarElemento (Cloud Functions), que repiten esa
+/// misma comprobación en servidor -- este widget nunca confía solo en
+/// deshabilitar el botón.
+class _ArchivarElementoButton extends StatefulWidget {
+  const _ArchivarElementoButton({
+    required this.casaId,
+    required this.elemento,
+  });
+
+  final String casaId;
+  final Elemento elemento;
+
+  @override
+  State<_ArchivarElementoButton> createState() =>
+      _ArchivarElementoButtonState();
+}
+
+class _ArchivarElementoButtonState extends State<_ArchivarElementoButton> {
+  bool _procesando = false;
+
+  Future<void> _archivar() async {
+    final confirmar = await AppDialog.confirmText(
+      context,
+      title: '¿Archivar este elemento?',
+      message:
+          'Dejará de aparecer en los listados activos, pero conserva todo su '
+          'historial, documentos y datos económicos. Puedes restaurarlo '
+          'cuando quieras.',
+      confirmLabel: 'Archivar',
+      destructive: false,
+    );
+    if (!confirmar || !mounted) return;
+    await _ejecutar(
+      () => ElementoService.archivar(widget.casaId, widget.elemento.id),
+      exito: 'Elemento archivado.',
+      error: 'No se pudo archivar el elemento.',
+    );
+  }
+
+  Future<void> _restaurar() async {
+    await _ejecutar(
+      () => ElementoService.restaurar(widget.casaId, widget.elemento.id),
+      exito: 'Elemento restaurado.',
+      error: 'No se pudo restaurar el elemento.',
+    );
+  }
+
+  Future<void> _ejecutar(
+    Future<void> Function() accion, {
+    required String exito,
+    required String error,
+  }) async {
+    setState(() => _procesando = true);
+    try {
+      await accion();
+      if (mounted) AppError.showSuccess(context, exito);
+    } on FirebaseFunctionsException catch (e, st) {
+      if (mounted) {
+        AppError.show(context, e.message ?? error, error: e, stackTrace: st);
+      }
+    } catch (e, st) {
+      if (mounted) AppError.show(context, error, error: e, stackTrace: st);
+    } finally {
+      if (mounted) setState(() => _procesando = false);
+    }
+  }
+
+  Widget _icono(IconData normal) => _procesando
+      ? SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: context.colors.inkMuted,
+          ),
+        )
+      : Icon(normal);
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.elemento.archivado) {
+      return IconButton(
+        icon: _icono(Icons.unarchive_outlined),
+        tooltip: 'Restaurar elemento',
+        onPressed: _procesando ? null : _restaurar,
+      );
+    }
+    return StreamBuilder<List<Registro>>(
+      stream: RegistroService.streamRegistros(
+        widget.casaId,
+        widget.elemento.id,
+      ),
+      builder: (context, snapshot) {
+        final registros = snapshot.data ?? const <Registro>[];
+        final tieneTrabajoActivo = registros.any(
+          RegistroService.esTrabajoActivo,
+        );
+        if (tieneTrabajoActivo) {
+          return IconButton(
+            icon: _icono(Icons.archive_outlined),
+            tooltip: 'No se puede archivar: tiene trabajo profesional activo',
+            onPressed: null,
+          );
+        }
+        // Ayuda visual (auditoría R6, octubre 2026), nunca autoridad: la
+        // Cloud Function vuelve a comprobar el saldo pendiente de cero en su
+        // propia transacción. Mientras esta comprobación todavía no ha
+        // resuelto, el botón se muestra habilitado por defecto -- si el
+        // usuario llega a tocarlo en ese instante, el servidor lo rechaza
+        // igual con un mensaje claro (ver _ejecutar).
+        return FutureBuilder<bool>(
+          future: RegistroService.tieneSaldoPendiente(
+            widget.casaId,
+            widget.elemento.id,
+            registros,
+          ),
+          builder: (context, saldoSnapshot) {
+            final tieneSaldoPendiente = saldoSnapshot.data ?? false;
+            return IconButton(
+              icon: _icono(Icons.archive_outlined),
+              tooltip: tieneSaldoPendiente
+                  ? 'No se puede archivar: tiene un saldo pendiente de pago'
+                  : 'Archivar elemento',
+              onPressed: (_procesando || tieneSaldoPendiente)
+                  ? null
+                  : _archivar,
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+/// Botón de eliminar de la AppBar (auditoría R9-H2, octubre 2026: comentario
+/// corregido -- describía un StatefulWidget que esta clase ya no es desde
+/// R6; es un StatelessWidget porque ya no tiene ningún estado propio que
+/// mostrar, solo explica por qué la acción está deshabilitada).
+///
+/// Eliminación definitiva DESHABILITADA (auditoría R6, octubre 2026):
+/// ElementoService.eliminar() solo borra el documento del elemento, nunca
+/// sus subcolecciones (registros, cambiosAlcance, presupuestos, pagos,
+/// historial) ni los archivos de Storage asociados -- confirmado en R3/R4 y
+/// nunca corregido, porque una eliminación segura necesita antes una
+/// política de retención de datos económicos que todavía no existe (ver el
+/// informe de R5/R6). Mientras esa política no esté aprobada, este botón ya
+/// NO llama a ElementoService.eliminar() en ningún caso -- ningún camino de
+/// este archivo lo hace; es el único punto de la app que lo invocaba (ver
+/// informe de esta iteración). Solo explica por qué, para que la ausencia
+/// de borrado no se confunda con un fallo de red.
+class _EliminarElementoButton extends StatelessWidget {
+  const _EliminarElementoButton();
+
+  void _explicar(BuildContext context) {
+    AppError.show(
+      context,
+      'La eliminación definitiva está temporalmente deshabilitada para '
+      'proteger el historial y los documentos. Puedes archivar este '
+      'elemento mientras tanto.',
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      icon: Icon(Icons.delete_outline, color: context.colors.inkMuted),
+      tooltip: 'Eliminación definitiva no disponible todavía',
+      onPressed: () => _explicar(context),
+    );
   }
 }
 

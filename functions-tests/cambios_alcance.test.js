@@ -136,3 +136,93 @@ test('7. un usuario que no pertenece a la casa no puede aprobar cambios ajenos',
   const { error } = await llamar('responderCambioAlcance', extrano.idToken, { casaId, elementoId, registroId, cambioAlcanceId: result.cambioAlcanceId, aprobar: true });
   assert.equal(error?.status, 'PERMISSION_DENIED');
 });
+
+// ── cancelarCambioAlcance (auditoría R3, octubre 2026) ──────────────────────
+
+test('8. quien creó la solicitud puede cancelarla mientras está pendiente', async () => {
+  const owner = await crearUsuario();
+  const pro = await crearUsuario();
+  const { casaId, elementoId, registroId } = await sembrarRegistro({ ownerUid: owner.uid, estado: 'nuevo', profesionalUid: pro.uid });
+  const { result } = await llamar('crearCambioAlcance', pro.idToken, { casaId, elementoId, registroId, titulo: 'Más tubería', importeAdicional: 80 });
+
+  const { error } = await llamar('cancelarCambioAlcance', pro.idToken, { casaId, elementoId, registroId, cambioAlcanceId: result.cambioAlcanceId });
+  assert.equal(error, undefined);
+
+  const cambios = await leerCambios(casaId, elementoId, registroId);
+  assert.equal(cambios[0].estado, 'cancelado');
+});
+
+test('9. el propietario (no es quien creó la solicitud) no puede cancelarla', async () => {
+  const owner = await crearUsuario();
+  const pro = await crearUsuario();
+  const { casaId, elementoId, registroId } = await sembrarRegistro({ ownerUid: owner.uid, estado: 'nuevo', profesionalUid: pro.uid });
+  const { result } = await llamar('crearCambioAlcance', pro.idToken, { casaId, elementoId, registroId, titulo: 'Más tubería', importeAdicional: 80 });
+
+  const { error } = await llamar('cancelarCambioAlcance', owner.idToken, { casaId, elementoId, registroId, cambioAlcanceId: result.cambioAlcanceId });
+  assert.equal(error?.status, 'PERMISSION_DENIED');
+
+  const cambios = await leerCambios(casaId, elementoId, registroId);
+  assert.equal(cambios[0].estado, 'pendiente', 'un intento rechazado no debe cambiar el estado');
+});
+
+test('10. una solicitud ya aprobada no puede cancelarse después', async () => {
+  const owner = await crearUsuario();
+  const pro = await crearUsuario();
+  const { casaId, elementoId, registroId } = await sembrarRegistro({ ownerUid: owner.uid, estado: 'nuevo', presupuesto: 100, profesionalUid: pro.uid });
+  const { result } = await llamar('crearCambioAlcance', pro.idToken, { casaId, elementoId, registroId, titulo: 'Más tubería', importeAdicional: 80 });
+
+  const aprobar = await llamar('responderCambioAlcance', owner.idToken, { casaId, elementoId, registroId, cambioAlcanceId: result.cambioAlcanceId, aprobar: true });
+  assert.equal(aprobar.error, undefined);
+
+  const cancelar = await llamar('cancelarCambioAlcance', pro.idToken, { casaId, elementoId, registroId, cambioAlcanceId: result.cambioAlcanceId });
+  assert.equal(cancelar.error?.status, 'FAILED_PRECONDITION');
+
+  const registro = await leerRegistro(casaId, elementoId, registroId);
+  assert.equal(registro.presupuesto, 180, 'el presupuesto ya incrementado no debe revertirse por un intento de cancelar');
+});
+
+test('11. no se puede cancelar una solicitud pendiente si el registro ya está finalizado', async () => {
+  const owner = await crearUsuario();
+  const pro = await crearUsuario();
+  const { casaId, elementoId, registroId } = await sembrarRegistro({ ownerUid: owner.uid, estado: 'nuevo', profesionalUid: pro.uid });
+  const { result } = await llamar('crearCambioAlcance', pro.idToken, { casaId, elementoId, registroId, titulo: 'Más tubería', importeAdicional: 80 });
+
+  // El registro se cierra por otra vía ajena a este test (p.ej.
+  // finalizarTrabajoPropietario) -- se simula el estado resultante
+  // directamente, Admin SDK, sin pasar por esa función.
+  await db.collection('casas').doc(casaId).collection('elementos').doc(elementoId)
+    .collection('registros').doc(registroId).update({ estado: 'terminado' });
+
+  const { error } = await llamar('cancelarCambioAlcance', pro.idToken, { casaId, elementoId, registroId, cambioAlcanceId: result.cambioAlcanceId });
+  assert.equal(error?.status, 'FAILED_PRECONDITION');
+
+  const cambios = await leerCambios(casaId, elementoId, registroId);
+  assert.equal(cambios[0].estado, 'pendiente', 'un intento rechazado no debe cambiar el estado');
+});
+
+// Esta es la prueba que de verdad ejercita la corrección R3: antes de
+// envolver cancelarCambioAlcance en una transacción, ambas llamadas podían
+// leer 'pendiente' antes de que ninguna escribiera, y "ganar" las dos.
+test('12. cancelar y aprobar a la vez producen exactamente un resultado económico, nunca los dos', async () => {
+  const owner = await crearUsuario();
+  const pro = await crearUsuario();
+  const { casaId, elementoId, registroId } = await sembrarRegistro({ ownerUid: owner.uid, estado: 'nuevo', presupuesto: 100, profesionalUid: pro.uid });
+  const { result } = await llamar('crearCambioAlcance', pro.idToken, { casaId, elementoId, registroId, titulo: 'Más tubería', importeAdicional: 80 });
+
+  const [cancelar, aprobar] = await Promise.all([
+    llamar('cancelarCambioAlcance', pro.idToken, { casaId, elementoId, registroId, cambioAlcanceId: result.cambioAlcanceId }),
+    llamar('responderCambioAlcance', owner.idToken, { casaId, elementoId, registroId, cambioAlcanceId: result.cambioAlcanceId, aprobar: true }),
+  ]);
+  const exitos = [cancelar, aprobar].filter((r) => !r.error);
+  assert.equal(exitos.length, 1, `exactamente uno de los dos debe triunfar (cancelar=${JSON.stringify(cancelar)}, aprobar=${JSON.stringify(aprobar)})`);
+
+  const registro = await leerRegistro(casaId, elementoId, registroId);
+  const cambios = await leerCambios(casaId, elementoId, registroId);
+  if (!aprobar.error) {
+    assert.equal(cambios[0].estado, 'aprobado');
+    assert.equal(registro.presupuesto, 180, 'si la aprobación ganó la carrera, el presupuesto debe reflejarlo');
+  } else {
+    assert.equal(cambios[0].estado, 'cancelado');
+    assert.equal(registro.presupuesto ?? 100, 100, 'si la cancelación ganó la carrera, el presupuesto no debe haberse incrementado');
+  }
+});

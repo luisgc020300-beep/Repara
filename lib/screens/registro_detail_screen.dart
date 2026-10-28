@@ -192,26 +192,25 @@ class RegistroDetailScreen extends StatelessWidget {
     }
   }
 
-  Future<void> _eliminar(BuildContext context, Registro registro) async {
-    final confirmar = await AppDialog.confirmText(
+  /// Eliminación definitiva DESHABILITADA (auditoría R7/R8, octubre 2026):
+  /// RegistroService.eliminar() solo borra el documento del registro, nunca
+  /// su propia foto en Storage ni los documentos (ni sus archivos) que lo
+  /// referencian por registroId -- mismo defecto que R6 encontró y
+  /// deshabilitó para ElementoService.eliminar(), aquí extendido al mismo
+  /// tratamiento. Este método ya NO llama a RegistroService.eliminar() en
+  /// ningún caso -- es el único punto de la app que lo invocaba (ver informe
+  /// de esta iteración). Solo explica por qué, para que la ausencia de
+  /// borrado no se confunda con un fallo de red.
+  ///
+  /// Sin parámetro `registro` (auditoría R9-H3, octubre 2026): ya no hace
+  /// falta ninguno de sus datos para mostrar el aviso -- se quitó tras
+  /// confirmar que no queda ninguna otra llamada que lo necesite.
+  void _eliminar(BuildContext context) {
+    AppError.show(
       context,
-      title: '¿Eliminar este evento?',
-      confirmLabel: 'Eliminar',
+      'La eliminación definitiva está temporalmente deshabilitada para '
+      'proteger los documentos y archivos asociados a este evento.',
     );
-    if (!confirmar || !context.mounted) return;
-    try {
-      await RegistroService.eliminar(casa.id, elementoId, registro.id);
-      if (context.mounted) Navigator.pop(context);
-    } catch (e, st) {
-      if (context.mounted) {
-        AppError.show(
-          context,
-          'No se pudo eliminar el evento.',
-          error: e,
-          stackTrace: st,
-        );
-      }
-    }
   }
 
   /// Sustituye al "Descargar expediente (PDF)" de la referencia visual --
@@ -250,10 +249,32 @@ class RegistroDetailScreen extends StatelessWidget {
     return StreamBuilder<Registro?>(
       stream: RegistroService.streamRegistro(casa.id, elementoId, registroId),
       builder: (context, snapshot) {
-        final registro = snapshot.data;
-        if (registro == null) {
+        // Mismo fix que elemento_detail_screen.dart (auditoría R3/R4, octubre
+        // 2026): snapshot.data == null por sí solo es ambiguo entre "todavía
+        // no ha llegado el primer snapshot", "el registro ya no existe" y
+        // "el stream terminó en error" (p.ej. permission-denied si deja de
+        // haber acceso mientras la ficha está abierta -- streamRegistro()
+        // relanza cualquier fallo de lectura, ver conRegistroDeErrores). Sin
+        // distinguir los tres casos, el segundo y el tercero se quedaban
+        // enseñando el spinner para siempre, sin botón de volver.
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (snapshot.hasError) {
+          return Scaffold(
+            appBar: AppBar(),
+            body: const Center(
+              child: Text('No se pudo cargar este evento.'),
+            ),
+          );
+        }
+        final registro = snapshot.data;
+        if (registro == null) {
+          return Scaffold(
+            appBar: AppBar(),
+            body: const Center(child: Text('Este evento ya no existe.')),
           );
         }
         return Scaffold(
@@ -284,7 +305,7 @@ class RegistroDetailScreen extends StatelessWidget {
                 PopupMenuButton<String>(
                   icon: const Icon(Icons.more_vert),
                   onSelected: (v) {
-                    if (v == 'eliminar') _eliminar(context, registro);
+                    if (v == 'eliminar') _eliminar(context);
                   },
                   itemBuilder: (_) => [
                     PopupMenuItem(
@@ -294,7 +315,7 @@ class RegistroDetailScreen extends StatelessWidget {
                           Icon(
                             Icons.delete_outline,
                             size: 18,
-                            color: context.colors.errorText,
+                            color: context.colors.inkMuted,
                           ),
                           const SizedBox(width: 10),
                           const Text('Eliminar evento'),

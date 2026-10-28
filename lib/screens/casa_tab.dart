@@ -29,6 +29,7 @@ import '../widgets/app_error.dart';
 import '../widgets/boton_ajustes.dart';
 import '../widgets/ios_list.dart';
 import 'elemento_detail_screen.dart';
+import 'elementos_archivados_screen.dart';
 import 'nuevo_elemento_screen.dart';
 
 class CasaTab extends StatelessWidget {
@@ -88,7 +89,19 @@ class CasaTab extends StatelessWidget {
             ),
           ],
         ),
-        actions: [BotonAjustes(casa: casa)],
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.inventory_2_outlined),
+            tooltip: 'Elementos archivados',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ElementosArchivadosScreen(casa: casa),
+              ),
+            ),
+          ),
+          BotonAjustes(casa: casa),
+        ],
       ),
       body: StreamBuilder<List<Habitacion>>(
         stream: HabitacionService.streamHabitaciones(casa.id),

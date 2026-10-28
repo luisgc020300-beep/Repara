@@ -210,6 +210,19 @@ class _PagoDetailScreenState extends State<PagoDetailScreen> {
         widget.pago!.id,
       );
       if (mounted) Navigator.pop(context);
+    } on FirebaseFunctionsException catch (e, st) {
+      // Mensaje concreto del servidor (p.ej. "elemento archivado, saldo
+      // pendiente" -- auditoría R8, octubre 2026) en vez del genérico de
+      // abajo, igual que ya hace _ArchivarElementoButton en
+      // elemento_detail_screen.dart.
+      if (mounted) {
+        AppError.show(
+          context,
+          e.message ?? 'No se pudo eliminar el pago.',
+          error: e,
+          stackTrace: st,
+        );
+      }
     } catch (e, st) {
       if (mounted) {
         AppError.show(
