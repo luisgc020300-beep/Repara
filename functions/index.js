@@ -1774,6 +1774,111 @@ exports.restaurarElemento = onCall({ region: REGION }, async (request) => {
 });
 
 // =============================================================================
+// BORRAR REGISTRO / ELEMENTO (auditoría R7/R8, octubre 2026): el borrado
+// directo del cliente (RegistroService.eliminar()/ElementoService.eliminar(),
+// desactivados en la app) solo borraba el documento de Firestore, nunca su
+// propia foto en Storage ni los "documentos" (facturas/fotos escaneadas) que
+// lo referencian -- quedaban huérfanos en Storage para siempre, sin ninguna
+// vía de limpieza. Estas dos funciones son el reemplazo real: hacen la
+// limpieza completa en servidor con Admin SDK, el único sitio con permiso
+// para ello -- firestore.rules sigue bloqueando el `delete` directo del
+// cliente sobre elementos/registros a propósito, así que esta es la única
+// vía legítima de borrado.
+//
+// Decisión de producto (CEO, octubre 2026): un registro "con profesional"
+// (presupuesto/pagos/invitación de por medio) NUNCA se puede borrar por esta
+// vía, ni directamente ni como parte de borrar su elemento -- aunque ya esté
+// terminado. Protege el historial de trabajos contratados/pagos. Para
+// quitarlo de los listados activos ya existe archivar.
+//
+// Mismo orden que eliminarCuenta (ver su cabecera para el porqué): lo
+// reintentable primero (Storage, documentos), recursiveDelete el último --
+// si algo falla de verdad a mitad, el documento se queda intacto y un
+// reintento repite la limpieza desde el principio en vez de perderla a
+// medias.
+
+// Las URL de descarga de Firebase Storage tienen la forma
+// ".../o/<ruta-codificada>?alt=media&token=..." -- la ruta real del objeto
+// en el bucket es justo ese segmento, URL-decodificado.
+function urlStorageAPath(url) {
+  const match = url.match(/\/o\/([^?]+)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+async function borrarArchivoDeUrl(url) {
+  const path = urlStorageAPath(url);
+  if (!path) return;
+  await getStorage().bucket().file(path).delete({ ignoreNotFound: true });
+}
+
+// Borra, para un filtro dado (registroId o elementoId), todos los
+// "documentos" que lo referencian -- su(s) archivo(s) en Storage primero
+// (url + archivosAdicionales, un documento multipágina sube varios),
+// después su propio documento de Firestore.
+async function borrarDocumentosDe(casaId, campo, valor) {
+  const snap = await db.collection('casas').doc(casaId).collection('documentos').where(campo, '==', valor).get();
+  for (const doc of snap.docs) {
+    const d = doc.data();
+    const urls = [d.url, ...(d.archivosAdicionales || [])].filter(Boolean);
+    for (const url of urls) {
+      await borrarArchivoDeUrl(url);
+    }
+    await doc.ref.delete();
+  }
+}
+
+function tieneRegistroConProfesional(registrosSnap) {
+  return registrosSnap.docs.some((d) => d.data().esConProfesional === true);
+}
+
+exports.eliminarRegistro = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+  const uid = request.auth.uid;
+  const { casaId, elementoId, registroId } = request.data || {};
+  if (!casaId || !elementoId || !registroId) throw new HttpsError('invalid-argument', 'Faltan datos.');
+  if (!(await esMiembroCasa(casaId, uid))) throw new HttpsError('permission-denied', 'No perteneces a esa casa.');
+
+  const regRef = registroRef(casaId, elementoId, registroId);
+  const regSnap = await regRef.get();
+  if (!regSnap.exists) return { ok: true }; // idempotente -- ya no existe.
+  if (regSnap.data().esConProfesional === true) {
+    throw new HttpsError('failed-precondition', 'Un evento con profesional no se puede eliminar -- solo archivar el elemento.');
+  }
+
+  await borrarDocumentosDe(casaId, 'registroId', registroId);
+  await getStorage().bucket().deleteFiles({ prefix: `casas/${casaId}/elementos/${elementoId}/registros/${registroId}/` });
+  await db.recursiveDelete(regRef);
+  return { ok: true };
+});
+
+exports.eliminarElemento = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+  const uid = request.auth.uid;
+  const { casaId, elementoId } = request.data || {};
+  if (!casaId || !elementoId) throw new HttpsError('invalid-argument', 'Faltan datos.');
+  if (!(await esMiembroCasa(casaId, uid))) throw new HttpsError('permission-denied', 'No perteneces a esa casa.');
+
+  const elRef = elementoRef(casaId, elementoId);
+  const elSnap = await elRef.get();
+  if (!elSnap.exists) return { ok: true }; // idempotente -- ya no existe.
+
+  const registrosSnap = await elRef.collection('registros').get();
+  if (tieneRegistroConProfesional(registrosSnap)) {
+    throw new HttpsError('failed-precondition', 'Este elemento tiene algún evento con profesional -- no se puede eliminar, solo archivar.');
+  }
+
+  // Un documento puede estar ligado solo al elemento (elementoId, sin
+  // registroId -- p.ej. garantía adjunta directamente) o a uno de sus
+  // registros (ambos campos) -- el propio Documento guarda elementoId en
+  // los dos casos (ver nuevo_documento_flow.dart), así que este único
+  // filtro los cubre todos sin recorrer los registros uno a uno.
+  await borrarDocumentosDe(casaId, 'elementoId', elementoId);
+  await getStorage().bucket().deleteFiles({ prefix: `casas/${casaId}/elementos/${elementoId}/` });
+  await db.recursiveDelete(elRef);
+  return { ok: true };
+});
+
+// =============================================================================
 // FINALIZAR REGISTRO (lado propietario) -- auditoría de seguridad, octubre
 // 2026. Antes esto era una escritura directa del cliente; las reglas de
 // Firestore ya bloquean esa escritura directa (ver match /registros/{rid}),

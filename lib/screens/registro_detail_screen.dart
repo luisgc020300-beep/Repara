@@ -194,25 +194,38 @@ class RegistroDetailScreen extends StatelessWidget {
     }
   }
 
-  /// Eliminación definitiva DESHABILITADA (auditoría R7/R8, octubre 2026):
-  /// RegistroService.eliminar() solo borra el documento del registro, nunca
-  /// su propia foto en Storage ni los documentos (ni sus archivos) que lo
-  /// referencian por registroId -- mismo defecto que R6 encontró y
-  /// deshabilitó para ElementoService.eliminar(), aquí extendido al mismo
-  /// tratamiento. Este método ya NO llama a RegistroService.eliminar() en
-  /// ningún caso -- es el único punto de la app que lo invocaba (ver informe
-  /// de esta iteración). Solo explica por qué, para que la ausencia de
-  /// borrado no se confunda con un fallo de red.
-  ///
-  /// Sin parámetro `registro` (auditoría R9-H3, octubre 2026): ya no hace
-  /// falta ninguno de sus datos para mostrar el aviso -- se quitó tras
-  /// confirmar que no queda ninguna otra llamada que lo necesite.
-  void _eliminar(BuildContext context) {
-    AppError.show(
+  /// Eliminación real (CEO, octubre 2026, cierre de R7/R8): la Cloud
+  /// Function limpia también la foto del registro en Storage y los
+  /// documentos (con sus archivos) que lo referencian -- RegistroService.
+  /// eliminar() ya no hace la escritura insegura que esto deshabilitaba (ver
+  /// esa función). Solo disponible para un registro simple -- un registro
+  /// con profesional nunca llega a ofrecer esta opción (ver el menú más
+  /// abajo), y el servidor la rechaza de todos modos si se intentara saltar
+  /// la UI.
+  Future<void> _eliminar(BuildContext context, Registro registro) async {
+    final confirmar = await AppDialog.confirm(
       context,
-      'La eliminación definitiva está temporalmente deshabilitada para '
-      'proteger los documentos y archivos asociados a este evento.',
+      title: '¿Eliminar este evento?',
+      message:
+          'Se eliminará para siempre, junto con su foto y los documentos '
+          'que tenga asociados. Esto no se puede deshacer.',
+      confirmLabel: 'Eliminar',
+      destructive: true,
     );
+    if (!confirmar || !context.mounted) return;
+    try {
+      await RegistroService.eliminar(casa.id, elementoId, registro.id);
+      if (context.mounted) Navigator.pop(context);
+    } catch (e, st) {
+      if (context.mounted) {
+        AppError.show(
+          context,
+          'No se pudo eliminar el evento.',
+          error: e,
+          stackTrace: st,
+        );
+      }
+    }
   }
 
   /// Sustituye al "Descargar expediente (PDF)" de la referencia visual --
@@ -314,7 +327,7 @@ class RegistroDetailScreen extends StatelessWidget {
                       registro: registro,
                     );
                   } else if (v == 'eliminar') {
-                    _eliminar(context);
+                    _eliminar(context, registro);
                   }
                 },
                 itemBuilder: (_) => [

@@ -1,12 +1,21 @@
 // test/screens/registro_eliminar_test.dart
 //
-// Eliminación definitiva DESHABILITADA (auditoría R7/R8, octubre 2026): el
-// menú "Eliminar evento" de un registro simple (sin profesional) -- antes
-// borraba directamente el documento, sin limpiar su propia foto en Storage
-// ni los documentos asociados -- ya nunca llama a RegistroService.eliminar().
-// Tocarlo solo explica por qué -- comprueba que el registro sigue existiendo
-// íntegro después de tocarlo, no que se borra nada. Usa FakeFirebaseFirestore,
-// nada de Firebase real.
+// Eliminación REAL (CEO, octubre 2026, cierre de R7/R8): "Eliminar evento"
+// ahora pide confirmación y, si se confirma, llama a RegistroService.
+// eliminar() -- que invoca la Cloud Function eliminarRegistro (limpieza
+// completa en servidor: Storage + documentos + recursiveDelete). Usa
+// FakeFirebaseFirestore, nada de Firebase real.
+//
+// NO IMPLEMENTADO (limitación real, no simulada): confirmar de verdad la
+// eliminación invoca una Cloud Function real vía FirebaseFunctions.
+// instanceFor(...), que no se puede invocar en este entorno de test sin el
+// emulador de Firebase -- mismo criterio de honestidad que ya documenta
+// elemento_archivar_test.dart (R5/R6). El comportamiento real de
+// eliminarRegistro (incluido que rechaza un registro con profesional) se
+// verifica en functions-tests/eliminar_registro_elemento.test.js, contra el
+// emulador. Aquí solo se comprueba lo que sí se puede probar sin red: que
+// aparece el diálogo de confirmación con el texto correcto, y que declinarlo
+// no borra nada.
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -87,7 +96,7 @@ void main() {
   });
 
   testWidgets(
-    'tocar "Eliminar evento" en un registro simple no borra nada -- solo explica que está deshabilitado',
+    'tocar "Eliminar evento" pide confirmación -- declinarla no borra nada',
     (tester) async {
       final db = await _prepararConRegistroSimple();
 
@@ -110,13 +119,13 @@ void main() {
       await tester.tap(find.text('Eliminar evento'));
       await tester.pumpAndSettle();
 
-      // Nunca aparece ningún diálogo de confirmación -- no hay nada que
-      // confirmar, porque no hay ninguna acción destructiva detrás.
-      expect(find.text('¿Eliminar este evento?'), findsNothing);
-      expect(
-        find.textContaining('eliminación definitiva está temporalmente deshabilitada'),
-        findsOneWidget,
-      );
+      expect(find.text('¿Eliminar este evento?'), findsOneWidget);
+      expect(find.textContaining('no se puede deshacer'), findsOneWidget);
+
+      // Cancelar -- nunca llega a RegistroService.eliminar().
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+
       expect(await _existe(db), isTrue);
     },
   );

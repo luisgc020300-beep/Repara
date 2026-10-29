@@ -163,22 +163,27 @@ class RegistroService {
     await _col(casaId, elementoId).doc(registroId).update(cambios);
   }
 
-  /// DESHABILITADA en servidor (auditoría R8, octubre 2026): borra solo este
-  /// documento, nunca su propia foto en Storage ni los documentos (ni sus
-  /// archivos) que lo referencian por registroId -- firestore.rules ya
-  /// bloquea este `delete` con `allow delete: if false`, así que llamar a
-  /// este método ahora falla siempre con `permission-denied`. Ningún código
-  /// de la app lo llama (ver informe de R8) -- se mantiene sin borrar para
-  /// no perder el historial de por qué `allow delete` está bloqueado, no
-  /// porque tenga ningún uso legítimo pendiente. No lo reactives sin una
-  /// limpieza segura de documentos/Storage detrás. Mismo criterio que
-  /// ElementoService.eliminar() (R6).
+  /// Borrado real (CEO, octubre 2026, cierre de R7/R8): la Cloud Function
+  /// hace en servidor lo que un borrado directo del cliente nunca podía
+  /// hacer bien -- limpiar también la foto del registro en Storage y los
+  /// documentos (con sus archivos) que lo referencian, con Admin SDK.
+  /// firestore.rules sigue bloqueando el `delete` directo del cliente a
+  /// propósito (ver esas reglas): esta función es la única vía legítima.
+  /// Rechaza con `failed-precondition` un registro con profesional -- ver
+  /// la propia Cloud Function para el motivo.
   static Future<void> eliminar(
     String casaId,
     String elementoId,
     String registroId,
   ) async {
-    await _col(casaId, elementoId).doc(registroId).delete();
+    final callable = FirebaseFunctions.instanceFor(
+      region: _region,
+    ).httpsCallable('eliminarRegistro');
+    await callable.call<Map<String, dynamic>>({
+      'casaId': casaId,
+      'elementoId': elementoId,
+      'registroId': registroId,
+    });
   }
 
   /// El propietario cierra el registro directamente, o confirma que el

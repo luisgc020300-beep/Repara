@@ -146,17 +146,22 @@ class ElementoService {
     });
   }
 
-  /// DESHABILITADA en servidor (auditoría R6, octubre 2026): borra solo este
-  /// documento, nunca sus subcolecciones ni los archivos de Storage
-  /// asociados -- firestore.rules ya bloquea este `delete` con
-  /// `allow delete: if false`, así que llamar a este método ahora falla
-  /// siempre con `permission-denied`. Ningún código de la app lo llama (ver
-  /// informe de R6) -- se mantiene sin borrar para no perder el historial de
-  /// por qué `allow delete` está bloqueado, no porque tenga ningún uso
-  /// legítimo pendiente. No lo reactives sin una limpieza segura de
-  /// subcolecciones/Storage detrás.
+  /// Borrado real (CEO, octubre 2026, cierre de R6): la Cloud Function hace
+  /// en servidor la limpieza completa -- subcolecciones (con
+  /// recursiveDelete), foto en Storage y los documentos (con sus archivos)
+  /// que referencian este elemento o cualquiera de sus registros. Rechaza
+  /// con `failed-precondition` un elemento con algún registro con
+  /// profesional -- ver la propia Cloud Function para el motivo.
+  /// firestore.rules sigue bloqueando el `delete` directo del cliente a
+  /// propósito: esta función es la única vía legítima.
   static Future<void> eliminar(String casaId, String elementoId) async {
-    await _col(casaId).doc(elementoId).delete();
+    final callable = FirebaseFunctions.instanceFor(
+      region: _region,
+    ).httpsCallable('eliminarElemento');
+    await callable.call<Map<String, dynamic>>({
+      'casaId': casaId,
+      'elementoId': elementoId,
+    });
   }
 
   /// Foto del elemento -- la única forma de rellenar [Elemento.fotoUrl],

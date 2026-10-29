@@ -439,7 +439,7 @@ class ElementoDetailScreen extends StatelessWidget {
                 ),
               ),
               _ArchivarElementoButton(casaId: casa.id, elemento: elemento),
-              const _EliminarElementoButton(),
+              _EliminarElementoButton(casaId: casa.id, elemento: elemento),
             ],
           ),
           // null cuando está archivado (auditoría R5, octubre 2026): la
@@ -808,24 +808,91 @@ class _ArchivarElementoButtonState extends State<_ArchivarElementoButton> {
 /// este archivo lo hace; es el único punto de la app que lo invocaba (ver
 /// informe de esta iteración). Solo explica por qué, para que la ausencia
 /// de borrado no se confunda con un fallo de red.
-class _EliminarElementoButton extends StatelessWidget {
-  const _EliminarElementoButton();
+class _EliminarElementoButton extends StatefulWidget {
+  const _EliminarElementoButton({required this.casaId, required this.elemento});
 
-  void _explicar(BuildContext context) {
-    AppError.show(
+  final String casaId;
+  final Elemento elemento;
+
+  @override
+  State<_EliminarElementoButton> createState() => _EliminarElementoButtonState();
+}
+
+class _EliminarElementoButtonState extends State<_EliminarElementoButton> {
+  bool _procesando = false;
+
+  Future<void> _eliminar() async {
+    final confirmar = await AppDialog.confirm(
       context,
-      'La eliminación definitiva está temporalmente deshabilitada para '
-      'proteger el historial y los documentos. Puedes archivar este '
-      'elemento mientras tanto.',
+      title: '¿Eliminar este elemento?',
+      message:
+          'Se eliminará para siempre, junto con su foto, su historial y los '
+          'documentos asociados. Esto no se puede deshacer.',
+      confirmLabel: 'Eliminar',
+      destructive: true,
     );
+    if (!confirmar || !mounted) return;
+    setState(() => _procesando = true);
+    try {
+      await ElementoService.eliminar(widget.casaId, widget.elemento.id);
+      if (mounted) Navigator.pop(context);
+    } on FirebaseFunctionsException catch (e, st) {
+      if (mounted) {
+        AppError.show(
+          context,
+          e.message ?? 'No se pudo eliminar el elemento.',
+          error: e,
+          stackTrace: st,
+        );
+      }
+    } catch (e, st) {
+      if (mounted) {
+        AppError.show(
+          context,
+          'No se pudo eliminar el elemento.',
+          error: e,
+          stackTrace: st,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _procesando = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return IconButton(
-      icon: Icon(Icons.delete_outline, color: context.colors.inkMuted),
-      tooltip: 'Eliminación definitiva no disponible todavía',
-      onPressed: () => _explicar(context),
+    // Ayuda visual, nunca autoridad -- la Cloud Function repite esta misma
+    // comprobación en servidor (ver eliminarElemento): un elemento con
+    // algún registro con profesional nunca se puede eliminar, aunque ya
+    // esté terminado (protege el historial de trabajos/pagos). Mientras la
+    // comprobación no ha resuelto, el botón se muestra habilitado por
+    // defecto -- si se llega a tocar en ese instante, el servidor lo
+    // rechaza igual con un mensaje claro.
+    return StreamBuilder<List<Registro>>(
+      stream: RegistroService.streamRegistros(widget.casaId, widget.elemento.id),
+      builder: (context, snapshot) {
+        final tieneRegistroConProfesional = (snapshot.data ?? const <Registro>[])
+            .any((r) => r.esConProfesional);
+        final icono = _procesando
+            ? SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: context.colors.inkMuted,
+                ),
+              )
+            : Icon(Icons.delete_outline, color: context.colors.inkMuted);
+        return IconButton(
+          icon: icono,
+          tooltip: tieneRegistroConProfesional
+              ? 'No se puede eliminar: tiene algún evento con profesional'
+              : 'Eliminar elemento',
+          onPressed: (_procesando || tieneRegistroConProfesional)
+              ? null
+              : _eliminar,
+        );
+      },
     );
   }
 }
