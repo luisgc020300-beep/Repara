@@ -563,6 +563,7 @@ class ElementoDetailScreen extends StatelessWidget {
                           (r) => IosRow(
                             icon: Icons.fact_check_outlined,
                             iconColor: context.colors.brand,
+                            imageUrl: r.fotoUrl,
                             title: r.titulo,
                             subtitle: DateFormat(
                               'd MMM yyyy',
