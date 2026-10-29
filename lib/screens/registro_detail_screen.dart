@@ -35,6 +35,7 @@ import '../theme/design_tokens.dart';
 import '../widgets/app_dialog.dart';
 import '../widgets/app_error.dart';
 import '../widgets/estado_registro_chip.dart';
+import '../widgets/foto_ampliada_screen.dart';
 import '../widgets/historial_timeline.dart';
 import '../widgets/ios_list.dart';
 import 'cambio_alcance_section.dart';
@@ -454,8 +455,17 @@ class _CabeceraRegistro extends StatelessWidget {
           ),
           const SizedBox(width: 14),
           GestureDetector(
-            onTap: () =>
-                _cambiarFotoRegistro(context, casa, elementoId, registro),
+            // Igual que _FotoElemento en elemento_detail_screen.dart: con
+            // foto, tocarla la amplía a pantalla completa -- cambiarla es
+            // el lápiz pequeño de la esquina, con su propio toque aparte
+            // (antes compartían el mismo GestureDetector y tocar en
+            // cualquier punto, lápiz incluido, abría la cámara/galería).
+            onTap: fotoUrl == null
+                ? () => _cambiarFotoRegistro(context, casa, elementoId, registro)
+                : () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => FotoAmpliadaScreen(url: fotoUrl)),
+                  ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(ReparaRadius.md),
               child: Stack(
@@ -494,16 +504,24 @@ class _CabeceraRegistro extends StatelessWidget {
                     Positioned(
                       right: 3,
                       bottom: 3,
-                      child: Container(
-                        padding: const EdgeInsets.all(3),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.45),
-                          shape: BoxShape.circle,
+                      child: GestureDetector(
+                        onTap: () => _cambiarFotoRegistro(
+                          context,
+                          casa,
+                          elementoId,
+                          registro,
                         ),
-                        child: const Icon(
-                          Icons.edit_outlined,
-                          size: 11,
-                          color: Colors.white,
+                        child: Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.45),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.edit_outlined,
+                            size: 11,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ),

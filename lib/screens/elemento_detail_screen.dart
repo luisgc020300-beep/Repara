@@ -29,6 +29,7 @@ import '../services/registro_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_dialog.dart';
 import '../widgets/app_error.dart';
+import '../widgets/foto_ampliada_screen.dart';
 import '../widgets/ios_list.dart';
 import 'nuevo_documento_flow.dart';
 import 'nuevo_elemento_screen.dart';
@@ -44,6 +45,90 @@ class ElementoDetailScreen extends StatelessWidget {
 
   final Casa casa;
   final String elementoId;
+
+  /// "+ Añadir evento" ofrece las mismas dos vías que el "+" global de
+  /// Inicio (ver menu_anadir.dart), pero ya con este elemento fijado -- el
+  /// CEO señaló que, estando ya dentro de un elemento, no había forma de
+  /// escanear un documento para crear el evento, solo el formulario manual.
+  /// iniciarNuevoDocumento() ya sabía crear el "registro fundacional" de un
+  /// elemento concreto a partir de lo que extrae la IA (ver su propio
+  /// archivo, _crearRegistroNuevo) -- aquí solo se expone esa vía ya
+  /// existente, no se construye nada nuevo por debajo.
+  Future<void> _mostrarMenuAnadirEvento(
+    BuildContext context,
+    Elemento elemento,
+  ) {
+    return showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            ReparaSpace.s4,
+            ReparaSpace.s2,
+            ReparaSpace.s4,
+            ReparaSpace.s4,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: ReparaSpace.s4),
+                decoration: BoxDecoration(
+                  color: ctx.colors.inkMuted.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              IosSection(
+                rows: [
+                  IosRow(
+                    icon: Icons.document_scanner_outlined,
+                    iconColor: ctx.colors.brand,
+                    title: 'Escanear factura o documento',
+                    subtitle: 'La IA rellena el evento por ti',
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      iniciarNuevoDocumento(
+                        context,
+                        casaId: casa.id,
+                        elementoId: elemento.id,
+                      );
+                    },
+                  ),
+                  IosRow(
+                    icon: Icons.edit_outlined,
+                    iconColor: ctx.colors.brand,
+                    title: 'Añadir evento a mano',
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      mostrarNuevoRegistroSheet(
+                        context,
+                        casaId: casa.id,
+                        elementoId: elemento.id,
+                        elementoNombre: elemento.nombre,
+                      );
+                    },
+                  ),
+                ],
+              ),
+              IosSection(
+                rows: [
+                  IosRow(
+                    icon: Icons.close,
+                    iconColor: ctx.colors.inkMuted,
+                    title: 'Cancelar',
+                    showChevron: false,
+                    onTap: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   Future<void> _editarMantenimiento(
     BuildContext context,
@@ -365,12 +450,7 @@ class ElementoDetailScreen extends StatelessWidget {
           floatingActionButton: elemento.archivado
               ? null
               : FloatingActionButton.extended(
-                  onPressed: () => mostrarNuevoRegistroSheet(
-                    context,
-                    casaId: casa.id,
-                    elementoId: elemento.id,
-                    elementoNombre: elemento.nombre,
-                  ),
+                  onPressed: () => _mostrarMenuAnadirEvento(context, elemento),
                   icon: const Icon(Icons.add),
                   label: const Text('Añadir evento'),
                 ),
@@ -566,7 +646,7 @@ class ElementoDetailScreen extends StatelessWidget {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => _FotoAmpliadaScreen(url: elemento.fotoUrl!),
+          builder: (_) => FotoAmpliadaScreen(url: elemento.fotoUrl!),
         ),
       );
     }
@@ -1029,27 +1109,3 @@ class _DocumentoTile extends StatelessWidget {
   }
 }
 
-/// Foto del elemento a pantalla completa, con zoom -- InteractiveViewer
-/// basta (pellizcar para ampliar), sin necesidad de ningún paquete nuevo.
-class _FotoAmpliadaScreen extends StatelessWidget {
-  const _FotoAmpliadaScreen({required this.url});
-
-  final String url;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
-      body: Center(
-        child: InteractiveViewer(
-          maxScale: 4,
-          child: Image.network(url, fit: BoxFit.contain),
-        ),
-      ),
-    );
-  }
-}
