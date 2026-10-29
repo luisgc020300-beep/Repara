@@ -293,7 +293,7 @@ class _ResumenCasa extends StatelessWidget {
         future: Future.wait([
           ElementoService.conGarantiaProximaAVencer(casa.id),
           ElementoService.conRevisionPendiente(casa.id),
-          RegistroService.elementosConTrabajoPendiente(casa.id),
+          RegistroService.registrosConTrabajoPendiente(casa.id),
         ]),
         builder: (context, snapshot) {
           final garantias = (snapshot.data?[0] as List<Elemento>?) ?? const [];

@@ -1,8 +1,11 @@
 // lib/screens/trabajos_pendientes_screen.dart
 //
-// Lista de elementos con al menos un registro en curso con un profesional
-// -- se abre al tocar "Trabajos pendientes" en Inicio, mismo patrón que
-// garantias_proximas_screen.dart y revisiones_pendientes_screen.dart.
+// Lista de registros pendientes (CEO, octubre 2026: una fila por evento,
+// no una por elemento -- un mismo elemento puede tener varios eventos
+// pendientes a la vez, ver registrosConTrabajoPendiente en
+// registro_service.dart) -- se abre al tocar "Trabajos pendientes" en
+// Inicio, mismo patrón que garantias_proximas_screen.dart y
+// revisiones_pendientes_screen.dart.
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 

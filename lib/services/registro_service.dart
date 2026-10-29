@@ -264,13 +264,17 @@ class RegistroService {
         .conRegistroDeErrores();
   }
 
-  /// Botón "Trabajos pendientes" de Inicio: un elemento por cada uno que
-  /// tenga al menos un registro con profesional todavía sin cerrar. Lectura
-  /// puntual (no stream) recorriendo la subcolección de registros de cada
-  /// elemento -- un registro nunca vive en una colección a nivel de casa,
-  /// así que no hay una única consulta que lo traiga todo de golpe (mismo
-  /// patrón que ExpedienteViviendaScreen._todosLosRegistros). Ordenado por
-  /// fecha ascendente: el que lleva más tiempo esperando sale primero.
+  /// Botón "Trabajos pendientes" de Inicio: una fila por cada REGISTRO
+  /// pendiente, no una por elemento (CEO, octubre 2026) -- antes, si un
+  /// mismo elemento tenía varios registros pendientes a la vez (p.ej. dos
+  /// instalaciones y una reforma, todas sobre "Pérgolas"), solo se
+  /// mostraba la más antigua y el resto desaparecía sin ningún aviso de
+  /// que había más. Lectura puntual (no stream) recorriendo la
+  /// subcolección de registros de cada elemento -- un registro nunca vive
+  /// en una colección a nivel de casa, así que no hay una única consulta
+  /// que lo traiga todo de golpe (mismo patrón que
+  /// ExpedienteViviendaScreen._todosLosRegistros). Ordenado por fecha
+  /// ascendente: el que lleva más tiempo esperando sale primero.
   static Future<
     List<
       ({
@@ -281,7 +285,7 @@ class RegistroService {
       })
     >
   >
-  elementosConTrabajoPendiente(String casaId) async {
+  registrosConTrabajoPendiente(String casaId) async {
     final elementos = await ElementoService.streamElementos(casaId).first;
     final resultado =
         <
@@ -294,16 +298,14 @@ class RegistroService {
         >[];
     for (final elemento in elementos) {
       final registros = await streamRegistros(casaId, elemento.id).first;
-      final pendientes =
-          registros.where(esTrabajoActivo).toList()
-            ..sort((a, b) => a.fecha.compareTo(b.fecha));
-      if (pendientes.isEmpty) continue;
-      resultado.add((
-        elemento: elemento,
-        registroId: pendientes.first.id,
-        registroTitulo: pendientes.first.titulo,
-        fecha: pendientes.first.fecha,
-      ));
+      for (final r in registros.where(esTrabajoActivo)) {
+        resultado.add((
+          elemento: elemento,
+          registroId: r.id,
+          registroTitulo: r.titulo,
+          fecha: r.fecha,
+        ));
+      }
     }
     resultado.sort((a, b) => a.fecha.compareTo(b.fecha));
     return resultado;
