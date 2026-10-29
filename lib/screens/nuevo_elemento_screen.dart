@@ -393,76 +393,100 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
                 ],
               ),
               const SizedBox(height: ReparaSpace.s3),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _costeCtrl,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
+              // Ocultos con el interruptor activado (CEO, octubre 2026): no
+              // es solo que sobren -- lo que se escribiera aquí se guardaba
+              // igualmente en el registro fundacional, pero _ResumenEconomico
+              // nunca lo muestra para un registro con profesional (el coste y
+              // el profesional "de verdad" de ese flujo vienen del
+              // presupuesto y de la invitación, no de este texto libre). Sin
+              // ocultarlos, el formulario invitaba a rellenar un dato que
+              // luego desaparecía sin explicación. En el elemento SÍ seguían
+              // viéndose (elemento_detail_screen.dart), lo que hacía más
+              // confuso todavía que "no funcionara" solo a medias.
+              if (!_esConProfesional)
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _costeCtrl,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: 'Coste (€)',
+                        ),
                       ),
-                      decoration: const InputDecoration(labelText: 'Coste (€)'),
                     ),
-                  ),
-                  const SizedBox(width: ReparaSpace.s3),
-                  Expanded(
-                    child: RawAutocomplete<Contacto>(
-                      textEditingController: _profesionalCtrl,
-                      focusNode: _profesionalFocusNode,
-                      displayStringForOption: (c) => c.nombre,
-                      // Vacío (campo recién tocado) -> todos los contactos
-                      // guardados, no solo los que coinciden con lo tecleado.
-                      optionsBuilder: (value) => value.text.isEmpty
-                          ? _contactos
-                          : _contactos.where(
-                              (c) => c.nombre.toLowerCase().contains(
-                                value.text.toLowerCase(),
+                    const SizedBox(width: ReparaSpace.s3),
+                    Expanded(
+                      child: RawAutocomplete<Contacto>(
+                        textEditingController: _profesionalCtrl,
+                        focusNode: _profesionalFocusNode,
+                        displayStringForOption: (c) => c.nombre,
+                        // Vacío (campo recién tocado) -> todos los contactos
+                        // guardados, no solo los que coinciden con lo tecleado.
+                        optionsBuilder: (value) => value.text.isEmpty
+                            ? _contactos
+                            : _contactos.where(
+                                (c) => c.nombre.toLowerCase().contains(
+                                  value.text.toLowerCase(),
+                                ),
+                              ),
+                        onSelected: (c) => _profesionalCtrl.text = c.nombre,
+                        fieldViewBuilder:
+                            (
+                              context,
+                              controller,
+                              focusNode,
+                              onFieldSubmitted,
+                            ) => TextField(
+                              controller: controller,
+                              focusNode: focusNode,
+                              decoration: const InputDecoration(
+                                labelText: 'Profesional (opcional)',
                               ),
                             ),
-                      onSelected: (c) => _profesionalCtrl.text = c.nombre,
-                      fieldViewBuilder:
-                          (context, controller, focusNode, onFieldSubmitted) =>
-                              TextField(
-                                controller: controller,
-                                focusNode: focusNode,
-                                decoration: const InputDecoration(
-                                  labelText: 'Profesional (opcional)',
-                                ),
-                              ),
-                      optionsViewBuilder: (context, onSelected, options) =>
-                          Align(
-                            alignment: Alignment.topLeft,
-                            child: Material(
-                              elevation: 4,
-                              borderRadius: BorderRadius.circular(10),
-                              child: ConstrainedBox(
-                                constraints: const BoxConstraints(
-                                  maxHeight: 220,
-                                  minWidth: 220,
-                                ),
-                                child: ListView.builder(
-                                  padding: EdgeInsets.zero,
-                                  shrinkWrap: true,
-                                  itemCount: options.length,
-                                  itemBuilder: (context, i) {
-                                    final c = options.elementAt(i);
-                                    return ListTile(
-                                      dense: true,
-                                      title: Text(c.nombre),
-                                      subtitle: c.especialidad != null
-                                          ? Text(c.especialidad!)
-                                          : null,
-                                      onTap: () => onSelected(c),
-                                    );
-                                  },
+                        optionsViewBuilder: (context, onSelected, options) =>
+                            Align(
+                              alignment: Alignment.topLeft,
+                              child: Material(
+                                elevation: 4,
+                                borderRadius: BorderRadius.circular(10),
+                                child: ConstrainedBox(
+                                  constraints: const BoxConstraints(
+                                    maxHeight: 220,
+                                    minWidth: 220,
+                                  ),
+                                  child: ListView.builder(
+                                    padding: EdgeInsets.zero,
+                                    shrinkWrap: true,
+                                    itemCount: options.length,
+                                    itemBuilder: (context, i) {
+                                      final c = options.elementAt(i);
+                                      return ListTile(
+                                        dense: true,
+                                        title: Text(c.nombre),
+                                        subtitle: c.especialidad != null
+                                            ? Text(c.especialidad!)
+                                            : null,
+                                        onTap: () => onSelected(c),
+                                      );
+                                    },
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                )
+              else
+                Text(
+                  'El coste y el profesional de este trabajo se fijan '
+                  'después, desde el propio evento: invita al profesional '
+                  'y, cuando acepte, podrá enviarte un presupuesto.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
             ],
           ),
           const SizedBox(height: ReparaSpace.s4),
