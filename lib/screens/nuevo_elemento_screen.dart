@@ -1,23 +1,23 @@
 // lib/screens/nuevo_elemento_screen.dart
 //
-// Único flujo de creación de la app (octubre 2026, fusión Elemento/Trabajo/
-// Evento): un elemento nunca nace solo, siempre con su registro fundacional
-// -- "compré una freidora" tanto como "me cambiaron la depuradora de la
-// piscina" se crean exactamente igual, con el mismo formulario. El tipo de
-// registro + "¿lo hace un profesional?" deciden, para ESTE primer registro,
-// si hace falta algo más que título/fecha/coste -- el flujo completo con
-// presupuesto/invitación se hace después, desde el propio registro.
+// Crea o edita un elemento en sí -- nombre, ubicación, marca/modelo, coste y
+// profesional (informativos, sobre el objeto, no sobre un evento concreto),
+// fechas y revisión periódica. Un elemento nace solo, sin ningún evento
+// (CEO, octubre 2026: antes se forzaba un "registro fundacional" en el
+// mismo formulario -- se quitó porque no tiene sentido obligar a registrar
+// un evento solo por dar de alta el objeto; los eventos se añaden cuando
+// de verdad ocurren, desde "+ Añadir evento" en la propia ficha del
+// elemento, ver nuevo_registro_sheet.dart, que ya cubre tanto el caso
+// simple como el de profesional).
 import 'dart:async';
 
 import 'package:cloud_functions/cloud_functions.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../models/casa.dart';
 import '../models/contacto.dart';
 import '../models/elemento.dart';
 import '../models/habitacion.dart';
-import '../models/registro.dart';
 import '../services/analytics_service.dart';
 import '../services/contacto_service.dart';
 import '../services/elemento_service.dart';
@@ -73,8 +73,6 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
   late DateTime? _garantiaHasta = widget.existente?.garantiaHasta;
   late String? _habitacionId =
       widget.existente?.habitacionId ?? widget.habitacionIdInicial;
-  TipoRegistro _tipo = TipoRegistro.compra;
-  bool _esConProfesional = false;
   bool _guardando = false;
   bool _sugiriendo = false;
 
@@ -232,27 +230,7 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
           intervaloMantenimientoMeses: intervaloMeses,
           proximoMantenimiento: proximoMantenimiento,
         );
-        final registro = Registro(
-          id: '',
-          elementoNombre: nombre,
-          tipo: _tipo,
-          esConProfesional: _esConProfesional,
-          titulo: '${nombreTipoRegistro(_tipo)} de $nombre',
-          estado: _esConProfesional
-              ? EstadoRegistro.nuevo
-              : estadoInicialRegistroSimple(coste),
-          fecha: base,
-          garantiaHasta: _garantiaHasta,
-          coste: coste,
-          profesionalNombre: profesional,
-        );
-        final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
-        await ElementoService.crearConRegistroFundacional(
-          casaId: widget.casa.id,
-          elemento: elemento,
-          registroFundacional: registro,
-          createdBy: uid,
-        );
+        await ElementoService.crear(widget.casa.id, elemento);
         unawaited(AnalyticsService.firstElementCreated());
       }
       if (mounted) Navigator.pop(context);
@@ -297,37 +275,6 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
       body: ListView(
         padding: const EdgeInsets.all(ReparaSpace.s4),
         children: [
-          if (!editando) ...[
-            _SeccionFormulario(
-              titulo: 'Tipo de elemento',
-              children: [
-                Wrap(
-                  spacing: ReparaSpace.s2,
-                  runSpacing: ReparaSpace.s2,
-                  children: TipoRegistro.values
-                      .map(
-                        (t) => ChoiceChip(
-                          label: Text(nombreTipoRegistro(t)),
-                          selected: _tipo == t,
-                          onSelected: (_) => setState(() => _tipo = t),
-                        ),
-                      )
-                      .toList(),
-                ),
-                const SizedBox(height: ReparaSpace.s2),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('¿Lo hace un profesional?'),
-                  subtitle: const Text(
-                    'Activa presupuesto, pagos e invitación de profesional',
-                  ),
-                  value: _esConProfesional,
-                  onChanged: (v) => setState(() => _esConProfesional = v),
-                ),
-              ],
-            ),
-            const SizedBox(height: ReparaSpace.s4),
-          ],
           _SeccionFormulario(
             titulo: 'Datos básicos',
             children: [
@@ -393,100 +340,76 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
                 ],
               ),
               const SizedBox(height: ReparaSpace.s3),
-              // Ocultos con el interruptor activado (CEO, octubre 2026): no
-              // es solo que sobren -- lo que se escribiera aquí se guardaba
-              // igualmente en el registro fundacional, pero _ResumenEconomico
-              // nunca lo muestra para un registro con profesional (el coste y
-              // el profesional "de verdad" de ese flujo vienen del
-              // presupuesto y de la invitación, no de este texto libre). Sin
-              // ocultarlos, el formulario invitaba a rellenar un dato que
-              // luego desaparecía sin explicación. En el elemento SÍ seguían
-              // viéndose (elemento_detail_screen.dart), lo que hacía más
-              // confuso todavía que "no funcionara" solo a medias.
-              if (!_esConProfesional)
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _costeCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        decoration: const InputDecoration(
-                          labelText: 'Coste (€)',
-                        ),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _costeCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
                       ),
+                      decoration: const InputDecoration(labelText: 'Coste (€)'),
                     ),
-                    const SizedBox(width: ReparaSpace.s3),
-                    Expanded(
-                      child: RawAutocomplete<Contacto>(
-                        textEditingController: _profesionalCtrl,
-                        focusNode: _profesionalFocusNode,
-                        displayStringForOption: (c) => c.nombre,
-                        // Vacío (campo recién tocado) -> todos los contactos
-                        // guardados, no solo los que coinciden con lo tecleado.
-                        optionsBuilder: (value) => value.text.isEmpty
-                            ? _contactos
-                            : _contactos.where(
-                                (c) => c.nombre.toLowerCase().contains(
-                                  value.text.toLowerCase(),
-                                ),
-                              ),
-                        onSelected: (c) => _profesionalCtrl.text = c.nombre,
-                        fieldViewBuilder:
-                            (
-                              context,
-                              controller,
-                              focusNode,
-                              onFieldSubmitted,
-                            ) => TextField(
-                              controller: controller,
-                              focusNode: focusNode,
-                              decoration: const InputDecoration(
-                                labelText: 'Profesional (opcional)',
+                  ),
+                  const SizedBox(width: ReparaSpace.s3),
+                  Expanded(
+                    child: RawAutocomplete<Contacto>(
+                      textEditingController: _profesionalCtrl,
+                      focusNode: _profesionalFocusNode,
+                      displayStringForOption: (c) => c.nombre,
+                      // Vacío (campo recién tocado) -> todos los contactos
+                      // guardados, no solo los que coinciden con lo tecleado.
+                      optionsBuilder: (value) => value.text.isEmpty
+                          ? _contactos
+                          : _contactos.where(
+                              (c) => c.nombre.toLowerCase().contains(
+                                value.text.toLowerCase(),
                               ),
                             ),
-                        optionsViewBuilder: (context, onSelected, options) =>
-                            Align(
-                              alignment: Alignment.topLeft,
-                              child: Material(
-                                elevation: 4,
-                                borderRadius: BorderRadius.circular(10),
-                                child: ConstrainedBox(
-                                  constraints: const BoxConstraints(
-                                    maxHeight: 220,
-                                    minWidth: 220,
-                                  ),
-                                  child: ListView.builder(
-                                    padding: EdgeInsets.zero,
-                                    shrinkWrap: true,
-                                    itemCount: options.length,
-                                    itemBuilder: (context, i) {
-                                      final c = options.elementAt(i);
-                                      return ListTile(
-                                        dense: true,
-                                        title: Text(c.nombre),
-                                        subtitle: c.especialidad != null
-                                            ? Text(c.especialidad!)
-                                            : null,
-                                        onTap: () => onSelected(c),
-                                      );
-                                    },
-                                  ),
+                      onSelected: (c) => _profesionalCtrl.text = c.nombre,
+                      fieldViewBuilder:
+                          (context, controller, focusNode, onFieldSubmitted) =>
+                              TextField(
+                                controller: controller,
+                                focusNode: focusNode,
+                                decoration: const InputDecoration(
+                                  labelText: 'Profesional (opcional)',
+                                ),
+                              ),
+                      optionsViewBuilder: (context, onSelected, options) =>
+                          Align(
+                            alignment: Alignment.topLeft,
+                            child: Material(
+                              elevation: 4,
+                              borderRadius: BorderRadius.circular(10),
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  maxHeight: 220,
+                                  minWidth: 220,
+                                ),
+                                child: ListView.builder(
+                                  padding: EdgeInsets.zero,
+                                  shrinkWrap: true,
+                                  itemCount: options.length,
+                                  itemBuilder: (context, i) {
+                                    final c = options.elementAt(i);
+                                    return ListTile(
+                                      dense: true,
+                                      title: Text(c.nombre),
+                                      subtitle: c.especialidad != null
+                                          ? Text(c.especialidad!)
+                                          : null,
+                                      onTap: () => onSelected(c),
+                                    );
+                                  },
                                 ),
                               ),
                             ),
-                      ),
+                          ),
                     ),
-                  ],
-                )
-              else
-                Text(
-                  'El coste y el profesional de este trabajo se fijan '
-                  'después, desde el propio evento: invita al profesional '
-                  'y, cuando acepte, podrá enviarte un presupuesto.',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
+                  ),
+                ],
+              ),
             ],
           ),
           const SizedBox(height: ReparaSpace.s4),
