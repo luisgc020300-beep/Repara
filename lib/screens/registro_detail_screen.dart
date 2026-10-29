@@ -1408,6 +1408,27 @@ class _CuerpoSimple extends StatelessWidget {
                     registro: registro,
                   ),
                   const SizedBox(height: 20),
+                  // "Coste" (arriba, en _ResumenEconomico) es solo lo que
+                  // costó -- un número informativo, nunca un registro de lo
+                  // que de verdad se ha pagado. Un registro simple no tiene
+                  // presupuesto (nunca se fija en esta vía, ver
+                  // nuevo_registro_sheet.dart/nuevo_elemento_screen.dart),
+                  // así que PagosSection recibe presupuesto: null -- ya está
+                  // preparada para eso (ver pago_detail_screen.dart: el
+                  // tope contra el presupuesto solo se aplica si no es
+                  // null), igual que registrarPago en servidor. No hace
+                  // falta ningún cambio de Cloud Function ni de reglas:
+                  // registrarPago ya nunca ha exigido esConProfesional,
+                  // solo lo usaba quien construía la pantalla.
+                  PagosSection(
+                    casaId: casa.id,
+                    elementoId: elementoId,
+                    registroId: registro.id,
+                    registroTitulo: registro.titulo,
+                    presupuesto: null,
+                    rol: RolEnTrabajo.propietario,
+                  ),
+                  const SizedBox(height: 20),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
