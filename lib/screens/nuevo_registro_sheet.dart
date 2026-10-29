@@ -1,12 +1,21 @@
 // lib/screens/nuevo_registro_sheet.dart
 //
-// Hoja para añadir un registro simple (sin profesional) a un elemento que
-// ya existe -- p.ej. "cambio de depuradora" sobre la Piscina, o anotar una
-// revisión hecha a mano. El flujo completo con presupuesto/profesional
-// nunca se crea aquí: eso siempre empieza desde el propio registro ya
-// creado (ver registro_detail_screen.dart). Un registro nunca vive sin
-// elemento (octubre 2026, fusión Elemento/Trabajo/Evento) -- a diferencia
-// del antiguo NuevoEventoSheet, aquí elementoId es obligatorio.
+// Hoja para añadir un registro a un elemento que ya existe -- p.ej. "cambio
+// de depuradora" sobre la Piscina, o anotar una revisión hecha a mano.
+// Un registro nunca vive sin elemento (octubre 2026, fusión Elemento/
+// Trabajo/Evento) -- a diferencia del antiguo NuevoEventoSheet, aquí
+// elementoId es obligatorio.
+//
+// "¿Lo hace un profesional?" (CEO, octubre 2026): antes esta hoja solo
+// creaba registros simples -- la única vía para arrancar el flujo con
+// profesional (presupuesto/invitación real) era crear un elemento nuevo
+// desde cero (ver nuevo_elemento_screen.dart). Un elemento que ya existe
+// nunca podía recibir un evento nuevo con profesional, aunque ya tuviera
+// otros con profesional de antes (p.ej. una reforma más sobre el mismo
+// elemento). Mismo interruptor y mismo criterio que allí: oculta Coste/
+// Profesional/Plazos (ese dato se fija después, desde el propio evento, al
+// invitar al profesional) y nace en estado "nuevo" en vez de "terminado"/
+// "pendientePago".
 //
 // Rediseño de fidelidad visual (octubre 2026), misma identidad "REPARA
 // Professional" que nuevo_contacto_sheet.dart/nuevo_elemento_screen.dart:
@@ -72,6 +81,7 @@ class _NuevoRegistroFormState extends State<_NuevoRegistroForm> {
   final _plazoFrecuenciaCtrl = TextEditingController();
   final _plazoImporteCtrl = TextEditingController();
   DateTime _fecha = DateTime.now();
+  bool _esConProfesional = false;
   bool _pagaAPlazos = false;
   bool _guardando = false;
 
@@ -116,9 +126,11 @@ class _NuevoRegistroFormState extends State<_NuevoRegistroForm> {
           id: '',
           elementoNombre: widget.elementoNombre,
           tipo: _tipo,
-          esConProfesional: false,
+          esConProfesional: _esConProfesional,
           titulo: titulo,
-          estado: estadoInicialRegistroSimple(coste),
+          estado: _esConProfesional
+              ? EstadoRegistro.nuevo
+              : estadoInicialRegistroSimple(coste),
           descripcion: _descripcionCtrl.text.trim().isEmpty
               ? null
               : _descripcionCtrl.text.trim(),
@@ -187,6 +199,15 @@ class _NuevoRegistroFormState extends State<_NuevoRegistroForm> {
                 );
               }).toList(),
             ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('¿Lo hace un profesional?'),
+              subtitle: const Text(
+                'Activa presupuesto, pagos e invitación de profesional',
+              ),
+              value: _esConProfesional,
+              onChanged: (v) => setState(() => _esConProfesional = v),
+            ),
             const SizedBox(height: ReparaSpace.s4),
             TextField(
               controller: _tituloCtrl,
@@ -209,61 +230,75 @@ class _NuevoRegistroFormState extends State<_NuevoRegistroForm> {
                 labelText: 'Descripción (opcional)',
               ),
             ),
-            const SizedBox(height: ReparaSpace.s3),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _costeCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    decoration: const InputDecoration(labelText: 'Coste (€)'),
-                  ),
-                ),
-                const SizedBox(width: ReparaSpace.s3),
-                Expanded(
-                  child: TextField(
-                    controller: _profesionalCtrl,
-                    decoration: const InputDecoration(labelText: 'Profesional'),
-                  ),
-                ),
-              ],
-            ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('¿Se paga a plazos?'),
-              subtitle: const Text('Para calcular cuándo toca el próximo pago'),
-              value: _pagaAPlazos,
-              onChanged: (v) => setState(() => _pagaAPlazos = v),
-            ),
-            if (_pagaAPlazos) ...[
+            if (!_esConProfesional) ...[
+              const SizedBox(height: ReparaSpace.s3),
               Row(
                 children: [
                   Expanded(
                     child: TextField(
-                      controller: _plazoFrecuenciaCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Cada cuántos meses',
+                      controller: _costeCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
                       ),
+                      decoration: const InputDecoration(labelText: 'Coste (€)'),
                     ),
                   ),
                   const SizedBox(width: ReparaSpace.s3),
                   Expanded(
                     child: TextField(
-                      controller: _plazoImporteCtrl,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
+                      controller: _profesionalCtrl,
                       decoration: const InputDecoration(
-                        labelText: 'Importe por plazo (€)',
+                        labelText: 'Profesional',
                       ),
                     ),
                   ),
                 ],
               ),
-            ],
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('¿Se paga a plazos?'),
+                subtitle: const Text(
+                  'Para calcular cuándo toca el próximo pago',
+                ),
+                value: _pagaAPlazos,
+                onChanged: (v) => setState(() => _pagaAPlazos = v),
+              ),
+              if (_pagaAPlazos)
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _plazoFrecuenciaCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Cada cuántos meses',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: ReparaSpace.s3),
+                    Expanded(
+                      child: TextField(
+                        controller: _plazoImporteCtrl,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: 'Importe por plazo (€)',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+            ] else
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: ReparaSpace.s2),
+                child: Text(
+                  'El coste y el profesional de este trabajo se fijan '
+                  'después, desde el propio evento: invita al profesional '
+                  'y, cuando acepte, podrá enviarte un presupuesto.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
             const SizedBox(height: ReparaSpace.s3),
             OutlinedButton.icon(
               onPressed: () async {
