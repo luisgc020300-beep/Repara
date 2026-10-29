@@ -38,6 +38,7 @@ import '../widgets/estado_registro_chip.dart';
 import '../widgets/historial_timeline.dart';
 import '../widgets/ios_list.dart';
 import 'cambio_alcance_section.dart';
+import 'editar_registro_sheet.dart';
 import 'elemento_detail_screen.dart';
 import 'nuevo_documento_flow.dart';
 import 'pagos_section.dart';
@@ -301,13 +302,41 @@ class RegistroDetailScreen extends StatelessWidget {
               ],
             ),
             actions: [
-              if (!registro.esConProfesional)
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert),
-                  onSelected: (v) {
-                    if (v == 'eliminar') _eliminar(context);
-                  },
-                  itemBuilder: (_) => [
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert),
+                onSelected: (v) {
+                  if (v == 'editar') {
+                    mostrarEditarRegistroSheet(
+                      context,
+                      casaId: casa.id,
+                      elementoId: elementoId,
+                      registro: registro,
+                    );
+                  } else if (v == 'eliminar') {
+                    _eliminar(context);
+                  }
+                },
+                itemBuilder: (_) => [
+                  PopupMenuItem(
+                    value: 'editar',
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.edit_outlined,
+                          size: 18,
+                          color: context.colors.inkMuted,
+                        ),
+                        const SizedBox(width: 10),
+                        const Text('Editar evento'),
+                      ],
+                    ),
+                  ),
+                  // "Eliminar evento" se mantiene solo para el registro
+                  // simple -- un registro con profesional (un trabajo
+                  // contratado, con posible presupuesto/pagos detrás) no
+                  // debe poder borrarse de un toque ni aunque el borrado
+                  // en sí esté deshabilitado (ver _eliminar más arriba).
+                  if (!registro.esConProfesional)
                     PopupMenuItem(
                       value: 'eliminar',
                       child: Row(
@@ -322,8 +351,8 @@ class RegistroDetailScreen extends StatelessWidget {
                         ],
                       ),
                     ),
-                  ],
-                ),
+                ],
+              ),
             ],
           ),
           body: registro.esConProfesional
