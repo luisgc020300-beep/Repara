@@ -630,10 +630,19 @@ Future<void> _cambiarFotoRegistro(
 /// padre (un único `StreamBuilder<List<Pago>>` compartido con la pestaña de
 /// Pagos -- nunca una segunda suscripción a la misma colección).
 class _TarjetaEconomica extends StatelessWidget {
-  const _TarjetaEconomica({required this.presupuesto, required this.pagado});
+  const _TarjetaEconomica({
+    required this.presupuesto,
+    required this.pagado,
+    this.etiquetaTotal = 'Presupuesto',
+  });
 
   final double presupuesto;
   final double pagado;
+  // "Coste" en un registro simple, "Presupuesto" en uno con profesional --
+  // mismo número al fin y al cabo (lo que hay que cubrir), solo cambia
+  // cómo se llama (CEO, octubre 2026: pidió la misma barra de progreso
+  // para los registros simples con pago pendiente).
+  final String etiquetaTotal;
 
   @override
   Widget build(BuildContext context) {
@@ -680,7 +689,7 @@ class _TarjetaEconomica extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               columna(
-                'Presupuesto',
+                etiquetaTotal,
                 Text(
                   '${_formatoImporte(presupuesto)} €',
                   style: ReparaText.amount(context),
@@ -1398,136 +1407,162 @@ class _CuerpoSimple extends StatelessWidget {
     return StreamBuilder<Elemento?>(
       stream: ElementoService.streamElemento(casa.id, elementoId),
       builder: (context, elementoSnap) {
-        return ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            _CabeceraRegistro(
-              casa: casa,
-              elementoId: elementoId,
-              registro: registro,
-              elemento: elementoSnap.data,
-            ),
-            if (registro.estado == EstadoRegistro.pendientePago)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                child: AvisoRegistro(
-                  mensaje:
-                      'El trabajo está hecho, pero todavía falta cobrarlo del todo. '
-                      'Apunta el pago más abajo para cerrarlo.',
+        return StreamBuilder<List<Pago>>(
+          // Un único stream de pagos para toda esta pantalla (igual que
+          // _CuerpoConProfesional) -- alimenta la barra de progreso de
+          // abajo y el "próximo pago estimado" del plan a plazos; la
+          // pestaña Pagos (PagosSection) mantiene su propia suscripción
+          // porque es un widget reutilizable independiente (igual que en
+          // el lado con profesional).
+          stream: PagoService.streamPagos(casa.id, elementoId, registro.id),
+          builder: (context, pagosSnap) {
+            final pagos = pagosSnap.data ?? const <Pago>[];
+            final totalPagado = pagos.fold<double>(
+              0,
+              (acc, p) => acc + p.importe,
+            );
+            final coste = registro.coste;
+            return ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                _CabeceraRegistro(
+                  casa: casa,
+                  elementoId: elementoId,
+                  registro: registro,
+                  elemento: elementoSnap.data,
                 ),
-              ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextFormField(
-                    initialValue: _nombreEstadoSimple(registro),
-                    enabled: false,
-                    decoration: const InputDecoration(labelText: 'Estado'),
-                  ),
-                  const SizedBox(height: 16),
-                  if (registro.descripcion != null) ...[
-                    Text(
-                      registro.descripcion!,
-                      style: Theme.of(context).textTheme.bodyLarge,
+                if (registro.estado == EstadoRegistro.pendientePago)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                    child: AvisoRegistro(
+                      mensaje:
+                          'El trabajo está hecho, pero todavía falta cobrarlo del todo. '
+                          'Apunta el pago más abajo para cerrarlo.',
                     ),
-                    const SizedBox(height: 16),
-                  ],
-                  _ResumenEconomico(
-                    casa: casa,
-                    elementoId: elementoId,
-                    registro: registro,
                   ),
-                  const SizedBox(height: 20),
-                  // "Coste" (arriba, en _ResumenEconomico) es solo lo que
-                  // costó -- un número informativo, nunca un registro de lo
-                  // que de verdad se ha pagado. Un registro simple no tiene
-                  // presupuesto (nunca se fija en esta vía, ver
-                  // nuevo_registro_sheet.dart/nuevo_elemento_screen.dart),
-                  // así que PagosSection recibe presupuesto: null -- ya está
-                  // preparada para eso (ver pago_detail_screen.dart: el
-                  // tope contra el presupuesto solo se aplica si no es
-                  // null), igual que registrarPago en servidor. No hace
-                  // falta ningún cambio de Cloud Function ni de reglas:
-                  // registrarPago ya nunca ha exigido esConProfesional,
-                  // solo lo usaba quien construía la pantalla.
-                  PagosSection(
-                    casaId: casa.id,
-                    elementoId: elementoId,
-                    registroId: registro.id,
-                    registroTitulo: registro.titulo,
-                    presupuesto: null,
-                    rol: RolEnTrabajo.propietario,
-                  ),
-                  if (registro.plazoFrecuenciaMeses != null) ...[
-                    const SizedBox(height: 20),
-                    _PlanDePagos(
-                      casa: casa,
-                      elementoId: elementoId,
-                      registro: registro,
-                    ),
-                  ],
-                  const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Documentos',
-                        style: Theme.of(context).textTheme.headlineSmall,
+                      TextFormField(
+                        initialValue: _nombreEstadoSimple(registro),
+                        enabled: false,
+                        decoration: const InputDecoration(labelText: 'Estado'),
                       ),
-                      TextButton.icon(
-                        onPressed: () => iniciarNuevoDocumento(
-                          context,
-                          casaId: casa.id,
-                          elementoId: elementoId,
+                      const SizedBox(height: 16),
+                      if (registro.descripcion != null) ...[
+                        Text(
+                          registro.descripcion!,
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      _ResumenEconomico(
+                        casa: casa,
+                        elementoId: elementoId,
+                        registro: registro,
+                      ),
+                      // Barra de progreso de cobro (CEO, octubre 2026),
+                      // igual que ya existía para un registro con
+                      // profesional (_TarjetaEconomica/presupuesto) --
+                      // "Coste" en vez de "Presupuesto" es la única
+                      // diferencia real.
+                      if (coste != null && coste > 0) ...[
+                        const SizedBox(height: 16),
+                        _TarjetaEconomica(
+                          presupuesto: coste,
+                          pagado: totalPagado,
+                          etiquetaTotal: 'Coste',
+                        ),
+                      ],
+                      const SizedBox(height: 20),
+                      // "Coste" (arriba, en _ResumenEconomico) es solo lo que
+                      // costó -- un número informativo, nunca un registro de lo
+                      // que de verdad se ha pagado. Un registro simple no tiene
+                      // presupuesto (nunca se fija en esta vía, ver
+                      // nuevo_registro_sheet.dart/nuevo_elemento_screen.dart),
+                      // así que PagosSection recibe presupuesto: null -- ya está
+                      // preparada para eso (ver pago_detail_screen.dart: el
+                      // tope contra el presupuesto solo se aplica si no es
+                      // null), igual que registrarPago en servidor. No hace
+                      // falta ningún cambio de Cloud Function ni de reglas:
+                      // registrarPago ya nunca ha exigido esConProfesional,
+                      // solo lo usaba quien construía la pantalla.
+                      PagosSection(
+                        casaId: casa.id,
+                        elementoId: elementoId,
+                        registroId: registro.id,
+                        registroTitulo: registro.titulo,
+                        presupuesto: null,
+                        rol: RolEnTrabajo.propietario,
+                      ),
+                      if (registro.plazoFrecuenciaMeses != null) ...[
+                        const SizedBox(height: 20),
+                        _PlanDePagos(registro: registro, pagos: pagos),
+                      ],
+                      const SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Documentos',
+                            style: Theme.of(context).textTheme.headlineSmall,
+                          ),
+                          TextButton.icon(
+                            onPressed: () => iniciarNuevoDocumento(
+                              context,
+                              casaId: casa.id,
+                              elementoId: elementoId,
+                              registroId: registro.id,
+                            ),
+                            icon: const Icon(
+                              Icons.document_scanner_outlined,
+                              size: 18,
+                            ),
+                            label: const Text('Escanear documento'),
+                          ),
+                        ],
+                      ),
+                      StreamBuilder<List<Documento>>(
+                        stream: DocumentoService.streamDocumentos(
+                          casa.id,
                           registroId: registro.id,
                         ),
-                        icon: const Icon(
-                          Icons.document_scanner_outlined,
-                          size: 18,
-                        ),
-                        label: const Text('Escanear documento'),
+                        builder: (context, snapshot) {
+                          final documentos = snapshot.data ?? [];
+                          if (documentos.isEmpty) {
+                            return const EmptyHint(
+                              message: 'Sin documentos todavía.',
+                              icon: Icons.description_outlined,
+                            );
+                          }
+                          return IosSection(
+                            rows: documentos
+                                .map(
+                                  (d) => IosRow(
+                                    icon: Icons.insert_drive_file_outlined,
+                                    iconColor: context.colors.brand,
+                                    title: d.proveedor ?? d.nombreArchivo,
+                                    trailing: d.importe != null
+                                        ? Text(
+                                            '${d.importe!.toStringAsFixed(0)} €',
+                                            style: ReparaText.amount(context),
+                                          )
+                                        : null,
+                                    showChevron: false,
+                                  ),
+                                )
+                                .toList(),
+                          );
+                        },
                       ),
                     ],
                   ),
-                  StreamBuilder<List<Documento>>(
-                    stream: DocumentoService.streamDocumentos(
-                      casa.id,
-                      registroId: registro.id,
-                    ),
-                    builder: (context, snapshot) {
-                      final documentos = snapshot.data ?? [];
-                      if (documentos.isEmpty) {
-                        return const EmptyHint(
-                          message: 'Sin documentos todavía.',
-                          icon: Icons.description_outlined,
-                        );
-                      }
-                      return IosSection(
-                        rows: documentos
-                            .map(
-                              (d) => IosRow(
-                                icon: Icons.insert_drive_file_outlined,
-                                iconColor: context.colors.brand,
-                                title: d.proveedor ?? d.nombreArchivo,
-                                trailing: d.importe != null
-                                    ? Text(
-                                        '${d.importe!.toStringAsFixed(0)} €',
-                                        style: ReparaText.amount(context),
-                                      )
-                                    : null,
-                                showChevron: false,
-                              ),
-                            )
-                            .toList(),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ],
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -1540,60 +1575,51 @@ class _CuerpoSimple extends StatelessWidget {
 /// registro si todavía no hay ninguno). Nunca cambia por su cuenta cuándo
 /// el registro pasa a terminado -- eso sigue dependiendo solo de que los
 /// pagos reales cubran coste/presupuesto (ver estadoTrasCambioDePago en
-/// functions/index.js).
+/// functions/index.js). [pagos] ya viene calculado del padre -- mismo
+/// único `StreamBuilder<List<Pago>>` que alimenta _TarjetaEconomica, nunca
+/// una segunda suscripción a la misma colección.
 class _PlanDePagos extends StatelessWidget {
-  const _PlanDePagos({
-    required this.casa,
-    required this.elementoId,
-    required this.registro,
-  });
+  const _PlanDePagos({required this.registro, required this.pagos});
 
-  final Casa casa;
-  final String elementoId;
   final Registro registro;
+  final List<Pago> pagos;
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<List<Pago>>(
-      stream: PagoService.streamPagos(casa.id, elementoId, registro.id),
-      builder: (context, snapshot) {
-        final pagos = snapshot.data ?? const <Pago>[];
-        final ultimoPago = pagos.isEmpty ? null : pagos.first.fecha;
-        final proximo = registro.proximoPagoEstimado(ultimoPago);
-        return Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: context.colors.surfaceMuted,
-            borderRadius: BorderRadius.circular(ReparaRadius.md),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.event_repeat_outlined, color: context.colors.inkMuted),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Pago a plazos · cada ${registro.plazoFrecuenciaMeses} '
-                      '${registro.plazoFrecuenciaMeses == 1 ? 'mes' : 'meses'} · '
-                      '${registro.plazoImporte!.toStringAsFixed(2)} €',
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    if (proximo != null)
-                      Text(
-                        'Próximo pago estimado: ${DateFormat('d MMM yyyy', 'es_ES').format(proximo)}',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                  ],
+    final ultimoPago = pagos.isEmpty ? null : pagos.first.fecha;
+    final proximo = registro.proximoPagoEstimado(ultimoPago);
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: context.colors.surfaceMuted,
+        borderRadius: BorderRadius.circular(ReparaRadius.md),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.event_repeat_outlined, color: context.colors.inkMuted),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Pago a plazos · cada ${registro.plazoFrecuenciaMeses} '
+                  '${registro.plazoFrecuenciaMeses == 1 ? 'mes' : 'meses'} · '
+                  '${registro.plazoImporte!.toStringAsFixed(2)} €',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
                 ),
-              ),
-            ],
+                if (proximo != null)
+                  Text(
+                    'Próximo pago estimado: ${DateFormat('d MMM yyyy', 'es_ES').format(proximo)}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+              ],
+            ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 }

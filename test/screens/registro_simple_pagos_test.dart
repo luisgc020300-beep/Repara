@@ -125,6 +125,68 @@ void main() {
     },
   );
 
+  // CEO, octubre 2026: pidió la misma barra de progreso verde (Coste/
+  // Pagado/Saldo) que ya tenía un registro con profesional (presupuesto),
+  // también para uno simple -- _TarjetaEconomica ya existía, solo faltaba
+  // reutilizarla aquí con "Coste" en vez de "Presupuesto".
+  testWidgets(
+    'un registro simple con coste y un pago parcial muestra la barra de progreso Coste/Pagado/Saldo',
+    (tester) async {
+      final db = await _prepararConRegistroSimple();
+      await db
+          .collection('casas')
+          .doc(_casa.id)
+          .collection('elementos')
+          .doc('e1')
+          .collection('registros')
+          .doc('r1')
+          .collection('pagos')
+          .add({
+            'fecha': Timestamp.fromDate(DateTime(2026, 10, 29)),
+            'importe': 800,
+            'concepto': 'Primer plazo',
+            'createdBy': 'u1',
+          });
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildReparaLightTheme(),
+          home: const RegistroDetailScreen(casa: _casa, elementoId: 'e1', registroId: 'r1'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('COSTE'), findsOneWidget);
+      expect(find.text('PAGADO'), findsOneWidget);
+      expect(find.text('SALDO'), findsOneWidget);
+      // "2000 €" aparece dos veces a propósito: una en _ResumenEconomico
+      // (el coste informativo de siempre) y otra en la columna "Coste" de
+      // la barra de progreso nueva.
+      expect(find.text('2000 €'), findsNWidgets(2));
+      expect(find.text('800 €'), findsOneWidget);
+      expect(find.text('1200 €'), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'un registro simple con coste completamente pagado muestra "Completado", sin barra de progreso',
+    (tester) async {
+      await _prepararConRegistroSimple(conPago: true);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildReparaLightTheme(),
+          home: const RegistroDetailScreen(casa: _casa, elementoId: 'e1', registroId: 'r1'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Completado'), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+    },
+  );
+
   testWidgets(
     '"Añadir pago" en un registro simple abre el formulario sin ningún tope de presupuesto',
     (tester) async {
