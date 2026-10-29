@@ -138,6 +138,88 @@ void main() {
   );
 
   testWidgets(
+    'activar "¿Se paga a plazos?" y rellenar frecuencia/importe los guarda juntos',
+    (tester) async {
+      final db = await _conRegistro({
+        'titulo': 'Instalación de aire acondicionado',
+        'tipo': 'instalacion',
+        'esConProfesional': false,
+        'estado': 'pendientePago',
+        'elementoNombre': 'Salón',
+        'fecha': Timestamp.fromDate(DateTime(2026, 10, 29)),
+        'coste': 1200,
+      });
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildReparaLightTheme(),
+          home: const RegistroDetailScreen(casa: _casa, elementoId: 'e1', registroId: 'r1'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.more_vert));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Editar evento'));
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(TextField, 'Cada cuántos meses'), findsNothing);
+      await tester.tap(find.text('¿Se paga a plazos?'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.widgetWithText(TextField, 'Cada cuántos meses'), '3');
+      await tester.enterText(find.widgetWithText(TextField, 'Importe por plazo (€)'), '300');
+      await tester.tap(find.text('Guardar cambios'));
+      await tester.pumpAndSettle();
+
+      final datos = await _datosRegistro(db);
+      expect(datos['plazoFrecuenciaMeses'], 3);
+      expect(datos['plazoImporte'], 300);
+    },
+  );
+
+  testWidgets(
+    'desactivar "¿Se paga a plazos?" en un registro que ya tenía plan lo borra entero',
+    (tester) async {
+      final db = await _conRegistro({
+        'titulo': 'Instalación de aire acondicionado',
+        'tipo': 'instalacion',
+        'esConProfesional': false,
+        'estado': 'pendientePago',
+        'elementoNombre': 'Salón',
+        'fecha': Timestamp.fromDate(DateTime(2026, 10, 29)),
+        'coste': 1200,
+        'plazoFrecuenciaMeses': 3,
+        'plazoImporte': 300,
+      });
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildReparaLightTheme(),
+          home: const RegistroDetailScreen(casa: _casa, elementoId: 'e1', registroId: 'r1'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.more_vert));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Editar evento'));
+      await tester.pumpAndSettle();
+
+      // Prellenado con el plan ya guardado.
+      expect(find.widgetWithText(TextField, '3'), findsOneWidget);
+      expect(find.widgetWithText(TextField, '300,00'), findsOneWidget);
+
+      await tester.tap(find.text('¿Se paga a plazos?'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Guardar cambios'));
+      await tester.pumpAndSettle();
+
+      final datos = await _datosRegistro(db);
+      expect(datos['plazoFrecuenciaMeses'], isNull);
+      expect(datos['plazoImporte'], isNull);
+    },
+  );
+
+  testWidgets(
     'editar evento no deja un título vacío -- avisa y no guarda nada',
     (tester) async {
       final db = await _conRegistro({

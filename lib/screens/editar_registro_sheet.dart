@@ -40,7 +40,9 @@ Future<void> mostrarEditarRegistroSheet(
     context: context,
     isScrollControlled: true,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(ReparaRadius.lg)),
+      borderRadius: BorderRadius.vertical(
+        top: Radius.circular(ReparaRadius.lg),
+      ),
     ),
     builder: (ctx) => _EditarRegistroForm(
       casaId: casaId,
@@ -78,6 +80,15 @@ class _EditarRegistroFormState extends State<_EditarRegistroForm> {
   late final _profesionalCtrl = TextEditingController(
     text: widget.registro.profesionalNombre ?? '',
   );
+  late final _plazoFrecuenciaCtrl = TextEditingController(
+    text: widget.registro.plazoFrecuenciaMeses?.toString() ?? '',
+  );
+  late final _plazoImporteCtrl = TextEditingController(
+    text: widget.registro.plazoImporte == null
+        ? ''
+        : widget.registro.plazoImporte!.toStringAsFixed(2).replaceAll('.', ','),
+  );
+  late bool _pagaAPlazos = widget.registro.plazoFrecuenciaMeses != null;
   bool _guardando = false;
   bool _mostrarErrorTitulo = false;
 
@@ -87,6 +98,8 @@ class _EditarRegistroFormState extends State<_EditarRegistroForm> {
     _descripcionCtrl.dispose();
     _costeCtrl.dispose();
     _profesionalCtrl.dispose();
+    _plazoFrecuenciaCtrl.dispose();
+    _plazoImporteCtrl.dispose();
     super.dispose();
   }
 
@@ -113,6 +126,17 @@ class _EditarRegistroFormState extends State<_EditarRegistroForm> {
       final profesional = _profesionalCtrl.text.trim();
       cambios['coste'] = coste;
       cambios['profesionalNombre'] = profesional.isEmpty ? null : profesional;
+      final frecuencia = _pagaAPlazos
+          ? int.tryParse(_plazoFrecuenciaCtrl.text)
+          : null;
+      final importePlazo = _pagaAPlazos
+          ? double.tryParse(_plazoImporteCtrl.text.replaceAll(',', '.'))
+          : null;
+      // Los dos van juntos -- si falta cualquiera, se borran los dos (ver
+      // comentario de plazoFrecuenciaMeses en models/registro.dart).
+      final plazoCompleto = frecuencia != null && importePlazo != null;
+      cambios['plazoFrecuenciaMeses'] = plazoCompleto ? frecuencia : null;
+      cambios['plazoImporte'] = plazoCompleto ? importePlazo : null;
     }
     try {
       await RegistroService.actualizar(
@@ -150,7 +174,10 @@ class _EditarRegistroFormState extends State<_EditarRegistroForm> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Editar evento', style: Theme.of(context).textTheme.displaySmall),
+            Text(
+              'Editar evento',
+              style: Theme.of(context).textTheme.displaySmall,
+            ),
             const SizedBox(height: ReparaSpace.s4),
             TextField(
               controller: _tituloCtrl,
@@ -159,7 +186,9 @@ class _EditarRegistroFormState extends State<_EditarRegistroForm> {
                 errorText: _mostrarErrorTitulo ? 'Obligatorio' : null,
               ),
               onChanged: (_) {
-                if (_mostrarErrorTitulo) setState(() => _mostrarErrorTitulo = false);
+                if (_mostrarErrorTitulo) {
+                  setState(() => _mostrarErrorTitulo = false);
+                }
               },
             ),
             const SizedBox(height: ReparaSpace.s3),
@@ -167,7 +196,9 @@ class _EditarRegistroFormState extends State<_EditarRegistroForm> {
               controller: _descripcionCtrl,
               minLines: 1,
               maxLines: 4,
-              decoration: const InputDecoration(labelText: 'Descripción (opcional)'),
+              decoration: const InputDecoration(
+                labelText: 'Descripción (opcional)',
+              ),
             ),
             if (!widget.registro.esConProfesional) ...[
               const SizedBox(height: ReparaSpace.s3),
@@ -176,7 +207,9 @@ class _EditarRegistroFormState extends State<_EditarRegistroForm> {
                   Expanded(
                     child: TextField(
                       controller: _costeCtrl,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       decoration: const InputDecoration(labelText: 'Coste (€)'),
                     ),
                   ),
@@ -184,11 +217,48 @@ class _EditarRegistroFormState extends State<_EditarRegistroForm> {
                   Expanded(
                     child: TextField(
                       controller: _profesionalCtrl,
-                      decoration: const InputDecoration(labelText: 'Profesional'),
+                      decoration: const InputDecoration(
+                        labelText: 'Profesional',
+                      ),
                     ),
                   ),
                 ],
               ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('¿Se paga a plazos?'),
+                subtitle: const Text(
+                  'Para calcular cuándo toca el próximo pago',
+                ),
+                value: _pagaAPlazos,
+                onChanged: (v) => setState(() => _pagaAPlazos = v),
+              ),
+              if (_pagaAPlazos)
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _plazoFrecuenciaCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Cada cuántos meses',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: ReparaSpace.s3),
+                    Expanded(
+                      child: TextField(
+                        controller: _plazoImporteCtrl,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: 'Importe por plazo (€)',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
             ],
             const SizedBox(height: ReparaSpace.s5),
             FilledButton(

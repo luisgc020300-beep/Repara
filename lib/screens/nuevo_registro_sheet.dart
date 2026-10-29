@@ -69,7 +69,10 @@ class _NuevoRegistroFormState extends State<_NuevoRegistroForm> {
   final _descripcionCtrl = TextEditingController();
   final _costeCtrl = TextEditingController();
   final _profesionalCtrl = TextEditingController();
+  final _plazoFrecuenciaCtrl = TextEditingController();
+  final _plazoImporteCtrl = TextEditingController();
   DateTime _fecha = DateTime.now();
+  bool _pagaAPlazos = false;
   bool _guardando = false;
 
   /// Eco visual en el propio campo del mismo error que ya muestra el
@@ -84,6 +87,8 @@ class _NuevoRegistroFormState extends State<_NuevoRegistroForm> {
     _descripcionCtrl.dispose();
     _costeCtrl.dispose();
     _profesionalCtrl.dispose();
+    _plazoFrecuenciaCtrl.dispose();
+    _plazoImporteCtrl.dispose();
     super.dispose();
   }
 
@@ -97,6 +102,12 @@ class _NuevoRegistroFormState extends State<_NuevoRegistroForm> {
     setState(() => _guardando = true);
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
     final coste = double.tryParse(_costeCtrl.text.replaceAll(',', '.'));
+    final frecuencia = _pagaAPlazos
+        ? int.tryParse(_plazoFrecuenciaCtrl.text)
+        : null;
+    final importePlazo = _pagaAPlazos
+        ? double.tryParse(_plazoImporteCtrl.text.replaceAll(',', '.'))
+        : null;
     try {
       await RegistroService.crear(
         widget.casaId,
@@ -115,6 +126,14 @@ class _NuevoRegistroFormState extends State<_NuevoRegistroForm> {
           profesionalNombre: _profesionalCtrl.text.trim().isEmpty
               ? null
               : _profesionalCtrl.text.trim(),
+          // Los dos van juntos -- si falta cualquiera, no se guarda ninguno
+          // (ver comentario de plazoFrecuenciaMeses en models/registro.dart).
+          plazoFrecuenciaMeses: frecuencia != null && importePlazo != null
+              ? frecuencia
+              : null,
+          plazoImporte: frecuencia != null && importePlazo != null
+              ? importePlazo
+              : null,
           fecha: _fecha,
         ),
         createdBy: uid,
@@ -211,6 +230,40 @@ class _NuevoRegistroFormState extends State<_NuevoRegistroForm> {
                 ),
               ],
             ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('¿Se paga a plazos?'),
+              subtitle: const Text('Para calcular cuándo toca el próximo pago'),
+              value: _pagaAPlazos,
+              onChanged: (v) => setState(() => _pagaAPlazos = v),
+            ),
+            if (_pagaAPlazos) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _plazoFrecuenciaCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Cada cuántos meses',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: ReparaSpace.s3),
+                  Expanded(
+                    child: TextField(
+                      controller: _plazoImporteCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: const InputDecoration(
+                        labelText: 'Importe por plazo (€)',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: ReparaSpace.s3),
             OutlinedButton.icon(
               onPressed: () async {

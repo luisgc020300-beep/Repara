@@ -53,4 +53,33 @@ void main() {
       expect(montoDebidoRegistro(registro()), isNull);
     });
   });
+
+  group('Registro.proximoPagoEstimado()', () {
+    Registro registroConPlan({int? frecuencia}) => Registro(
+          id: '',
+          elementoNombre: 'Salón',
+          tipo: TipoRegistro.instalacion,
+          esConProfesional: false,
+          titulo: 'Aire acondicionado',
+          estado: EstadoRegistro.pendientePago,
+          fecha: DateTime(2026, 1, 15),
+          coste: 1200,
+          plazoFrecuenciaMeses: frecuencia,
+          plazoImporte: 300,
+        );
+
+    test('sin plan (plazoFrecuenciaMeses null), no hay próximo pago que calcular', () {
+      expect(registroConPlan().proximoPagoEstimado(null), isNull);
+    });
+
+    test('sin ningún pago todavía, se cuenta desde la fecha del registro', () {
+      final r = registroConPlan(frecuencia: 3);
+      expect(r.proximoPagoEstimado(null), DateTime(2026, 4, 15));
+    });
+
+    test('con un pago ya registrado, se cuenta desde la fecha de ese último pago', () {
+      final r = registroConPlan(frecuencia: 1);
+      expect(r.proximoPagoEstimado(DateTime(2026, 6, 10)), DateTime(2026, 7, 10));
+    });
+  });
 }

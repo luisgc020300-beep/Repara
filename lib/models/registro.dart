@@ -18,23 +18,30 @@
 // lado Pro nunca necesita permiso de lectura sobre el elemento en sí.
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum TipoRegistro { compra, averia, reparacion, mantenimiento, instalacion, reforma, sustitucion, nota }
+enum TipoRegistro {
+  compra,
+  averia,
+  reparacion,
+  mantenimiento,
+  instalacion,
+  reforma,
+  sustitucion,
+  nota,
+}
 
-TipoRegistro tipoRegistroFromString(String? s) => TipoRegistro.values.firstWhere(
-      (t) => t.name == s,
-      orElse: () => TipoRegistro.nota,
-    );
+TipoRegistro tipoRegistroFromString(String? s) => TipoRegistro.values
+    .firstWhere((t) => t.name == s, orElse: () => TipoRegistro.nota);
 
 String nombreTipoRegistro(TipoRegistro t) => switch (t) {
-      TipoRegistro.compra => 'Compra',
-      TipoRegistro.averia => 'Avería',
-      TipoRegistro.reparacion => 'Reparación',
-      TipoRegistro.mantenimiento => 'Mantenimiento',
-      TipoRegistro.instalacion => 'Instalación',
-      TipoRegistro.reforma => 'Reforma/Mejora',
-      TipoRegistro.sustitucion => 'Sustitución',
-      TipoRegistro.nota => 'Nota',
-    };
+  TipoRegistro.compra => 'Compra',
+  TipoRegistro.averia => 'Avería',
+  TipoRegistro.reparacion => 'Reparación',
+  TipoRegistro.mantenimiento => 'Mantenimiento',
+  TipoRegistro.instalacion => 'Instalación',
+  TipoRegistro.reforma => 'Reforma/Mejora',
+  TipoRegistro.sustitucion => 'Sustitución',
+  TipoRegistro.nota => 'Nota',
+};
 
 // pendienteConfirmacion: el profesional dice que ha terminado, pero el
 // propietario todavía no lo ha confirmado ni rechazado -- modelo de dos
@@ -53,7 +60,15 @@ String nombreTipoRegistro(TipoRegistro t) => switch (t) {
 // Cloud Function al registrar/editar/borrar un pago o al finalizar: nunca
 // se escribe a mano desde el cliente (ver _estadoControlado en
 // registro_detail_screen.dart).
-enum EstadoRegistro { nuevo, presupuestado, enCurso, pendienteConfirmacion, pendientePago, terminado, archivado }
+enum EstadoRegistro {
+  nuevo,
+  presupuestado,
+  enCurso,
+  pendienteConfirmacion,
+  pendientePago,
+  terminado,
+  archivado,
+}
 
 // Importe del que depende si un registro está realmente cobrado: el
 // presupuesto cuando va con profesional, el coste cuando es simple -- nunca
@@ -66,12 +81,12 @@ double? montoDebidoRegistro(Registro r) => r.presupuesto ?? r.coste;
 // puso un coste > 0 al crearlo -- si no, nace "terminado" directo, nunca
 // "pendientePago" sin nada pendiente de verdad.
 EstadoRegistro estadoInicialRegistroSimple(double? coste) =>
-    (coste != null && coste > 0) ? EstadoRegistro.pendientePago : EstadoRegistro.terminado;
+    (coste != null && coste > 0)
+    ? EstadoRegistro.pendientePago
+    : EstadoRegistro.terminado;
 
-EstadoRegistro estadoRegistroFromString(String? s) => EstadoRegistro.values.firstWhere(
-      (t) => t.name == s,
-      orElse: () => EstadoRegistro.nuevo,
-    );
+EstadoRegistro estadoRegistroFromString(String? s) => EstadoRegistro.values
+    .firstWhere((t) => t.name == s, orElse: () => EstadoRegistro.nuevo);
 
 class Registro {
   const Registro({
@@ -91,6 +106,8 @@ class Registro {
     this.profesionalContacto,
     this.profesionalUid,
     this.presupuesto,
+    this.plazoFrecuenciaMeses,
+    this.plazoImporte,
     this.createdAt,
     this.createdBy,
   });
@@ -111,6 +128,13 @@ class Registro {
   final String? profesionalContacto;
   final String? profesionalUid;
   final double? presupuesto;
+  // Pago a plazos (CEO, octubre 2026) -- puramente informativo, para que la
+  // ficha pueda calcular un "próximo pago estimado"; no cambia en nada
+  // cuándo pasa a terminado (eso sigue dependiendo solo de los pagos reales
+  // en Pagos, ver estadoTrasCambioDePago). Los dos van juntos o ninguno --
+  // no tiene sentido una frecuencia sin importe ni al revés.
+  final int? plazoFrecuenciaMeses;
+  final double? plazoImporte;
   final DateTime? createdAt;
   final String? createdBy;
 
@@ -133,27 +157,45 @@ class Registro {
       profesionalContacto: data['profesionalContacto'] as String?,
       profesionalUid: data['profesionalUid'] as String?,
       presupuesto: (data['presupuesto'] as num?)?.toDouble(),
+      plazoFrecuenciaMeses: (data['plazoFrecuenciaMeses'] as num?)?.toInt(),
+      plazoImporte: (data['plazoImporte'] as num?)?.toDouble(),
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
       createdBy: data['createdBy'] as String?,
     );
   }
 
   Map<String, dynamic> toMap() => {
-        'elementoNombre': elementoNombre,
-        'tipo': tipo.name,
-        'esConProfesional': esConProfesional,
-        'titulo': titulo,
-        'estado': estado.name,
-        'fecha': Timestamp.fromDate(fecha),
-        if (descripcion != null) 'descripcion': descripcion,
-        if (garantiaHasta != null) 'garantiaHasta': Timestamp.fromDate(garantiaHasta!),
-        if (coste != null) 'coste': coste,
-        if (fotoUrl != null) 'fotoUrl': fotoUrl,
-        'documentoIds': documentoIds,
-        if (profesionalNombre != null) 'profesionalNombre': profesionalNombre,
-        if (profesionalContacto != null) 'profesionalContacto': profesionalContacto,
-        if (profesionalUid != null) 'profesionalUid': profesionalUid,
-        if (presupuesto != null) 'presupuesto': presupuesto,
-        'createdAt': FieldValue.serverTimestamp(),
-      };
+    'elementoNombre': elementoNombre,
+    'tipo': tipo.name,
+    'esConProfesional': esConProfesional,
+    'titulo': titulo,
+    'estado': estado.name,
+    'fecha': Timestamp.fromDate(fecha),
+    if (descripcion != null) 'descripcion': descripcion,
+    if (garantiaHasta != null)
+      'garantiaHasta': Timestamp.fromDate(garantiaHasta!),
+    if (coste != null) 'coste': coste,
+    if (fotoUrl != null) 'fotoUrl': fotoUrl,
+    'documentoIds': documentoIds,
+    if (profesionalNombre != null) 'profesionalNombre': profesionalNombre,
+    if (profesionalContacto != null) 'profesionalContacto': profesionalContacto,
+    if (profesionalUid != null) 'profesionalUid': profesionalUid,
+    if (presupuesto != null) 'presupuesto': presupuesto,
+    if (plazoFrecuenciaMeses != null)
+      'plazoFrecuenciaMeses': plazoFrecuenciaMeses,
+    if (plazoImporte != null) 'plazoImporte': plazoImporte,
+    'createdAt': FieldValue.serverTimestamp(),
+  };
+
+  // Próximo pago estimado: fecha del último pago registrado (o, si todavía
+  // no hay ninguno, la fecha de creación del registro) + la frecuencia del
+  // plan. Mismo patrón que proximoMantenimiento en nuevo_elemento_screen.
+  // dart -- DateTime normaliza el desbordamiento de mes él solo, sin
+  // necesidad de un cálculo de calendario más elaborado.
+  DateTime? proximoPagoEstimado(DateTime? fechaUltimoPago) {
+    final frecuencia = plazoFrecuenciaMeses;
+    if (frecuencia == null) return null;
+    final base = fechaUltimoPago ?? fecha;
+    return DateTime(base.year, base.month + frecuencia, base.day);
+  }
 }

@@ -280,9 +280,7 @@ class RegistroDetailScreen extends StatelessWidget {
         if (snapshot.hasError) {
           return Scaffold(
             appBar: AppBar(),
-            body: const Center(
-              child: Text('No se pudo cargar este evento.'),
-            ),
+            body: const Center(child: Text('No se pudo cargar este evento.')),
           );
         }
         final registro = snapshot.data;
@@ -474,10 +472,13 @@ class _CabeceraRegistro extends StatelessWidget {
             // (antes compartían el mismo GestureDetector y tocar en
             // cualquier punto, lápiz incluido, abría la cámara/galería).
             onTap: fotoUrl == null
-                ? () => _cambiarFotoRegistro(context, casa, elementoId, registro)
+                ? () =>
+                      _cambiarFotoRegistro(context, casa, elementoId, registro)
                 : () => Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => FotoAmpliadaScreen(url: fotoUrl)),
+                    MaterialPageRoute(
+                      builder: (_) => FotoAmpliadaScreen(url: fotoUrl),
+                    ),
                   ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(ReparaRadius.md),
@@ -908,10 +909,8 @@ class _CuerpoConProfesional extends StatelessWidget {
                             rol: RolEnTrabajo.propietario,
                             registroCerrado:
                                 registro.estado == EstadoRegistro.terminado ||
-                                registro.estado ==
-                                    EstadoRegistro.archivado ||
-                                registro.estado ==
-                                    EstadoRegistro.pendientePago,
+                                registro.estado == EstadoRegistro.archivado ||
+                                registro.estado == EstadoRegistro.pendientePago,
                           ),
                         ),
                         SingleChildScrollView(
@@ -1461,6 +1460,14 @@ class _CuerpoSimple extends StatelessWidget {
                     presupuesto: null,
                     rol: RolEnTrabajo.propietario,
                   ),
+                  if (registro.plazoFrecuenciaMeses != null) ...[
+                    const SizedBox(height: 20),
+                    _PlanDePagos(
+                      casa: casa,
+                      elementoId: elementoId,
+                      registro: registro,
+                    ),
+                  ],
                   const SizedBox(height: 20),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1521,6 +1528,70 @@ class _CuerpoSimple extends StatelessWidget {
               ),
             ),
           ],
+        );
+      },
+    );
+  }
+}
+
+/// Plan de pago a plazos (CEO, octubre 2026) -- puramente informativo:
+/// muestra la frecuencia/importe guardados y calcula un "próximo pago
+/// estimado" a partir del último pago real de Pagos (o de la fecha del
+/// registro si todavía no hay ninguno). Nunca cambia por su cuenta cuándo
+/// el registro pasa a terminado -- eso sigue dependiendo solo de que los
+/// pagos reales cubran coste/presupuesto (ver estadoTrasCambioDePago en
+/// functions/index.js).
+class _PlanDePagos extends StatelessWidget {
+  const _PlanDePagos({
+    required this.casa,
+    required this.elementoId,
+    required this.registro,
+  });
+
+  final Casa casa;
+  final String elementoId;
+  final Registro registro;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<Pago>>(
+      stream: PagoService.streamPagos(casa.id, elementoId, registro.id),
+      builder: (context, snapshot) {
+        final pagos = snapshot.data ?? const <Pago>[];
+        final ultimoPago = pagos.isEmpty ? null : pagos.first.fecha;
+        final proximo = registro.proximoPagoEstimado(ultimoPago);
+        return Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: context.colors.surfaceMuted,
+            borderRadius: BorderRadius.circular(ReparaRadius.md),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.event_repeat_outlined, color: context.colors.inkMuted),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Pago a plazos · cada ${registro.plazoFrecuenciaMeses} '
+                      '${registro.plazoFrecuenciaMeses == 1 ? 'mes' : 'meses'} · '
+                      '${registro.plazoImporte!.toStringAsFixed(2)} €',
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (proximo != null)
+                      Text(
+                        'Próximo pago estimado: ${DateFormat('d MMM yyyy', 'es_ES').format(proximo)}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         );
       },
     );
