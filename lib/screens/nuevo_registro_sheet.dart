@@ -96,6 +96,7 @@ class _NuevoRegistroFormState extends State<_NuevoRegistroForm> {
     }
     setState(() => _guardando = true);
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final coste = double.tryParse(_costeCtrl.text.replaceAll(',', '.'));
     try {
       await RegistroService.crear(
         widget.casaId,
@@ -106,11 +107,11 @@ class _NuevoRegistroFormState extends State<_NuevoRegistroForm> {
           tipo: _tipo,
           esConProfesional: false,
           titulo: titulo,
-          estado: EstadoRegistro.terminado,
+          estado: estadoInicialRegistroSimple(coste),
           descripcion: _descripcionCtrl.text.trim().isEmpty
               ? null
               : _descripcionCtrl.text.trim(),
-          coste: double.tryParse(_costeCtrl.text.replaceAll(',', '.')),
+          coste: coste,
           profesionalNombre: _profesionalCtrl.text.trim().isEmpty
               ? null
               : _profesionalCtrl.text.trim(),

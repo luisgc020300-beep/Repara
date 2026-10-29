@@ -74,7 +74,7 @@ void main() {
     expect(actualizado.titulo, 'Avería'); // el resto de campos no se toca
   });
 
-  test('elementosConTrabajoPendiente() solo cuenta registros con profesional y sin cerrar', () async {
+  test('elementosConTrabajoPendiente() cuenta registros con profesional sin cerrar', () async {
     final db = FakeFirebaseFirestore();
     RegistroService.debugFirestoreOverride = db;
     ElementoService.debugFirestoreOverride = db;
@@ -97,5 +97,49 @@ void main() {
 
     final pendientes = await RegistroService.elementosConTrabajoPendiente(casaId);
     expect(pendientes, hasLength(1)); // el elemento solo cuenta una vez, aunque tenga más de un registro
+  });
+
+  // CEO, octubre 2026: "terminado" exige trabajo Y pago -- un registro
+  // SIMPLE (sin profesional) en pendientePago también debe salir en el
+  // aviso de Inicio, no solo los que tienen profesional.
+  test('elementosConTrabajoPendiente() también cuenta un registro simple en pago pendiente', () async {
+    final db = FakeFirebaseFirestore();
+    RegistroService.debugFirestoreOverride = db;
+    ElementoService.debugFirestoreOverride = db;
+
+    await db.collection('casas').doc(casaId).collection('elementos').doc(elementoId).set({'nombre': 'Caldera', 'createdAt': Timestamp.now()});
+    await db
+        .collection('casas')
+        .doc(casaId)
+        .collection('elementos')
+        .doc(elementoId)
+        .collection('registros')
+        .add({...registro(estado: EstadoRegistro.pendientePago).toMap(), 'esConProfesional': false, 'coste': 2000, 'fecha': Timestamp.fromDate(DateTime(2026, 2, 1))});
+
+    final pendientes = await RegistroService.elementosConTrabajoPendiente(casaId);
+    expect(pendientes, hasLength(1));
+  });
+
+  test('esTrabajoActivo() es true para pendientePago sin importar esConProfesional, y false para terminado', () {
+    final simplePendiente = Registro(
+      id: '',
+      elementoNombre: 'Caldera',
+      tipo: TipoRegistro.compra,
+      esConProfesional: false,
+      titulo: 'Compra',
+      estado: EstadoRegistro.pendientePago,
+      fecha: DateTime(2026, 1, 1),
+    );
+    final simpleTerminado = Registro(
+      id: '',
+      elementoNombre: 'Caldera',
+      tipo: TipoRegistro.compra,
+      esConProfesional: false,
+      titulo: 'Compra',
+      estado: EstadoRegistro.terminado,
+      fecha: DateTime(2026, 1, 1),
+    );
+    expect(RegistroService.esTrabajoActivo(simplePendiente), isTrue);
+    expect(RegistroService.esTrabajoActivo(simpleTerminado), isFalse);
   });
 }

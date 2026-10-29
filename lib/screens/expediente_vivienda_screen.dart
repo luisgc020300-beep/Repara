@@ -27,8 +27,7 @@ import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
 import '../widgets/ios_list.dart';
 
-double? _costeRegistro(Registro r) =>
-    r.esConProfesional ? r.presupuesto : r.coste;
+double? _costeRegistro(Registro r) => montoDebidoRegistro(r);
 
 class ExpedienteViviendaScreen extends StatelessWidget {
   const ExpedienteViviendaScreen({required this.casa, super.key});
@@ -129,10 +128,13 @@ class ExpedienteViviendaScreen extends StatelessWidget {
     }
   }
 
+  // "Terminado" ahora exige también estar cobrado (CEO, octubre 2026) -- un
+  // registro simple con coste sin pagar vive en pendientePago, no en
+  // terminado, así que ya no hace falta el bypass "!esConProfesional" que
+  // antes incluía a TODOS los registros simples sin mirar su estado.
   List<Registro> _finalizados(List<Registro> registros) => registros
       .where(
         (r) =>
-            !r.esConProfesional ||
             r.estado == EstadoRegistro.terminado ||
             r.estado == EstadoRegistro.archivado,
       )

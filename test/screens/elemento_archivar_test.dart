@@ -121,7 +121,39 @@ void main() {
       expect(boton.onPressed, isNull);
       expect(
         boton.tooltip,
-        'No se puede archivar: tiene trabajo profesional activo',
+        'No se puede archivar: tiene trabajo activo o pendiente de pago',
+      );
+    },
+  );
+
+  testWidgets(
+    'un registro simple en pago pendiente también bloquea el archivado, aunque no tenga profesional',
+    (tester) async {
+      final db = await _prepararElemento('e1');
+      await db
+          .collection('casas')
+          .doc('c1')
+          .collection('elementos')
+          .doc('e1')
+          .collection('registros')
+          .add({
+            'titulo': 'Instalación sin cobrar',
+            'esConProfesional': false,
+            'estado': 'pendientePago',
+            'coste': 2000,
+            'fecha': Timestamp.fromDate(DateTime(2026, 1, 1)),
+          });
+
+      await tester.pumpWidget(_envolver('e1'));
+      await tester.pumpAndSettle();
+
+      final boton = tester.widget<IconButton>(
+        find.widgetWithIcon(IconButton, Icons.archive_outlined),
+      );
+      expect(boton.onPressed, isNull);
+      expect(
+        boton.tooltip,
+        'No se puede archivar: tiene trabajo activo o pendiente de pago',
       );
     },
   );

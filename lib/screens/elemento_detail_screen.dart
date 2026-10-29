@@ -330,7 +330,7 @@ class ElementoDetailScreen extends StatelessWidget {
           tipo: TipoRegistro.mantenimiento,
           esConProfesional: false,
           titulo: 'Revisión periódica · ${elemento.nombre}',
-          estado: EstadoRegistro.terminado,
+          estado: estadoInicialRegistroSimple(null),
           fecha: DateTime.now(),
         ),
         createdBy: uid,
@@ -759,7 +759,7 @@ class _ArchivarElementoButtonState extends State<_ArchivarElementoButton> {
         if (tieneTrabajoActivo) {
           return IconButton(
             icon: _icono(Icons.archive_outlined),
-            tooltip: 'No se puede archivar: tiene trabajo profesional activo',
+            tooltip: 'No se puede archivar: tiene trabajo activo o pendiente de pago',
             onPressed: null,
           );
         }

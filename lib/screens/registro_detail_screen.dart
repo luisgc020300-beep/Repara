@@ -824,6 +824,20 @@ class _CuerpoConProfesional extends StatelessWidget {
                         ),
                       ),
                     ),
+                  // Trabajo confirmado pero sin cobrar del todo (CEO, octubre
+                  // 2026): se pasa a "Terminado" solo cuando los pagos de la
+                  // pestaña Pagos cubran el total -- aquí solo se avisa, sin
+                  // botones, para no duplicar la acción real de apuntar el
+                  // pago.
+                  if (registro.estado == EstadoRegistro.pendientePago)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                      child: AvisoRegistro(
+                        mensaje:
+                            'El trabajo está hecho, pero todavía falta cobrarlo del todo. '
+                            'Apunta el pago en la pestaña Pagos para cerrarlo.',
+                      ),
+                    ),
                   if (registro.presupuesto != null)
                     _TarjetaEconomica(
                       presupuesto: registro.presupuesto!,
@@ -894,7 +908,10 @@ class _CuerpoConProfesional extends StatelessWidget {
                             rol: RolEnTrabajo.propietario,
                             registroCerrado:
                                 registro.estado == EstadoRegistro.terminado ||
-                                registro.estado == EstadoRegistro.archivado,
+                                registro.estado ==
+                                    EstadoRegistro.archivado ||
+                                registro.estado ==
+                                    EstadoRegistro.pendientePago,
                           ),
                         ),
                         SingleChildScrollView(
@@ -1200,6 +1217,13 @@ class _SeccionHistorial extends StatelessWidget {
                   icono: Icons.task_alt,
                   color: context.colors.success,
                 ),
+              if (registro.estado == EstadoRegistro.pendientePago)
+                TimelineItem(
+                  titulo: 'Trabajo confirmado',
+                  subtitulo: 'Pendiente de cobrar del todo',
+                  icono: Icons.hourglass_top_outlined,
+                  color: context.colors.warningText,
+                ),
               ...eventos.map((e) => _eventoATimelineItem(context, e)),
             ];
             if (items.isEmpty) {
@@ -1384,6 +1408,15 @@ class _CuerpoSimple extends StatelessWidget {
               registro: registro,
               elemento: elementoSnap.data,
             ),
+            if (registro.estado == EstadoRegistro.pendientePago)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                child: AvisoRegistro(
+                  mensaje:
+                      'El trabajo está hecho, pero todavía falta cobrarlo del todo. '
+                      'Apunta el pago más abajo para cerrarlo.',
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
               child: Column(
@@ -1866,20 +1899,28 @@ class _ResumenEconomico extends StatelessWidget {
   }
 }
 
-// terminado/archivado/pendienteConfirmacion nunca son editables por esta vía
-// directa -- "Finalizar"/"Confirmar"/"Todavía no" son las únicas puertas
-// (modelo de dos pasos, auditoría de producto, octubre 2026).
+// terminado/archivado/pendienteConfirmacion/pendientePago nunca son
+// editables por esta vía directa -- "Finalizar"/"Confirmar"/"Todavía no" son
+// las únicas puertas (modelo de dos pasos, auditoría de producto, octubre
+// 2026); pendientePago, además, solo lo escribe la Cloud Function al
+// registrar/editar/borrar un pago (CEO, octubre 2026 -- ver
+// estadoTrasCambioDePago en functions/index.js), nunca a mano.
 bool _estadoControlado(EstadoRegistro e) =>
     e == EstadoRegistro.terminado ||
     e == EstadoRegistro.archivado ||
-    e == EstadoRegistro.pendienteConfirmacion;
+    e == EstadoRegistro.pendienteConfirmacion ||
+    e == EstadoRegistro.pendientePago;
 
-// Un registro simple (sin profesional) nace directamente "terminado" -- no
-// tiene el ciclo de vida nuevo/presupuestado/en curso, así que aquí solo se
-// distingue archivado de "registrado" en vez de reutilizar los nombres del
-// flujo con profesional.
-String _nombreEstadoSimple(Registro r) =>
-    r.estado == EstadoRegistro.archivado ? 'Archivado' : 'Registrado';
+// Un registro simple (sin profesional) nace directamente "terminado" (o
+// "pendientePago" si tiene coste sin cobrar, CEO octubre 2026) -- no tiene
+// el ciclo de vida nuevo/presupuestado/en curso, así que aquí solo se
+// distingue archivado/pago pendiente de "registrado" en vez de reutilizar
+// los nombres del flujo con profesional.
+String _nombreEstadoSimple(Registro r) => switch (r.estado) {
+  EstadoRegistro.archivado => 'Archivado',
+  EstadoRegistro.pendientePago => 'Pago pendiente',
+  _ => 'Registrado',
+};
 
 const _estadosEditables = [
   EstadoRegistro.nuevo,

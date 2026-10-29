@@ -195,6 +195,13 @@ class RegistroProDetailScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
               ],
+              if (registro.estado == EstadoRegistro.pendientePago) ...[
+                const AvisoRegistro(
+                  mensaje:
+                      'Trabajo confirmado -- falta que se registre el pago para cerrarlo del todo.',
+                ),
+                const SizedBox(height: 16),
+              ],
               if (registro.descripcion != null) ...[
                 Text(
                   registro.descripcion!,
@@ -222,6 +229,8 @@ class RegistroProDetailScreen extends StatelessWidget {
                     helperText: switch (registro.estado) {
                       EstadoRegistro.pendienteConfirmacion =>
                         'Esperando confirmación del propietario',
+                      EstadoRegistro.pendientePago =>
+                        'Trabajo confirmado -- falta que se registre el pago',
                       _ => 'Ya está finalizado',
                     },
                   ),
@@ -296,7 +305,8 @@ class RegistroProDetailScreen extends StatelessWidget {
                 rol: RolEnTrabajo.profesional,
                 registroCerrado:
                     registro.estado == EstadoRegistro.terminado ||
-                    registro.estado == EstadoRegistro.archivado,
+                    registro.estado == EstadoRegistro.archivado ||
+                    registro.estado == EstadoRegistro.pendientePago,
               ),
               const SizedBox(height: 20),
               PagosSection(
@@ -376,7 +386,8 @@ class RegistroProDetailScreen extends StatelessWidget {
 bool _estadoControlado(EstadoRegistro e) =>
     e == EstadoRegistro.terminado ||
     e == EstadoRegistro.archivado ||
-    e == EstadoRegistro.pendienteConfirmacion;
+    e == EstadoRegistro.pendienteConfirmacion ||
+    e == EstadoRegistro.pendientePago;
 
 const _estadosEditables = [
   EstadoRegistro.nuevo,

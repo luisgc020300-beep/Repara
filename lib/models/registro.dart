@@ -40,9 +40,33 @@ String nombreTipoRegistro(TipoRegistro t) => switch (t) {
 // propietario todavía no lo ha confirmado ni rechazado -- modelo de dos
 // pasos (auditoría de producto, octubre 2026) en vez de que cualquiera de
 // las dos partes pueda cerrar el registro unilateralmente sin que la otra
-// esté de acuerdo. Solo aplica cuando esConProfesional es true -- un
-// registro simple nace directamente "terminado".
-enum EstadoRegistro { nuevo, presupuestado, enCurso, pendienteConfirmacion, terminado, archivado }
+// esté de acuerdo. Solo aplica cuando esConProfesional es true.
+//
+// pendientePago (CEO, octubre 2026): "terminado" significa el proceso
+// entero -- trabajo hecho Y cobrado -- no solo el trabajo. Un registro
+// llega aquí en vez de a "terminado" cuando el trabajo ya está confirmado
+// pero coste/presupuesto todavía no está cubierto por la suma de sus pagos
+// (ver montoDebido en registro_service.dart/functions/index.js). Cuenta
+// como "trabajo activo" a todos los efectos (RegistroService.esTrabajoActivo,
+// aviso de Inicio, bloqueo de archivado) para que no se olvide que falta
+// cobrar. Transición automática en ambos sentidos, gestionada siempre por
+// Cloud Function al registrar/editar/borrar un pago o al finalizar: nunca
+// se escribe a mano desde el cliente (ver _estadoControlado en
+// registro_detail_screen.dart).
+enum EstadoRegistro { nuevo, presupuestado, enCurso, pendienteConfirmacion, pendientePago, terminado, archivado }
+
+// Importe del que depende si un registro está realmente cobrado: el
+// presupuesto cuando va con profesional, el coste cuando es simple -- nunca
+// los dos a la vez en la práctica. Mismo criterio en los tres sitios que lo
+// necesitan (aquí, expediente_vivienda_screen.dart y, repetido en servidor
+// porque la decisión de cambiar `estado` se toma ahí, functions/index.js).
+double? montoDebidoRegistro(Registro r) => r.presupuesto ?? r.coste;
+
+// Un registro simple (sin profesional) solo tiene algo que cobrar si se le
+// puso un coste > 0 al crearlo -- si no, nace "terminado" directo, nunca
+// "pendientePago" sin nada pendiente de verdad.
+EstadoRegistro estadoInicialRegistroSimple(double? coste) =>
+    (coste != null && coste > 0) ? EstadoRegistro.pendientePago : EstadoRegistro.terminado;
 
 EstadoRegistro estadoRegistroFromString(String? s) => EstadoRegistro.values.firstWhere(
       (t) => t.name == s,

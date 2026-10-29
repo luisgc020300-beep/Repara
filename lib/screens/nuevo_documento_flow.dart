@@ -608,7 +608,7 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
             titulo: _numeroCtrl.text.trim().isNotEmpty
                 ? '${_nombreTipoDoc(_tipo)} · ${_numeroCtrl.text.trim()}'
                 : _nombreTipoDoc(_tipo),
-            estado: EstadoRegistro.terminado,
+            estado: estadoInicialRegistroSimple(_importe),
             fecha: _fecha ?? DateTime.now(),
             descripcion: _descripcionCtrl.text.trim().isEmpty
                 ? null

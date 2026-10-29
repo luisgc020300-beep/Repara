@@ -541,7 +541,7 @@ exports.responderInvitacion = onCall({ region: REGION }, async (request) => {
       const regSnap = await tx.get(regRef);
       if (!regSnap.exists) throw new HttpsError('not-found', 'El registro ya no existe.');
       const estadoRegistro = regSnap.data().estado;
-      if (estadoRegistro === 'terminado' || estadoRegistro === 'archivado' || estadoRegistro === 'pendienteConfirmacion') {
+      if (estadoRegistro === 'terminado' || estadoRegistro === 'archivado' || estadoRegistro === 'pendienteConfirmacion' || estadoRegistro === 'pendientePago') {
         throw new HttpsError('failed-precondition', 'Este evento ya está cerrado -- no se puede aceptar la invitación.');
       }
       const userSnap = await tx.get(db.collection('users').doc(uid));
@@ -1134,7 +1134,7 @@ exports.enviarPresupuesto = onCall({ region: REGION }, async (request) => {
   // enviar) -- mismo motivo que responderInvitacion vuelve a comprobar el
   // estado en el momento de aceptar, no solo al invitar.
   const estadoRegistro = registroSnap.data().estado;
-  if (estadoRegistro === 'terminado' || estadoRegistro === 'archivado' || estadoRegistro === 'pendienteConfirmacion') {
+  if (estadoRegistro === 'terminado' || estadoRegistro === 'archivado' || estadoRegistro === 'pendienteConfirmacion' || estadoRegistro === 'pendientePago') {
     throw new HttpsError('failed-precondition', 'Este evento ya está finalizado o pendiente de confirmación, no se puede enviar el presupuesto.');
   }
 
@@ -1179,7 +1179,7 @@ exports.responderPresupuesto = onCall({ region: REGION }, async (request) => {
     // aceptar un presupuesto -- si no se bloquea aquí, el estado pasa a
     // 'presupuestado' y el botón de Finalizar del propietario reaparece.
     const estadoRegistro = registroSnap.data().estado;
-    if (estadoRegistro === 'terminado' || estadoRegistro === 'archivado') {
+    if (estadoRegistro === 'terminado' || estadoRegistro === 'archivado' || estadoRegistro === 'pendientePago') {
       throw new HttpsError('failed-precondition', 'Este registro ya está finalizado, no se pueden responder presupuestos.');
     }
     // DATA-3 (auditoría de integridad económica, octubre 2026): dos
@@ -1264,7 +1264,7 @@ exports.crearNuevaVersionPresupuesto = onCall({ region: REGION }, async (request
   const registroSnap = await regRef.get();
   if (!registroSnap.exists) throw new HttpsError('not-found', 'El registro no existe.');
   const estadoRegistro = registroSnap.data().estado;
-  if (estadoRegistro === 'terminado' || estadoRegistro === 'archivado' || estadoRegistro === 'pendienteConfirmacion') {
+  if (estadoRegistro === 'terminado' || estadoRegistro === 'archivado' || estadoRegistro === 'pendienteConfirmacion' || estadoRegistro === 'pendientePago') {
     throw new HttpsError('failed-precondition', 'Este evento ya está finalizado o pendiente de confirmación, no se pueden crear presupuestos nuevos.');
   }
 
@@ -1405,6 +1405,30 @@ exports.crearCambioAlcance = onCall({ region: REGION }, async (request) => {
 // "viejo" y ninguna se enteraría de la otra.
 // =============================================================================
 
+// "Terminado" significa el proceso entero -- trabajo hecho Y cobrado, no
+// solo el trabajo (CEO, octubre 2026). Importe del que depende: el
+// presupuesto cuando el registro va con profesional, el coste cuando es
+// simple -- mismo criterio que montoDebidoRegistro() en registro.dart (lado
+// cliente).
+function montoDebido(registroData) {
+  return registroData.presupuesto ?? registroData.coste ?? null;
+}
+
+// Decide si, tras un cambio en los pagos de un registro, su estado debe
+// pasar de 'terminado' a 'pendientePago' (se ha dejado un saldo real) o de
+// 'pendientePago' a 'terminado' (el pago acaba de cubrirlo) -- en ambos
+// sentidos, automático, sin que nadie tenga que volver a tocar el botón
+// "Finalizar". Nunca toca ningún otro estado (nuevo/enCurso/...): mientras
+// el trabajo en sí no se ha confirmado terminado, cambiar un pago no debe
+// cerrar nada por su cuenta. Devuelve null si no hace falta escribir nada.
+function estadoTrasCambioDePago(estadoActual, deuda, totalPagado) {
+  if (estadoActual !== 'terminado' && estadoActual !== 'pendientePago') return null;
+  if (deuda == null) return null;
+  const cubierto = redondear2(deuda - totalPagado) <= 0.01;
+  const nuevoEstado = cubierto ? 'terminado' : 'pendientePago';
+  return nuevoEstado === estadoActual ? null : nuevoEstado;
+}
+
 function validarDatosPago(data) {
   const importe = redondear2(Number(data?.importe));
   if (!Number.isFinite(importe) || importe <= 0 || importe > 1000000) {
@@ -1455,14 +1479,19 @@ exports.registrarPago = onCall({ region: REGION }, async (request) => {
       throw new HttpsError('already-exists', 'Ya se registró un pago distinto con este identificador de solicitud. Recarga la pantalla antes de reintentar.');
     }
 
-    const presupuesto = registroSnap.data().presupuesto;
+    const regData = registroSnap.data();
+    const totalActual = existentesSnap.docs.reduce((acc, d) => acc + (Number(d.data().importe) || 0), 0);
+    const presupuesto = regData.presupuesto;
     if (presupuesto != null) {
-      const totalActual = existentesSnap.docs.reduce((acc, d) => acc + (Number(d.data().importe) || 0), 0);
       if (redondear2(totalActual + importe) > presupuesto + 0.01) {
         throw new HttpsError('failed-precondition', 'Ese importe supera el presupuesto disponible para este registro.');
       }
     }
     tx.create(pagoRef, { fecha, importe, ...opcionales, createdAt: FieldValue.serverTimestamp(), createdBy: uid });
+    // Solo puede completar un pago pendiente (sumar nunca baja el total) --
+    // ver estadoTrasCambioDePago.
+    const nuevoEstado = estadoTrasCambioDePago(regData.estado, montoDebido(regData), redondear2(totalActual + importe));
+    if (nuevoEstado) tx.update(regRef, { estado: nuevoEstado });
     return { ok: true, pagoId: pagoRef.id, yaExistia: false };
   });
 
@@ -1494,10 +1523,11 @@ exports.actualizarPago = onCall({ region: REGION }, async (request) => {
     // SDK, que no pasa por firestore.rules.
     if (pagoSnap.data().createdBy !== uid) throw new HttpsError('permission-denied', 'Solo quien registró el pago puede editarlo.');
 
-    const presupuesto = registroSnap.data().presupuesto;
+    const regData = registroSnap.data();
+    const totalSinEste = existentesSnap.docs.reduce((acc, d) => (d.id === pagoId ? acc : acc + (Number(d.data().importe) || 0)), 0);
+    const nuevoTotal = redondear2(totalSinEste + importe);
+    const presupuesto = regData.presupuesto;
     if (presupuesto != null) {
-      const totalSinEste = existentesSnap.docs.reduce((acc, d) => (d.id === pagoId ? acc : acc + (Number(d.data().importe) || 0)), 0);
-      const nuevoTotal = redondear2(totalSinEste + importe);
       if (nuevoTotal > presupuesto + 0.01) {
         throw new HttpsError('failed-precondition', 'Ese importe supera el presupuesto disponible para este registro.');
       }
@@ -1512,6 +1542,11 @@ exports.actualizarPago = onCall({ region: REGION }, async (request) => {
       }
     }
     tx.update(pagoRef, { fecha, importe, ...opcionales });
+    // Reabre a pendientePago si esta edición deja un saldo real, o cierra a
+    // terminado si lo acaba de cubrir (CEO, octubre 2026: "si falla una de
+    // las dos, el trabajo no está terminado" -- ver estadoTrasCambioDePago).
+    const nuevoEstado = estadoTrasCambioDePago(regData.estado, montoDebido(regData), nuevoTotal);
+    if (nuevoEstado) tx.update(regRef, { estado: nuevoEstado });
   });
 
   return { ok: true };
@@ -1550,14 +1585,21 @@ exports.eliminarPago = onCall({ region: REGION }, async (request) => {
     if (!pagoSnap.exists) throw new HttpsError('not-found', 'El pago no existe.');
     if (pagoSnap.data().createdBy !== uid) throw new HttpsError('permission-denied', 'Solo quien registró el pago puede borrarlo.');
 
-    const presupuesto = registroSnap.exists ? registroSnap.data().presupuesto : null;
+    const regData = registroSnap.exists ? registroSnap.data() : null;
+    const presupuesto = regData ? regData.presupuesto : null;
+    const totalSinEste = existentesSnap.docs.reduce((acc, d) => (d.id === pagoId ? acc : acc + (Number(d.data().importe) || 0)), 0);
     if (elSnap.exists && elSnap.data().archivado === true && presupuesto != null) {
-      const totalSinEste = existentesSnap.docs.reduce((acc, d) => (d.id === pagoId ? acc : acc + (Number(d.data().importe) || 0)), 0);
       if (redondear2(presupuesto - totalSinEste) > 0.01) {
         throw new HttpsError('failed-precondition', 'Este elemento está archivado -- borrar este pago dejaría un saldo pendiente de pago.');
       }
     }
     tx.delete(pagoRef);
+    // Borrar un pago solo puede bajar el total -- puede reabrir a
+    // pendientePago, nunca cerrar a terminado (CEO, octubre 2026).
+    if (regData) {
+      const nuevoEstado = estadoTrasCambioDePago(regData.estado, montoDebido(regData), totalSinEste);
+      if (nuevoEstado) tx.update(regRef, { estado: nuevoEstado });
+    }
   });
 
   return { ok: true };
@@ -1589,7 +1631,7 @@ exports.responderCambioAlcance = onCall({ region: REGION }, async (request) => {
     // incrementando `presupuesto` vía FieldValue.increment() después de
     // cerrado -- desincronizando el importe mostrado.
     const estadoRegistro = registroSnap.exists ? registroSnap.data().estado : null;
-    if (estadoRegistro === 'terminado' || estadoRegistro === 'archivado') {
+    if (estadoRegistro === 'terminado' || estadoRegistro === 'archivado' || estadoRegistro === 'pendientePago') {
       throw new HttpsError('failed-precondition', 'Este registro ya está finalizado, no se pueden responder cambios de alcance.');
     }
     if (!snap.exists) throw new HttpsError('not-found', 'El cambio de alcance no existe.');
@@ -1648,7 +1690,7 @@ exports.cancelarCambioAlcance = onCall({ region: REGION }, async (request) => {
   await db.runTransaction(async (tx) => {
     const [registroSnap, snap] = await Promise.all([tx.get(regRef), tx.get(ref)]);
     const estadoRegistro = registroSnap.exists ? registroSnap.data().estado : null;
-    if (estadoRegistro === 'terminado' || estadoRegistro === 'archivado') {
+    if (estadoRegistro === 'terminado' || estadoRegistro === 'archivado' || estadoRegistro === 'pendientePago') {
       throw new HttpsError('failed-precondition', 'Este registro ya está finalizado, no se puede cancelar la solicitud.');
     }
     if (!snap.exists) throw new HttpsError('not-found', 'No existe.');
@@ -1683,10 +1725,14 @@ function elementoRef(casaId, elementoId) {
 // profesional asignado que todavía no está terminado ni archivado es
 // "trabajo activo". Repetido aquí porque la decisión de bloquear el
 // archivado tiene que tomarse en servidor, no solo confiar en la UI.
+// pendientePago cuenta como activo sin importar esConProfesional -- trabajo
+// hecho pero sin cobrar del todo sigue siendo trabajo pendiente de cerrar
+// (CEO, octubre 2026).
 function tieneTrabajoActivo(registrosSnap) {
   return registrosSnap.docs.some((d) => {
     const r = d.data();
-    return r.esConProfesional === true && r.estado !== 'terminado' && r.estado !== 'archivado';
+    return r.estado === 'pendientePago' ||
+      (r.esConProfesional === true && r.estado !== 'terminado' && r.estado !== 'archivado');
   });
 }
 
@@ -1744,7 +1790,7 @@ exports.archivarElemento = onCall({ region: REGION }, async (request) => {
     if (!elSnap.exists) throw new HttpsError('not-found', 'El elemento no existe.');
     if (elSnap.data().archivado === true) throw new HttpsError('failed-precondition', 'Este elemento ya está archivado.');
     if (tieneTrabajoActivo(registrosSnap)) {
-      throw new HttpsError('failed-precondition', 'Este elemento tiene un trabajo profesional activo o pendiente -- no se puede archivar todavía.');
+      throw new HttpsError('failed-precondition', 'Este elemento tiene un trabajo activo o pendiente de pago -- no se puede archivar todavía.');
     }
     if (await tieneSaldoPendiente(registrosSnap, tx)) {
       throw new HttpsError('failed-precondition', 'Este elemento tiene un saldo pendiente de pago -- no se puede archivar todavía.');
@@ -1899,27 +1945,38 @@ exports.finalizarTrabajoPropietario = onCall({ region: REGION }, async (request)
   // podía pasar la comprobación de estado las dos veces antes de que
   // ninguna hubiera escrito.
   const registro = await db.runTransaction(async (tx) => {
-    const snap = await tx.get(regRef);
+    const [snap, pagosSnap] = await Promise.all([tx.get(regRef), tx.get(regRef.collection('pagos'))]);
     if (!snap.exists) throw new HttpsError('not-found', 'El registro no existe.');
     const data = snap.data();
-    if (data.estado === 'terminado' || data.estado === 'archivado') {
+    if (data.estado === 'terminado' || data.estado === 'archivado' || data.estado === 'pendientePago') {
       throw new HttpsError('failed-precondition', 'Este registro ya estaba finalizado.');
     }
     // Confirma tanto si el propietario lo cierra directamente como si está
     // confirmando que el profesional de verdad ha terminado (modelo de dos
-    // pasos) -- en ambos casos el resultado es el mismo: terminado de
-    // verdad.
-    tx.update(regRef, { estado: 'terminado', estadoPrevioAPendiente: FieldValue.delete() });
-    return data;
+    // pasos). "Terminado" exige además que coste/presupuesto esté cubierto
+    // por los pagos ya registrados (CEO, octubre 2026) -- si no, el trabajo
+    // queda confirmado pero el registro pasa a pendientePago en vez de
+    // terminado, para que siga contando como activo hasta que se cobre.
+    const deuda = montoDebido(data);
+    const totalPagado = pagosSnap.docs.reduce((acc, p) => acc + (Number(p.data().importe) || 0), 0);
+    const cubierto = deuda == null || redondear2(deuda - totalPagado) <= 0.01;
+    tx.update(regRef, {
+      estado: cubierto ? 'terminado' : 'pendientePago',
+      estadoPrevioAPendiente: FieldValue.delete(),
+    });
+    return { ...data, cubierto };
   });
 
   // Avisa al resto de la casa (si hay más de un miembro), nunca a quien
   // acaba de finalizarlo.
   const casaSnap = await db.collection('casas').doc(casaId).get();
+  const mensaje = registro.cubierto
+    ? `"${registro.titulo}" se ha marcado como terminado.`
+    : `"${registro.titulo}" está confirmado, pero todavía falta cobrarlo del todo.`;
   for (const memberUid of casaSnap.data().members || []) {
     if (memberUid === uid) continue;
     await crearNotificacion(memberUid, 'trabajo_finalizado',
-      'Registro finalizado', `"${registro.titulo}" se ha marcado como terminado.`,
+      'Registro finalizado', mensaje,
       { casaId, elementoId, registroId });
   }
   return { ok: true };

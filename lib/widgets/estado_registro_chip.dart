@@ -15,6 +15,7 @@ String nombreEstadoRegistro(EstadoRegistro e) => switch (e) {
       EstadoRegistro.presupuestado => 'Presupuestado',
       EstadoRegistro.enCurso => 'En curso',
       EstadoRegistro.pendienteConfirmacion => 'Pendiente de confirmación',
+      EstadoRegistro.pendientePago => 'Pago pendiente',
       EstadoRegistro.terminado => 'Terminado',
       EstadoRegistro.archivado => 'Archivado',
     };
@@ -40,7 +41,7 @@ class EstadoRegistroChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (Color fg, Color bg) = switch (estado) {
-      EstadoRegistro.pendienteConfirmacion => (context.colors.warningText, context.colors.warning.withValues(alpha: 0.12)),
+      EstadoRegistro.pendienteConfirmacion || EstadoRegistro.pendientePago => (context.colors.warningText, context.colors.warning.withValues(alpha: 0.12)),
       EstadoRegistro.terminado || EstadoRegistro.archivado => (context.colors.success, context.colors.success.withValues(alpha: 0.12)),
       EstadoRegistro.nuevo || EstadoRegistro.presupuestado || EstadoRegistro.enCurso => (context.colors.brand, context.colors.brandTint),
     };

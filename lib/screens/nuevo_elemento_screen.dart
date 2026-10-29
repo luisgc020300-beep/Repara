@@ -240,7 +240,7 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
           titulo: '${nombreTipoRegistro(_tipo)} de $nombre',
           estado: _esConProfesional
               ? EstadoRegistro.nuevo
-              : EstadoRegistro.terminado,
+              : estadoInicialRegistroSimple(coste),
           fecha: base,
           garantiaHasta: _garantiaHasta,
           coste: coste,
