@@ -30,6 +30,7 @@ import '../services/registro_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
 import '../widgets/ios_list.dart';
+import '../widgets/pdf_trabajo.dart';
 import 'expediente_vivienda_pdf.dart';
 
 double? _costeRegistro(Registro r) => montoDebidoRegistro(r);

@@ -32,6 +32,7 @@ import 'package:repara/models/habitacion.dart';
 import 'package:repara/models/pago.dart';
 import 'package:repara/models/registro.dart';
 import 'package:repara/screens/expediente_vivienda_pdf.dart';
+import 'package:repara/widgets/pdf_trabajo.dart';
 
 const _casa = Casa(
   id: 'c1',

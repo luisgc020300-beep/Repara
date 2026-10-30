@@ -17,21 +17,28 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 
+import '../models/cambio_alcance.dart';
 import '../models/casa.dart';
 import '../models/documento.dart';
 import '../models/elemento.dart';
 import '../models/habitacion.dart';
 import '../models/registro.dart';
+import '../services/cambio_alcance_service.dart';
 import '../services/documento_service.dart';
 import '../services/elemento_service.dart';
 import '../services/habitacion_service.dart';
+import '../services/pago_service.dart';
 import '../services/registro_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_dialog.dart';
 import '../widgets/app_error.dart';
+import '../widgets/estado_registro_chip.dart' show nombreEstadoRegistro;
 import '../widgets/foto_ampliada_screen.dart';
 import '../widgets/ios_list.dart';
+import '../widgets/pdf_trabajo.dart';
+import 'elemento_resumen_pdf.dart';
 import 'nuevo_documento_flow.dart';
 import 'nuevo_elemento_screen.dart';
 import 'nuevo_registro_sheet.dart';
@@ -639,6 +646,8 @@ class ElementoDetailScreen extends StatelessWidget {
                   );
                 },
               ),
+              const SizedBox(height: 22),
+              _AccionesElemento(casa: casa, elemento: elemento),
             ],
           ),
         );
@@ -657,6 +666,222 @@ class ElementoDetailScreen extends StatelessWidget {
         ),
       );
     }
+  }
+}
+
+/// Compartir/descargar PDF del elemento (CEO, octubre 2026): más completo
+/// que un solo registro -- sus propios datos (ubicación, marca/modelo,
+/// fecha de instalación, coste, profesional, garantía) y su historial
+/// COMPLETO de trabajos, cada uno con estado real, pagos y cambios de
+/// alcance -- mismo motivo que _ArchivarElementoButton para ser su propio
+/// StatefulWidget: solo este trozo necesita el estado de "generando PDF".
+/// Pagos/cambios de alcance de cada registro se piden aquí, bajo demanda,
+/// nunca en el build() de la pantalla -- el Historial que ya se ve en
+/// pantalla no los necesita.
+class _AccionesElemento extends StatefulWidget {
+  const _AccionesElemento({required this.casa, required this.elemento});
+
+  final Casa casa;
+  final Elemento elemento;
+
+  @override
+  State<_AccionesElemento> createState() => _AccionesElementoState();
+}
+
+class _AccionesElementoState extends State<_AccionesElemento> {
+  bool _generandoPdf = false;
+
+  Future<List<TrabajoConDetalle>> _trabajosConDetalle() async {
+    final registros = await RegistroService.streamRegistros(
+      widget.casa.id,
+      widget.elemento.id,
+    ).first;
+    return Future.wait(
+      registros.map((r) async {
+        final pagos = await PagoService.streamPagos(
+          widget.casa.id,
+          widget.elemento.id,
+          r.id,
+        ).first;
+        final cambios = r.esConProfesional
+            ? await CambioAlcanceService.streamCambios(
+                widget.casa.id,
+                widget.elemento.id,
+                r.id,
+              ).first
+            : const <CambioAlcance>[];
+        return TrabajoConDetalle(registro: r, pagos: pagos, cambios: cambios);
+      }),
+    );
+  }
+
+  Future<String?> _ubicacion() async {
+    final habitacionId = widget.elemento.habitacionId;
+    if (habitacionId == null) return null;
+    final habitaciones = await HabitacionService.streamHabitaciones(
+      widget.casa.id,
+    ).first;
+    final coincidencias = habitaciones.where((h) => h.id == habitacionId);
+    return coincidencias.isEmpty ? null : coincidencias.first.nombre;
+  }
+
+  Future<void> _compartir(BuildContext context) async {
+    final elemento = widget.elemento;
+    final registros = await RegistroService.streamRegistros(
+      widget.casa.id,
+      elemento.id,
+    ).first;
+    if (!context.mounted) return;
+    final buffer = StringBuffer()
+      ..writeln('${elemento.nombre} · ${widget.casa.nombre}')
+      ..writeln();
+    final detalle = [
+      if (elemento.marca != null)
+        '${elemento.marca}${elemento.modelo != null ? ' ${elemento.modelo}' : ''}',
+      if (elemento.fechaInstalacion != null)
+        'instalado ${DateFormat('MM/yyyy').format(elemento.fechaInstalacion!)}',
+      if (elemento.coste != null) '${elemento.coste!.toStringAsFixed(0)} €',
+      if (elemento.profesionalNombre != null) elemento.profesionalNombre!,
+    ];
+    if (detalle.isNotEmpty) buffer.writeln(detalle.join(' · '));
+    if (elemento.garantiaHasta != null) {
+      buffer.writeln(
+        'Garantía hasta ${DateFormat('MM/yyyy').format(elemento.garantiaHasta!)}',
+      );
+    }
+    buffer.writeln();
+    if (registros.isNotEmpty) {
+      buffer.writeln('HISTORIAL (${registros.length})');
+      for (final r in registros) {
+        final coste = montoDebidoRegistro(r);
+        final detalleR = [
+          nombreEstadoRegistro(r.estado),
+          if (coste != null) '${coste.toStringAsFixed(0)} €',
+        ].join(' · ');
+        buffer.writeln(
+          '- ${r.titulo} ($detalleR) -- ${DateFormat('d MMM yyyy', 'es_ES').format(r.fecha)}',
+        );
+      }
+      buffer.writeln();
+    }
+    buffer.writeln('Generado con Repara.');
+    try {
+      await Share.share(
+        buffer.toString(),
+        subject: '${elemento.nombre} - Repara',
+        sharePositionOrigin: Offset.zero & MediaQuery.of(context).size,
+      );
+    } catch (e, st) {
+      if (context.mounted) {
+        AppError.show(
+          context,
+          'No se pudo abrir el selector para compartir.',
+          error: e,
+          stackTrace: st,
+        );
+      }
+    }
+  }
+
+  Future<void> _ofrecerPdf(BuildContext context) async {
+    final confirmar = await showModalBottomSheet<bool>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Generar ficha PDF del elemento',
+                style: Theme.of(ctx).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Incluye los datos de "${widget.elemento.nombre}" (ubicación, '
+                'marca/modelo, coste, profesional, garantía) y su historial '
+                'completo de trabajos, con importes y pagos. Puede contener '
+                'datos de contacto de profesionales -- revísalo antes de '
+                'compartirlo con otra persona.',
+                style: Theme.of(ctx).textTheme.bodyLarge,
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Generar PDF'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (confirmar != true || !context.mounted) return;
+    await _descargarPdf(context);
+  }
+
+  Future<void> _descargarPdf(BuildContext context) async {
+    setState(() => _generandoPdf = true);
+    try {
+      final ubicacion = await _ubicacion();
+      final trabajos = await _trabajosConDetalle();
+      if (!context.mounted) return;
+      await ElementoResumenPdf.descargar(
+        context,
+        casa: widget.casa,
+        elemento: widget.elemento,
+        ubicacion: ubicacion,
+        trabajos: trabajos,
+      );
+    } catch (e, st) {
+      if (context.mounted) {
+        AppError.show(
+          context,
+          'No se pudo generar el PDF.',
+          error: e,
+          stackTrace: st,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _generandoPdf = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Compartir y exportar', style: Theme.of(context).textTheme.headlineSmall),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: () => _compartir(context),
+            icon: const Icon(Icons.ios_share_outlined),
+            label: const Text('Compartir resumen'),
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: _generandoPdf ? null : () => _ofrecerPdf(context),
+            icon: _generandoPdf
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.picture_as_pdf_outlined),
+            label: const Text('Generar ficha PDF'),
+          ),
+        ),
+      ],
+    );
   }
 }
 

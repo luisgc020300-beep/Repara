@@ -19,40 +19,20 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart' show BuildContext;
-import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
-import '../models/cambio_alcance.dart';
 import '../models/casa.dart';
 import '../models/documento.dart';
 import '../models/elemento.dart';
 import '../models/habitacion.dart';
-import '../models/pago.dart';
 import '../models/registro.dart';
-import '../widgets/estado_registro_chip.dart' show nombreEstadoRegistro;
+import '../widgets/pdf_estilo.dart';
 import '../widgets/pdf_fuente_unicode.dart';
-
-// Mismos tonos de marca que registro_resumen_pdf.dart / ReparaColors.light
-// (theme/design_tokens.dart) -- el paquete pdf no puede leer un
-// ThemeExtension de Flutter, así que se repiten aquí como PdfColor.
-const _pdfBrandStrong = PdfColor.fromInt(0xFF183650);
-const _pdfBrand = PdfColor.fromInt(0xFF42658B);
-const _pdfInk = PdfColor.fromInt(0xFF203044);
-const _pdfInkMuted = PdfColor.fromInt(0xFF687789);
-const _pdfBorder = PdfColor.fromInt(0xFFE5E3DE);
-const _pdfSurfaceSunken = PdfColor.fromInt(0xFFE8E5DD);
-const _pdfSuccess = PdfColor.fromInt(0xFF23856D);
-const _pdfWarningText = PdfColor.fromInt(0xFF8A5A1F);
-const _pdfErrorText = PdfColor.fromInt(0xFFC23B3B);
-
-// El símbolo "€" se ve de verdad gracias a la fuente Unicode empaquetada
-// como asset del proyecto -- ver cargarTemaPdfUnicode en
-// widgets/pdf_fuente_unicode.dart (nunca depende de red).
-String _formatoImporte(double v) =>
-    '${v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(2)} €';
+import '../widgets/pdf_imagenes.dart';
+import '../widgets/pdf_trabajo.dart';
 
 String _nombreTipoDocumento(TipoDocumento t) => switch (t) {
   TipoDocumento.factura => 'Factura',
@@ -63,101 +43,8 @@ String _nombreTipoDocumento(TipoDocumento t) => switch (t) {
   TipoDocumento.otro => 'Otro',
 };
 
-String _nombreMetodoPago(MetodoPago? m) => switch (m) {
-  MetodoPago.bizum => 'Bizum',
-  MetodoPago.transferencia => 'Transferencia',
-  MetodoPago.efectivo => 'Efectivo',
-  MetodoPago.tarjeta => 'Tarjeta',
-  MetodoPago.otro => 'Otro',
-  null => '',
-};
-
-enum _EstadoGarantia { vigente, proxima, vencida, desconocida }
-
-_EstadoGarantia _clasificarGarantia(DateTime? hasta) {
-  if (hasta == null) return _EstadoGarantia.desconocida;
-  final ahora = DateTime.now();
-  if (hasta.isBefore(ahora)) return _EstadoGarantia.vencida;
-  if (hasta.isBefore(ahora.add(const Duration(days: 30)))) {
-    return _EstadoGarantia.proxima;
-  }
-  return _EstadoGarantia.vigente;
-}
-
-// pdf.Image solo decodifica formatos raster estándar -- un documento subido
-// como PDF (o cualquier extensión que no reconozcamos) nunca se "incrusta"
-// como si fuera una foto, solo se identifica con una ficha (sección 5 del
-// encargo: "no afirmes que se ha incluido un archivo si solo se muestra su
-// nombre").
-bool _esImagenEmbebible(String nombreArchivo) {
-  final ext = nombreArchivo.toLowerCase().split('.').lastOrNull;
-  return ext == 'jpg' || ext == 'jpeg' || ext == 'png';
-}
-
-extension<T> on List<T> {
-  T? get lastOrNull => isEmpty ? null : last;
-}
-
-/// Un trabajo (Registro) con sus pagos y cambios de alcance ya resueltos --
-/// agregado por quien llama (ExpedienteViviendaScreen), nunca por este
-/// fichero: aquí solo se maqueta, nunca se decide qué leer de Firestore.
-class TrabajoConDetalle {
-  const TrabajoConDetalle({
-    required this.registro,
-    this.pagos = const [],
-    this.cambios = const [],
-  });
-
-  final Registro registro;
-  final List<Pago> pagos;
-  final List<CambioAlcance> cambios;
-
-  double get totalPagado => pagos.fold(0, (acc, p) => acc + p.importe);
-}
-
 class ExpedienteViviendaPdf {
   ExpedienteViviendaPdf._();
-
-  // Límite global de fotos a descargar para todo el dossier (no por
-  // sección) -- una vivienda con muchos elementos/trabajos/documentos no
-  // debe disparar decenas de descargas; prioriza identificación (portada de
-  // cada elemento) sobre detalle (fotos de trabajo, documentos escaneados).
-  static const _maxImagenesTotal = 24;
-  static const _timeoutImagen = Duration(seconds: 8);
-  static const _concurrenciaDescargas = 6;
-
-  static Future<Uint8List?> _descargarImagen(String url) async {
-    try {
-      final respuesta = await http.get(Uri.parse(url)).timeout(_timeoutImagen);
-      if (respuesta.statusCode == 200) return respuesta.bodyBytes;
-    } catch (_) {
-      // Una foto que falla (red, URL caducada, formato dañado) nunca debe
-      // impedir el resto del dossier -- mismo criterio que ya usa
-      // registro_resumen_pdf.dart.
-    }
-    return null;
-  }
-
-  /// Descarga en lotes paralelos (no secuencial, a diferencia del único
-  /// precedente en registro_resumen_pdf.dart -- ahí bastaba para 4 fotos de
-  /// un solo trabajo, aquí puede haber muchas más URLs de toda la
-  /// vivienda) con un tope global y timeout por petición, para que una
-  /// vivienda con mucho contenido no deje la generación colgada.
-  static Future<Map<String, Uint8List>> _descargarImagenes(
-    List<String> urls,
-  ) async {
-    final unicas = urls.toSet().take(_maxImagenesTotal).toList();
-    final resultado = <String, Uint8List>{};
-    for (var i = 0; i < unicas.length; i += _concurrenciaDescargas) {
-      final lote = unicas.skip(i).take(_concurrenciaDescargas).toList();
-      final bytesLote = await Future.wait(lote.map(_descargarImagen));
-      for (var j = 0; j < lote.length; j++) {
-        final bytes = bytesLote[j];
-        if (bytes != null) resultado[lote[j]] = bytes;
-      }
-    }
-    return resultado;
-  }
 
   static Future<Uint8List> construirBytes({
     required Casa casa,
@@ -187,9 +74,9 @@ class ExpedienteViviendaPdf {
       for (final t in trabajos)
         for (final f in t.registro.fotos.take(2)) f,
       for (final d in documentosConfirmados)
-        if (_esImagenEmbebible(d.nombreArchivo)) d.url,
+        if (esImagenEmbebiblePdf(d.nombreArchivo)) d.url,
     ];
-    final imagenes = await _descargarImagenes(urlsAFetch);
+    final imagenes = await descargarImagenesPdf(urlsAFetch);
     final doc = pw.Document(theme: await cargarTemaPdfUnicode());
 
     // ---- Portada ------------------------------------------------------
@@ -202,7 +89,7 @@ class ExpedienteViviendaPdf {
         build: (context) => pw.Container(
           width: double.infinity,
           height: double.infinity,
-          color: _pdfBrandStrong,
+          color: pdfBrandStrong,
           padding: const pw.EdgeInsets.all(48),
           child: pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -263,9 +150,9 @@ class ExpedienteViviendaPdf {
       0,
       (acc, t) => acc + (montoDebidoRegistro(t.registro) ?? 0),
     );
-    final porGarantia = <_EstadoGarantia, List<Elemento>>{};
+    final porGarantia = <EstadoGarantiaPdf, List<Elemento>>{};
     for (final e in elementos) {
-      porGarantia.putIfAbsent(_clasificarGarantia(e.garantiaHasta), () => []).add(e);
+      porGarantia.putIfAbsent(clasificarGarantiaPdf(e.garantiaHasta), () => []).add(e);
     }
 
     final trabajosConFotos = trabajos
@@ -289,7 +176,7 @@ class ExpedienteViviendaPdf {
         header: (context) => pw.Container(
           padding: const pw.EdgeInsets.only(bottom: 8),
           decoration: const pw.BoxDecoration(
-            border: pw.Border(bottom: pw.BorderSide(color: _pdfBorder, width: 0.5)),
+            border: pw.Border(bottom: pw.BorderSide(color: pdfBorder, width: 0.5)),
           ),
           child: pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
@@ -297,7 +184,7 @@ class ExpedienteViviendaPdf {
               pw.Text(
                 'REPARA',
                 style: pw.TextStyle(
-                  color: _pdfBrandStrong,
+                  color: pdfBrandStrong,
                   fontSize: 9,
                   fontWeight: pw.FontWeight.bold,
                   letterSpacing: 1,
@@ -305,7 +192,7 @@ class ExpedienteViviendaPdf {
               ),
               pw.Text(
                 casa.nombre,
-                style: const pw.TextStyle(color: _pdfInkMuted, fontSize: 9),
+                style: const pw.TextStyle(color: pdfInkMuted, fontSize: 9),
               ),
             ],
           ),
@@ -313,18 +200,18 @@ class ExpedienteViviendaPdf {
         footer: (context) => pw.Container(
           padding: const pw.EdgeInsets.only(top: 8),
           decoration: const pw.BoxDecoration(
-            border: pw.Border(top: pw.BorderSide(color: _pdfBorder, width: 0.5)),
+            border: pw.Border(top: pw.BorderSide(color: pdfBorder, width: 0.5)),
           ),
           child: pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
               pw.Text(
                 'Dossier generado con REPARA',
-                style: const pw.TextStyle(color: _pdfInkMuted, fontSize: 8),
+                style: const pw.TextStyle(color: pdfInkMuted, fontSize: 8),
               ),
               pw.Text(
                 'Página ${context.pageNumber} de ${context.pagesCount}',
-                style: const pw.TextStyle(color: _pdfInkMuted, fontSize: 8),
+                style: const pw.TextStyle(color: pdfInkMuted, fontSize: 8),
               ),
             ],
           ),
@@ -336,7 +223,7 @@ class ExpedienteViviendaPdf {
             style: pw.TextStyle(
               fontSize: 11,
               fontWeight: pw.FontWeight.bold,
-              color: _pdfInkMuted,
+              color: pdfInkMuted,
             ),
           ),
           pw.SizedBox(height: 6),
@@ -345,18 +232,18 @@ class ExpedienteViviendaPdf {
               padding: const pw.EdgeInsets.only(bottom: 2),
               child: pw.Text(
                 '· $s',
-                style: const pw.TextStyle(fontSize: 10, color: _pdfInk),
+                style: const pw.TextStyle(fontSize: 10, color: pdfInk),
               ),
             ),
           pw.SizedBox(height: 22),
 
           // -- Resumen de la vivienda --
-          _tituloSeccion('Resumen de la vivienda'),
+          tituloSeccionPdf('Resumen de la vivienda'),
           pw.SizedBox(height: 10),
           _tarjetaResumen(
             elementos: elementos.length,
             trabajosFinalizados: finalizados.length,
-            garantiasVigentes: porGarantia[_EstadoGarantia.vigente]?.length ?? 0,
+            garantiasVigentes: porGarantia[EstadoGarantiaPdf.vigente]?.length ?? 0,
             documentos: documentosConfirmados.length,
             costeTotal: costeTotal,
           ),
@@ -364,7 +251,7 @@ class ExpedienteViviendaPdf {
           // -- Elementos --
           if (elementos.isNotEmpty) ...[
             pw.SizedBox(height: 26),
-            _tituloSeccion('Elementos e instalaciones (${elementos.length})'),
+            tituloSeccionPdf('Elementos e instalaciones (${elementos.length})'),
             pw.SizedBox(height: 10),
             for (final e in elementos)
               pw.Padding(
@@ -385,19 +272,19 @@ class ExpedienteViviendaPdf {
           // en pantalla; el estado real de cada uno se respeta tal cual) --
           if (trabajos.isNotEmpty) ...[
             pw.SizedBox(height: 26),
-            _tituloSeccion('Historial de trabajos (${trabajos.length})'),
+            tituloSeccionPdf('Historial de trabajos (${trabajos.length})'),
             pw.SizedBox(height: 10),
             for (final t in trabajos)
               pw.Padding(
                 padding: const pw.EdgeInsets.only(bottom: 10),
-                child: _fichaTrabajo(t, formatoFechaCorta: formatoFechaCorta),
+                child: fichaTrabajoPdf(t, formatoFechaCorta: formatoFechaCorta),
               ),
           ],
 
           // -- Documentación --
           if (documentosConfirmados.isNotEmpty) ...[
             pw.SizedBox(height: 26),
-            _tituloSeccion('Documentación (${documentosConfirmados.length})'),
+            tituloSeccionPdf('Documentación (${documentosConfirmados.length})'),
             pw.SizedBox(height: 10),
             for (final d in documentosConfirmados)
               pw.Padding(
@@ -405,7 +292,7 @@ class ExpedienteViviendaPdf {
                 child: _fichaDocumento(
                   d,
                   elementoNombre: nombreElemento[d.elementoId],
-                  foto: _esImagenEmbebible(d.nombreArchivo)
+                  foto: esImagenEmbebiblePdf(d.nombreArchivo)
                       ? imagenes[d.url]
                       : null,
                   formatoFechaCorta: formatoFechaCorta,
@@ -419,7 +306,7 @@ class ExpedienteViviendaPdf {
           // pinta ese grupo).
           if (elementos.any((e) => e.garantiaHasta != null)) ...[
             pw.SizedBox(height: 26),
-            _tituloSeccion('Garantías'),
+            tituloSeccionPdf('Garantías'),
             pw.SizedBox(height: 10),
             _seccionGarantias(porGarantia, formatoMes),
           ],
@@ -427,15 +314,15 @@ class ExpedienteViviendaPdf {
           // -- Fotografías de los trabajos --
           if (trabajosConFotos.isNotEmpty) ...[
             pw.SizedBox(height: 26),
-            _tituloSeccion('Fotografías de los trabajos'),
+            tituloSeccionPdf('Fotografías de los trabajos'),
             pw.SizedBox(height: 10),
             for (final t in trabajosConFotos)
-              _galeriaTrabajo(t, imagenes),
+              galeriaTrabajoPdf(t, imagenes),
           ],
 
           // -- Cierre --
           pw.SizedBox(height: 26),
-          _tituloSeccion('Sobre este documento'),
+          tituloSeccionPdf('Sobre este documento'),
           pw.SizedBox(height: 10),
           pw.Text(
             'Este dossier organiza la información que el propietario ha '
@@ -445,48 +332,13 @@ class ExpedienteViviendaPdf {
             'legal, y no confirma que los documentos incluidos sigan '
             'vigentes. REPARA no afirma que la vivienda cumpla ninguna '
             'normativa ni que sus instalaciones estén libres de defectos.',
-            style: const pw.TextStyle(fontSize: 9, color: _pdfInkMuted),
+            style: const pw.TextStyle(fontSize: 9, color: pdfInkMuted),
           ),
         ],
       ),
     );
 
     return doc.save();
-  }
-
-  static pw.Widget _tituloSeccion(String texto) => pw.Text(
-    texto,
-    style: pw.TextStyle(
-      fontSize: 14,
-      fontWeight: pw.FontWeight.bold,
-      color: _pdfBrandStrong,
-    ),
-  );
-
-  static pw.Widget _etiqueta(String texto, PdfColor color) => pw.Container(
-    padding: const pw.EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-    decoration: pw.BoxDecoration(
-      color: PdfColor.fromInt(0xFFEFF3F8),
-      borderRadius: pw.BorderRadius.circular(10),
-    ),
-    child: pw.Text(
-      texto.toUpperCase(),
-      style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: color),
-    ),
-  );
-
-  static pw.Widget _miniatura(Uint8List? bytes, {double size = 64}) {
-    if (bytes == null) return pw.SizedBox(width: size, height: size);
-    return pw.ClipRRect(
-      horizontalRadius: 6,
-      verticalRadius: 6,
-      child: pw.Image(
-        pw.MemoryImage(bytes),
-        width: size,
-        height: size,
-        fit: pw.BoxFit.cover,
-      ),
-    );
   }
 
   static pw.Widget _tarjetaResumen({
@@ -503,7 +355,7 @@ class ExpedienteViviendaPdf {
             children: [
               pw.Text(
                 etiqueta.toUpperCase(),
-                style: const pw.TextStyle(fontSize: 8, color: _pdfInkMuted),
+                style: const pw.TextStyle(fontSize: 8, color: pdfInkMuted),
               ),
               pw.SizedBox(height: 3),
               pw.Text(
@@ -511,7 +363,7 @@ class ExpedienteViviendaPdf {
                 style: pw.TextStyle(
                   fontSize: 15,
                   fontWeight: pw.FontWeight.bold,
-                  color: color ?? _pdfBrandStrong,
+                  color: color ?? pdfBrandStrong,
                 ),
               ),
             ],
@@ -520,7 +372,7 @@ class ExpedienteViviendaPdf {
     return pw.Container(
       padding: const pw.EdgeInsets.all(16),
       decoration: pw.BoxDecoration(
-        color: _pdfSurfaceSunken,
+        color: pdfSurfaceSunken,
         borderRadius: pw.BorderRadius.circular(8),
       ),
       child: pw.Column(
@@ -538,8 +390,8 @@ class ExpedienteViviendaPdf {
               columna('Documentos', '$documentos'),
               columna(
                 'Invertido en trabajos finalizados',
-                _formatoImporte(costeTotal),
-                color: _pdfSuccess,
+                formatoImportePdf(costeTotal),
+                color: pdfSuccess,
               ),
               pw.Expanded(child: pw.SizedBox()),
             ],
@@ -555,11 +407,11 @@ class ExpedienteViviendaPdf {
     required Uint8List? foto,
     required DateFormat formatoMes,
   }) {
-    final garantia = _clasificarGarantia(e.garantiaHasta);
+    final garantia = clasificarGarantiaPdf(e.garantiaHasta);
     return pw.Container(
       padding: const pw.EdgeInsets.all(12),
       decoration: pw.BoxDecoration(
-        border: pw.Border.all(color: _pdfBorder),
+        border: pw.Border.all(color: pdfBorder),
         borderRadius: pw.BorderRadius.circular(8),
       ),
       child: pw.Row(
@@ -577,7 +429,7 @@ class ExpedienteViviendaPdf {
                         style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
                       ),
                     ),
-                    if (e.archivado) _etiqueta('Archivado', _pdfInkMuted),
+                    if (e.archivado) etiquetaPdf('Archivado', pdfInkMuted),
                   ],
                 ),
                 pw.SizedBox(height: 4),
@@ -588,37 +440,37 @@ class ExpedienteViviendaPdf {
                     if (e.fechaInstalacion != null)
                       'instalado ${formatoMes.format(e.fechaInstalacion!)}',
                   ].join(' · '),
-                  style: const pw.TextStyle(fontSize: 9, color: _pdfInkMuted),
+                  style: const pw.TextStyle(fontSize: 9, color: pdfInkMuted),
                 ),
                 if (e.profesionalNombre != null) ...[
                   pw.SizedBox(height: 3),
                   pw.Text(
                     'Profesional: ${e.profesionalNombre}',
-                    style: const pw.TextStyle(fontSize: 9, color: _pdfInkMuted),
+                    style: const pw.TextStyle(fontSize: 9, color: pdfInkMuted),
                   ),
                 ],
                 pw.SizedBox(height: 6),
                 pw.Row(
                   children: [
                     if (e.garantiaHasta != null)
-                      _etiqueta(
+                      etiquetaPdf(
                         switch (garantia) {
-                          _EstadoGarantia.vigente => 'Garantía vigente',
-                          _EstadoGarantia.proxima => 'Garantía próxima a vencer',
-                          _EstadoGarantia.vencida => 'Garantía vencida',
-                          _EstadoGarantia.desconocida => 'Garantía',
+                          EstadoGarantiaPdf.vigente => 'Garantía vigente',
+                          EstadoGarantiaPdf.proxima => 'Garantía próxima a vencer',
+                          EstadoGarantiaPdf.vencida => 'Garantía vencida',
+                          EstadoGarantiaPdf.desconocida => 'Garantía',
                         },
                         switch (garantia) {
-                          _EstadoGarantia.vigente => _pdfSuccess,
-                          _EstadoGarantia.proxima => _pdfWarningText,
-                          _EstadoGarantia.vencida => _pdfErrorText,
-                          _EstadoGarantia.desconocida => _pdfInkMuted,
+                          EstadoGarantiaPdf.vigente => pdfSuccess,
+                          EstadoGarantiaPdf.proxima => pdfWarningText,
+                          EstadoGarantiaPdf.vencida => pdfErrorText,
+                          EstadoGarantiaPdf.desconocida => pdfInkMuted,
                         },
                       ),
                     if (e.coste != null) ...[
                       pw.SizedBox(width: 6),
                       pw.Text(
-                        _formatoImporte(e.coste!),
+                        formatoImportePdf(e.coste!),
                         style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
                       ),
                     ],
@@ -627,91 +479,7 @@ class ExpedienteViviendaPdf {
               ],
             ),
           ),
-          if (foto != null) ...[pw.SizedBox(width: 10), _miniatura(foto)],
-        ],
-      ),
-    );
-  }
-
-  static pw.Widget _fichaTrabajo(
-    TrabajoConDetalle t, {
-    required DateFormat formatoFechaCorta,
-  }) {
-    final r = t.registro;
-    final monto = montoDebidoRegistro(r);
-    final estadoColor = switch (r.estado) {
-      EstadoRegistro.terminado || EstadoRegistro.archivado => _pdfSuccess,
-      EstadoRegistro.pendientePago => _pdfWarningText,
-      _ => _pdfInkMuted,
-    };
-    return pw.Container(
-      padding: const pw.EdgeInsets.all(12),
-      decoration: pw.BoxDecoration(
-        border: pw.Border.all(color: _pdfBorder),
-        borderRadius: pw.BorderRadius.circular(8),
-      ),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Row(
-            children: [
-              pw.Expanded(
-                child: pw.Text(
-                  r.titulo,
-                  style: pw.TextStyle(fontSize: 11.5, fontWeight: pw.FontWeight.bold),
-                ),
-              ),
-              _etiqueta(nombreEstadoRegistro(r.estado), estadoColor),
-            ],
-          ),
-          pw.SizedBox(height: 3),
-          pw.Text(
-            '${r.elementoNombre} · ${formatoFechaCorta.format(r.fecha)}',
-            style: const pw.TextStyle(fontSize: 9, color: _pdfInkMuted),
-          ),
-          if (r.profesionalNombre != null) ...[
-            pw.SizedBox(height: 3),
-            pw.Text(
-              'Profesional: ${r.profesionalNombre}',
-              style: const pw.TextStyle(fontSize: 9, color: _pdfInkMuted),
-            ),
-          ],
-          if (monto != null || t.pagos.isNotEmpty) ...[
-            pw.SizedBox(height: 6),
-            pw.Text(
-              [
-                if (monto != null) 'Acordado: ${_formatoImporte(monto)}',
-                if (t.pagos.isNotEmpty) 'Pagado: ${_formatoImporte(t.totalPagado)}',
-                if (monto != null)
-                  'Saldo: ${_formatoImporte((monto - t.totalPagado).clamp(0, double.infinity))}',
-              ].join('  ·  '),
-              style: const pw.TextStyle(fontSize: 9.5, color: _pdfInk),
-            ),
-          ],
-          for (final p in t.pagos) ...[
-            pw.SizedBox(height: 3),
-            pw.Text(
-              '· ${formatoFechaCorta.format(p.fecha)}'
-              '${p.concepto != null ? ' -- ${p.concepto}' : ''}'
-              '${p.metodo != null ? ' (${_nombreMetodoPago(p.metodo)})' : ''}'
-              ': ${_formatoImporte(p.importe)}',
-              style: const pw.TextStyle(fontSize: 8.5, color: _pdfInkMuted),
-            ),
-          ],
-          for (final c in t.cambios) ...[
-            pw.SizedBox(height: 4),
-            pw.Text(
-              '+ Cambio de alcance: ${c.titulo}'
-              '${c.importeAdicional != null ? ' (${_formatoImporte(c.importeAdicional!)})' : ''}'
-              ' -- ${switch (c.estado) {
-                EstadoCambioAlcance.aprobado => 'aprobado',
-                EstadoCambioAlcance.rechazado => 'rechazado',
-                EstadoCambioAlcance.cancelado => 'cancelado',
-                EstadoCambioAlcance.pendiente => 'pendiente',
-              }}',
-              style: const pw.TextStyle(fontSize: 8.5, color: _pdfInkMuted),
-            ),
-          ],
+          if (foto != null) ...[pw.SizedBox(width: 10), miniaturaPdf(foto)],
         ],
       ),
     );
@@ -726,7 +494,7 @@ class ExpedienteViviendaPdf {
     return pw.Container(
       padding: const pw.EdgeInsets.all(12),
       decoration: pw.BoxDecoration(
-        border: pw.Border.all(color: _pdfBorder),
+        border: pw.Border.all(color: pdfBorder),
         borderRadius: pw.BorderRadius.circular(8),
       ),
       child: pw.Row(
@@ -738,12 +506,12 @@ class ExpedienteViviendaPdf {
               children: [
                 pw.Row(
                   children: [
-                    _etiqueta(_nombreTipoDocumento(d.tipo), _pdfBrand),
+                    etiquetaPdf(_nombreTipoDocumento(d.tipo), pdfBrand),
                     if (d.fecha != null) ...[
                       pw.SizedBox(width: 6),
                       pw.Text(
                         formatoFechaCorta.format(d.fecha!),
-                        style: const pw.TextStyle(fontSize: 8.5, color: _pdfInkMuted),
+                        style: const pw.TextStyle(fontSize: 8.5, color: pdfInkMuted),
                       ),
                     ],
                   ],
@@ -760,7 +528,7 @@ class ExpedienteViviendaPdf {
                       if (d.proveedor != null) d.proveedor!,
                       if (elementoNombre != null) 'vinculado a $elementoNombre',
                     ].join(' · '),
-                    style: const pw.TextStyle(fontSize: 9, color: _pdfInkMuted),
+                    style: const pw.TextStyle(fontSize: 9, color: pdfInkMuted),
                   ),
                 ],
                 if (d.descripcionTrabajo != null) ...[
@@ -776,18 +544,18 @@ class ExpedienteViviendaPdf {
           if (d.importe != null) ...[
             pw.SizedBox(width: 10),
             pw.Text(
-              _formatoImporte(d.importe!),
+              formatoImportePdf(d.importe!),
               style: pw.TextStyle(fontSize: 10.5, fontWeight: pw.FontWeight.bold),
             ),
           ],
-          if (foto != null) ...[pw.SizedBox(width: 10), _miniatura(foto, size: 48)],
+          if (foto != null) ...[pw.SizedBox(width: 10), miniaturaPdf(foto, size: 48)],
         ],
       ),
     );
   }
 
   static pw.Widget _seccionGarantias(
-    Map<_EstadoGarantia, List<Elemento>> porGarantia,
+    Map<EstadoGarantiaPdf, List<Elemento>> porGarantia,
     DateFormat formatoMes,
   ) {
     pw.Widget grupo(String titulo, PdfColor color, List<Elemento> lista) {
@@ -818,52 +586,10 @@ class ExpedienteViviendaPdf {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        grupo('Vigentes', _pdfSuccess, porGarantia[_EstadoGarantia.vigente] ?? []),
-        grupo('Próximas a vencer', _pdfWarningText, porGarantia[_EstadoGarantia.proxima] ?? []),
-        grupo('Vencidas', _pdfErrorText, porGarantia[_EstadoGarantia.vencida] ?? []),
+        grupo('Vigentes', pdfSuccess, porGarantia[EstadoGarantiaPdf.vigente] ?? []),
+        grupo('Próximas a vencer', pdfWarningText, porGarantia[EstadoGarantiaPdf.proxima] ?? []),
+        grupo('Vencidas', pdfErrorText, porGarantia[EstadoGarantiaPdf.vencida] ?? []),
       ],
-    );
-  }
-
-  static pw.Widget _galeriaTrabajo(
-    TrabajoConDetalle t,
-    Map<String, Uint8List> imagenes,
-  ) {
-    final fotos = t.registro.fotos
-        .take(2)
-        .map((url) => imagenes[url])
-        .whereType<Uint8List>()
-        .toList();
-    if (fotos.isEmpty) return pw.SizedBox();
-    return pw.Padding(
-      padding: const pw.EdgeInsets.only(bottom: 14),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Text(
-            '${t.registro.titulo} · ${t.registro.elementoNombre}',
-            style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
-          ),
-          pw.SizedBox(height: 6),
-          pw.Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final f in fotos)
-                pw.ClipRRect(
-                  horizontalRadius: 6,
-                  verticalRadius: 6,
-                  child: pw.Image(
-                    pw.MemoryImage(f),
-                    width: 150,
-                    height: 112,
-                    fit: pw.BoxFit.cover,
-                  ),
-                ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 
