@@ -14,6 +14,7 @@
 // falta tocar nada de servidor.
 import 'dart:io';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -226,24 +227,36 @@ class RegistroCabecera extends StatelessWidget {
                       ? () => _anadirFotos(context)
                       : () => _abrirGaleria(context, 0),
                   child: fotoPortada != null
-                      ? Image.network(
-                          fotoPortada,
+                      ? CachedNetworkImage(
+                          imageUrl: fotoPortada,
                           width: 92,
                           height: 92,
                           fit: BoxFit.cover,
+                          // Decodificar a ~3x el tamaño real -- ver nota en
+                          // ios_list.dart.
+                          memCacheWidth: 280,
+                          // Caché en disco (CEO, octubre 2026): la primera
+                          // vez se ve este fondo mientras descarga (sin
+                          // spinner: un indicador indeterminado nunca dejaría
+                          // "asentarse" un pumpAndSettle en los tests), las
+                          // siguientes carga al instante sin red.
+                          placeholder: (context, url) => Container(
+                            width: 92,
+                            height: 92,
+                            color: context.colors.surfaceMuted,
+                          ),
                           // URL de foto rota -- cae a un icono claro en vez
                           // de dejar un hueco en blanco.
-                          errorBuilder: (context, error, stackTrace) =>
-                              Container(
-                                width: 92,
-                                height: 92,
-                                color: context.colors.surfaceMuted,
-                                child: Icon(
-                                  Icons.broken_image_outlined,
-                                  size: 24,
-                                  color: context.colors.inkFaint,
-                                ),
-                              ),
+                          errorWidget: (context, url, error) => Container(
+                            width: 92,
+                            height: 92,
+                            color: context.colors.surfaceMuted,
+                            child: Icon(
+                              Icons.broken_image_outlined,
+                              size: 24,
+                              color: context.colors.inkFaint,
+                            ),
+                          ),
                         )
                       : Container(
                           width: 92,

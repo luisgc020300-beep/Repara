@@ -7,6 +7,7 @@
 // opcional: cuando se pasa, cada página ofrece un botón de borrar -- la
 // pantalla nunca decide por sí sola qué significa "borrar" (Storage +
 // Firestore), delega siempre en el llamador.
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 class GaleriaFotosScreen extends StatefulWidget {
@@ -88,7 +89,19 @@ class _GaleriaFotosScreenState extends State<GaleriaFotosScreen> {
         itemBuilder: (context, i) => Center(
           child: InteractiveViewer(
             maxScale: 4,
-            child: Image.network(_urls[i], fit: BoxFit.contain),
+            child: CachedNetworkImage(
+              imageUrl: _urls[i],
+              fit: BoxFit.contain,
+              // Sin spinner animado (indeterminado): un indicador así nunca
+              // deja "asentarse" un pumpAndSettle en los tests, y aquí
+              // suele resolverse en el acto gracias al caché en disco.
+              placeholder: (context, url) => const SizedBox.shrink(),
+              errorWidget: (context, url, error) => const Icon(
+                Icons.broken_image_outlined,
+                size: 40,
+                color: Colors.white54,
+              ),
+            ),
           ),
         ),
       ),

@@ -11,6 +11,7 @@
 // screen.dart (que lee estos mismos campos del Elemento).
 import 'dart:io';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -945,10 +946,17 @@ class _FotoElemento extends StatelessWidget {
           children: [
             if (fotoUrl != null)
               Positioned.fill(
-                child: Image.network(
-                  fotoUrl!,
+                child: CachedNetworkImage(
+                  imageUrl: fotoUrl!,
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Center(
+                  // Decodificar a un ancho razonable en vez de a
+                  // resolución completa (hasta 1600px, ver image_picker) --
+                  // sigue de sobra para una portada de 190px de alto.
+                  memCacheWidth: 800,
+                  // Sin spinner animado -- ver nota en
+                  // galeria_fotos_screen.dart.
+                  placeholder: (context, url) => const SizedBox.shrink(),
+                  errorWidget: (context, url, error) => Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [

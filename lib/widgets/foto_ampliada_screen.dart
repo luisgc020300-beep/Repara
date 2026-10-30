@@ -5,6 +5,7 @@
 // aquí desde elemento_detail_screen.dart (era privado de esa pantalla)
 // para que registro_detail_screen.dart pueda reutilizarlo tal cual en la
 // foto de un evento, en vez de duplicar la pantalla.
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 class FotoAmpliadaScreen extends StatelessWidget {
@@ -23,7 +24,17 @@ class FotoAmpliadaScreen extends StatelessWidget {
       body: Center(
         child: InteractiveViewer(
           maxScale: 4,
-          child: Image.network(url, fit: BoxFit.contain),
+          child: CachedNetworkImage(
+            imageUrl: url,
+            fit: BoxFit.contain,
+            // Sin spinner animado -- ver nota en galeria_fotos_screen.dart.
+            placeholder: (context, url) => const SizedBox.shrink(),
+            errorWidget: (context, url, error) => const Icon(
+              Icons.broken_image_outlined,
+              size: 40,
+              color: Colors.white54,
+            ),
+          ),
         ),
       ),
     );

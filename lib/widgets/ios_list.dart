@@ -6,6 +6,7 @@
 // suelta por fila -- el look que pidió el CEO para toda la app, no solo
 // Ajustes. Icono en una insignia de color (como los ajustes nativos de
 // iOS), chevron a la derecha solo cuando la fila navega a otro sitio.
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/design_tokens.dart';
@@ -211,15 +212,25 @@ class IosRow extends StatelessWidget {
                   borderRadius: BorderRadius.circular(7),
                 ),
                 child: imageUrl != null
-                    ? Image.network(
-                        imageUrl!,
+                    ? CachedNetworkImage(
+                        imageUrl: imageUrl!,
                         fit: BoxFit.cover,
-                        // Sin esto, una foto con URL rota (p.ej. el archivo
-                        // de Storage se borró o cambió) dejaba un hueco en
-                        // blanco en vez de caer al mismo icono que se ve
-                        // cuando nunca hubo foto (CEO, octubre 2026: "la
-                        // única que no se ve es la del sofá").
-                        errorBuilder: (context, error, stackTrace) =>
+                        // Decodificar a ~3x el tamaño real en vez de a
+                        // resolución completa (hasta 1600px, ver
+                        // image_picker) -- menos memoria, pintado más
+                        // rápido, sin perder nitidez en una miniatura tan
+                        // pequeña.
+                        memCacheWidth: 90,
+                        // Miniatura de 29px -- un spinner no cabe con
+                        // dignidad ahí, así que mientras carga (o si falla:
+                        // URL rota, p.ej. el archivo de Storage se borró o
+                        // cambió) se ve el mismo icono que cuando nunca
+                        // hubo foto (CEO, octubre 2026: "la única que no se
+                        // ve es la del sofá"). Con caché en disco, la
+                        // segunda vez ya no hay "mientras carga".
+                        placeholder: (context, url) =>
+                            Icon(icon, color: Colors.white, size: 17),
+                        errorWidget: (context, url, error) =>
                             Icon(icon, color: Colors.white, size: 17),
                       )
                     : Icon(icon, color: Colors.white, size: 17),

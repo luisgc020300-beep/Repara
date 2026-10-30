@@ -20,6 +20,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -334,7 +335,24 @@ class _CambioCardState extends State<_CambioCard> {
                         borderRadius: BorderRadius.circular(ReparaRadius.xs),
                         border: Border.all(color: context.colors.border),
                       ),
-                      child: Image.network(cambio.fotos[i], fit: BoxFit.cover),
+                      child: CachedNetworkImage(
+                        imageUrl: cambio.fotos[i],
+                        fit: BoxFit.cover,
+                        // Decodificar a ~3x el tamaño real -- ver nota en
+                        // ios_list.dart.
+                        memCacheWidth: 210,
+                        // Sin spinner animado -- ver nota en
+                        // galeria_fotos_screen.dart.
+                        placeholder: (context, url) =>
+                            Container(color: context.colors.surfaceMuted),
+                        errorWidget: (context, url, error) => Container(
+                          color: context.colors.surfaceMuted,
+                          child: Icon(
+                            Icons.broken_image_outlined,
+                            color: context.colors.inkFaint,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -406,8 +424,19 @@ class _CambioCardState extends State<_CambioCard> {
   void _verFotoCompleta(BuildContext context, String url) {
     showDialog<void>(
       context: context,
-      builder: (ctx) =>
-          Dialog(child: InteractiveViewer(child: Image.network(url))),
+      builder: (ctx) => Dialog(
+        child: InteractiveViewer(
+          child: CachedNetworkImage(
+            imageUrl: url,
+            // Sin spinner animado -- ver nota en galeria_fotos_screen.dart.
+            placeholder: (context, url) => const SizedBox.shrink(),
+            errorWidget: (context, url, error) => const Padding(
+              padding: EdgeInsets.all(40),
+              child: Icon(Icons.broken_image_outlined, size: 40),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

@@ -6,6 +6,7 @@
 // directos (garantías, mantenimiento, trabajos pendientes) que antes vivían
 // en la pestaña Casa -- tienen más sentido en Inicio, que es donde se mira
 // a diario (CEO, octubre 2026); debajo, el listado filtrable por ubicación.
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -660,13 +661,24 @@ class _ElementoRow extends StatelessWidget {
                   borderRadius: BorderRadius.circular(ReparaRadius.sm),
                 ),
                 child: elemento.fotoUrl != null
-                    ? Image.network(
-                        elemento.fotoUrl!,
+                    ? CachedNetworkImage(
+                        imageUrl: elemento.fotoUrl!,
                         fit: BoxFit.cover,
-                        // Igual que en ios_list.dart: una URL de foto rota
-                        // no debe dejar un hueco en blanco, cae al mismo
-                        // icono que el estado sin foto.
-                        errorBuilder: (context, error, stackTrace) => Icon(
+                        // Decodificar a ~3x el tamaño real -- ver nota en
+                        // ios_list.dart.
+                        memCacheWidth: 140,
+                        // Igual que en ios_list.dart: mientras carga (o si
+                        // la URL está rota) no debe dejar un hueco en
+                        // blanco, cae al mismo icono que el estado sin
+                        // foto.
+                        placeholder: (context, url) => Icon(
+                          Icons.category_outlined,
+                          size: 21,
+                          color: avisado
+                              ? context.colors.warning
+                              : context.colors.brand,
+                        ),
+                        errorWidget: (context, url, error) => Icon(
                           Icons.category_outlined,
                           size: 21,
                           color: avisado
