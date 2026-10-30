@@ -1,13 +1,13 @@
-// test/screens/registro_foto_test.dart
+// test/screens/registro_cabecera_foto_test.dart
 //
-// Foto de un registro CON PROFESIONAL (CEO, octubre 2026): la gestión de
-// varias fotos es solo para el registro simple (ver
-// registro_simple_galeria_fotos_test.dart) -- este lado sigue usando
-// _CabeceraRegistro/FotoAmpliadaScreen exactamente como antes, sin ningún
-// cambio, a propósito (petición explícita del CEO de no tocar la pantalla
-// con profesional). Este fichero prueba justo eso: que una sola foto, tap
-// para ampliar / lápiz para cambiar, se sigue comportando igual que
-// siempre en ese lado. Usa FakeFirebaseFirestore, nada de Firebase real.
+// Galería de varias fotos en un registro CON PROFESIONAL (CEO, octubre
+// 2026) -- RegistroCabecera (antes "_CabeceraRegistro", de una sola foto y
+// exclusiva de este lado) pasa a ser la MISMA cabecera que ya tenía el
+// registro simple: miniatura pequeña a la derecha, texto a la izquierda, y
+// ahora también galería de varias fotos (ver registro_service.dart:
+// agregarFotos/eliminarFoto, ya eran genéricos). Mismo comportamiento que
+// prueba registro_simple_galeria_fotos_test.dart, aquí del lado con
+// profesional. Usa FakeFirebaseFirestore, nada de Firebase real.
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -24,7 +24,7 @@ import 'package:repara/services/pago_service.dart';
 import 'package:repara/services/presupuesto_service.dart';
 import 'package:repara/services/registro_service.dart';
 import 'package:repara/theme/design_tokens.dart';
-import 'package:repara/widgets/foto_ampliada_screen.dart';
+import 'package:repara/widgets/galeria_fotos_screen.dart';
 
 const _casa = Casa(
   id: 'c1',
@@ -80,56 +80,6 @@ void main() {
   });
 
   testWidgets(
-    'con foto, tocar la miniatura la amplía a pantalla completa (no abre el selector de cámara/galería)',
-    (tester) async {
-      await _prepararConRegistro({'fotoUrl': 'https://example.com/foto.jpg'});
-
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: buildReparaLightTheme(),
-          home: const RegistroDetailScreen(casa: _casa, elementoId: 'e1', registroId: 'r1'),
-        ),
-      );
-      await tester.pumpAndSettle();
-      // En el entorno de test no hay red real -- Image.network falla
-      // siempre (lo gestiona errorBuilder en pantalla, pero el propio
-      // framework de test también lo registra como excepción pendiente).
-      // Se consume aquí para no confundirlo con un fallo real del test.
-      tester.takeException();
-
-      await tester.tap(find.byType(Image).first);
-      await tester.pumpAndSettle();
-      tester.takeException();
-
-      expect(find.byType(FotoAmpliadaScreen), findsOneWidget);
-      expect(find.text('Hacer una foto'), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'el lápiz de la esquina sigue abriendo el selector para cambiar la foto, aunque ya haya una',
-    (tester) async {
-      await _prepararConRegistro({'fotoUrl': 'https://example.com/foto.jpg'});
-
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: buildReparaLightTheme(),
-          home: const RegistroDetailScreen(casa: _casa, elementoId: 'e1', registroId: 'r1'),
-        ),
-      );
-      await tester.pumpAndSettle();
-      tester.takeException(); // sin red real -- ver nota del test anterior.
-
-      await tester.tap(find.byIcon(Icons.edit_outlined).first);
-      await tester.pumpAndSettle();
-
-      expect(find.text('Hacer una foto'), findsOneWidget);
-      expect(find.text('Elegir de la galería'), findsOneWidget);
-      expect(find.byType(FotoAmpliadaScreen), findsNothing);
-    },
-  );
-
-  testWidgets(
     'sin foto todavía, tocar la miniatura abre directamente el selector para añadirla',
     (tester) async {
       await _prepararConRegistro({});
@@ -142,10 +92,93 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byIcon(Icons.add_a_photo_outlined));
+      await tester.tap(find.byIcon(Icons.add_a_photo_outlined).first);
       await tester.pumpAndSettle();
 
       expect(find.text('Hacer una foto'), findsOneWidget);
+      expect(find.text('Elegir de la galería'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'con una sola foto heredada (fotoUrl antiguo, sin fotoUrls), tocar la miniatura abre la galería con esa foto',
+    (tester) async {
+      await _prepararConRegistro({'fotoUrl': 'https://example.com/foto.jpg'});
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildReparaLightTheme(),
+          home: const RegistroDetailScreen(casa: _casa, elementoId: 'e1', registroId: 'r1'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      tester.takeException(); // sin red real -- Image.network falla en test.
+
+      await tester.tap(find.byType(Image).first);
+      await tester.pumpAndSettle();
+      tester.takeException();
+
+      final galeria = tester.widget<GaleriaFotosScreen>(
+        find.byType(GaleriaFotosScreen),
+      );
+      expect(galeria.urls, ['https://example.com/foto.jpg']);
+    },
+  );
+
+  testWidgets(
+    'con varias fotos, muestra el contador y la galería recibe todas, con opción de borrar',
+    (tester) async {
+      await _prepararConRegistro({
+        'fotoUrls': [
+          'https://example.com/1.jpg',
+          'https://example.com/2.jpg',
+        ],
+      });
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildReparaLightTheme(),
+          home: const RegistroDetailScreen(casa: _casa, elementoId: 'e1', registroId: 'r1'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      tester.takeException();
+
+      expect(find.text('2'), findsOneWidget);
+
+      await tester.tap(find.byType(Image).first);
+      await tester.pumpAndSettle();
+      tester.takeException();
+
+      final galeria = tester.widget<GaleriaFotosScreen>(
+        find.byType(GaleriaFotosScreen),
+      );
+      expect(galeria.urls, hasLength(2));
+      expect(galeria.onEliminar, isNotNull);
+    },
+  );
+
+  testWidgets(
+    'con fotos ya puestas, el botón de la esquina también ofrece añadir más',
+    (tester) async {
+      await _prepararConRegistro({
+        'fotoUrls': ['https://example.com/1.jpg'],
+      });
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildReparaLightTheme(),
+          home: const RegistroDetailScreen(casa: _casa, elementoId: 'e1', registroId: 'r1'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      tester.takeException();
+
+      await tester.tap(find.byIcon(Icons.add_a_photo_outlined).first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Hacer una foto'), findsOneWidget);
+      expect(find.text('Elegir de la galería'), findsOneWidget);
     },
   );
 }

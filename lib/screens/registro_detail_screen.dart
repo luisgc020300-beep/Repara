@@ -9,11 +9,9 @@
 // sus datos con editar/eliminar, con la misma cabecera para que se sienta
 // el mismo producto.
 import 'dart:async';
-import 'dart:io';
 
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -35,7 +33,6 @@ import '../theme/design_tokens.dart';
 import '../widgets/app_dialog.dart';
 import '../widgets/app_error.dart';
 import '../widgets/estado_registro_chip.dart';
-import '../widgets/foto_ampliada_screen.dart';
 import '../widgets/historial_timeline.dart';
 import '../widgets/ios_list.dart';
 import 'cambio_alcance_section.dart';
@@ -44,8 +41,9 @@ import 'elemento_detail_screen.dart';
 import 'nuevo_documento_flow.dart';
 import 'pagos_section.dart';
 import 'presupuestos_section.dart';
+import 'registro_simple/registro_cabecera.dart';
+import 'registro_simple/registro_resumen_pdf.dart';
 import 'registro_simple/registro_simple_acciones.dart';
-import 'registro_simple/registro_simple_cabecera.dart';
 import 'registro_simple/registro_simple_progreso.dart';
 
 String _formatoImporte(double v) =>
@@ -400,239 +398,6 @@ class RegistroDetailScreen extends StatelessWidget {
   }
 }
 
-/// Cabecera compartida entre el cuerpo con profesional y el simple -- mismo
-/// producto, mismo lenguaje visual (auditoría de craft, octubre 2026).
-/// [elemento] es opcional porque su stream vive en el widget padre
-/// (compartido con la tarjeta de mantenimiento cuando aplica, para no abrir
-/// dos suscripciones a la misma colección).
-class _CabeceraRegistro extends StatelessWidget {
-  const _CabeceraRegistro({
-    required this.casa,
-    required this.elementoId,
-    required this.registro,
-    this.elemento,
-  });
-
-  final Casa casa;
-  final String elementoId;
-  final Registro registro;
-  final Elemento? elemento;
-
-  @override
-  Widget build(BuildContext context) {
-    final fotoUrl = registro.fotoUrl ?? elemento?.fotoUrl;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      iconoTipoRegistro(registro.tipo),
-                      size: 12,
-                      color: context.colors.inkMuted,
-                    ),
-                    const SizedBox(width: 5),
-                    Expanded(
-                      child: Text(
-                        '${registro.elementoNombre} · ${nombreTipoRegistro(registro.tipo)}'
-                            .toUpperCase(),
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          fontSize: 11,
-                          color: context.colors.inkMuted,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  registro.titulo,
-                  style: Theme.of(context).textTheme.displaySmall,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    EstadoRegistroChip(estado: registro.estado),
-                    const SizedBox(width: 8),
-                    Text(
-                      '· ${DateFormat('d MMM yyyy', 'es_ES').format(registro.fecha)}',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 14),
-          GestureDetector(
-            // Igual que _FotoElemento en elemento_detail_screen.dart: con
-            // foto, tocarla la amplía a pantalla completa -- cambiarla es
-            // el lápiz pequeño de la esquina, con su propio toque aparte
-            // (antes compartían el mismo GestureDetector y tocar en
-            // cualquier punto, lápiz incluido, abría la cámara/galería).
-            onTap: fotoUrl == null
-                ? () =>
-                      _cambiarFotoRegistro(context, casa, elementoId, registro)
-                : () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => FotoAmpliadaScreen(url: fotoUrl),
-                    ),
-                  ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(ReparaRadius.md),
-              child: Stack(
-                children: [
-                  fotoUrl != null
-                      ? Image.network(
-                          fotoUrl,
-                          width: 92,
-                          height: 92,
-                          fit: BoxFit.cover,
-                          // URL de foto rota -- cae a un icono claro en vez
-                          // de dejar un hueco en blanco.
-                          errorBuilder: (context, error, stackTrace) =>
-                              Container(
-                                width: 92,
-                                height: 92,
-                                color: context.colors.surfaceMuted,
-                                child: Icon(
-                                  Icons.broken_image_outlined,
-                                  size: 24,
-                                  color: context.colors.inkFaint,
-                                ),
-                              ),
-                        )
-                      : Container(
-                          width: 92,
-                          height: 92,
-                          color: context.colors.surfaceMuted,
-                          child: Icon(
-                            Icons.add_a_photo_outlined,
-                            size: 24,
-                            color: context.colors.inkFaint,
-                          ),
-                        ),
-                  if (fotoUrl != null)
-                    Positioned(
-                      right: 3,
-                      bottom: 3,
-                      child: GestureDetector(
-                        onTap: () => _cambiarFotoRegistro(
-                          context,
-                          casa,
-                          elementoId,
-                          registro,
-                        ),
-                        child: Container(
-                          padding: const EdgeInsets.all(3),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.45),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.edit_outlined,
-                            size: 11,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Mismo flujo que _cambiarFoto en elemento_detail_screen.dart (cámara o
-/// galería), pero escribe en [Registro.fotoUrl] -- nunca toca la foto del
-/// elemento padre, aunque sea la que se esté mostrando como respaldo.
-Future<void> _cambiarFotoRegistro(
-  BuildContext context,
-  Casa casa,
-  String elementoId,
-  Registro registro,
-) async {
-  final picker = ImagePicker();
-  final foto = await showModalBottomSheet<XFile?>(
-    context: context,
-    builder: (ctx) => SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-        child: IosSection(
-          rows: [
-            IosRow(
-              icon: Icons.photo_camera_outlined,
-              iconColor: ctx.colors.brand,
-              title: 'Hacer una foto',
-              onTap: () async {
-                final navigator = Navigator.of(ctx);
-                final imagen = await picker.pickImage(
-                  source: ImageSource.camera,
-                  imageQuality: 85,
-                  maxWidth: 1600,
-                  maxHeight: 1600,
-                );
-                if (!ctx.mounted) return;
-                navigator.pop(imagen);
-              },
-            ),
-            IosRow(
-              icon: Icons.photo_library_outlined,
-              iconColor: ctx.colors.brand,
-              title: 'Elegir de la galería',
-              onTap: () async {
-                final navigator = Navigator.of(ctx);
-                final imagen = await picker.pickImage(
-                  source: ImageSource.gallery,
-                  imageQuality: 85,
-                  maxWidth: 1600,
-                  maxHeight: 1600,
-                );
-                if (!ctx.mounted) return;
-                navigator.pop(imagen);
-              },
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-  if (foto == null || !context.mounted) return;
-  try {
-    final url = await RegistroService.subirFoto(
-      casa.id,
-      elementoId,
-      registro.id,
-      File(foto.path),
-    );
-    await RegistroService.actualizarFoto(casa.id, elementoId, registro.id, url);
-  } catch (e, st) {
-    if (context.mounted) {
-      AppError.show(
-        context,
-        'No se pudo guardar la foto.',
-        error: e,
-        stackTrace: st,
-      );
-    }
-  }
-}
-
 /// Tarjeta económica de 3 columnas (presupuesto/pagado/saldo o completado) --
 /// combina la composición de la referencia visual con el tratamiento de
 /// importes de pago_detail_screen.dart. Recibe [pagado] ya calculado por el
@@ -661,35 +426,47 @@ class _TarjetaEconomica extends StatelessWidget {
         ? 0.0
         : (pagado / presupuesto).clamp(0, 1).toDouble();
 
+    // Caja más "estado de cuenta" que "tarjeta de stat" (CEO, octubre
+    // 2026): importes a 15px en vez de los 17/32px de ReparaText.amount
+    // (ese token se reutiliza en toda la app -- presupuestos, pagos,
+    // documentos -- así que se ajusta solo aquí, por composición, en vez
+    // de tocar el token global), caja más baja y alargada, y un fondo
+    // sutilmente distinto al resto de la pantalla en vez de un simple
+    // borde, para que lea como un resumen y no como un stat card suelto.
+    TextStyle importeStyle({Color? color}) => ReparaText.amount(
+      context,
+    ).copyWith(fontSize: 15, fontWeight: FontWeight.w700, color: color);
+
     Widget etiqueta(String texto) => Text(
       texto.toUpperCase(),
       style: Theme.of(context).textTheme.labelSmall?.copyWith(
         color: context.colors.inkMuted,
-        fontSize: 10,
+        fontSize: 9.5,
+        letterSpacing: 0.8,
       ),
     );
 
     Widget columna(String texto, Widget valor) => Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [etiqueta(texto), const SizedBox(height: 4), valor],
+        children: [etiqueta(texto), const SizedBox(height: 5), valor],
       ),
     );
 
     Widget divisor() => Container(
       width: 1,
-      height: 34,
-      margin: const EdgeInsets.symmetric(horizontal: 10),
-      color: context.colors.border,
+      height: 24,
+      margin: const EdgeInsets.symmetric(horizontal: 14),
+      color: context.colors.border.withValues(alpha: 0.6),
     );
 
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
       decoration: BoxDecoration(
-        color: context.colors.surface,
+        color: context.colors.surfaceSunken.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(ReparaRadius.md),
-        border: Border.all(color: context.colors.border),
+        border: Border.all(color: context.colors.border.withValues(alpha: 0.7)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -701,7 +478,7 @@ class _TarjetaEconomica extends StatelessWidget {
                 etiquetaTotal,
                 Text(
                   '${_formatoImporte(presupuesto)} €',
-                  style: ReparaText.amount(context),
+                  style: importeStyle(),
                 ),
               ),
               divisor(),
@@ -709,9 +486,7 @@ class _TarjetaEconomica extends StatelessWidget {
                 'Pagado',
                 Text(
                   '${_formatoImporte(pagado)} €',
-                  style: ReparaText.amount(
-                    context,
-                  ).copyWith(color: context.colors.success),
+                  style: importeStyle(color: context.colors.success),
                 ),
               ),
               divisor(),
@@ -722,15 +497,16 @@ class _TarjetaEconomica extends StatelessWidget {
                         children: [
                           Icon(
                             Icons.check_circle,
-                            size: 16,
+                            size: 14,
                             color: context.colors.success,
                           ),
                           const SizedBox(width: 4),
                           Flexible(
                             child: Text(
                               'Completado',
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(color: context.colors.success),
+                              style: importeStyle(
+                                color: context.colors.success,
+                              ),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
@@ -741,18 +517,18 @@ class _TarjetaEconomica extends StatelessWidget {
                       'Saldo',
                       Text(
                         '${_formatoImporte(saldo)} €',
-                        style: ReparaText.amount(context),
+                        style: importeStyle(),
                       ),
                     ),
             ],
           ),
           if (!completo) ...[
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
             ClipRRect(
               borderRadius: BorderRadius.circular(6),
               child: LinearProgressIndicator(
                 value: porcentaje,
-                minHeight: 6,
+                minHeight: 5,
                 backgroundColor: context.colors.surfaceSunken,
                 color: context.colors.brand,
               ),
@@ -775,7 +551,7 @@ const _tabIcons = [
   Icons.description_outlined,
 ];
 
-class _CuerpoConProfesional extends StatelessWidget {
+class _CuerpoConProfesional extends StatefulWidget {
   const _CuerpoConProfesional({
     required this.casa,
     required this.elementoId,
@@ -795,7 +571,48 @@ class _CuerpoConProfesional extends StatelessWidget {
   final void Function(double? pagado) onCompartirResumen;
 
   @override
+  State<_CuerpoConProfesional> createState() => _CuerpoConProfesionalState();
+}
+
+class _CuerpoConProfesionalState extends State<_CuerpoConProfesional> {
+  // "Descargar PDF" junto a "Compartir resumen" (CEO, octubre 2026) --
+  // mismo RegistroResumenPdf que ya usaba el registro simple, aquí con los
+  // pagos/totalPagado que ya calcula este cuerpo para la tarjeta económica.
+  bool _generandoPdf = false;
+
+  Future<void> _descargarPdf(List<Pago> pagos, double totalPagado) async {
+    setState(() => _generandoPdf = true);
+    try {
+      await RegistroResumenPdf.descargar(
+        context,
+        registro: widget.registro,
+        casa: widget.casa,
+        pagos: pagos,
+        totalPagado: totalPagado,
+      );
+    } catch (e, st) {
+      if (mounted) {
+        AppError.show(
+          context,
+          'No se pudo generar el PDF.',
+          error: e,
+          stackTrace: st,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _generandoPdf = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final casa = widget.casa;
+    final elementoId = widget.elementoId;
+    final registro = widget.registro;
+    final onFinalizar = widget.onFinalizar;
+    final onConfirmarFinalizacion = widget.onConfirmarFinalizacion;
+    final onRechazarFinalizacion = widget.onRechazarFinalizacion;
+    final onCompartirResumen = widget.onCompartirResumen;
     return StreamBuilder<Elemento?>(
       stream: ElementoService.streamElemento(casa.id, elementoId),
       builder: (context, elementoSnap) {
@@ -812,7 +629,7 @@ class _CuerpoConProfesional extends StatelessWidget {
               length: _tabs.length,
               child: Column(
                 children: [
-                  _CabeceraRegistro(
+                  RegistroCabecera(
                     casa: casa,
                     elementoId: elementoId,
                     registro: registro,
@@ -958,8 +775,11 @@ class _CuerpoConProfesional extends StatelessWidget {
                       // "Finalizar" flotando sobre esta misma barra -- se
                       // solapaban visualmente. Una sola barra con las dos
                       // acciones evita el choque y mantiene ambas alcanzables.
-                      child: _estadoControlado(registro.estado)
-                          ? SizedBox(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_estadoControlado(registro.estado))
+                            SizedBox(
                               width: double.infinity,
                               child: FilledButton.icon(
                                 onPressed: () => onCompartirResumen(
@@ -972,7 +792,8 @@ class _CuerpoConProfesional extends StatelessWidget {
                                 label: const Text('Compartir resumen'),
                               ),
                             )
-                          : Row(
+                          else
+                            Row(
                               children: [
                                 OutlinedButton(
                                   onPressed: () => onCompartirResumen(
@@ -993,6 +814,30 @@ class _CuerpoConProfesional extends StatelessWidget {
                                 ),
                               ],
                             ),
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: _generandoPdf
+                                  ? null
+                                  : () => _descargarPdf(pagos, totalPagado),
+                              icon: _generandoPdf
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.picture_as_pdf_outlined,
+                                      size: 18,
+                                    ),
+                              label: const Text('Descargar PDF'),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -1436,7 +1281,7 @@ class _CuerpoSimple extends StatelessWidget {
             return ListView(
               padding: EdgeInsets.zero,
               children: [
-                RegistroSimpleCabecera(
+                RegistroCabecera(
                   casa: casa,
                   elementoId: elementoId,
                   registro: registro,
@@ -1477,13 +1322,19 @@ class _CuerpoSimple extends StatelessWidget {
                         ),
                         const SizedBox(height: 20),
                       ],
-                      RegistroSimpleAcciones(
+                      // Mismo historial cronológico vertical que ya tenía
+                      // un registro con profesional (CEO, octubre 2026) --
+                      // _SeccionHistorial ya era un widget genérico
+                      // (casa/elementoId/registro), no hacía falta nada
+                      // nuevo: el cierre del registro y los pagos ya
+                      // quedan registrados en Firestore para cualquier
+                      // registro, con o sin profesional (ver
+                      // onPagoEscritoHistorial en functions/index.js, no
+                      // depende de esConProfesional).
+                      _SeccionHistorial(
                         casa: casa,
                         elementoId: elementoId,
                         registro: registro,
-                        pagos: pagos,
-                        totalPagado: totalPagado,
-                        onCompartir: () => onCompartirResumen(totalPagado),
                       ),
                       const SizedBox(height: 20),
                       // Un registro simple no tiene presupuesto (nunca se
@@ -1563,6 +1414,22 @@ class _CuerpoSimple extends StatelessWidget {
                                 .toList(),
                           );
                         },
+                      ),
+                      const SizedBox(height: 24),
+                      // Acciones rápidas al final (CEO, octubre 2026): solo
+                      // compartir/exportar -- "Añadir pago" y "Escanear
+                      // documento" ya tienen su propio botón en las
+                      // cabeceras de Pagos/Documentos de arriba, repetirlos
+                      // aquí era la misma acción dos veces. Exportar/
+                      // compartir es lo último que se hace tras revisar el
+                      // resumen, los pagos y los documentos -- no el primer
+                      // bloque de la pantalla.
+                      RegistroSimpleAcciones(
+                        casa: casa,
+                        registro: registro,
+                        pagos: pagos,
+                        totalPagado: totalPagado,
+                        onCompartir: () => onCompartirResumen(totalPagado),
                       ),
                     ],
                   ),

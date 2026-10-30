@@ -105,16 +105,19 @@ class _Paso extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 6),
-        Text(
-          titulo,
-          textAlign: TextAlign.start,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: estado == _PasoEstado.pendiente
-                ? context.colors.inkFaint
-                : context.colors.ink,
-            fontWeight: estado == _PasoEstado.actual
-                ? FontWeight.w700
-                : FontWeight.w600,
+        SizedBox(
+          width: double.infinity,
+          child: Text(
+            titulo,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: estado == _PasoEstado.pendiente
+                  ? context.colors.inkFaint
+                  : context.colors.ink,
+              fontWeight: estado == _PasoEstado.actual
+                  ? FontWeight.w700
+                  : FontWeight.w600,
+            ),
           ),
         ),
       ],

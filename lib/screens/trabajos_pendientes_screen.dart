@@ -29,6 +29,7 @@ class TrabajosPendientesScreen extends StatelessWidget {
       String registroId,
       String registroTitulo,
       DateTime fecha,
+      String? fotoUrl,
     })
   >
   items;
@@ -81,6 +82,7 @@ class TrabajosPendientesScreen extends StatelessWidget {
                         (item) => IosRow(
                           icon: Icons.hourglass_top_outlined,
                           iconColor: context.colors.brand,
+                          imageUrl: item.fotoUrl,
                           title: item.elemento.nombre,
                           subtitle:
                               '${item.registroTitulo} · ${DateFormat('d MMM yyyy', 'es_ES').format(item.fecha)}',

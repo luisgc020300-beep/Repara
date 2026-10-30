@@ -1,29 +1,23 @@
 // lib/screens/registro_simple/registro_simple_acciones.dart
 //
-// Acciones rápidas de un registro simple (CEO, octubre 2026) -- solo las
-// que ya existían y tienen sentido en esta pantalla: registrar un pago
-// (la más importante si queda saldo, ver pagos_section.dart), escanear un
-// documento (nuevo_documento_flow.dart), compartir el resumen por texto
-// (ya existía, ver _compartirResumen en registro_detail_screen.dart) y
-// descargar el PDF nuevo. Nada de "contactar con el profesional" -- un
-// registro simple no tiene ningún profesional con cuenta en Repara al
-// otro lado, inventar ese botón aquí prometería algo que no existe.
+// Acciones rápidas de un registro simple (CEO, octubre 2026) -- solo
+// compartir/exportar. "Registrar pago" y "Añadir documento" se quitaron de
+// aquí porque duplicaban el "+ Añadir pago" de PagosSection y el "Escanear
+// documento" de la cabecera de Documentos (misma acción, dos sitios) --
+// ver _CuerpoSimple en registro_detail_screen.dart. Compartir resumen y
+// Descargar PDF se muestran como botones llenos (FilledButton), no como
+// filas de lista, a petición explícita del CEO.
 import 'package:flutter/material.dart';
 
 import '../../models/casa.dart';
 import '../../models/pago.dart';
 import '../../models/registro.dart';
-import '../../theme/design_tokens.dart';
 import '../../widgets/app_error.dart';
-import '../../widgets/ios_list.dart';
-import '../nuevo_documento_flow.dart';
-import '../pago_detail_screen.dart';
 import 'registro_resumen_pdf.dart';
 
 class RegistroSimpleAcciones extends StatefulWidget {
   const RegistroSimpleAcciones({
     required this.casa,
-    required this.elementoId,
     required this.registro,
     required this.pagos,
     required this.totalPagado,
@@ -32,7 +26,6 @@ class RegistroSimpleAcciones extends StatefulWidget {
   });
 
   final Casa casa;
-  final String elementoId;
   final Registro registro;
   final List<Pago> pagos;
   final double totalPagado;
@@ -44,12 +37,6 @@ class RegistroSimpleAcciones extends StatefulWidget {
 
 class _RegistroSimpleAccionesState extends State<RegistroSimpleAcciones> {
   bool _generandoPdf = false;
-
-  double? get _saldo {
-    final deuda = montoDebidoRegistro(widget.registro);
-    if (deuda == null) return null;
-    return (deuda - widget.totalPagado).clamp(0, double.infinity).toDouble();
-  }
 
   Future<void> _descargarPdf() async {
     setState(() => _generandoPdf = true);
@@ -77,8 +64,6 @@ class _RegistroSimpleAccionesState extends State<RegistroSimpleAcciones> {
 
   @override
   Widget build(BuildContext context) {
-    final saldo = _saldo;
-    final conSaldoPendiente = saldo != null && saldo > 0.01;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -87,65 +72,28 @@ class _RegistroSimpleAccionesState extends State<RegistroSimpleAcciones> {
           style: Theme.of(context).textTheme.headlineSmall,
         ),
         const SizedBox(height: 10),
-        if (conSaldoPendiente)
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => PagoDetailScreen(
-                    casaId: widget.casa.id,
-                    elementoId: widget.elementoId,
-                    registroId: widget.registro.id,
-                    registroTitulo: widget.registro.titulo,
-                    presupuesto: null,
-                    editable: true,
-                    conceptoSugerido: 'Pago ${widget.pagos.length + 1}',
-                  ),
-                ),
-              ),
-              icon: const Icon(Icons.payment_outlined, size: 18),
-              label: const Text('Registrar pago'),
-            ),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: widget.onCompartir,
+            icon: const Icon(Icons.ios_share_outlined, size: 18),
+            label: const Text('Compartir resumen'),
           ),
-        if (conSaldoPendiente) const SizedBox(height: 10),
-        IosSection(
-          rows: [
-            IosRow(
-              icon: Icons.document_scanner_outlined,
-              iconColor: context.colors.brand,
-              title: 'Añadir documento',
-              onTap: () => iniciarNuevoDocumento(
-                context,
-                casaId: widget.casa.id,
-                elementoId: widget.elementoId,
-                registroId: widget.registro.id,
-              ),
-            ),
-            IosRow(
-              icon: Icons.ios_share_outlined,
-              iconColor: context.colors.brand,
-              title: 'Compartir resumen',
-              onTap: widget.onCompartir,
-            ),
-            IosRow(
-              icon: Icons.picture_as_pdf_outlined,
-              iconColor: context.colors.brand,
-              title: 'Descargar PDF',
-              trailing: _generandoPdf
-                  ? SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: context.colors.brand,
-                      ),
-                    )
-                  : null,
-              onTap: _generandoPdf ? null : _descargarPdf,
-            ),
-          ],
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: _generandoPdf ? null : _descargarPdf,
+            icon: _generandoPdf
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.picture_as_pdf_outlined, size: 18),
+            label: const Text('Descargar PDF'),
+          ),
         ),
       ],
     );

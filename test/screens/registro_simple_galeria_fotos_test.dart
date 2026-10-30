@@ -1,11 +1,14 @@
 // test/screens/registro_simple_galeria_fotos_test.dart
 //
 // Galería de varias fotos en un registro SIMPLE (CEO, octubre 2026) -- ver
-// RegistroSimpleCabecera/GaleriaFotosScreen. Comprueba: el contador "N
-// fotos", que tocar la portada abre la galería con TODAS las fotos (tanto
-// con [fotoUrls] nuevo como con el [fotoUrl] antiguo de un registro creado
-// antes de esta mejora, sin ninguna migración de datos -- ver
-// Registro.fotos), y que el botón "+" siempre ofrece añadir más.
+// RegistroCabecera/GaleriaFotosScreen. RegistroCabecera es, desde esta misma
+// pasada, COMPARTIDA con el registro con profesional (ver
+// registro_cabecera_foto_test.dart para el mismo comportamiento del otro
+// lado) -- este fichero se queda centrado en el caso simple. Comprueba: el
+// contador de fotos, que tocar la portada abre la galería con TODAS las
+// fotos (tanto con [fotoUrls] nuevo como con el [fotoUrl] antiguo de un
+// registro creado antes de esta mejora, sin ninguna migración de datos --
+// ver Registro.fotos), y que el botón "+" siempre ofrece añadir más.
 //
 // NO PROBADO AQUÍ (limitación real, no simulada): completar de verdad una
 // subida o un borrado invoca FirebaseStorage.instance, que no se puede
@@ -145,7 +148,10 @@ void main() {
       await tester.pumpAndSettle();
       tester.takeException();
 
-      expect(find.text('3 fotos'), findsOneWidget);
+      // Miniatura pequeña (92x92, CEO, octubre 2026: misma cabecera que
+      // un registro con profesional) -- el contador ya no cabe como "N
+      // fotos" con etiqueta, solo el número.
+      expect(find.text('3'), findsOneWidget);
 
       await tester.tap(find.byType(Image).first);
       await tester.pumpAndSettle();

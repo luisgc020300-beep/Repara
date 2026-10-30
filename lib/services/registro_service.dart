@@ -132,35 +132,8 @@ class RegistroService {
     ).doc(registroId).update({'estado': estado.name});
   }
 
-  /// Mismo patrón que ElementoService.subirFoto -- nombre de archivo fijo
-  /// ("foto"), una foto nueva sustituye a la anterior, nunca se acumulan
-  /// fotos sueltas. Es la foto DE ESTE registro (p.ej. la reparación en
-  /// curso), nunca toca la foto del elemento padre.
-  static Future<String> subirFoto(
-    String casaId,
-    String elementoId,
-    String registroId,
-    File archivo,
-  ) async {
-    final ref = FirebaseStorage.instance.ref().child(
-      'casas/$casaId/elementos/$elementoId/registros/$registroId/foto',
-    );
-    await ref.putFile(archivo);
-    return ref.getDownloadURL();
-  }
-
-  static Future<void> actualizarFoto(
-    String casaId,
-    String elementoId,
-    String registroId,
-    String fotoUrl,
-  ) async {
-    await _col(casaId, elementoId).doc(registroId).update({'fotoUrl': fotoUrl});
-  }
-
-  /// Galería de un registro simple (CEO, octubre 2026) -- a diferencia de
-  /// [subirFoto] (nombre de archivo fijo, una foto sustituye a la
-  /// anterior), cada foto de la galería vive en su propio archivo bajo
+  /// Galería de un registro (CEO, octubre 2026: ahora también con
+  /// profesional, no solo simple) -- cada foto vive en su propio archivo bajo
   /// "fotos/", igual que DocumentoService.subirArchivo (timestamp +
   /// nombre, nunca se pisan entre sí). [fotosActuales] es Registro.fotos
   /// (ya incluye, si hace falta, la [fotoUrl] antigua de un registro
@@ -342,6 +315,7 @@ class RegistroService {
         String registroId,
         String registroTitulo,
         DateTime fecha,
+        String? fotoUrl,
       })
     >
   >
@@ -354,6 +328,7 @@ class RegistroService {
             String registroId,
             String registroTitulo,
             DateTime fecha,
+            String? fotoUrl,
           })
         >[];
     for (final elemento in elementos) {
@@ -364,6 +339,9 @@ class RegistroService {
           registroId: r.id,
           registroTitulo: r.titulo,
           fecha: r.fecha,
+          // r.fotos cubre el evento con una sola foto (fotoUrl heredado) y
+          // con varias (fotoUrls) -- ver Registro.fotos.
+          fotoUrl: r.fotos.isNotEmpty ? r.fotos.first : null,
         ));
       }
     }

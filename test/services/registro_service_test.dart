@@ -166,6 +166,59 @@ void main() {
     },
   );
 
+  // CEO, octubre 2026: "Trabajos pendientes" (Inicio) mostraba siempre el
+  // icono genérico, aunque el registro tuviera foto -- faltaba propagar
+  // r.fotos (fotoUrl heredado o fotoUrls nuevo) en el record que alimenta
+  // esa pantalla.
+  test(
+    'registrosConTrabajoPendiente() propaga la primera foto del registro, con fotoUrl heredado o con fotoUrls',
+    () async {
+      final db = FakeFirebaseFirestore();
+      RegistroService.debugFirestoreOverride = db;
+      ElementoService.debugFirestoreOverride = db;
+
+      await db
+          .collection('casas')
+          .doc(casaId)
+          .collection('elementos')
+          .doc(elementoId)
+          .set({'nombre': 'Pérgolas', 'createdAt': Timestamp.now()});
+      await db
+          .collection('casas')
+          .doc(casaId)
+          .collection('elementos')
+          .doc(elementoId)
+          .collection('registros')
+          .add({
+            ...registro(estado: EstadoRegistro.enCurso).toMap(),
+            'esConProfesional': true,
+            'fecha': Timestamp.fromDate(DateTime(2026, 2, 1)),
+            'fotoUrl': 'https://example.com/antigua.jpg',
+          });
+      await db
+          .collection('casas')
+          .doc(casaId)
+          .collection('elementos')
+          .doc(elementoId)
+          .collection('registros')
+          .add({
+            ...registro(estado: EstadoRegistro.pendientePago).toMap(),
+            'fecha': Timestamp.fromDate(DateTime(2026, 2, 2)),
+            'fotoUrls': [
+              'https://example.com/primera.jpg',
+              'https://example.com/segunda.jpg',
+            ],
+          });
+
+      final pendientes = await RegistroService.registrosConTrabajoPendiente(
+        casaId,
+      );
+      expect(pendientes, hasLength(2));
+      expect(pendientes[0].fotoUrl, 'https://example.com/antigua.jpg');
+      expect(pendientes[1].fotoUrl, 'https://example.com/primera.jpg');
+    },
+  );
+
   // CEO, octubre 2026: antes, un elemento con varios registros pendientes a
   // la vez (p.ej. dos instalaciones y una reforma sobre "Pérgolas") solo
   // mostraba el más antiguo -- el resto desaparecía del aviso de Inicio sin

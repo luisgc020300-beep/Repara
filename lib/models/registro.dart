@@ -123,13 +123,13 @@ class Registro {
   final String? descripcion;
   final DateTime? garantiaHasta;
   final double? coste;
-  // Foto única de siempre -- se conserva tal cual para el lado con
-  // profesional y la ficha del elemento (ver _CabeceraRegistro/
-  // FotoAmpliadaScreen en registro_detail_screen.dart), que nunca han
-  // necesitado más de una. [fotoUrls] es la galería nueva (CEO, octubre
-  // 2026), solo para el registro SIMPLE -- ver [fotos] más abajo para el
-  // criterio de compatibilidad con los registros antiguos que solo tienen
-  // [fotoUrl].
+  // Foto única heredada -- se conserva tal cual para la ficha del elemento
+  // (Elemento.fotoUrl, que sigue siendo de una sola foto) y para
+  // registros creados antes de la galería nueva. [fotoUrls] es la galería
+  // (CEO, octubre 2026: primero solo en el registro simple, ahora también
+  // en el de con profesional -- ver RegistroCabecera, compartida entre
+  // ambos) -- ver [fotos] más abajo para el criterio de compatibilidad con
+  // los registros antiguos que solo tienen [fotoUrl].
   final String? fotoUrl;
   final List<String> fotoUrls;
   final List<String> documentoIds;

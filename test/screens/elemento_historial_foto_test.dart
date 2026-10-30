@@ -4,7 +4,14 @@
 // mismo icono genérico, aunque el evento tuviera su propia foto -- IosRow
 // ya soportaba una miniatura en vez del icono (imageUrl, ver
 // widgets/ios_list.dart, usada en otras listas), solo faltaba pasarle
-// r.fotoUrl en esta. Usa FakeFirebaseFirestore, nada de Firebase real.
+// r.fotoUrl en esta.
+//
+// Regresión (CEO, octubre 2026): en cuanto un evento pasa a tener varias
+// fotos, el campo antiguo fotoUrl se borra (ver RegistroService.
+// agregarFotos) -- esta fila seguía leyendo r.fotoUrl directamente, así que
+// el evento dejaba de mostrar foto en el Historial aunque tuviera 2+. Ahora
+// lee r.fotos (fotoUrls si existen, si no cae a fotoUrl) y siempre muestra
+// la primera que se subió. Usa FakeFirebaseFirestore, nada de Firebase real.
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -97,6 +104,51 @@ void main() {
       );
       expect(filaConFoto.imageUrl, 'https://example.com/foto.jpg');
       expect(filaSinFoto.imageUrl, isNull);
+    },
+  );
+
+  testWidgets(
+    'en el Historial, un evento con varias fotos (sin fotoUrl heredado) muestra la primera que se subió',
+    (tester) async {
+      final db = FakeFirebaseFirestore();
+      await db.collection('casas').doc(_casa.id).collection('elementos').doc('e1').set({
+        'nombre': 'Pérgolas',
+      });
+      await db
+          .collection('casas')
+          .doc(_casa.id)
+          .collection('elementos')
+          .doc('e1')
+          .collection('registros')
+          .doc('con-varias-fotos')
+          .set({
+            'titulo': 'Placa de madera',
+            'tipo': 'instalacion',
+            'esConProfesional': false,
+            'estado': 'terminado',
+            'elementoNombre': 'Pérgolas',
+            'fecha': Timestamp.fromDate(DateTime(2026, 10, 29)),
+            'fotoUrls': [
+              'https://example.com/primera.jpg',
+              'https://example.com/segunda.jpg',
+            ],
+          });
+      ElementoService.debugFirestoreOverride = db;
+      RegistroService.debugFirestoreOverride = db;
+      HabitacionService.debugFirestoreOverride = db;
+      DocumentoService.debugFirestoreOverride = db;
+      PagoService.debugFirestoreOverride = db;
+
+      await tester.pumpWidget(
+        MaterialApp(theme: buildReparaLightTheme(), home: const ElementoDetailScreen(casa: _casa, elementoId: 'e1')),
+      );
+      await tester.pumpAndSettle();
+      tester.takeException(); // sin red real -- ver registro_foto_test.dart.
+
+      final fila = tester.widget<IosRow>(
+        find.ancestor(of: find.text('Placa de madera'), matching: find.byType(IosRow)),
+      );
+      expect(fila.imageUrl, 'https://example.com/primera.jpg');
     },
   );
 }

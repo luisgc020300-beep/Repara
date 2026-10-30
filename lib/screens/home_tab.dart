@@ -306,6 +306,7 @@ class _ResumenCasa extends StatelessWidget {
                       String registroId,
                       String registroTitulo,
                       DateTime fecha,
+                      String? fotoUrl,
                     })
                   >?) ??
               const [];

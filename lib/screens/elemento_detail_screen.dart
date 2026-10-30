@@ -563,7 +563,12 @@ class ElementoDetailScreen extends StatelessWidget {
                           (r) => IosRow(
                             icon: Icons.fact_check_outlined,
                             iconColor: context.colors.brand,
-                            imageUrl: r.fotoUrl,
+                            // r.fotoUrl se queda vacío en cuanto el evento
+                            // tiene más de una foto (se guardan en
+                            // fotoUrls, ver Registro.fotos) -- r.fotos ya
+                            // cubre los dos casos y siempre pone primero la
+                            // foto más antigua.
+                            imageUrl: r.fotos.isNotEmpty ? r.fotos.first : null,
                             title: r.titulo,
                             subtitle: DateFormat(
                               'd MMM yyyy',
