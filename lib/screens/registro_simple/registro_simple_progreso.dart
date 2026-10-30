@@ -36,6 +36,14 @@ class RegistroSimpleProgreso extends StatelessWidget {
       ),
       ('Terminado', cobrado ? _PasoEstado.actual : _PasoEstado.pendiente),
     ];
+    // Color de la línea entre el paso i y el i+1: verde si el paso i ya
+    // está completado, gris si no. Se reparte en dos mitades simétricas
+    // (ver _Paso) para que el círculo quede centrado sobre su texto en
+    // vez de empujado hacia la izquierda por una línea que solo salía a
+    // su derecha (CEO, octubre 2026).
+    Color colorConexion(int i) => pasos[i].$2 == _PasoEstado.completado
+        ? context.colors.success
+        : context.colors.surfaceSunken;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
       child: Row(
@@ -45,7 +53,10 @@ class RegistroSimpleProgreso extends StatelessWidget {
               child: _Paso(
                 titulo: pasos[i].$1,
                 estado: pasos[i].$2,
-                esUltimo: i == pasos.length - 1,
+                colorLineaIzquierda: i == 0 ? null : colorConexion(i - 1),
+                colorLineaDerecha: i == pasos.length - 1
+                    ? null
+                    : colorConexion(i),
               ),
             ),
           ],
@@ -59,12 +70,16 @@ class _Paso extends StatelessWidget {
   const _Paso({
     required this.titulo,
     required this.estado,
-    required this.esUltimo,
+    required this.colorLineaIzquierda,
+    required this.colorLineaDerecha,
   });
 
   final String titulo;
   final _PasoEstado estado;
-  final bool esUltimo;
+  // null = sin línea (extremo de la secuencia), pero sigue ocupando el
+  // mismo espacio que la de enfrente para que el círculo quede centrado.
+  final Color? colorLineaIzquierda;
+  final Color? colorLineaDerecha;
 
   @override
   Widget build(BuildContext context) {
@@ -77,6 +92,12 @@ class _Paso extends StatelessWidget {
       children: [
         Row(
           children: [
+            Expanded(
+              child: Container(
+                height: 2,
+                color: colorLineaIzquierda ?? Colors.transparent,
+              ),
+            ),
             Container(
               width: 20,
               height: 20,
@@ -93,15 +114,12 @@ class _Paso extends StatelessWidget {
                   ? const Icon(Icons.check, size: 13, color: Colors.white)
                   : null,
             ),
-            if (!esUltimo)
-              Expanded(
-                child: Container(
-                  height: 2,
-                  color: estado == _PasoEstado.completado
-                      ? context.colors.success
-                      : context.colors.surfaceSunken,
-                ),
+            Expanded(
+              child: Container(
+                height: 2,
+                color: colorLineaDerecha ?? Colors.transparent,
               ),
+            ),
           ],
         ),
         const SizedBox(height: 6),
