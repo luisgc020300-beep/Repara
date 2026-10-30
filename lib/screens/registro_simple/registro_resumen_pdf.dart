@@ -20,6 +20,7 @@ import '../../models/casa.dart';
 import '../../models/pago.dart';
 import '../../models/registro.dart';
 import '../../widgets/estado_registro_chip.dart';
+import '../../widgets/pdf_fuente_unicode.dart';
 
 // Mismos tonos de marca que ReparaColors.light (theme/design_tokens.dart)
 // -- el paquete pdf no puede leer un ThemeExtension de Flutter, así que se
@@ -60,7 +61,11 @@ class RegistroResumenPdf {
     required List<Pago> pagos,
     required double totalPagado,
   }) async {
-    final doc = pw.Document();
+    // Fuente Unicode empaquetada como asset (CEO, octubre 2026) -- sin
+    // esto, el "€" de cada importe se veía como un hueco en blanco: la
+    // fuente base del PDF estándar (Helvetica) no tiene ese glifo. Ver
+    // cargarTemaPdfUnicode en widgets/pdf_fuente_unicode.dart.
+    final doc = pw.Document(theme: await cargarTemaPdfUnicode());
     final deuda = montoDebidoRegistro(registro);
     final saldo = deuda == null
         ? null

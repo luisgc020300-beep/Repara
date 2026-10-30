@@ -15,24 +15,38 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../models/cambio_alcance.dart';
 import '../models/casa.dart';
 import '../models/documento.dart';
 import '../models/elemento.dart';
 import '../models/registro.dart';
 import '../services/analytics_service.dart';
+import '../services/cambio_alcance_service.dart';
 import '../services/documento_service.dart';
 import '../services/elemento_service.dart';
+import '../services/habitacion_service.dart';
+import '../services/pago_service.dart';
 import '../services/registro_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
 import '../widgets/ios_list.dart';
+import 'expediente_vivienda_pdf.dart';
 
 double? _costeRegistro(Registro r) => montoDebidoRegistro(r);
 
-class ExpedienteViviendaScreen extends StatelessWidget {
+class ExpedienteViviendaScreen extends StatefulWidget {
   const ExpedienteViviendaScreen({required this.casa, super.key});
 
   final Casa casa;
+
+  @override
+  State<ExpedienteViviendaScreen> createState() =>
+      _ExpedienteViviendaScreenState();
+}
+
+class _ExpedienteViviendaScreenState extends State<ExpedienteViviendaScreen> {
+  Casa get casa => widget.casa;
+  bool _generandoPdf = false;
 
   /// Un registro nunca vive en una colección a nivel de casa (octubre 2026,
   /// fusión Elemento/Trabajo/Evento) -- se agrega aquí leyendo la
@@ -126,6 +140,135 @@ class ExpedienteViviendaScreen extends StatelessWidget {
         AppError.show(context, 'No se pudo abrir el selector para compartir.');
       }
     }
+  }
+
+  // "Generar dossier PDF" (CEO, octubre 2026): hoja explicativa breve
+  // primero (qué incluye + aviso de privacidad, pedido explícito del
+  // encargo) y solo entonces se reúnen los datos que el resumen en
+  // pantalla no necesita (pagos y cambios de alcance por cada trabajo,
+  // habitaciones para la ubicación de cada elemento) y se genera.
+  // ExpedienteViviendaPdf es el mismo motor que ya usa el PDF por trabajo
+  // individual (registro_resumen_pdf.dart) -- nada inventado, todo sale de
+  // los modelos reales.
+  Future<void> _ofrecerDossier(
+    BuildContext context,
+    List<Elemento> elementos,
+  ) async {
+    final confirmar = await showModalBottomSheet<bool>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Generar dossier PDF de mi vivienda',
+                style: Theme.of(ctx).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Incluye los elementos registrados, el historial completo de '
+                'trabajos (con su estado real, importes y pagos), los '
+                'documentos guardados y las garantías. Puede contener '
+                'importes y datos de contacto de profesionales -- revísalo '
+                'antes de compartirlo con otra persona.',
+                style: Theme.of(ctx).textTheme.bodyLarge,
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Generar PDF'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (confirmar != true || !context.mounted) return;
+    await _descargarPdf(context, elementos);
+  }
+
+  Future<void> _descargarPdf(
+    BuildContext context,
+    List<Elemento> elementos,
+  ) async {
+    setState(() => _generandoPdf = true);
+    try {
+      final habitaciones = await HabitacionService.streamHabitaciones(
+        casa.id,
+      ).first;
+      final trabajos = await _trabajosConDetalle(elementos);
+      final documentos = await DocumentoService.streamTodos(casa.id).first;
+      if (!context.mounted) return;
+      await ExpedienteViviendaPdf.descargar(
+        context,
+        casa: casa,
+        elementos: elementos,
+        habitaciones: habitaciones,
+        trabajos: trabajos,
+        documentos: documentos,
+      );
+    } catch (e, st) {
+      if (context.mounted) {
+        AppError.show(
+          context,
+          'No se pudo generar el PDF.',
+          error: e,
+          stackTrace: st,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _generandoPdf = false);
+    }
+  }
+
+  // Igual que _todosLosRegistros, pero recorriendo por elemento en vez de
+  // aplanar al final (CEO, octubre 2026) -- un Registro no guarda su propio
+  // elementoId (solo elementoNombre denormalizado, ver registro.dart), y
+  // pedir sus pagos/cambios de alcance sí necesita el elementoId real.
+  // Emparejar por nombre en vez de por este recorrido sería incorrecto si
+  // dos elementos compartieran nombre -- se volvería a leer la
+  // subcolección de registros una segunda vez (ya se lee una para el
+  // resumen en pantalla) solo cuando el usuario pide de verdad el dossier,
+  // nunca en cada apertura de esta pantalla.
+  Future<List<TrabajoConDetalle>> _trabajosConDetalle(
+    List<Elemento> elementos,
+  ) async {
+    final porElemento = await Future.wait(
+      elementos.map((elemento) async {
+        final registros = await RegistroService.streamRegistros(
+          casa.id,
+          elemento.id,
+        ).first;
+        return Future.wait(
+          registros.map((r) async {
+            final pagos = await PagoService.streamPagos(
+              casa.id,
+              elemento.id,
+              r.id,
+            ).first;
+            final cambios = r.esConProfesional
+                ? await CambioAlcanceService.streamCambios(
+                    casa.id,
+                    elemento.id,
+                    r.id,
+                  ).first
+                : const <CambioAlcance>[];
+            return TrabajoConDetalle(
+              registro: r,
+              pagos: pagos,
+              cambios: cambios,
+            );
+          }),
+        );
+      }),
+    );
+    return porElemento.expand((lista) => lista).toList();
   }
 
   // "Terminado" ahora exige también estar cobrado (CEO, octubre 2026) -- un
@@ -324,6 +467,23 @@ class ExpedienteViviendaScreen extends StatelessWidget {
                 _compartir(context, elementos, registros, documentos.length),
             icon: const Icon(Icons.ios_share_outlined),
             label: const Text('Compartir resumen'),
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: _generandoPdf
+                ? null
+                : () => _ofrecerDossier(context, elementos),
+            icon: _generandoPdf
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.picture_as_pdf_outlined),
+            label: const Text('Generar dossier PDF'),
           ),
         ),
       ],
