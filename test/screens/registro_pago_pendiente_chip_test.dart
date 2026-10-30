@@ -1,9 +1,8 @@
 // test/screens/registro_pago_pendiente_chip_test.dart
 //
 // "Terminado" exige trabajo Y pago (CEO, octubre 2026): un registro en
-// pendientePago debe mostrarse como tal en la cabecera (EstadoRegistroChip),
-// con un aviso explicando qué falta -- en el campo "Estado" propio de un
-// registro simple (_nombreEstadoSimple), y sin el botón "Finalizar" de un
+// pendientePago debe mostrarse como tal en la cabecera (EstadoRegistroChip)
+// con un aviso explicando qué falta, y sin el botón "Finalizar" de un
 // registro con profesional (ya no hay nada que finalizar del lado del
 // trabajo -- solo falta el pago, que se gestiona desde Pagos). Usa
 // FakeFirebaseFirestore, nada de Firebase real.
@@ -72,7 +71,7 @@ void main() {
   });
 
   testWidgets(
-    'un registro simple en pago pendiente muestra el chip, el campo Estado y el aviso correctos',
+    'un registro simple en pago pendiente muestra el chip y el aviso correctos',
     (tester) async {
       await _prepararRegistroPendientePago();
 
@@ -85,7 +84,6 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('PAGO PENDIENTE'), findsOneWidget); // EstadoRegistroChip, en mayúsculas
-      expect(find.widgetWithText(TextFormField, 'Pago pendiente'), findsOneWidget); // campo "Estado"
       expect(
         find.textContaining('El trabajo está hecho, pero todavía falta cobrarlo'),
         findsOneWidget,

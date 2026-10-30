@@ -101,6 +101,7 @@ class Registro {
     this.garantiaHasta,
     this.coste,
     this.fotoUrl,
+    this.fotoUrls = const [],
     this.documentoIds = const [],
     this.profesionalNombre,
     this.profesionalContacto,
@@ -122,7 +123,15 @@ class Registro {
   final String? descripcion;
   final DateTime? garantiaHasta;
   final double? coste;
+  // Foto única de siempre -- se conserva tal cual para el lado con
+  // profesional y la ficha del elemento (ver _CabeceraRegistro/
+  // FotoAmpliadaScreen en registro_detail_screen.dart), que nunca han
+  // necesitado más de una. [fotoUrls] es la galería nueva (CEO, octubre
+  // 2026), solo para el registro SIMPLE -- ver [fotos] más abajo para el
+  // criterio de compatibilidad con los registros antiguos que solo tienen
+  // [fotoUrl].
   final String? fotoUrl;
+  final List<String> fotoUrls;
   final List<String> documentoIds;
   final String? profesionalNombre;
   final String? profesionalContacto;
@@ -152,6 +161,7 @@ class Registro {
       garantiaHasta: (data['garantiaHasta'] as Timestamp?)?.toDate(),
       coste: (data['coste'] as num?)?.toDouble(),
       fotoUrl: data['fotoUrl'] as String?,
+      fotoUrls: List<String>.from(data['fotoUrls'] as List? ?? []),
       documentoIds: List<String>.from(data['documentoIds'] as List? ?? []),
       profesionalNombre: data['profesionalNombre'] as String?,
       profesionalContacto: data['profesionalContacto'] as String?,
@@ -176,6 +186,7 @@ class Registro {
       'garantiaHasta': Timestamp.fromDate(garantiaHasta!),
     if (coste != null) 'coste': coste,
     if (fotoUrl != null) 'fotoUrl': fotoUrl,
+    if (fotoUrls.isNotEmpty) 'fotoUrls': fotoUrls,
     'documentoIds': documentoIds,
     if (profesionalNombre != null) 'profesionalNombre': profesionalNombre,
     if (profesionalContacto != null) 'profesionalContacto': profesionalContacto,
@@ -186,6 +197,13 @@ class Registro {
     if (plazoImporte != null) 'plazoImporte': plazoImporte,
     'createdAt': FieldValue.serverTimestamp(),
   };
+
+  // Galería del registro simple (CEO, octubre 2026): [fotoUrls] si ya se
+  // usó la galería nueva; si no, cae a la [fotoUrl] única de un registro
+  // creado antes de esta mejora -- así un evento antiguo con una sola foto
+  // se ve exactamente igual en la nueva galería, sin ninguna migración de
+  // datos.
+  List<String> get fotos => fotoUrls.isNotEmpty ? fotoUrls : [?fotoUrl];
 
   // Próximo pago estimado: fecha del último pago registrado (o, si todavía
   // no hay ninguno, la fecha de creación del registro) + la frecuencia del

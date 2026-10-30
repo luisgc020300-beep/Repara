@@ -42,6 +42,9 @@ dependencies:
   # cualquiera.
   local_auth_platform_interface: ^1.1.0
   flutter_secure_storage: ^9.2.2
+  pdf: ^3.12.0
+  printing: ^5.14.3
+  http: ^1.6.0
 
 dev_dependencies:
   flutter_test:

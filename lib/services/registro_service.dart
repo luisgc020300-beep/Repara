@@ -158,6 +158,66 @@ class RegistroService {
     await _col(casaId, elementoId).doc(registroId).update({'fotoUrl': fotoUrl});
   }
 
+  /// Galería de un registro simple (CEO, octubre 2026) -- a diferencia de
+  /// [subirFoto] (nombre de archivo fijo, una foto sustituye a la
+  /// anterior), cada foto de la galería vive en su propio archivo bajo
+  /// "fotos/", igual que DocumentoService.subirArchivo (timestamp +
+  /// nombre, nunca se pisan entre sí). [fotosActuales] es Registro.fotos
+  /// (ya incluye, si hace falta, la [fotoUrl] antigua de un registro
+  /// creado antes de esta mejora, ver ese getter) -- se escribe la lista
+  /// COMPLETA resultante en vez de un FieldValue.arrayUnion sobre el campo
+  /// en bruto, para que la primera foto que se añada a un registro antiguo
+  /// "migre" sola esa foto heredada al array nuevo. Sube todos los
+  /// archivos primero y solo entonces escribe, para que un fallo a mitad
+  /// de la subida nunca deje en Firestore una URL que no llegó a existir.
+  static Future<void> agregarFotos(
+    String casaId,
+    String elementoId,
+    String registroId,
+    List<String> fotosActuales,
+    List<File> archivosNuevos,
+  ) async {
+    final urls = [...fotosActuales];
+    for (final archivo in archivosNuevos) {
+      final ref = FirebaseStorage.instance.ref().child(
+        'casas/$casaId/elementos/$elementoId/registros/$registroId/fotos/'
+        '${DateTime.now().microsecondsSinceEpoch}_${urls.length}',
+      );
+      await ref.putFile(archivo);
+      urls.add(await ref.getDownloadURL());
+    }
+    // fotoUrl (campo antiguo) se borra aquí -- a partir de la primera vez
+    // que se toca la galería nueva, [fotoUrls] pasa a ser la única fuente
+    // de verdad para este registro; dejar fotoUrl vivo podría "resucitar"
+    // una foto ya borrada si fotoUrls llega a quedar vacío (ver el
+    // criterio de compatibilidad de Registro.fotos).
+    await _col(casaId, elementoId).doc(registroId).update({
+      'fotoUrls': urls,
+      'fotoUrl': FieldValue.delete(),
+    });
+  }
+
+  /// Borra una foto de la galería: el archivo real en Storage primero (si
+  /// ese borrado falla, se corta aquí -- mejor un archivo huérfano que
+  /// hacer creer que se borró sin haberlo hecho de verdad) y solo entonces
+  /// se escribe la lista restante -- mismo criterio de "lista completa,
+  /// nunca arrayRemove en bruto" que [agregarFotos], por si la foto que se
+  /// borra era la heredada de la [fotoUrl] antigua.
+  static Future<void> eliminarFoto(
+    String casaId,
+    String elementoId,
+    String registroId,
+    List<String> fotosActuales,
+    String url,
+  ) async {
+    await FirebaseStorage.instance.refFromURL(url).delete();
+    final restantes = fotosActuales.where((u) => u != url).toList();
+    await _col(casaId, elementoId).doc(registroId).update({
+      'fotoUrls': restantes,
+      'fotoUrl': FieldValue.delete(),
+    });
+  }
+
   static Future<void> actualizar(
     String casaId,
     String elementoId,

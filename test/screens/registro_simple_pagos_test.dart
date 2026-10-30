@@ -1,11 +1,11 @@
 // test/screens/registro_simple_pagos_test.dart
 //
 // "Pagos" en un registro SIMPLE (CEO, octubre 2026): hasta ahora solo
-// existía esa sección para un registro con profesional -- "Coste" (ver
-// _ResumenEconomico) es un número informativo, nunca un registro de lo que
-// de verdad se ha pagado. PagosSection ya estaba preparada para funcionar
-// sin presupuesto (presupuesto: null) -- registrarPago en servidor tampoco
-// lo exige -- solo faltaba conectarla a _CuerpoSimple.
+// existía esa sección para un registro con profesional -- "Coste" es un
+// número informativo, nunca un registro de lo que de verdad se ha pagado.
+// PagosSection ya estaba preparada para funcionar sin presupuesto
+// (presupuesto: null) -- registrarPago en servidor tampoco lo exige --
+// solo faltaba conectarla a _CuerpoSimple.
 //
 // NO IMPLEMENTADO AQUÍ (limitación real, no simulada): completar de verdad
 // "Añadir pago" invoca la Cloud Function registrarPago vía FirebaseFunctions.
@@ -159,10 +159,7 @@ void main() {
       expect(find.text('COSTE'), findsOneWidget);
       expect(find.text('PAGADO'), findsOneWidget);
       expect(find.text('SALDO'), findsOneWidget);
-      // "2000 €" aparece dos veces a propósito: una en _ResumenEconomico
-      // (el coste informativo de siempre) y otra en la columna "Coste" de
-      // la barra de progreso nueva.
-      expect(find.text('2000 €'), findsNWidgets(2));
+      expect(find.text('2000 €'), findsOneWidget);
       expect(find.text('800 €'), findsOneWidget);
       expect(find.text('1200 €'), findsOneWidget);
       expect(find.byType(LinearProgressIndicator), findsOneWidget);
@@ -200,6 +197,18 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      // Con la cabecera/progreso/acciones rápidas nuevas, "Añadir pago"
+      // queda fuera del viewport inicial -- hay que desplazarse antes de
+      // poder tocarlo. scrollUntilVisible para en cuanto el widget EXISTE
+      // en el árbol, no necesariamente dentro del viewport visible todavía
+      // -- un segundo arrastre de sobra lo deja ya tocable de verdad.
+      await tester.scrollUntilVisible(
+        find.text('Añadir pago'),
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, -300));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Añadir pago'));
       await tester.pumpAndSettle();
 

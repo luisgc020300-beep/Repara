@@ -1,14 +1,13 @@
 // test/screens/registro_foto_test.dart
 //
-// Foto de un registro (CEO, octubre 2026): con foto, toda la miniatura
-// compartía un único GestureDetector que siempre abría el selector de
-// cámara/galería para CAMBIARLA -- nunca se podía ampliar para verla
-// mejor, a diferencia de la foto del elemento (_FotoElemento en
-// elemento_detail_screen.dart), que ya separaba "tocar la foto = ampliar"
-// de "tocar el lápiz = cambiar" desde una corrección anterior. Aplica aquí
-// el mismo criterio, reutilizando FotoAmpliadaScreen (antes privado de esa
-// pantalla, ahora en lib/widgets/). Usa FakeFirebaseFirestore, nada de
-// Firebase real.
+// Foto de un registro CON PROFESIONAL (CEO, octubre 2026): la gestión de
+// varias fotos es solo para el registro simple (ver
+// registro_simple_galeria_fotos_test.dart) -- este lado sigue usando
+// _CabeceraRegistro/FotoAmpliadaScreen exactamente como antes, sin ningún
+// cambio, a propósito (petición explícita del CEO de no tocar la pantalla
+// con profesional). Este fichero prueba justo eso: que una sola foto, tap
+// para ampliar / lápiz para cambiar, se sigue comportando igual que
+// siempre en ese lado. Usa FakeFirebaseFirestore, nada de Firebase real.
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -16,10 +15,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:repara/models/casa.dart';
 import 'package:repara/screens/registro_detail_screen.dart';
+import 'package:repara/services/cambio_alcance_service.dart';
 import 'package:repara/services/documento_service.dart';
 import 'package:repara/services/elemento_service.dart';
 import 'package:repara/services/historial_service.dart';
+import 'package:repara/services/invitacion_service.dart';
 import 'package:repara/services/pago_service.dart';
+import 'package:repara/services/presupuesto_service.dart';
 import 'package:repara/services/registro_service.dart';
 import 'package:repara/theme/design_tokens.dart';
 import 'package:repara/widgets/foto_ampliada_screen.dart';
@@ -45,9 +47,9 @@ Future<void> _prepararConRegistro(Map<String, dynamic> extra) async {
       .collection('registros')
       .doc('r1')
       .set({
-        'titulo': 'Placa de madera',
-        'tipo': 'instalacion',
-        'esConProfesional': false,
+        'titulo': 'Reforma de pérgola',
+        'tipo': 'reforma',
+        'esConProfesional': true,
         'estado': 'terminado',
         'elementoNombre': 'Pérgolas',
         'fecha': Timestamp.fromDate(DateTime(2026, 10, 29)),
@@ -58,6 +60,9 @@ Future<void> _prepararConRegistro(Map<String, dynamic> extra) async {
   PagoService.debugFirestoreOverride = db;
   DocumentoService.debugFirestoreOverride = db;
   HistorialService.debugFirestoreOverride = db;
+  InvitacionService.debugFirestoreOverride = db;
+  PresupuestoService.debugFirestoreOverride = db;
+  CambioAlcanceService.debugFirestoreOverride = db;
 }
 
 void main() {
@@ -69,6 +74,9 @@ void main() {
     PagoService.debugFirestoreOverride = null;
     DocumentoService.debugFirestoreOverride = null;
     HistorialService.debugFirestoreOverride = null;
+    InvitacionService.debugFirestoreOverride = null;
+    PresupuestoService.debugFirestoreOverride = null;
+    CambioAlcanceService.debugFirestoreOverride = null;
   });
 
   testWidgets(

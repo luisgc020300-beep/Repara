@@ -44,6 +44,9 @@ import 'elemento_detail_screen.dart';
 import 'nuevo_documento_flow.dart';
 import 'pagos_section.dart';
 import 'presupuestos_section.dart';
+import 'registro_simple/registro_simple_acciones.dart';
+import 'registro_simple/registro_simple_cabecera.dart';
+import 'registro_simple/registro_simple_progreso.dart';
 
 String _formatoImporte(double v) =>
     v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(2);
@@ -244,6 +247,10 @@ class RegistroDetailScreen extends StatelessWidget {
     ];
     if (registro.presupuesto != null) {
       partes.add('Presupuesto: ${_formatoImporte(registro.presupuesto!)} €');
+    } else if (registro.coste != null) {
+      // Un registro simple no tiene presupuesto -- su coste es el importe
+      // de referencia equivalente (mismo criterio que montoDebidoRegistro).
+      partes.add('Coste: ${_formatoImporte(registro.coste!)} €');
     }
     if (pagado != null) partes.add('Pagado: ${_formatoImporte(pagado)} €');
     partes.add('Estado: ${nombreEstadoRegistro(registro.estado)}');
@@ -384,6 +391,8 @@ class RegistroDetailScreen extends StatelessWidget {
                   casa: casa,
                   elementoId: elementoId,
                   registro: registro,
+                  onCompartirResumen: (pagado) =>
+                      _compartirResumen(context, registro, pagado),
                 ),
         );
       },
@@ -1396,11 +1405,13 @@ class _CuerpoSimple extends StatelessWidget {
     required this.casa,
     required this.elementoId,
     required this.registro,
+    required this.onCompartirResumen,
   });
 
   final Casa casa;
   final String elementoId;
   final Registro registro;
+  final void Function(double? pagado) onCompartirResumen;
 
   @override
   Widget build(BuildContext context) {
@@ -1425,12 +1436,13 @@ class _CuerpoSimple extends StatelessWidget {
             return ListView(
               padding: EdgeInsets.zero,
               children: [
-                _CabeceraRegistro(
+                RegistroSimpleCabecera(
                   casa: casa,
                   elementoId: elementoId,
                   registro: registro,
                   elemento: elementoSnap.data,
                 ),
+                RegistroSimpleProgreso(registro: registro),
                 if (registro.estado == EstadoRegistro.pendientePago)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
@@ -1445,12 +1457,6 @@ class _CuerpoSimple extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      TextFormField(
-                        initialValue: _nombreEstadoSimple(registro),
-                        enabled: false,
-                        decoration: const InputDecoration(labelText: 'Estado'),
-                      ),
-                      const SizedBox(height: 16),
                       if (registro.descripcion != null) ...[
                         Text(
                           registro.descripcion!,
@@ -1458,35 +1464,36 @@ class _CuerpoSimple extends StatelessWidget {
                         ),
                         const SizedBox(height: 16),
                       ],
-                      _ResumenEconomico(
-                        casa: casa,
-                        elementoId: elementoId,
-                        registro: registro,
-                      ),
                       // Barra de progreso de cobro (CEO, octubre 2026),
                       // igual que ya existía para un registro con
                       // profesional (_TarjetaEconomica/presupuesto) --
                       // "Coste" en vez de "Presupuesto" es la única
                       // diferencia real.
                       if (coste != null && coste > 0) ...[
-                        const SizedBox(height: 16),
                         _TarjetaEconomica(
                           presupuesto: coste,
                           pagado: totalPagado,
                           etiquetaTotal: 'Coste',
                         ),
+                        const SizedBox(height: 20),
                       ],
+                      RegistroSimpleAcciones(
+                        casa: casa,
+                        elementoId: elementoId,
+                        registro: registro,
+                        pagos: pagos,
+                        totalPagado: totalPagado,
+                        onCompartir: () => onCompartirResumen(totalPagado),
+                      ),
                       const SizedBox(height: 20),
-                      // "Coste" (arriba, en _ResumenEconomico) es solo lo que
-                      // costó -- un número informativo, nunca un registro de lo
-                      // que de verdad se ha pagado. Un registro simple no tiene
-                      // presupuesto (nunca se fija en esta vía, ver
-                      // nuevo_registro_sheet.dart/nuevo_elemento_screen.dart),
-                      // así que PagosSection recibe presupuesto: null -- ya está
-                      // preparada para eso (ver pago_detail_screen.dart: el
-                      // tope contra el presupuesto solo se aplica si no es
-                      // null), igual que registrarPago en servidor. No hace
-                      // falta ningún cambio de Cloud Function ni de reglas:
+                      // Un registro simple no tiene presupuesto (nunca se
+                      // fija en esta vía, ver nuevo_registro_sheet.dart/
+                      // nuevo_elemento_screen.dart), así que PagosSection
+                      // recibe presupuesto: null -- ya está preparada para
+                      // eso (ver pago_detail_screen.dart: el tope contra el
+                      // presupuesto solo se aplica si no es null), igual
+                      // que registrarPago en servidor. No hace falta
+                      // ningún cambio de Cloud Function ni de reglas:
                       // registrarPago ya nunca ha exigido esConProfesional,
                       // solo lo usaba quien construía la pantalla.
                       PagosSection(
@@ -1904,98 +1911,6 @@ class _SeccionInvitarProfesionalState
   }
 }
 
-/// Resumen económico en una sola tarjeta para el registro SIMPLE (sin
-/// profesional) -- el coste de una compra o el profesional de texto libre.
-/// Ningún dato nuevo, ningún saldo inventado: el profesional de texto libre
-/// solo se repite aquí cuando NO hay sección "Profesional" propia
-/// (esConProfesional == false).
-class _ResumenEconomico extends StatelessWidget {
-  const _ResumenEconomico({
-    required this.casa,
-    required this.elementoId,
-    required this.registro,
-  });
-
-  final Casa casa;
-  final String elementoId;
-  final Registro registro;
-
-  @override
-  Widget build(BuildContext context) {
-    final mostrarCoste = registro.coste != null && !registro.esConProfesional;
-    final mostrarPresupuesto = registro.presupuesto != null;
-    final mostrarProfesional =
-        !registro.esConProfesional && registro.profesionalNombre != null;
-    if (!mostrarCoste && !mostrarPresupuesto && !mostrarProfesional) {
-      return const SizedBox.shrink();
-    }
-
-    Widget divisor() => Padding(
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      child: Divider(height: 1, color: context.colors.border),
-    );
-
-    return Card(
-      margin: EdgeInsets.zero,
-      clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (mostrarCoste) ...[
-              Text(
-                'Coste',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: context.colors.inkMuted,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                '${registro.coste!.toStringAsFixed(0)} €',
-                style: ReparaText.amount(context, large: true),
-              ),
-            ],
-            if (mostrarCoste && (mostrarPresupuesto || mostrarProfesional))
-              divisor(),
-            if (mostrarPresupuesto) ...[
-              Text(
-                'Presupuesto',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: context.colors.inkMuted,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                '${registro.presupuesto!.toStringAsFixed(0)} €',
-                style: ReparaText.amount(context, large: true),
-              ),
-            ],
-            if (mostrarPresupuesto && mostrarProfesional) divisor(),
-            if (mostrarProfesional)
-              Row(
-                children: [
-                  Icon(
-                    Icons.engineering_outlined,
-                    size: 18,
-                    color: context.colors.brand,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '${registro.profesionalNombre}${registro.profesionalContacto != null ? ' · ${registro.profesionalContacto}' : ''}',
-                      style: Theme.of(context).textTheme.bodyLarge,
-                    ),
-                  ),
-                ],
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 // terminado/archivado/pendienteConfirmacion/pendientePago nunca son
 // editables por esta vía directa -- "Finalizar"/"Confirmar"/"Todavía no" son
 // las únicas puertas (modelo de dos pasos, auditoría de producto, octubre
@@ -2007,17 +1922,6 @@ bool _estadoControlado(EstadoRegistro e) =>
     e == EstadoRegistro.archivado ||
     e == EstadoRegistro.pendienteConfirmacion ||
     e == EstadoRegistro.pendientePago;
-
-// Un registro simple (sin profesional) nace directamente "terminado" (o
-// "pendientePago" si tiene coste sin cobrar, CEO octubre 2026) -- no tiene
-// el ciclo de vida nuevo/presupuestado/en curso, así que aquí solo se
-// distingue archivado/pago pendiente de "registrado" en vez de reutilizar
-// los nombres del flujo con profesional.
-String _nombreEstadoSimple(Registro r) => switch (r.estado) {
-  EstadoRegistro.archivado => 'Archivado',
-  EstadoRegistro.pendientePago => 'Pago pendiente',
-  _ => 'Registrado',
-};
 
 const _estadosEditables = [
   EstadoRegistro.nuevo,
