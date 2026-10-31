@@ -24,10 +24,23 @@ class _CasaShellScreenState extends State<CasaShellScreen> {
   // Controla el PageView del cuerpo -- permite deslizar entre pestañas con
   // el dedo, no solo tocando la barra de abajo (mismo patrón que Convive).
   final _pageController = PageController();
+  // "En curso"/garantías/revisiones de Inicio usan Future.wait (lectura
+  // puntual), no Stream -- un registro vive en la subcolección de su
+  // elemento, cambiarlo (p.ej. terminar un trabajo al cobrarlo del todo)
+  // nunca dispara el stream de elementos que ya escucha Inicio. Sin esto,
+  // _KeepAlivePage mantiene HomeTab montado al cambiar de pestaña (a
+  // propósito, para no perder la posición de scroll) y ese Future.wait no
+  // se repetía nunca más -- el usuario tenía que cerrar y reabrir la app
+  // entera para verlo actualizado (CEO, octubre 2026). Incrementar esto
+  // cada vez que se vuelve a Inicio hace que _ResumenCasa relance esa
+  // lectura sin necesidad de un stream combinado de todas las
+  // subcolecciones de registros de la casa.
+  final _homeRefreshTick = ValueNotifier<int>(0);
 
   @override
   void dispose() {
     _pageController.dispose();
+    _homeRefreshTick.dispose();
     super.dispose();
   }
 
@@ -41,7 +54,10 @@ class _CasaShellScreenState extends State<CasaShellScreen> {
     unawaited(FcmService.inicializar());
   }
 
-  void _onPageChanged(int i) => setState(() => _index = i);
+  void _onPageChanged(int i) {
+    setState(() => _index = i);
+    if (i == 0) _homeRefreshTick.value++;
+  }
 
   void _cambiarPestana(int i) {
     // Salto directo, sin animación -- deslizar con el dedo ya tiene su
@@ -60,7 +76,9 @@ class _CasaShellScreenState extends State<CasaShellScreen> {
         }
         final casa = snapshot.data!;
         final tabs = [
-          _KeepAlivePage(child: HomeTab(casa: casa)),
+          _KeepAlivePage(
+            child: HomeTab(casa: casa, refreshTick: _homeRefreshTick),
+          ),
           _KeepAlivePage(child: CasaTab(casa: casa)),
           _KeepAlivePage(child: ContactosTab(casa: casa)),
         ];

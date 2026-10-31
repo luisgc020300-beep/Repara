@@ -7,6 +7,7 @@
 // en la pestaña Casa -- tienen más sentido en Inicio, que es donde se mira
 // a diario (CEO, octubre 2026); debajo, el listado filtrable por ubicación.
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -39,9 +40,16 @@ String _saludo() {
 }
 
 class HomeTab extends StatefulWidget {
-  const HomeTab({required this.casa, super.key});
+  const HomeTab({required this.casa, this.refreshTick, super.key});
 
   final Casa casa;
+  // Se incrementa cada vez que se vuelve a esta pestaña (ver
+  // casa_shell_screen.dart) -- _ResumenCasa lo escucha para relanzar su
+  // Future.wait, que si no se queda obsoleto mientras HomeTab sigue
+  // montado por _KeepAlivePage. Opcional (null en los sitios que no lo
+  // necesitan, p.ej. tests) -- sin él, _ResumenCasa simplemente no se
+  // refresca más que al construirse la primera vez.
+  final ValueListenable<int>? refreshTick;
 
   @override
   State<HomeTab> createState() => _HomeTabState();
@@ -120,7 +128,7 @@ class _HomeTabState extends State<HomeTab> {
               }
               return ListView(
                 children: [
-                  _ResumenCasa(casa: widget.casa),
+                  _ResumenCasa(casa: widget.casa, refreshTick: widget.refreshTick),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
                     child: TextField(
@@ -282,21 +290,37 @@ _Aviso? _avisoMasUrgente(List<Elemento> garantias, List<Elemento> revisiones) {
 /// mensaje "todo en orden" cuando no es cierto: ambas piezas salen de los
 /// mismos datos reales que ya alimentaban las tiles, en una sola consulta.
 class _ResumenCasa extends StatelessWidget {
-  const _ResumenCasa({required this.casa});
+  const _ResumenCasa({required this.casa, this.refreshTick});
 
   final Casa casa;
+  final ValueListenable<int>? refreshTick;
 
   @override
   Widget build(BuildContext context) {
+    final tick = refreshTick;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, ReparaSpace.s4),
-      child: FutureBuilder(
-        future: Future.wait([
-          ElementoService.conGarantiaProximaAVencer(casa.id),
-          ElementoService.conRevisionPendiente(casa.id),
-          RegistroService.registrosConTrabajoPendiente(casa.id),
-        ]),
-        builder: (context, snapshot) {
+      child: tick == null
+          ? _futureBuilder(context)
+          : ValueListenableBuilder<int>(
+              valueListenable: tick,
+              builder: (context, value, child) => _futureBuilder(context),
+            ),
+    );
+  }
+
+  // Future.wait nuevo en cada reconstrucción -- volver a Inicio incrementa
+  // refreshTick, lo que reconstruye este FutureBuilder con una lectura
+  // fresca en vez de quedarse con la de la primera vez que se montó
+  // HomeTab (ver nota de _homeRefreshTick en casa_shell_screen.dart).
+  Widget _futureBuilder(BuildContext context) {
+    return FutureBuilder(
+      future: Future.wait([
+        ElementoService.conGarantiaProximaAVencer(casa.id),
+        ElementoService.conRevisionPendiente(casa.id),
+        RegistroService.registrosConTrabajoPendiente(casa.id),
+      ]),
+      builder: (context, snapshot) {
           final garantias = (snapshot.data?[0] as List<Elemento>?) ?? const [];
           final revisiones = (snapshot.data?[1] as List<Elemento>?) ?? const [];
           final pendientes =
@@ -467,8 +491,7 @@ class _ResumenCasa extends StatelessWidget {
             ],
           );
         },
-      ),
-    );
+      );
   }
 }
 

@@ -34,7 +34,7 @@ class RegistroSimpleProgreso extends StatelessWidget {
         'Cobro pendiente',
         cobrado ? _PasoEstado.completado : _PasoEstado.actual,
       ),
-      ('Terminado', cobrado ? _PasoEstado.actual : _PasoEstado.pendiente),
+      ('Terminado', cobrado ? _PasoEstado.completado : _PasoEstado.pendiente),
     ];
     // Color de la línea entre el paso i y el i+1: verde si el paso i ya
     // está completado, gris si no. Se reparte en dos mitades simétricas
