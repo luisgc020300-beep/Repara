@@ -643,10 +643,34 @@ class ElementoDetailScreen extends StatelessWidget {
                       icon: Icons.description_outlined,
                     );
                   }
-                  return IosSection(
-                    rows: documentos
-                        .map((d) => _DocumentoTile(documento: d))
-                        .toList(),
+                  // Título del evento de origen de cada documento (CEO,
+                  // noviembre 2026) -- mismo stream de registros que ya
+                  // alimenta "Historial" arriba, solo que aquí se necesita
+                  // de nuevo para construir el mapa id -> título (los dos
+                  // StreamBuilder están separados, no comparten estado).
+                  return StreamBuilder<List<Registro>>(
+                    stream: RegistroService.streamRegistros(
+                      casa.id,
+                      elemento.id,
+                    ),
+                    builder: (context, registrosSnap) {
+                      final tituloPorRegistro = {
+                        for (final r in registrosSnap.data ?? const <Registro>[])
+                          r.id: r.titulo,
+                      };
+                      return IosSection(
+                        rows: documentos
+                            .map(
+                              (d) => _DocumentoTile(
+                                documento: d,
+                                registroTitulo: d.registroId != null
+                                    ? tituloPorRegistro[d.registroId]
+                                    : null,
+                              ),
+                            )
+                            .toList(),
+                      );
+                    },
                   );
                 },
               ),
@@ -1385,10 +1409,21 @@ class _TarjetaMantenimiento extends StatelessWidget {
   }
 }
 
+/// Fila de un documento en la ficha de ELEMENTO (CEO, noviembre 2026: "aquí
+/// aparecen todos los documentos añadidos en todos los eventos de la
+/// piscina en este caso, quiero que pongan de qué evento vienen") -- a
+/// diferencia de la misma fila dentro de un evento concreto (donde el
+/// evento ya es obvio por contexto), aquí varios documentos de proveedores
+/// iguales o parecidos se confundían entre sí sin saber a qué evento
+/// pertenecía cada uno. [registroTitulo] es el título real del evento de
+/// origen (de Historial, ya cargado en esta misma pantalla, sin ninguna
+/// consulta nueva) -- null para un documento sin evento (p.ej. guardado
+/// directamente sobre el elemento) o si ese evento ya no existe.
 class _DocumentoTile extends StatelessWidget {
-  const _DocumentoTile({required this.documento});
+  const _DocumentoTile({required this.documento, this.registroTitulo});
 
   final Documento documento;
+  final String? registroTitulo;
 
   IconData get _icono => switch (documento.tipo) {
     TipoDocumento.factura => Icons.receipt_long_outlined,
@@ -1401,13 +1436,19 @@ class _DocumentoTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final titulo = registroTitulo;
+    final subtitulo = [
+      if (documento.proveedor != null) documento.proveedor!,
+      if (documento.fecha != null)
+        DateFormat('d MMM yyyy', 'es_ES').format(documento.fecha!),
+    ].join(' · ');
     return IosRow(
       icon: _icono,
       iconColor: context.colors.brand,
-      title: documento.proveedor ?? documento.nombreArchivo,
-      subtitle: documento.fecha != null
-          ? DateFormat('d MMM yyyy', 'es_ES').format(documento.fecha!)
-          : null,
+      title: titulo != null
+          ? '${nombreTipoDocumento(documento.tipo)} · $titulo'
+          : (documento.proveedor ?? documento.nombreArchivo),
+      subtitle: subtitulo.isEmpty ? null : subtitulo,
       trailing: documento.importe != null
           ? Text(
               '${documento.importe!.toStringAsFixed(0)} €',

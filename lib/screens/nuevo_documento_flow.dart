@@ -717,8 +717,8 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
             tipo: _tipoRegistro,
             esConProfesional: false,
             titulo: _numeroCtrl.text.trim().isNotEmpty
-                ? '${_nombreTipoDoc(_tipo)} · ${_numeroCtrl.text.trim()}'
-                : _nombreTipoDoc(_tipo),
+                ? '${nombreTipoDocumento(_tipo)} · ${_numeroCtrl.text.trim()}'
+                : nombreTipoDocumento(_tipo),
             estado: estadoInicialRegistroSimple(_importe),
             fecha: _fecha ?? DateTime.now(),
             descripcion: _descripcionCtrl.text.trim().isEmpty
@@ -739,7 +739,7 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
         // documento_abrir.dart).
         url: urls.isEmpty ? '' : urls.first,
         nombreArchivo: widget.paginas.isEmpty
-            ? _nombreTipoDoc(_tipo)
+            ? nombreTipoDocumento(_tipo)
             : widget.paginas.first.nombre,
         tipo: _tipo,
         fecha: _fecha,
@@ -922,7 +922,7 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
                       .map(
                         (t) => DropdownMenuItem(
                           value: t,
-                          child: Text(_nombreTipoDoc(t)),
+                          child: Text(nombreTipoDocumento(t)),
                         ),
                       )
                       .toList(),
@@ -1246,11 +1246,3 @@ String _tituloElemento(List<Elemento> elementos, String id) {
   return 'Elemento de esta ficha';
 }
 
-String _nombreTipoDoc(TipoDocumento t) => switch (t) {
-  TipoDocumento.factura => 'Factura',
-  TipoDocumento.presupuesto => 'Presupuesto',
-  TipoDocumento.garantia => 'Garantía',
-  TipoDocumento.manual => 'Manual',
-  TipoDocumento.contrato => 'Contrato',
-  TipoDocumento.otro => 'Otro',
-};

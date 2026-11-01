@@ -15,6 +15,15 @@ TipoDocumento tipoDocumentoFromString(String? s) => TipoDocumento.values.firstWh
       orElse: () => TipoDocumento.otro,
     );
 
+String nombreTipoDocumento(TipoDocumento t) => switch (t) {
+      TipoDocumento.factura => 'Factura',
+      TipoDocumento.presupuesto => 'Presupuesto',
+      TipoDocumento.garantia => 'Garantía',
+      TipoDocumento.manual => 'Manual',
+      TipoDocumento.contrato => 'Contrato',
+      TipoDocumento.otro => 'Otro',
+    };
+
 /// pendiente: guardado como borrador, sin revisar ni volcar al historial.
 /// sugerido: la IA propuso datos pero el usuario aún no los confirmó (no
 /// debería persistir así -- se usa solo en memoria, ver SugerenciaIA).
