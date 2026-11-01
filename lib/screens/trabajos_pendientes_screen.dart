@@ -40,7 +40,7 @@ class TrabajosPendientesScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text(
           'Trabajos pendientes',
-          style: Theme.of(context).textTheme.displaySmall,
+          style: Theme.of(context).textTheme.displaySmall?.copyWith(color: Colors.white),
         ),
       ),
       body: items.isEmpty

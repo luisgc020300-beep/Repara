@@ -54,7 +54,7 @@ class GarantiasProximasScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(titulo, style: Theme.of(context).textTheme.displaySmall),
+        title: Text(titulo, style: Theme.of(context).textTheme.displaySmall?.copyWith(color: Colors.white)),
       ),
       body: elementos.isEmpty
           ? Center(

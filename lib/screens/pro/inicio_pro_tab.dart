@@ -41,14 +41,14 @@ class InicioProTab extends StatelessWidget {
               'MODO PROFESIONAL',
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                 fontSize: 11,
-                color: context.colors.inkMuted,
+                color: Colors.white70,
               ),
             ),
             Text(
               'Repara Pro',
               style: Theme.of(
                 context,
-              ).textTheme.displayMedium?.copyWith(fontSize: 26),
+              ).textTheme.displayMedium?.copyWith(fontSize: 26, color: Colors.white),
             ),
           ],
         ),

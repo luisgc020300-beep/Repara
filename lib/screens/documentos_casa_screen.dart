@@ -82,8 +82,8 @@ class DocumentosCasaScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('CASA', style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 11, color: context.colors.inkMuted)),
-            Text('Documentos', style: Theme.of(context).textTheme.displayMedium?.copyWith(fontSize: 26)),
+            Text('CASA', style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 11, color: Colors.white70)),
+            Text('Documentos', style: Theme.of(context).textTheme.displayMedium?.copyWith(fontSize: 26, color: Colors.white)),
           ],
         ),
       ),

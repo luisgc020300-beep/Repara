@@ -105,8 +105,8 @@ class _PresupuestosProTabState extends State<PresupuestosProTab> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('MODO PROFESIONAL', style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 11, color: context.colors.inkMuted)),
-            Text('Presupuestos', style: Theme.of(context).textTheme.displayMedium?.copyWith(fontSize: 26)),
+            Text('MODO PROFESIONAL', style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 11, color: Colors.white70)),
+            Text('Presupuestos', style: Theme.of(context).textTheme.displayMedium?.copyWith(fontSize: 26, color: Colors.white)),
           ],
         ),
         actions: const [BotonAjustes(modoPro: true)],

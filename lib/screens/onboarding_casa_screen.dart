@@ -89,6 +89,7 @@ class _OnboardingCasaScreenState extends State<OnboardingCasaScreen> {
         title: const Text('Repara'),
         actions: [
           TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.white),
             onPressed: () async {
               await FcmService.olvidarEsteDispositivo();
               await FirebaseAuth.instance.signOut();

@@ -49,14 +49,14 @@ class _TrabajosProTabState extends State<TrabajosProTab> {
               'MODO PROFESIONAL',
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                 fontSize: 11,
-                color: context.colors.inkMuted,
+                color: Colors.white70,
               ),
             ),
             Text(
               'Trabajos',
               style: Theme.of(
                 context,
-              ).textTheme.displayMedium?.copyWith(fontSize: 26),
+              ).textTheme.displayMedium?.copyWith(fontSize: 26, color: Colors.white),
             ),
           ],
         ),

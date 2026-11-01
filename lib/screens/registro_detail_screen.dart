@@ -302,10 +302,10 @@ class RegistroDetailScreen extends StatelessWidget {
             title: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
+                const Icon(
                   Icons.home_outlined,
                   size: 14,
-                  color: context.colors.inkMuted,
+                  color: Colors.white70,
                 ),
                 const SizedBox(width: 6),
                 Flexible(
@@ -314,6 +314,7 @@ class RegistroDetailScreen extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       fontWeight: FontWeight.w600,
+                      color: Colors.white,
                     ),
                   ),
                 ),

@@ -7,6 +7,7 @@
 // sin acentos decorativos: cada color tiene un rol semántico concreto.
 import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 
 class ReparaColors extends ThemeExtension<ReparaColors> {
   const ReparaColors({
@@ -249,14 +250,22 @@ ThemeData _buildReparaTheme(Brightness brightness) {
       error: palette.error,
       onError: Colors.white,
     ),
+    // Navy en vez del fondo claro/oscuro del resto de la pantalla (CEO,
+    // noviembre 2026: "todos los AppBar deben ser navy, igual que el bloque
+    // de Inicio") -- texto e iconos en blanco (foregroundColor cubre los
+    // iconos por defecto -- back, overflow, BotonAjustes/BotonNotificaciones,
+    // que no fijan su propio color -- título vía titleTextStyle) y la barra
+    // de estado en modo claro (iconos blancos) porque se pinta sobre navy,
+    // igual que ya hacía Inicio con su AnnotatedRegion propio.
     appBarTheme: AppBarTheme(
-      backgroundColor: palette.background,
-      foregroundColor: palette.ink,
+      backgroundColor: palette.brandStrong,
+      foregroundColor: Colors.white,
       elevation: 0,
       centerTitle: false,
+      systemOverlayStyle: SystemUiOverlayStyle.light,
       titleTextStyle: TextStyle(
         fontFamily: ReparaText.fontFamily,
-        color: palette.ink,
+        color: Colors.white,
         fontSize: 22,
         fontWeight: FontWeight.w700,
         letterSpacing: -0.2,

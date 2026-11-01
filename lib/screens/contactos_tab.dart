@@ -45,8 +45,8 @@ class _ContactosTabState extends State<ContactosTab> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('AGENDA', style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 11, color: context.colors.inkMuted)),
-            Text('Contactos', style: Theme.of(context).textTheme.displayMedium?.copyWith(fontSize: 26)),
+            Text('AGENDA', style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 11, color: Colors.white70)),
+            Text('Contactos', style: Theme.of(context).textTheme.displayMedium?.copyWith(fontSize: 26, color: Colors.white)),
           ],
         ),
         actions: [BotonAjustes(casa: casa)],

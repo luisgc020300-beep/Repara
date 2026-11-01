@@ -139,7 +139,7 @@ class RegistroProDetailScreen extends StatelessWidget {
                 Icon(
                   iconoTipoRegistro(registro.tipo),
                   size: 14,
-                  color: context.colors.inkMuted,
+                  color: Colors.white70,
                 ),
                 const SizedBox(width: 6),
                 Flexible(
@@ -150,6 +150,7 @@ class RegistroProDetailScreen extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       fontWeight: FontWeight.w600,
+                      color: Colors.white,
                     ),
                   ),
                 ),

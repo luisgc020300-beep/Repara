@@ -42,7 +42,7 @@ class NotificacionesScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Notificaciones', style: Theme.of(context).textTheme.displaySmall),
+        title: Text('Notificaciones', style: Theme.of(context).textTheme.displaySmall?.copyWith(color: Colors.white)),
         actions: [BotonAjustes(casa: casa, modoPro: modoPro)],
       ),
       body: StreamBuilder<List<Notificacion>>(

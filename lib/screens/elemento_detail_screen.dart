@@ -415,10 +415,10 @@ class ElementoDetailScreen extends StatelessWidget {
             title: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
+                const Icon(
                   Icons.home_outlined,
                   size: 14,
-                  color: context.colors.inkMuted,
+                  color: Colors.white70,
                 ),
                 const SizedBox(width: 6),
                 Flexible(
@@ -427,6 +427,7 @@ class ElementoDetailScreen extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       fontWeight: FontWeight.w600,
+                      color: Colors.white,
                     ),
                   ),
                 ),
@@ -965,7 +966,7 @@ class _ArchivarElementoButtonState extends State<_ArchivarElementoButton> {
           height: 20,
           child: CircularProgressIndicator(
             strokeWidth: 2,
-            color: context.colors.inkMuted,
+            color: Colors.white70,
           ),
         )
       : Icon(normal);
@@ -1113,10 +1114,10 @@ class _EliminarElementoButtonState extends State<_EliminarElementoButton> {
                 height: 20,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: context.colors.inkMuted,
+                  color: Colors.white70,
                 ),
               )
-            : Icon(Icons.delete_outline, color: context.colors.inkMuted);
+            : const Icon(Icons.delete_outline, color: Colors.white70);
         return IconButton(
           icon: icono,
           tooltip: tieneRegistroConProfesional
