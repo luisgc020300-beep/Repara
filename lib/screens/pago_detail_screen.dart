@@ -29,6 +29,8 @@ class PagoDetailScreen extends StatefulWidget {
     required this.editable,
     this.pago,
     this.conceptoSugerido,
+    this.fechaSugerida,
+    this.importeSugerido,
     super.key,
   });
 
@@ -51,14 +53,28 @@ class PagoDetailScreen extends StatefulWidget {
   /// existente con su propio concepto.
   final String? conceptoSugerido;
 
+  /// Fecha/importe que propone la IA al escanear un recibo/justificante
+  /// para este pago (CEO, noviembre 2026: "Presupuestos y Facturas/Notas
+  /// ya dejan escanear, Pagos también debería"). Solo se usan al crear un
+  /// pago nuevo (pago == null) -- null en el resto de casos, igual que
+  /// conceptoSugerido. El propietario siempre ve y puede corregir el valor
+  /// antes de guardar, nunca se guarda sin pasar por aquí.
+  final DateTime? fechaSugerida;
+  final double? importeSugerido;
+
   @override
   State<PagoDetailScreen> createState() => _PagoDetailScreenState();
 }
 
 class _PagoDetailScreenState extends State<PagoDetailScreen> {
-  late DateTime _fecha = widget.pago?.fecha ?? DateTime.now();
+  late DateTime _fecha =
+      widget.pago?.fecha ?? widget.fechaSugerida ?? DateTime.now();
   late final _importeCtrl = TextEditingController(
-    text: widget.pago == null ? '' : _formato(widget.pago!.importe),
+    text: widget.pago != null
+        ? _formato(widget.pago!.importe)
+        : (widget.importeSugerido == null
+              ? ''
+              : _formato(widget.importeSugerido!)),
   );
   late final _conceptoCtrl = TextEditingController(
     text: widget.pago?.concepto ?? widget.conceptoSugerido ?? '',

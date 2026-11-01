@@ -188,38 +188,66 @@ void main() {
     },
   );
 
+  Future<void> _tocarAnadirPago(WidgetTester tester) async {
+    await _prepararConRegistroSimple();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildReparaLightTheme(),
+        home: const RegistroDetailScreen(casa: _casa, elementoId: 'e1', registroId: 'r1'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Con la cabecera/progreso/acciones rápidas nuevas, "Añadir pago"
+    // queda fuera del viewport inicial -- hay que desplazarse antes de
+    // poder tocarlo. scrollUntilVisible para en cuanto el widget EXISTE
+    // en el árbol, no necesariamente dentro del viewport visible todavía
+    // -- un segundo arrastre de sobra lo deja ya tocable de verdad.
+    await tester.scrollUntilVisible(
+      find.text('Añadir pago'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -300));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Añadir pago'));
+    await tester.pumpAndSettle();
+  }
+
   testWidgets(
-    '"Añadir pago" en un registro simple abre el formulario sin ningún tope de presupuesto',
+    '"Añadir pago" ofrece elegir entre escanear un recibo o rellenarlo a mano -- igual que Presupuestos/Facturas',
     (tester) async {
-      await _prepararConRegistroSimple();
+      await _tocarAnadirPago(tester);
 
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: buildReparaLightTheme(),
-          home: const RegistroDetailScreen(casa: _casa, elementoId: 'e1', registroId: 'r1'),
-        ),
-      );
-      await tester.pumpAndSettle();
+      expect(find.text('Escanear'), findsOneWidget);
+      expect(find.text('Rellenar a mano'), findsOneWidget);
+    },
+  );
 
-      // Con la cabecera/progreso/acciones rápidas nuevas, "Añadir pago"
-      // queda fuera del viewport inicial -- hay que desplazarse antes de
-      // poder tocarlo. scrollUntilVisible para en cuanto el widget EXISTE
-      // en el árbol, no necesariamente dentro del viewport visible todavía
-      // -- un segundo arrastre de sobra lo deja ya tocable de verdad.
-      await tester.scrollUntilVisible(
-        find.text('Añadir pago'),
-        300,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.drag(find.byType(Scrollable).first, const Offset(0, -300));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Añadir pago'));
+  testWidgets(
+    '"Rellenar a mano" abre el formulario sin ningún tope de presupuesto',
+    (tester) async {
+      await _tocarAnadirPago(tester);
+      await tester.tap(find.text('Rellenar a mano'));
       await tester.pumpAndSettle();
 
       final pantalla = tester.widget<PagoDetailScreen>(find.byType(PagoDetailScreen));
       expect(pantalla.presupuesto, isNull);
       expect(pantalla.editable, isTrue);
       expect(find.text('Guardar'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    '"Escanear" abre el selector de foto/galería/archivo',
+    (tester) async {
+      await _tocarAnadirPago(tester);
+      await tester.tap(find.text('Escanear'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Hacer una foto'), findsOneWidget);
+      expect(find.text('Elegir de la galería'), findsOneWidget);
     },
   );
 }

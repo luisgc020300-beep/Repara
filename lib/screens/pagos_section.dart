@@ -12,6 +12,7 @@ import '../services/pago_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
 import '../widgets/ios_list.dart';
+import 'nuevo_documento_flow.dart' show elegirFormaDeAnadirPago;
 import 'pago_detail_screen.dart';
 import 'presupuestos_section.dart' show RolEnTrabajo;
 
@@ -58,19 +59,14 @@ class PagosSection extends StatelessWidget {
                 ),
                 if (editable)
                   TextButton.icon(
-                    onPressed: () => Navigator.push(
+                    onPressed: () => elegirFormaDeAnadirPago(
                       context,
-                      MaterialPageRoute(
-                        builder: (_) => PagoDetailScreen(
-                          casaId: casaId,
-                          elementoId: elementoId,
-                          registroId: registroId,
-                          registroTitulo: registroTitulo,
-                          presupuesto: presupuesto,
-                          editable: true,
-                          conceptoSugerido: 'Pago ${pagos.length + 1}',
-                        ),
-                      ),
+                      casaId: casaId,
+                      elementoId: elementoId,
+                      registroId: registroId,
+                      registroTitulo: registroTitulo,
+                      presupuesto: presupuesto,
+                      conceptoSugerido: 'Pago ${pagos.length + 1}',
                     ),
                     icon: const Icon(Icons.add, size: 18),
                     label: const Text('Añadir pago'),

@@ -25,6 +25,7 @@ import '../widgets/app_dialog.dart';
 import '../widgets/app_error.dart';
 import '../widgets/ios_list.dart';
 import '../widgets/seccion_formulario.dart';
+import 'pago_detail_screen.dart';
 
 Future<void> iniciarNuevoDocumento(
   BuildContext context, {
@@ -230,6 +231,168 @@ Future<void> elegirFormaDeAnadirDocumento(
             ),
           ],
         ),
+      ),
+    ),
+  );
+}
+
+/// Elegir cómo añadir un pago: escanear (con IA) o rellenar a mano -- mismo
+/// patrón que elegirFormaDeAnadirDocumento, para Pagos (CEO, noviembre 2026:
+/// "Presupuestos y Facturas/Notas ya dejan escanear, Pagos solo dejaba
+/// rellenar a mano").
+Future<void> elegirFormaDeAnadirPago(
+  BuildContext context, {
+  required String casaId,
+  required String elementoId,
+  required String registroId,
+  required String registroTitulo,
+  required double? presupuesto,
+  required String conceptoSugerido,
+}) {
+  return showModalBottomSheet<void>(
+    context: context,
+    builder: (ctx) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          ReparaSpace.s4,
+          ReparaSpace.s2,
+          ReparaSpace.s4,
+          ReparaSpace.s4,
+        ),
+        child: IosSection(
+          rows: [
+            IosRow(
+              icon: Icons.document_scanner_outlined,
+              iconColor: ctx.colors.brand,
+              title: 'Escanear',
+              subtitle: 'La IA rellena el importe y la fecha por ti',
+              onTap: () {
+                Navigator.pop(ctx);
+                iniciarEscaneoPago(
+                  context,
+                  casaId: casaId,
+                  elementoId: elementoId,
+                  registroId: registroId,
+                  registroTitulo: registroTitulo,
+                  presupuesto: presupuesto,
+                  conceptoSugeridoPorDefecto: conceptoSugerido,
+                );
+              },
+            ),
+            IosRow(
+              icon: Icons.edit_outlined,
+              iconColor: ctx.colors.brand,
+              title: 'Rellenar a mano',
+              subtitle: 'Sin escanear nada',
+              onTap: () {
+                Navigator.pop(ctx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => PagoDetailScreen(
+                      casaId: casaId,
+                      elementoId: elementoId,
+                      registroId: registroId,
+                      registroTitulo: registroTitulo,
+                      presupuesto: presupuesto,
+                      editable: true,
+                      conceptoSugerido: conceptoSugerido,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+/// Escanear un recibo/justificante para registrar un pago -- mismo flujo de
+/// IA que los Documentos (elegir origen, previsualizar, "Analizando
+/// documento…"), pero el resultado nunca se guarda como Documento: solo
+/// prerellena el recibo de PagoDetailScreen (importe/fecha/concepto), que
+/// el propietario siempre revisa y confirma como con cualquier otro pago
+/// (sección 61 del spec: nunca se asume información no confirmada). Si la
+/// IA falla, cae a PagoDetailScreen sin prerellenar -- igual que
+/// iniciarNuevoDocumento cae al formulario manual.
+Future<void> iniciarEscaneoPago(
+  BuildContext context, {
+  required String casaId,
+  required String elementoId,
+  required String registroId,
+  required String registroTitulo,
+  required double? presupuesto,
+  required String conceptoSugeridoPorDefecto,
+}) async {
+  final paginas = await _elegirPaginas(context);
+  if (paginas == null || paginas.isEmpty || !context.mounted) return;
+
+  final confirmadas = await Navigator.push<List<PaginaDocumento>>(
+    context,
+    MaterialPageRoute(
+      builder: (_) => _VistaPreviaScreen(paginasIniciales: paginas),
+    ),
+  );
+  if (confirmadas == null || confirmadas.isEmpty || !context.mounted) return;
+
+  SugerenciaIA? sugerencia;
+  String? errorIA;
+  showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) => AlertDialog(
+      shape: AppDialog.shape(),
+      content: const Row(
+        children: [
+          SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          SizedBox(width: 16),
+          Expanded(child: Text('Analizando documento…')),
+        ],
+      ),
+    ),
+  );
+  try {
+    sugerencia = await DocumentoService.clasificarConIA(
+      confirmadas,
+    ).timeout(const Duration(seconds: 55));
+  } on FirebaseFunctionsException catch (e) {
+    errorIA =
+        (e.code == 'resource-exhausted' || e.code == 'unavailable') &&
+            e.message != null
+        ? e.message!
+        : 'No se pudo contactar con el servicio de IA. Puedes rellenar los datos a mano.';
+  } catch (e) {
+    errorIA =
+        'No se pudo contactar con el servicio de IA. Puedes rellenar los datos a mano.';
+  } finally {
+    if (context.mounted) Navigator.pop(context);
+  }
+
+  if (!context.mounted) return;
+  if (errorIA != null) AppError.show(context, errorIA);
+
+  await Navigator.push<void>(
+    context,
+    MaterialPageRoute(
+      builder: (_) => PagoDetailScreen(
+        casaId: casaId,
+        elementoId: elementoId,
+        registroId: registroId,
+        registroTitulo: registroTitulo,
+        presupuesto: presupuesto,
+        editable: true,
+        fechaSugerida: sugerencia?.fecha,
+        importeSugerido: sugerencia?.importe,
+        conceptoSugerido:
+            sugerencia?.proveedor ??
+            sugerencia?.descripcionTrabajo ??
+            conceptoSugeridoPorDefecto,
       ),
     ),
   );
