@@ -16,6 +16,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:repara/models/casa.dart';
 import 'package:repara/screens/registro_detail_screen.dart';
 import 'package:repara/services/cambio_alcance_service.dart';
+import 'package:repara/services/contacto_service.dart';
 import 'package:repara/services/documento_service.dart';
 import 'package:repara/services/elemento_service.dart';
 import 'package:repara/services/historial_service.dart';
@@ -57,6 +58,7 @@ Future<FakeFirebaseFirestore> _conRegistro(Map<String, dynamic> datos) async {
   CambioAlcanceService.debugFirestoreOverride = db;
   PresupuestoService.debugFirestoreOverride = db;
   InvitacionService.debugFirestoreOverride = db;
+  ContactoService.debugFirestoreOverride = db;
   return db;
 }
 
@@ -84,6 +86,7 @@ void main() {
     CambioAlcanceService.debugFirestoreOverride = null;
     PresupuestoService.debugFirestoreOverride = null;
     InvitacionService.debugFirestoreOverride = null;
+    ContactoService.debugFirestoreOverride = null;
   });
 
   testWidgets(

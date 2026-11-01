@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repara/models/casa.dart';
 import 'package:repara/screens/elemento_detail_screen.dart';
+import 'package:repara/services/contacto_service.dart';
 import 'package:repara/services/documento_service.dart';
 import 'package:repara/services/elemento_service.dart';
 import 'package:repara/services/habitacion_service.dart';
@@ -42,6 +43,7 @@ Future<FakeFirebaseFirestore> _prepararConElemento() async {
   HabitacionService.debugFirestoreOverride = db;
   DocumentoService.debugFirestoreOverride = db;
   PagoService.debugFirestoreOverride = db;
+  ContactoService.debugFirestoreOverride = db;
   return db;
 }
 
@@ -52,6 +54,7 @@ void main() {
     HabitacionService.debugFirestoreOverride = null;
     DocumentoService.debugFirestoreOverride = null;
     PagoService.debugFirestoreOverride = null;
+    ContactoService.debugFirestoreOverride = null;
   });
 
   testWidgets(

@@ -14,6 +14,7 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repara/screens/nuevo_registro_screen.dart';
+import 'package:repara/services/contacto_service.dart';
 import 'package:repara/services/registro_service.dart';
 import 'package:repara/theme/design_tokens.dart';
 
@@ -44,8 +45,15 @@ Future<void> _abrirHoja(WidgetTester tester) async {
 }
 
 void main() {
-  setUp(() => RegistroService.debugFirestoreOverride = FakeFirebaseFirestore());
-  tearDown(() => RegistroService.debugFirestoreOverride = null);
+  setUp(() {
+    final db = FakeFirebaseFirestore();
+    RegistroService.debugFirestoreOverride = db;
+    ContactoService.debugFirestoreOverride = db;
+  });
+  tearDown(() {
+    RegistroService.debugFirestoreOverride = null;
+    ContactoService.debugFirestoreOverride = null;
+  });
 
   // Pantalla completa, no hoja compacta (rediseño visual, noviembre 2026) --
   // "Información económica" (el título de esa sección en ambas ramas, con o

@@ -29,6 +29,7 @@ import '../models/registro.dart';
 import '../services/registro_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
+import '../widgets/selector_profesional_field.dart';
 
 Future<void> mostrarEditarRegistroSheet(
   BuildContext context, {
@@ -221,11 +222,10 @@ class _EditarRegistroFormState extends State<_EditarRegistroForm> {
                   ),
                   const SizedBox(width: ReparaSpace.s3),
                   Expanded(
-                    child: TextField(
-                      controller: _profesionalCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Profesional',
-                      ),
+                    child: ProfesionalAutocompleteField(
+                      casaId: widget.casaId,
+                      nombreCtrl: _profesionalCtrl,
+                      telefonoCtrl: _profesionalTelefonoCtrl,
                     ),
                   ),
                 ],

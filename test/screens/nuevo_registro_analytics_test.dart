@@ -20,11 +20,15 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repara/screens/nuevo_registro_screen.dart';
+import 'package:repara/services/contacto_service.dart';
 import 'package:repara/services/registro_service.dart';
 import 'package:repara/theme/design_tokens.dart';
 
 void main() {
-  tearDown(() => RegistroService.debugFirestoreOverride = null);
+  tearDown(() {
+    RegistroService.debugFirestoreOverride = null;
+    ContactoService.debugFirestoreOverride = null;
+  });
 
   testWidgets(
     'un título vacío no crea el registro -- RegistroService.crear() nunca se alcanza, '
@@ -32,6 +36,7 @@ void main() {
     (tester) async {
       final db = FakeFirebaseFirestore();
       RegistroService.debugFirestoreOverride = db;
+      ContactoService.debugFirestoreOverride = db;
 
       await tester.pumpWidget(
         MaterialApp(

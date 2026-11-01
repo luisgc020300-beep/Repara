@@ -7,9 +7,11 @@
 // comprueba la visibilidad/valor por defecto del interruptor, nunca llega a
 // tocar "Guardar" -- eso llama a FirebaseAuth.instance, que no se puede
 // invocar en este entorno de test sin Firebase Core inicializado.
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repara/screens/nuevo_registro_screen.dart';
+import 'package:repara/services/contacto_service.dart';
 import 'package:repara/theme/design_tokens.dart';
 
 Future<void> _abrirPantalla(WidgetTester tester) async {
@@ -39,6 +41,9 @@ Future<void> _abrirPantalla(WidgetTester tester) async {
 }
 
 void main() {
+  setUp(() => ContactoService.debugFirestoreOverride = FakeFirebaseFirestore());
+  tearDown(() => ContactoService.debugFirestoreOverride = null);
+
   testWidgets(
     'por defecto, "¿Ya se ha realizado el trabajo?" está activado (comportamiento de siempre)',
     (tester) async {
