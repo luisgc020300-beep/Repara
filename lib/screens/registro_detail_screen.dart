@@ -38,6 +38,7 @@ import '../widgets/estado_registro_chip.dart';
 import '../widgets/historial_timeline.dart';
 import '../widgets/ios_list.dart';
 import 'cambio_alcance_section.dart';
+import 'contacto_acciones.dart';
 import 'editar_registro_sheet.dart';
 import 'elemento_detail_screen.dart';
 import 'nuevo_documento_flow.dart';
@@ -1042,28 +1043,36 @@ class _SeccionHistorial extends StatelessWidget {
     required this.casa,
     required this.elementoId,
     required this.registro,
+    this.mostrarTitulo = true,
   });
 
   final Casa casa;
   final String elementoId;
   final Registro registro;
+  // false cuando ya vive dentro de un ExpansionTile con su propio título
+  // "Historial" (CEO, noviembre 2026: "que sea un desplegable abajo del
+  // todo") -- evita el "Historial" del desplegable seguido de "Historial de
+  // la reparación" repitiéndose justo debajo.
+  final bool mostrarTitulo;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Icon(Icons.show_chart, size: 16, color: context.colors.inkMuted),
-            const SizedBox(width: 6),
-            Text(
-              'Historial de la reparación',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
+        if (mostrarTitulo) ...[
+          Row(
+            children: [
+              Icon(Icons.show_chart, size: 16, color: context.colors.inkMuted),
+              const SizedBox(width: 6),
+              Text(
+                'Historial de la reparación',
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+        ],
         StreamBuilder<List<HistorialEvento>>(
           stream: HistorialService.streamHistorial(
             casa.id,
@@ -1327,29 +1336,74 @@ class _CuerpoSimple extends StatelessWidget {
                         ),
                         const SizedBox(height: 20),
                       ],
-                      // Mismo historial cronológico vertical que ya tenía
-                      // un registro con profesional (CEO, octubre 2026) --
-                      // _SeccionHistorial ya era un widget genérico
-                      // (casa/elementoId/registro), no hacía falta nada
-                      // nuevo: el cierre del registro y los pagos ya
-                      // quedan registrados en Firestore para cualquier
-                      // registro, con o sin profesional (ver
-                      // onPagoEscritoHistorial en functions/index.js, no
-                      // depende de esConProfesional).
-                      _SeccionHistorial(
-                        casa: casa,
-                        elementoId: elementoId,
-                        registro: registro,
+                      if (registro.profesionalNombre != null) ...[
+                        _SeccionProfesionalSimple(registro: registro),
+                        const SizedBox(height: 20),
+                      ],
+                      // 3 categorías en vez de "Pagos"/"Documentos" sueltos
+                      // (CEO, noviembre 2026): Presupuestos y Facturas/Notas
+                      // son la misma colección de Documentos de siempre,
+                      // separada por su campo `tipo` -- un presupuesto que
+                      // te ha dado un profesional ajeno a la app entra aquí
+                      // igual, a mano o escaneado, nunca solo por invitación
+                      // real (eso sigue siendo exclusivo del registro CON
+                      // profesional, ver presupuestos_section.dart).
+                      StreamBuilder<List<Documento>>(
+                        stream: DocumentoService.streamDocumentos(
+                          casa.id,
+                          registroId: registro.id,
+                        ),
+                        builder: (context, snapshot) {
+                          final documentos = snapshot.data ?? const <Documento>[];
+                          final presupuestos = documentos
+                              .where((d) => d.tipo == TipoDocumento.presupuesto)
+                              .toList();
+                          final facturasNotas = documentos
+                              .where((d) => d.tipo != TipoDocumento.presupuesto)
+                              .toList();
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _SeccionCategoriaDocumentos(
+                                titulo: 'Presupuestos',
+                                documentos: presupuestos,
+                                emptyMensaje: 'Sin presupuestos todavía.',
+                                onAnadir: () => elegirFormaDeAnadirDocumento(
+                                  context,
+                                  casaId: casa.id,
+                                  elementoId: elementoId,
+                                  registroId: registro.id,
+                                  tipoInicial: TipoDocumento.presupuesto,
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              _SeccionCategoriaDocumentos(
+                                titulo: 'Facturas/Notas',
+                                documentos: facturasNotas,
+                                emptyMensaje: 'Sin facturas ni notas todavía.',
+                                onAnadir: () => elegirFormaDeAnadirDocumento(
+                                  context,
+                                  casaId: casa.id,
+                                  elementoId: elementoId,
+                                  registroId: registro.id,
+                                  tipoInicial: TipoDocumento.factura,
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
                       const SizedBox(height: 20),
-                      // Un registro simple no tiene presupuesto (nunca se
-                      // fija en esta vía, ver nuevo_registro_sheet.dart/
-                      // nuevo_elemento_screen.dart), así que PagosSection
-                      // recibe presupuesto: null -- ya está preparada para
-                      // eso (ver pago_detail_screen.dart: el tope contra el
+                      // Un registro simple no tiene presupuesto formal
+                      // (nunca se fija en esta vía, ver nuevo_registro_
+                      // screen.dart/nuevo_elemento_screen.dart) -- el nuevo
+                      // apartado "Presupuestos" de arriba es solo Documentos
+                      // de ese tipo, así que PagosSection sigue recibiendo
+                      // presupuesto: null -- ya está preparada para eso (ver
+                      // pago_detail_screen.dart: el tope contra el
                       // presupuesto solo se aplica si no es null), igual
-                      // que registrarPago en servidor. No hace falta
-                      // ningún cambio de Cloud Function ni de reglas:
+                      // que registrarPago en servidor. No hace falta ningún
+                      // cambio de Cloud Function ni de reglas:
                       // registrarPago ya nunca ha exigido esConProfesional,
                       // solo lo usaba quien construía la pantalla.
                       PagosSection(
@@ -1364,77 +1418,53 @@ class _CuerpoSimple extends StatelessWidget {
                         const SizedBox(height: 20),
                         _PlanDePagos(registro: registro, pagos: pagos),
                       ],
-                      const SizedBox(height: 20),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Documentos',
-                            style: Theme.of(context).textTheme.headlineSmall,
-                          ),
-                          TextButton.icon(
-                            onPressed: () => iniciarNuevoDocumento(
-                              context,
-                              casaId: casa.id,
-                              elementoId: elementoId,
-                              registroId: registro.id,
-                            ),
-                            icon: const Icon(
-                              Icons.document_scanner_outlined,
-                              size: 18,
-                            ),
-                            label: const Text('Escanear documento'),
-                          ),
-                        ],
-                      ),
-                      StreamBuilder<List<Documento>>(
-                        stream: DocumentoService.streamDocumentos(
-                          casa.id,
-                          registroId: registro.id,
-                        ),
-                        builder: (context, snapshot) {
-                          final documentos = snapshot.data ?? [];
-                          if (documentos.isEmpty) {
-                            return const EmptyHint(
-                              message: 'Sin documentos todavía.',
-                              icon: Icons.description_outlined,
-                            );
-                          }
-                          return IosSection(
-                            rows: documentos
-                                .map(
-                                  (d) => IosRow(
-                                    icon: Icons.insert_drive_file_outlined,
-                                    iconColor: context.colors.brand,
-                                    title: d.proveedor ?? d.nombreArchivo,
-                                    trailing: d.importe != null
-                                        ? Text(
-                                            '${d.importe!.toStringAsFixed(0)} €',
-                                            style: ReparaText.amount(context),
-                                          )
-                                        : null,
-                                    showChevron: false,
-                                  ),
-                                )
-                                .toList(),
-                          );
-                        },
-                      ),
                       const SizedBox(height: 24),
-                      // Acciones rápidas al final (CEO, octubre 2026): solo
-                      // compartir/exportar -- "Añadir pago" y "Escanear
-                      // documento" ya tienen su propio botón en las
-                      // cabeceras de Pagos/Documentos de arriba, repetirlos
-                      // aquí era la misma acción dos veces. Exportar/
-                      // compartir es lo último que se hace tras revisar el
-                      // resumen, los pagos y los documentos -- no el primer
-                      // bloque de la pantalla.
+                      // Acciones rápidas antes del historial (CEO, octubre
+                      // 2026): solo compartir/exportar -- "Añadir pago" y
+                      // "Añadir"/"Escanear" ya tienen su propio botón en las
+                      // cabeceras de arriba, repetirlos aquí era la misma
+                      // acción dos veces.
                       RegistroSimpleAcciones(
                         casa: casa,
                         registro: registro,
                         pagos: pagos,
                         totalPagado: totalPagado,
                         onCompartir: () => onCompartirResumen(totalPagado),
+                      ),
+                      const SizedBox(height: 20),
+                      // Historial como desplegable cerrado por defecto, al
+                      // final de todo (CEO, noviembre 2026: "si el usuario
+                      // quiere verlo lo despliegue, si no, no") -- antes
+                      // siempre visible entre la tarjeta económica y Pagos.
+                      Theme(
+                        data: Theme.of(context).copyWith(
+                          dividerColor: Colors.transparent,
+                        ),
+                        child: ExpansionTile(
+                          tilePadding: EdgeInsets.zero,
+                          title: Row(
+                            children: [
+                              Icon(
+                                Icons.show_chart,
+                                size: 16,
+                                color: context.colors.inkMuted,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Historial',
+                                style: Theme.of(context).textTheme.headlineSmall,
+                              ),
+                            ],
+                          ),
+                          children: [
+                            _SeccionHistorial(
+                              casa: casa,
+                              elementoId: elementoId,
+                              registro: registro,
+                              mostrarTitulo: false,
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -1444,6 +1474,125 @@ class _CuerpoSimple extends StatelessWidget {
           },
         );
       },
+    );
+  }
+}
+
+/// Categoría de Documentos dentro de un evento simple (CEO, noviembre 2026:
+/// "Presupuestos, Facturas/Notas y Pagos, cada una con su total y su botón
+/// de añadir a mano o escaneando"). [documentos] ya viene filtrado por el
+/// padre (por `tipo`) -- este widget solo pinta la lista y suma el total,
+/// no decide qué pertenece a qué categoría.
+class _SeccionCategoriaDocumentos extends StatelessWidget {
+  const _SeccionCategoriaDocumentos({
+    required this.titulo,
+    required this.documentos,
+    required this.emptyMensaje,
+    required this.onAnadir,
+  });
+
+  final String titulo;
+  final List<Documento> documentos;
+  final String emptyMensaje;
+  final VoidCallback onAnadir;
+
+  @override
+  Widget build(BuildContext context) {
+    final total = documentos.fold<double>(0, (acc, d) => acc + (d.importe ?? 0));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Text(titulo, style: Theme.of(context).textTheme.headlineSmall),
+                if (total > 0) ...[
+                  const SizedBox(width: 8),
+                  Text(
+                    '${total.toStringAsFixed(0)} €',
+                    style: ReparaText.amount(context).copyWith(fontSize: 15),
+                  ),
+                ],
+              ],
+            ),
+            TextButton.icon(
+              onPressed: onAnadir,
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Añadir'),
+            ),
+          ],
+        ),
+        if (documentos.isEmpty)
+          EmptyHint(message: emptyMensaje, icon: Icons.description_outlined)
+        else
+          IosSection(
+            rows: documentos
+                .map(
+                  (d) => IosRow(
+                    icon: Icons.insert_drive_file_outlined,
+                    iconColor: context.colors.brand,
+                    title: d.proveedor ?? d.nombreArchivo,
+                    subtitle: d.fecha != null
+                        ? DateFormat('d MMM yyyy', 'es_ES').format(d.fecha!)
+                        : null,
+                    trailing: d.importe != null
+                        ? Text(
+                            '${d.importe!.toStringAsFixed(0)} €',
+                            style: ReparaText.amount(context),
+                          )
+                        : null,
+                    showChevron: false,
+                    onTap: () => abrirDocumento(context, d),
+                  ),
+                )
+                .toList(),
+          ),
+      ],
+    );
+  }
+}
+
+/// Profesional de texto libre de un registro simple (CEO, noviembre 2026:
+/// "las mismas opciones que hay en Contactos para interactuar con él") --
+/// solo aparece con teléfono guardado (`profesionalContacto`), porque sin
+/// número no hay nada que llamar/escribir. No es un Contacto de la libreta
+/// (nunca se guarda ahí), así que reutiliza las filas de interacción de
+/// contacto_acciones.dart por nombre/teléfono sueltos, no Editar/Eliminar
+/// (eso sí es gestión de la libreta, no de este evento).
+class _SeccionProfesionalSimple extends StatelessWidget {
+  const _SeccionProfesionalSimple({required this.registro});
+
+  final Registro registro;
+
+  @override
+  Widget build(BuildContext context) {
+    final nombre = registro.profesionalNombre!;
+    final telefono = registro.profesionalContacto;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Profesional', style: Theme.of(context).textTheme.headlineSmall),
+        const SizedBox(height: 8),
+        IosSection(
+          rows: [
+            IosRow(
+              icon: Icons.person_outline,
+              iconColor: context.colors.brand,
+              title: nombre,
+              subtitle: telefono,
+              showChevron: false,
+            ),
+            if (telefono != null && telefono.isNotEmpty)
+              ...filasInteraccionTelefono(
+                context: context,
+                nombre: nombre,
+                telefono: telefono,
+              ),
+          ],
+        ),
+      ],
     );
   }
 }

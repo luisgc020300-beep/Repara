@@ -51,6 +51,8 @@
 	<string>Repara necesita acceso a tus fotos para adjuntar documentos ya guardados en tu galería.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Repara usa Face ID para proteger el acceso a documentos sensibles y a Repara Pro.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Repara necesita acceso a tus contactos para que puedas importar a tus profesionales de confianza.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

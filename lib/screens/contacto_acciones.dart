@@ -58,38 +58,12 @@ Future<void> mostrarAccionesContacto(BuildContext context, {required String casa
             ),
             const SizedBox(height: ReparaSpace.s4),
             IosSection(
-              rows: [
-                IosRow(
-                  icon: Icons.call_outlined,
-                  iconColor: ctx.colors.brand,
-                  title: 'Llamar',
-                  onTap: () async {
-                    Navigator.pop(ctx);
-                    await launchUrl(Uri(scheme: 'tel', path: contacto.telefono));
-                  },
-                ),
-                IosRow(
-                  icon: Icons.chat_outlined,
-                  iconColor: Colors.green,
-                  title: 'Abrir chat de WhatsApp',
-                  subtitle: 'Sin foto, solo para escribir',
-                  onTap: () async {
-                    Navigator.pop(ctx);
-                    final numero = contacto.telefono.replaceAll(RegExp(r'[^0-9]'), '');
-                    await launchUrl(Uri.parse('https://wa.me/$numero'), mode: LaunchMode.externalApplication);
-                  },
-                ),
-                IosRow(
-                  icon: Icons.camera_alt_outlined,
-                  iconColor: ctx.colors.brand,
-                  title: 'Reportar un problema con foto',
-                  subtitle: 'Foto + descripción, listo para enviar por WhatsApp',
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _iniciarReporte(context, casaId: casaId, contacto: contacto);
-                  },
-                ),
-              ],
+              rows: filasInteraccionTelefono(
+                context: context,
+                nombre: contacto.nombre,
+                telefono: contacto.telefono,
+                antesDeCadaAccion: () => Navigator.pop(ctx),
+              ),
             ),
             IosSection(
               rows: [
@@ -143,7 +117,53 @@ Future<void> _eliminarContacto(BuildContext context, {required String casaId, re
   }
 }
 
-Future<void> _iniciarReporte(BuildContext context, {required String casaId, required Contacto contacto}) async {
+// Filas de interacción por teléfono (CEO, noviembre 2026: "las mismas
+// opciones que hay en Contactos" también para el profesional de texto libre
+// de un evento, que no vive en la libreta de Contactos -- por eso recibe
+// nombre/teléfono sueltos, no un Contacto entero). Compartidas entre
+// mostrarAccionesContacto (aquí, dentro de una hoja modal -- [antesDeCadaAccion]
+// la cierra antes de cada acción) y la sección de profesional de
+// registro_detail_screen.dart (ya en la propia pantalla, sin hoja que cerrar
+// -- ahí no se pasa [antesDeCadaAccion]).
+List<Widget> filasInteraccionTelefono({
+  required BuildContext context,
+  required String nombre,
+  required String telefono,
+  VoidCallback? antesDeCadaAccion,
+}) => [
+      IosRow(
+        icon: Icons.call_outlined,
+        iconColor: context.colors.brand,
+        title: 'Llamar',
+        onTap: () async {
+          antesDeCadaAccion?.call();
+          await launchUrl(Uri(scheme: 'tel', path: telefono));
+        },
+      ),
+      IosRow(
+        icon: Icons.chat_outlined,
+        iconColor: Colors.green,
+        title: 'Abrir chat de WhatsApp',
+        subtitle: 'Sin foto, solo para escribir',
+        onTap: () async {
+          antesDeCadaAccion?.call();
+          final numero = telefono.replaceAll(RegExp(r'[^0-9]'), '');
+          await launchUrl(Uri.parse('https://wa.me/$numero'), mode: LaunchMode.externalApplication);
+        },
+      ),
+      IosRow(
+        icon: Icons.camera_alt_outlined,
+        iconColor: context.colors.brand,
+        title: 'Reportar un problema con foto',
+        subtitle: 'Foto + descripción, listo para enviar por WhatsApp',
+        onTap: () {
+          antesDeCadaAccion?.call();
+          iniciarReporteConFoto(context, nombre: nombre);
+        },
+      ),
+    ];
+
+Future<void> iniciarReporteConFoto(BuildContext context, {required String nombre}) async {
   final picker = ImagePicker();
   final foto = await showModalBottomSheet<XFile?>(
     context: context,
@@ -183,7 +203,7 @@ Future<void> _iniciarReporte(BuildContext context, {required String casaId, requ
 
   final descripcion = await AppDialog.promptText(
     context,
-    title: '¿Qué le pasa? (para ${contacto.nombre})',
+    title: '¿Qué le pasa? (para $nombre)',
     hint: 'p.ej. Gotea el grifo del baño desde ayer',
     confirmLabel: 'Enviar',
     minLines: 2,

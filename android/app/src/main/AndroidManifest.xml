@@ -11,6 +11,9 @@
          permiso en vano y ninguna notificación llega a mostrarse nunca,
          aunque el token se registre bien. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Importar contactos del teléfono a la libreta de Contactos de la casa
+         (flutter_contacts) — CEO, noviembre 2026. -->
+    <uses-permission android:name="android.permission.READ_CONTACTS"/>
     <application
         android:label="repara"
         android:name="${applicationName}"

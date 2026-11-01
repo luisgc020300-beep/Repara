@@ -17,6 +17,14 @@ import '../services/security/security_preferences_service.dart';
 import 'app_error.dart';
 
 Future<void> abrirDocumento(BuildContext context, Documento documento) async {
+  // Un documento rellenado a mano (Presupuestos/Facturas-Notas sin escanear
+  // nada, CEO noviembre 2026) nunca tiene archivo -- url vacía es la señal,
+  // no un fallo de subida. Nada que abrir, así que ni siquiera se pide el
+  // gate biométrico.
+  if (documento.url.isEmpty) {
+    AppError.show(context, 'Este documento se guardó solo con datos, sin ningún archivo adjunto.');
+    return;
+  }
   if (await SecurityPreferencesService.instance.isDocumentProtectionEnabled()) {
     final verificado = await sl<BiometricService>().authenticate('Verifica tu identidad para abrir este documento') ==
         BiometricAuthResult.success;

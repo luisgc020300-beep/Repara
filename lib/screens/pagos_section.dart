@@ -40,13 +40,22 @@ class PagosSection extends StatelessWidget {
       stream: PagoService.streamPagos(casaId, elementoId, registroId),
       builder: (context, snapshot) {
         final pagos = snapshot.data ?? [];
+        final total = pagos.fold<double>(0, (acc, p) => acc + p.importe);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Pagos', style: Theme.of(context).textTheme.headlineSmall),
+                Row(
+                  children: [
+                    Text('Pagos', style: Theme.of(context).textTheme.headlineSmall),
+                    if (total > 0) ...[
+                      const SizedBox(width: 8),
+                      Text('${total.toStringAsFixed(0)} €', style: ReparaText.amount(context).copyWith(fontSize: 15)),
+                    ],
+                  ],
+                ),
                 if (editable)
                   TextButton.icon(
                     onPressed: () => Navigator.push(

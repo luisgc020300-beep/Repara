@@ -75,6 +75,7 @@ class _NuevoRegistroScreenState extends State<_NuevoRegistroScreen> {
   final _descripcionCtrl = TextEditingController();
   final _costeCtrl = TextEditingController();
   final _profesionalCtrl = TextEditingController();
+  final _profesionalTelefonoCtrl = TextEditingController();
   final _plazoFrecuenciaCtrl = TextEditingController();
   final _plazoImporteCtrl = TextEditingController();
   DateTime _fecha = DateTime.now();
@@ -94,6 +95,7 @@ class _NuevoRegistroScreenState extends State<_NuevoRegistroScreen> {
     _descripcionCtrl.dispose();
     _costeCtrl.dispose();
     _profesionalCtrl.dispose();
+    _profesionalTelefonoCtrl.dispose();
     _plazoFrecuenciaCtrl.dispose();
     _plazoImporteCtrl.dispose();
     super.dispose();
@@ -135,6 +137,9 @@ class _NuevoRegistroScreenState extends State<_NuevoRegistroScreen> {
           profesionalNombre: _profesionalCtrl.text.trim().isEmpty
               ? null
               : _profesionalCtrl.text.trim(),
+          profesionalContacto: _profesionalTelefonoCtrl.text.trim().isEmpty
+              ? null
+              : _profesionalTelefonoCtrl.text.trim(),
           // Los dos van juntos -- si falta cualquiera, no se guarda ninguno
           // (ver comentario de plazoFrecuenciaMeses en models/registro.dart).
           plazoFrecuenciaMeses: frecuencia != null && importePlazo != null
@@ -280,6 +285,14 @@ class _NuevoRegistroScreenState extends State<_NuevoRegistroScreen> {
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: ReparaSpace.s3),
+                  TextField(
+                    controller: _profesionalTelefonoCtrl,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(
+                      labelText: 'Teléfono del profesional (opcional)',
+                    ),
                   ),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,

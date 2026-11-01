@@ -51,6 +51,9 @@ dependencies:
   # volvía a descargar de cero. Con esto, una foto ya vista carga al
   # instante sin red.
   cached_network_image: ^3.4.1
+  # Importar contactos del teléfono a la libreta de Contactos de la casa
+  # (CEO, noviembre 2026).
+  flutter_contacts: ^1.1.9+2
 
 dev_dependencies:
   flutter_test:

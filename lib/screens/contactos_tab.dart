@@ -14,6 +14,7 @@ import '../widgets/app_error.dart';
 import '../widgets/boton_ajustes.dart';
 import '../widgets/ios_list.dart';
 import 'contacto_acciones.dart';
+import 'importar_contactos_screen.dart';
 import 'nuevo_contacto_sheet.dart';
 
 class ContactosTab extends StatefulWidget {
@@ -49,7 +50,14 @@ class _ContactosTabState extends State<ContactosTab> {
             Text('Contactos', style: Theme.of(context).textTheme.displayMedium?.copyWith(fontSize: 26, color: Colors.white)),
           ],
         ),
-        actions: [BotonAjustes(casa: casa)],
+        actions: [
+          IconButton(
+            tooltip: 'Importar de tus contactos',
+            icon: const Icon(Icons.contact_phone_outlined),
+            onPressed: () => abrirImportarContactos(context, casaId: casa.id),
+          ),
+          BotonAjustes(casa: casa),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => mostrarNuevoContactoSheet(context, casaId: casa.id),

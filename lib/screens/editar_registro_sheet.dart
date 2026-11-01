@@ -80,6 +80,9 @@ class _EditarRegistroFormState extends State<_EditarRegistroForm> {
   late final _profesionalCtrl = TextEditingController(
     text: widget.registro.profesionalNombre ?? '',
   );
+  late final _profesionalTelefonoCtrl = TextEditingController(
+    text: widget.registro.profesionalContacto ?? '',
+  );
   late final _plazoFrecuenciaCtrl = TextEditingController(
     text: widget.registro.plazoFrecuenciaMeses?.toString() ?? '',
   );
@@ -98,6 +101,7 @@ class _EditarRegistroFormState extends State<_EditarRegistroForm> {
     _descripcionCtrl.dispose();
     _costeCtrl.dispose();
     _profesionalCtrl.dispose();
+    _profesionalTelefonoCtrl.dispose();
     _plazoFrecuenciaCtrl.dispose();
     _plazoImporteCtrl.dispose();
     super.dispose();
@@ -124,8 +128,10 @@ class _EditarRegistroFormState extends State<_EditarRegistroForm> {
     if (!widget.registro.esConProfesional) {
       final coste = double.tryParse(_costeCtrl.text.replaceAll(',', '.'));
       final profesional = _profesionalCtrl.text.trim();
+      final telefono = _profesionalTelefonoCtrl.text.trim();
       cambios['coste'] = coste;
       cambios['profesionalNombre'] = profesional.isEmpty ? null : profesional;
+      cambios['profesionalContacto'] = telefono.isEmpty ? null : telefono;
       final frecuencia = _pagaAPlazos
           ? int.tryParse(_plazoFrecuenciaCtrl.text)
           : null;
@@ -223,6 +229,14 @@ class _EditarRegistroFormState extends State<_EditarRegistroForm> {
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: ReparaSpace.s3),
+              TextField(
+                controller: _profesionalTelefonoCtrl,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  labelText: 'Teléfono del profesional (opcional)',
+                ),
               ),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,

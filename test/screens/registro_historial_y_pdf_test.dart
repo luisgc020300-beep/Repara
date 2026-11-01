@@ -103,7 +103,18 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Historial de la reparación'), findsOneWidget);
+      // Desplegable cerrado por defecto (rediseño "Presupuestos/Facturas-
+      // Notas/Pagos", noviembre 2026) -- el título del ExpansionTile es
+      // "Historial" a secas (el "Historial de la reparación" interno de
+      // _SeccionHistorial se suprime con mostrarTitulo: false para no
+      // repetirlo), y "Trabajo finalizado" solo aparece tras desplegarlo.
+      expect(find.text('Historial'), findsOneWidget);
+      expect(find.text('Trabajo finalizado'), findsNothing);
+      await tester.ensureVisible(find.text('Historial'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Historial'));
+      await tester.pumpAndSettle();
+
       expect(find.text('Trabajo finalizado'), findsOneWidget);
     },
   );

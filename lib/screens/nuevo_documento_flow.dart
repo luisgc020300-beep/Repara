@@ -123,6 +123,110 @@ Future<void> iniciarNuevoDocumento(
   );
 }
 
+/// Rellenar un presupuesto/factura a mano, sin escanear nada (CEO, noviembre
+/// 2026: "un usuario también puede poner o escanear un presupuesto que le
+/// haya dado un profesional que no use la app -- los mismos campos que un
+/// documento, pero a mano, sin archivo obligatorio"). Mismo formulario de
+/// revisión que el flujo con IA (_RevisionDocumentoScreen), sin páginas ni
+/// sugerencia -- paginas: const [] es la señal de "sin archivo adjunto".
+Future<void> iniciarNuevoDocumentoManual(
+  BuildContext context, {
+  required String casaId,
+  String? elementoId,
+  String? registroId,
+  String? habitacionId,
+  TipoDocumento? tipoInicial,
+}) async {
+  List<Elemento> elementos = const [];
+  try {
+    elementos = await ElementoService.streamElementos(casaId).first;
+  } catch (e) {
+    // Mismo motivo que en iniciarNuevoDocumento: un profesional invitado no
+    // puede listar todos los elementos de la casa -- se sigue sin sugerencias.
+  }
+  if (!context.mounted) return;
+  await Navigator.push<void>(
+    context,
+    MaterialPageRoute(
+      builder: (_) => _RevisionDocumentoScreen(
+        casaId: casaId,
+        paginas: const [],
+        sugerencia: null,
+        elementos: elementos,
+        elementoIdInicial: elementoId,
+        registroIdInicial: registroId,
+        habitacionIdInicial: habitacionId,
+        tipoInicial: tipoInicial,
+      ),
+    ),
+  );
+}
+
+/// Elegir cómo añadir un presupuesto/factura-nota a un evento (CEO,
+/// noviembre 2026): escanear (con IA) o rellenar a mano -- mismo patrón que
+/// "+ Añadir evento" en elemento_detail_screen.dart. [tipoInicial] preselecciona
+/// la categoría al rellenar a mano (Presupuestos -> presupuesto, Facturas/
+/// Notas -> factura, editable igualmente desde el desplegable "Tipo").
+Future<void> elegirFormaDeAnadirDocumento(
+  BuildContext context, {
+  required String casaId,
+  String? elementoId,
+  String? registroId,
+  String? habitacionId,
+  TipoDocumento? tipoInicial,
+}) {
+  return showModalBottomSheet<void>(
+    context: context,
+    builder: (ctx) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          ReparaSpace.s4,
+          ReparaSpace.s2,
+          ReparaSpace.s4,
+          ReparaSpace.s4,
+        ),
+        child: IosSection(
+          rows: [
+            IosRow(
+              icon: Icons.document_scanner_outlined,
+              iconColor: ctx.colors.brand,
+              title: 'Escanear',
+              subtitle: 'La IA rellena los datos por ti',
+              onTap: () {
+                Navigator.pop(ctx);
+                iniciarNuevoDocumento(
+                  context,
+                  casaId: casaId,
+                  elementoId: elementoId,
+                  registroId: registroId,
+                  habitacionId: habitacionId,
+                );
+              },
+            ),
+            IosRow(
+              icon: Icons.edit_outlined,
+              iconColor: ctx.colors.brand,
+              title: 'Rellenar a mano',
+              subtitle: 'Sin escanear nada -- p.ej. lo que te han dicho de palabra',
+              onTap: () {
+                Navigator.pop(ctx);
+                iniciarNuevoDocumentoManual(
+                  context,
+                  casaId: casaId,
+                  elementoId: elementoId,
+                  registroId: registroId,
+                  habitacionId: habitacionId,
+                  tipoInicial: tipoInicial,
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
 // =============================================================================
 // SELECCIÓN DE ORIGEN: cámara, galería (varias páginas) o archivo (PDF)
 // =============================================================================
@@ -403,6 +507,7 @@ class _RevisionDocumentoScreen extends StatefulWidget {
     this.elementoIdInicial,
     this.registroIdInicial,
     this.habitacionIdInicial,
+    this.tipoInicial,
   });
 
   final String casaId;
@@ -412,6 +517,10 @@ class _RevisionDocumentoScreen extends StatefulWidget {
   final String? elementoIdInicial;
   final String? registroIdInicial;
   final String? habitacionIdInicial;
+  // Categoría ya elegida antes de llegar aquí (CEO, noviembre 2026: "Añadir"
+  // desde Presupuestos/Facturas-Notas) -- gana sobre la sugerencia de la IA,
+  // que aquí ni siquiera existe (solo se usa desde iniciarNuevoDocumentoManual).
+  final TipoDocumento? tipoInicial;
 
   @override
   State<_RevisionDocumentoScreen> createState() =>
@@ -419,7 +528,8 @@ class _RevisionDocumentoScreen extends StatefulWidget {
 }
 
 class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
-  late TipoDocumento _tipo = widget.sugerencia?.tipo ?? TipoDocumento.otro;
+  late TipoDocumento _tipo =
+      widget.tipoInicial ?? widget.sugerencia?.tipo ?? TipoDocumento.otro;
   late TipoRegistro _tipoRegistro = _tipoRegistroPorDefecto(
     widget.sugerencia?.tipo,
   );
@@ -624,8 +734,13 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
 
       final documento = Documento(
         id: '',
-        url: urls.first,
-        nombreArchivo: widget.paginas.first.nombre,
+        // Sin páginas = relleno a mano, sin archivo (CEO, noviembre 2026) --
+        // url vacía es la señal de "sin archivo adjunto" en toda la app (ver
+        // documento_abrir.dart).
+        url: urls.isEmpty ? '' : urls.first,
+        nombreArchivo: widget.paginas.isEmpty
+            ? _nombreTipoDoc(_tipo)
+            : widget.paginas.first.nombre,
         tipo: _tipo,
         fecha: _fecha,
         proveedor: _proveedor,
@@ -699,21 +814,28 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
   @override
   Widget build(BuildContext context) {
     final confianza = widget.sugerencia?.confianza;
+    final sinArchivo = widget.paginas.isEmpty;
     return Scaffold(
-      appBar: AppBar(title: const Text('Revisar documento')),
+      appBar: AppBar(
+        title: Text(sinArchivo ? 'Añadir a mano' : 'Revisar documento'),
+      ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(ReparaSpace.s4),
           children: [
             Text(
-              widget.sugerencia != null
+              sinArchivo
+                  ? 'Añade los datos a mano'
+                  : widget.sugerencia != null
                   ? 'Hemos preparado el evento de tu documento'
                   : 'No hemos podido leer el documento automáticamente',
               style: Theme.of(context).textTheme.displaySmall,
             ),
             const SizedBox(height: ReparaSpace.s1),
             Text(
-              widget.sugerencia != null
+              sinArchivo
+                  ? 'Sin archivo, solo los datos que tengas a mano -- p.ej. un presupuesto que te hayan dado de palabra o en papel.'
+                  : widget.sugerencia != null
                   ? 'Revisa los datos y corrige lo que haga falta antes de guardar.'
                   : 'Rellena los datos a mano.',
               style: Theme.of(context).textTheme.bodySmall,
@@ -746,45 +868,49 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
                 ),
               ),
             ],
-            const SizedBox(height: ReparaSpace.s4),
-            SeccionFormulario(
-              titulo: 'Documento original',
-              children: [
-                SizedBox(
-                  height: 90,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: widget.paginas.length,
-                    separatorBuilder: (_, _) =>
-                        const SizedBox(width: ReparaSpace.s2),
-                    itemBuilder: (context, i) {
-                      final p = widget.paginas[i];
-                      return Container(
-                        width: 70,
-                        clipBehavior: Clip.antiAlias,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(ReparaRadius.sm),
-                          border: Border.all(color: context.colors.border),
-                        ),
-                        child: _esPdf(p)
-                            ? Container(
-                                color: context.colors.surfaceMuted,
-                                child: const Icon(
-                                  Icons.picture_as_pdf_outlined,
+            if (!sinArchivo) ...[
+              const SizedBox(height: ReparaSpace.s4),
+              SeccionFormulario(
+                titulo: 'Documento original',
+                children: [
+                  SizedBox(
+                    height: 90,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: widget.paginas.length,
+                      separatorBuilder: (_, _) =>
+                          const SizedBox(width: ReparaSpace.s2),
+                      itemBuilder: (context, i) {
+                        final p = widget.paginas[i];
+                        return Container(
+                          width: 70,
+                          clipBehavior: Clip.antiAlias,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(
+                              ReparaRadius.sm,
+                            ),
+                            border: Border.all(color: context.colors.border),
+                          ),
+                          child: _esPdf(p)
+                              ? Container(
+                                  color: context.colors.surfaceMuted,
+                                  child: const Icon(
+                                    Icons.picture_as_pdf_outlined,
+                                  ),
+                                )
+                              : Image.file(
+                                  p.archivo,
+                                  width: 70,
+                                  height: 90,
+                                  fit: BoxFit.cover,
                                 ),
-                              )
-                            : Image.file(
-                                p.archivo,
-                                width: 70,
-                                height: 90,
-                                fit: BoxFit.cover,
-                              ),
-                      );
-                    },
+                        );
+                      },
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
+            ],
             const SizedBox(height: ReparaSpace.s4),
             SeccionFormulario(
               titulo: 'Información del documento',
