@@ -2234,19 +2234,47 @@ Elementos existentes en esta casa: ${listaElementos.length ? listaElementos.join
 
     const data = await res.json();
     const textoRespuesta = data.content?.[0]?.text || '{}';
-    try {
-      const parsed = JSON.parse(textoRespuesta);
-      return { ok: true, sugerencia: parsed };
-    } catch (e) {
-      // Si el modelo no devuelve JSON válido, no se revienta la función --
-      // el cliente cae al flujo de clasificación manual (ver estadoIA en
-      // lib/models/documento.dart). Nunca se afirma que el documento se
-      // procesó correctamente cuando esto pasa.
-      console.error('classifyDocument: respuesta no parseable como JSON');
-      return { ok: true, sugerencia: null };
-    }
+    const parsed = _parsearJsonDeRespuestaIA(textoRespuesta);
+    if (parsed) return { ok: true, sugerencia: parsed };
+
+    // Si el modelo no devuelve JSON válido, no se revienta la función -- el
+    // cliente cae al flujo de clasificación manual (ver estadoIA en
+    // lib/models/documento.dart). Nunca se afirma que el documento se
+    // procesó correctamente cuando esto pasa. Se registra stop_reason y
+    // longitud (nunca el contenido) para poder diagnosticar sin exponer
+    // datos de la factura del usuario en los logs.
+    console.error(
+      `classifyDocument: respuesta no parseable como JSON (stop_reason=${data.stop_reason}, longitud=${textoRespuesta.length})`
+    );
+    return { ok: true, sugerencia: null };
   }
 );
+
+// Claude a veces no devuelve JSON puro pese a que el prompt lo exige
+// explícitamente: lo envuelve en un bloque ```json...``` de markdown, o le
+// antepone una frase ("No he podido leer bien la fecha, pero esto es lo que
+// veo:") cuando el documento es difícil de leer. Se intenta en orden: JSON
+// directo, JSON sin el fence de markdown, y por último el primer objeto
+// balanceado `{...}` dentro del texto -- null si ninguno parsea.
+function _parsearJsonDeRespuestaIA(texto) {
+  const candidatos = [texto.trim()];
+
+  const fence = texto.trim().match(/^```(?:json)?\s*([\s\S]*?)\s*```$/);
+  if (fence) candidatos.push(fence[1].trim());
+
+  const inicio = texto.indexOf('{');
+  const fin = texto.lastIndexOf('}');
+  if (inicio !== -1 && fin > inicio) candidatos.push(texto.slice(inicio, fin + 1));
+
+  for (const candidato of candidatos) {
+    try {
+      return JSON.parse(candidato);
+    } catch (e) {
+      // se prueba el siguiente candidato
+    }
+  }
+  return null;
+}
 
 // =============================================================================
 // 4. SUGERIR INTERVALO DE MANTENIMIENTO (calendario autogenerado por tipo de

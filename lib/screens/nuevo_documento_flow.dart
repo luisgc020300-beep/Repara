@@ -81,10 +81,16 @@ Future<void> iniciarNuevoDocumento(
     ),
   );
   try {
+    // 55s, no 30s: la Cloud Function (classifyDocument) tiene
+    // timeoutSeconds: 60 -- con un timeout de cliente más corto que el del
+    // servidor, el cliente podía rendirse y mostrar "no se pudo contactar"
+    // mientras la IA todavía estaba trabajando dentro de su propio margen
+    // (confirmado en logs de producción, noviembre 2026: una llamada sin
+    // ningún error de servidor, solo más lenta de lo habitual).
     sugerencia = await DocumentoService.clasificarConIA(
       confirmadas,
       elementosDisponibles: elementos.map((e) => e.nombre).toList(),
-    ).timeout(const Duration(seconds: 30));
+    ).timeout(const Duration(seconds: 55));
   } on FirebaseFunctionsException catch (e) {
     // 'resource-exhausted' es el límite diario de IA -- su mensaje ya es
     // claro para el usuario, a diferencia del resto de fallos de red.
