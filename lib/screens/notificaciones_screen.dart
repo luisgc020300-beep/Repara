@@ -11,19 +11,25 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../models/casa.dart';
 import '../models/notificacion.dart';
 import '../services/analytics_service.dart';
 import '../services/notificacion_router.dart';
 import '../services/notificacion_service.dart';
 import '../theme/design_tokens.dart';
+import '../widgets/boton_ajustes.dart';
 import '../widgets/ios_list.dart';
 
 class NotificacionesScreen extends StatelessWidget {
-  const NotificacionesScreen({required this.modoPro, super.key});
+  const NotificacionesScreen({required this.modoPro, this.casa, super.key});
 
   /// true si se abrió desde Repara Pro -- filtra la lista a solo las
   /// notificaciones de ese lado y decide a qué pantalla de trabajo navegar.
   final bool modoPro;
+
+  /// Se pasa desde Hogar para que el engranaje abra Ajustes con la sección
+  /// "Tu casa". Se omite desde Pro (mismo patrón que BotonAjustes).
+  final Casa? casa;
 
   Future<void> _abrirTrabajo(BuildContext context, Notificacion n) async {
     if (!n.leida) await NotificacionService.marcarLeida(n.id);
@@ -35,7 +41,10 @@ class NotificacionesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Notificaciones', style: Theme.of(context).textTheme.displaySmall)),
+      appBar: AppBar(
+        title: Text('Notificaciones', style: Theme.of(context).textTheme.displaySmall),
+        actions: [BotonAjustes(casa: casa, modoPro: modoPro)],
+      ),
       body: StreamBuilder<List<Notificacion>>(
         stream: NotificacionService.streamMisNotificaciones(),
         builder: (context, snapshot) {

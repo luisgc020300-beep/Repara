@@ -157,7 +157,7 @@ class _CambioCardState extends State<_CambioCard> {
   // como texto (auditoría de accesibilidad, octubre 2026).
   Color _color(BuildContext context) => switch (widget.cambio.estado) {
     EstadoCambioAlcance.pendiente => context.colors.warningText,
-    EstadoCambioAlcance.aprobado => context.colors.success,
+    EstadoCambioAlcance.aprobado => context.colors.successText,
     EstadoCambioAlcance.rechazado => context.colors.errorText,
     EstadoCambioAlcance.cancelado => context.colors.inkMuted,
   };

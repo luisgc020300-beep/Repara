@@ -29,6 +29,7 @@ import '../services/pago_service.dart';
 import '../services/registro_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
+import '../widgets/boton_ajustes.dart';
 import '../widgets/ios_list.dart';
 import '../widgets/pdf_trabajo.dart';
 import 'expediente_vivienda_pdf.dart';
@@ -287,7 +288,10 @@ class _ExpedienteViviendaScreenState extends State<ExpedienteViviendaScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Expediente de la vivienda')),
+      appBar: AppBar(
+        title: const Text('Expediente de la vivienda'),
+        actions: [BotonAjustes(casa: casa)],
+      ),
       body: FutureBuilder<List<Elemento>>(
         // incluirArchivados: true (auditoría R5, octubre 2026) -- este
         // expediente es precisamente el resumen histórico/económico

@@ -34,10 +34,12 @@ import '../services/registro_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_dialog.dart';
 import '../widgets/app_error.dart';
+import '../widgets/boton_ajustes.dart';
 import '../widgets/estado_registro_chip.dart' show nombreEstadoRegistro;
 import '../widgets/foto_ampliada_screen.dart';
 import '../widgets/ios_list.dart';
 import '../widgets/pdf_trabajo.dart';
+import 'compartir_informacion_screen.dart';
 import 'elemento_resumen_pdf.dart';
 import 'nuevo_documento_flow.dart';
 import 'nuevo_elemento_screen.dart';
@@ -448,6 +450,7 @@ class ElementoDetailScreen extends StatelessWidget {
               ),
               _ArchivarElementoButton(casaId: casa.id, elemento: elemento),
               _EliminarElementoButton(casaId: casa.id, elemento: elemento),
+              BotonAjustes(casa: casa),
             ],
           ),
           // null cuando está archivado (auditoría R5, octubre 2026): la
@@ -647,7 +650,25 @@ class ElementoDetailScreen extends StatelessWidget {
                 },
               ),
               const SizedBox(height: 22),
-              _AccionesElemento(casa: casa, elemento: elemento),
+              IosSection(
+                rows: [
+                  IosRow(
+                    icon: Icons.ios_share_outlined,
+                    iconColor: context.colors.brand,
+                    title: 'Compartir y exportar',
+                    subtitle: 'Resumen por texto o ficha en PDF',
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => CompartirInformacionScreen(
+                          title: 'Compartir y exportar',
+                          body: _AccionesElemento(casa: casa, elemento: elemento),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         );
@@ -855,8 +876,6 @@ class _AccionesElementoState extends State<_AccionesElemento> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Compartir y exportar', style: Theme.of(context).textTheme.headlineSmall),
-        const SizedBox(height: 10),
         SizedBox(
           width: double.infinity,
           child: FilledButton.icon(

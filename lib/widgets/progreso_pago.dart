@@ -33,7 +33,7 @@ class ProgresoPago extends StatelessWidget {
         final totalPagado = pagos.fold<double>(0, (acc, p) => acc + p.importe);
         final porcentaje = presupuesto <= 0 ? 0.0 : (totalPagado / presupuesto).clamp(0, 1).toDouble();
         final completo = totalPagado >= presupuesto;
-        final colorEstado = completo ? context.colors.success : context.colors.brand;
+        final colorEstado = completo ? context.colors.successText : context.colors.brand;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,

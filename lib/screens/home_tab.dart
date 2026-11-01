@@ -91,7 +91,7 @@ class _HomeTabState extends State<HomeTab> {
           ],
         ),
         actions: [
-          const BotonNotificaciones(modoPro: false),
+          BotonNotificaciones(modoPro: false, casa: widget.casa),
           BotonAjustes(casa: widget.casa),
         ],
       ),

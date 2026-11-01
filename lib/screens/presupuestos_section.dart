@@ -170,7 +170,7 @@ class _PresupuestoCardState extends State<_PresupuestoCard> {
       switch (widget.presupuesto.estado) {
         EstadoPresupuesto.borrador => context.colors.inkMuted,
         EstadoPresupuesto.enviado => context.colors.warningText,
-        EstadoPresupuesto.aceptado => context.colors.success,
+        EstadoPresupuesto.aceptado => context.colors.successText,
         EstadoPresupuesto.rechazado => context.colors.errorText,
         EstadoPresupuesto.cancelado => context.colors.inkMuted,
       };

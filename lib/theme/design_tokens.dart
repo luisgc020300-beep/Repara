@@ -24,6 +24,7 @@ class ReparaColors extends ThemeExtension<ReparaColors> {
     required this.brandTint,
     required this.sand,
     required this.success,
+    required this.successText,
     required this.warning,
     required this.warningText,
     required this.error,
@@ -44,7 +45,8 @@ class ReparaColors extends ThemeExtension<ReparaColors> {
   final Color brandOn; // texto/icono sobre un fondo de marca relleno
   final Color brandTint; // fondo tenue azul: icono circular, chip activo
   final Color sand; // acento secundario neutro -- decorativo puntual, nunca semántico
-  final Color success;
+  final Color success; // SOLO icono, borde o fondo tenue -- como texto usa successText
+  final Color successText; // variante de success que sí cumple contraste de texto
   final Color warning; // SOLO icono o fondo tenue -- como texto no llega a 4.5:1, usa warningText
   final Color warningText; // variante oscurecida de warning para cumplir contraste de texto
   final Color error; // SOLO icono, borde o fondo tenue -- como texto usa errorText
@@ -66,6 +68,7 @@ class ReparaColors extends ThemeExtension<ReparaColors> {
     brandTint: Color(0x1F42658B),
     sand: Color(0xFF42658B),
     success: Color(0xFF23856D),
+    successText: Color(0xFF1C6F59),
     warning: Color(0xFFE5A23B),
     warningText: Color(0xFF8A5A1F),
     error: Color(0xFFE57373),
@@ -98,6 +101,7 @@ class ReparaColors extends ThemeExtension<ReparaColors> {
     brandTint: Color(0x334F85C4),
     sand: Color(0xFF6D93C2),
     success: Color(0xFF4FB996),
+    successText: Color(0xFF7ED4B7),
     warning: Color(0xFFF0B860),
     warningText: Color(0xFFF3C88A),
     error: Color(0xFFE88888),
@@ -110,7 +114,7 @@ class ReparaColors extends ThemeExtension<ReparaColors> {
     Color? background, Color? surface, Color? surfaceMuted, Color? surfaceSunken, Color? border,
     Color? ink, Color? inkMuted, Color? inkFaint,
     Color? brand, Color? brandStrong, Color? brandOn, Color? brandTint,
-    Color? sand, Color? success, Color? warning, Color? warningText,
+    Color? sand, Color? success, Color? successText, Color? warning, Color? warningText,
     Color? error, Color? errorText, Color? overlay,
   }) {
     return ReparaColors(
@@ -128,6 +132,7 @@ class ReparaColors extends ThemeExtension<ReparaColors> {
       brandTint: brandTint ?? this.brandTint,
       sand: sand ?? this.sand,
       success: success ?? this.success,
+      successText: successText ?? this.successText,
       warning: warning ?? this.warning,
       warningText: warningText ?? this.warningText,
       error: error ?? this.error,
@@ -323,6 +328,39 @@ ThemeData _buildReparaTheme(Brightness brightness) {
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
     ),
+    dialogTheme: DialogThemeData(
+      backgroundColor: palette.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(ReparaRadius.md)),
+    ),
+    // Sin el divider gris por defecto de Material -- el indicador ya marca
+    // la pestaña activa, un divider encima solo añadía una línea gris que
+    // competía con el borde fino del resto del sistema.
+    tabBarTheme: TabBarThemeData(
+      indicatorColor: palette.brandStrong,
+      labelColor: palette.ink,
+      unselectedLabelColor: palette.inkMuted,
+      dividerColor: Colors.transparent,
+      labelStyle: const TextStyle(fontWeight: FontWeight.w600),
+      unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500),
+    ),
+    // El FAB tomaba por defecto colorScheme.primary (brand, azul de
+    // interacción más claro) en vez del azul marino profundo del resto de
+    // CTAs principales -- mismo tono que filledButtonTheme.
+    floatingActionButtonTheme: FloatingActionButtonThemeData(
+      backgroundColor: palette.brandStrong,
+      foregroundColor: palette.brandOn,
+    ),
+    iconTheme: IconThemeData(color: palette.ink),
+    primaryIconTheme: IconThemeData(color: palette.ink),
+    listTileTheme: ListTileThemeData(
+      iconColor: palette.inkMuted,
+      textColor: palette.ink,
+      tileColor: Colors.transparent,
+    ),
+    // Spinners de "generando PDF"/"cargando" tomaban colorScheme.primary por
+    // defecto -- mismo azul marino profundo que el resto de CTAs, no el azul
+    // de interacción más claro.
+    progressIndicatorTheme: ProgressIndicatorThemeData(color: palette.brandStrong),
   );
 }
 

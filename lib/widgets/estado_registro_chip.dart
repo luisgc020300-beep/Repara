@@ -42,7 +42,7 @@ class EstadoRegistroChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final (Color fg, Color bg) = switch (estado) {
       EstadoRegistro.pendienteConfirmacion || EstadoRegistro.pendientePago => (context.colors.warningText, context.colors.warning.withValues(alpha: 0.12)),
-      EstadoRegistro.terminado || EstadoRegistro.archivado => (context.colors.success, context.colors.success.withValues(alpha: 0.12)),
+      EstadoRegistro.terminado || EstadoRegistro.archivado => (context.colors.successText, context.colors.success.withValues(alpha: 0.12)),
       EstadoRegistro.nuevo || EstadoRegistro.presupuestado || EstadoRegistro.enCurso => (context.colors.brand, context.colors.brandTint),
     };
     return Container(
