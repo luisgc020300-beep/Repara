@@ -37,7 +37,6 @@ import '../widgets/estado_registro_chip.dart';
 import '../widgets/historial_timeline.dart';
 import '../widgets/ios_list.dart';
 import 'cambio_alcance_section.dart';
-import 'compartir_informacion_screen.dart';
 import 'editar_registro_sheet.dart';
 import 'elemento_detail_screen.dart';
 import 'nuevo_documento_flow.dart';
@@ -1426,32 +1425,13 @@ class _CuerpoSimple extends StatelessWidget {
                       // aquí era la misma acción dos veces. Exportar/
                       // compartir es lo último que se hace tras revisar el
                       // resumen, los pagos y los documentos -- no el primer
-                      // bloque de la pantalla. Pantalla propia, no botones
-                      // sueltos (rediseño visual, noviembre 2026).
-                      IosSection(
-                        rows: [
-                          IosRow(
-                            icon: Icons.ios_share_outlined,
-                            iconColor: context.colors.brand,
-                            title: 'Compartir y exportar',
-                            subtitle: 'Resumen por texto o PDF',
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => CompartirInformacionScreen(
-                                  title: 'Compartir y exportar',
-                                  body: RegistroSimpleAcciones(
-                                    casa: casa,
-                                    registro: registro,
-                                    pagos: pagos,
-                                    totalPagado: totalPagado,
-                                    onCompartir: () => onCompartirResumen(totalPagado),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                      // bloque de la pantalla.
+                      RegistroSimpleAcciones(
+                        casa: casa,
+                        registro: registro,
+                        pagos: pagos,
+                        totalPagado: totalPagado,
+                        onCompartir: () => onCompartirResumen(totalPagado),
                       ),
                     ],
                   ),

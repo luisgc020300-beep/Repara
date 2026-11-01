@@ -132,7 +132,7 @@ void main() {
 
   group('ElementoDetailScreen -- UI', () {
     testWidgets(
-      'ofrece "Compartir resumen" y "Generar ficha PDF" dentro de "Compartir y exportar"',
+      'ofrece "Compartir resumen" y "Generar ficha PDF"',
       (tester) async {
         final db = FakeFirebaseFirestore();
         await db.collection('casas').doc(_casa.id).collection('elementos').doc('e1').set({
@@ -148,16 +148,11 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        // "Compartir y exportar" pasó a ser una pantalla propia (rediseño
-        // visual, noviembre 2026) -- hay que entrar en ella primero.
         await tester.scrollUntilVisible(
-          find.text('Compartir y exportar'),
+          find.text('Compartir resumen'),
           300,
           scrollable: find.byType(Scrollable).first,
         );
-        await tester.tap(find.text('Compartir y exportar'));
-        await tester.pumpAndSettle();
-
         expect(find.text('Compartir resumen'), findsOneWidget);
         expect(find.text('Generar ficha PDF'), findsOneWidget);
       },
@@ -181,13 +176,10 @@ void main() {
         await tester.pumpAndSettle();
 
         await tester.scrollUntilVisible(
-          find.text('Compartir y exportar'),
+          find.text('Generar ficha PDF'),
           300,
           scrollable: find.byType(Scrollable).first,
         );
-        await tester.tap(find.text('Compartir y exportar'));
-        await tester.pumpAndSettle();
-
         await tester.tap(find.text('Generar ficha PDF'));
         await tester.pumpAndSettle();
 

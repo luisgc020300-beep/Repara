@@ -16,13 +16,28 @@ import '../widgets/ios_list.dart';
 import 'contacto_acciones.dart';
 import 'nuevo_contacto_sheet.dart';
 
-class ContactosTab extends StatelessWidget {
+class ContactosTab extends StatefulWidget {
   const ContactosTab({required this.casa, super.key});
 
   final Casa casa;
 
   @override
+  State<ContactosTab> createState() => _ContactosTabState();
+}
+
+class _ContactosTabState extends State<ContactosTab> {
+  final _busquedaCtrl = TextEditingController();
+  String _busqueda = '';
+
+  @override
+  void dispose() {
+    _busquedaCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final casa = widget.casa;
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: 68,
@@ -69,9 +84,46 @@ class ContactosTab extends StatelessWidget {
               ),
             );
           }
+          // Filtro en memoria, mismo patrón que home_tab.dart -- la agenda
+          // nunca busca gente nueva (ver cabecera del archivo), solo filtra
+          // los contactos que ya tienes cuando la lista crece (CEO,
+          // noviembre 2026).
+          final filtrados = _busqueda.isEmpty
+              ? contactos
+              : contactos
+                    .where(
+                      (c) =>
+                          c.nombre.toLowerCase().contains(_busqueda) ||
+                          (c.especialidad?.toLowerCase().contains(_busqueda) ?? false),
+                    )
+                    .toList();
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 90),
-            children: [IosSection(rows: contactos.map((c) => _ContactoRow(casa: casa, contacto: c)).toList())],
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: TextField(
+                  controller: _busquedaCtrl,
+                  decoration: const InputDecoration(
+                    hintText: 'Buscar contacto',
+                    prefixIcon: Icon(Icons.search, size: 20),
+                    isDense: true,
+                  ),
+                  onChanged: (v) => setState(() => _busqueda = v.trim().toLowerCase()),
+                ),
+              ),
+              if (filtrados.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Text(
+                    'Ningún contacto coincide con "$_busqueda".',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: context.colors.inkMuted),
+                  ),
+                )
+              else
+                IosSection(rows: filtrados.map((c) => _ContactoRow(casa: casa, contacto: c)).toList()),
+            ],
           );
         },
       ),

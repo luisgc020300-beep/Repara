@@ -7,8 +7,10 @@
 // en la pestaña Casa -- tienen más sentido en Inicio, que es donde se mira
 // a diario (CEO, octubre 2026); debajo, el listado filtrable por ubicación.
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 import 'package:intl/intl.dart';
 
 import '../models/casa.dart';
@@ -37,6 +39,22 @@ String _saludo() {
   if (hora < 13) return 'Buenos días';
   if (hora < 20) return 'Buenas tardes';
   return 'Buenas noches';
+}
+
+// Nunca un nombre inventado -- memberProfiles lo rellena el servidor al
+// crear/unirse a la casa (ver functions/index.js), así que si no hay nadie
+// autenticado o su perfil no está (todavía) en memberProfiles, el saludo se
+// queda sin nombre en vez de simular uno. try/catch porque acceder a
+// FirebaseAuth.instance sin una app de Firebase inicializada (los widget
+// tests no la inicializan, solo FakeFirebaseFirestore) lanza -- mismo límite
+// de sistema que ya protegen con debugUidOverride los servicios con sesión.
+String? _nombreUsuarioActual(Casa casa) {
+  try {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    return uid != null ? casa.memberProfiles[uid]?.displayName : null;
+  } catch (_) {
+    return null;
+  }
 }
 
 class HomeTab extends StatefulWidget {
@@ -68,177 +86,168 @@ class _HomeTabState extends State<HomeTab> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        toolbarHeight: 68,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              _saludo(),
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                fontSize: 11,
-                color: context.colors.inkMuted,
-              ),
-            ),
-            Text(
-              widget.casa.nombre,
-              style: Theme.of(
-                context,
-              ).textTheme.displayMedium?.copyWith(fontSize: 26),
-            ),
-          ],
+    // Sin Scaffold.appBar (CEO, noviembre 2026: "⌂ REPARA" debe vivir sobre
+    // el mismo bloque navy que el saludo, pegado a la barra de estado, no en
+    // una barra separada encima) -- AnnotatedRegion fuerza los iconos de la
+    // barra de estado (hora, batería, señal) a blanco, ya que se pintan
+    // sobre el degradado oscuro de _CabeceraNavy en vez de sobre el fondo
+    // claro/oscuro normal del tema.
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: () => mostrarMenuAnadir(context, casa: widget.casa),
+          icon: const Icon(Icons.add),
+          label: const Text('Añadir'),
         ),
-        actions: [
-          BotonNotificaciones(modoPro: false, casa: widget.casa),
-          BotonAjustes(casa: widget.casa),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => mostrarMenuAnadir(context, casa: widget.casa),
-        icon: const Icon(Icons.add),
-        label: const Text('Añadir'),
-      ),
-      // Un único ListView, no un Column con el encabezado fijo arriba y el
-      // listado aparte en un Expanded -- antes el resumen, la búsqueda y los
-      // filtros nunca se iban de la pantalla por mucho que hubiera scroll,
-      // quitándole sitio permanente a los elementos (CEO, octubre 2026: con
-      // muchos elementos, la parte de arriba debe desaparecer progresivamente
-      // al hacer scroll). Ahora todo vive en el mismo scroll: cabecera y
-      // elementos suben juntos, igual que el resto de listas de la app.
-      body: StreamBuilder<List<Habitacion>>(
-        stream: HabitacionService.streamHabitaciones(widget.casa.id),
-        builder: (context, habSnapshot) {
-          final habitaciones = habSnapshot.data ?? const <Habitacion>[];
-          final nombrePorHabitacion = {
-            for (final h in habitaciones) h.id: h.nombre,
-          };
-          return StreamBuilder<List<Elemento>>(
-            stream: ElementoService.streamElementos(
-              widget.casa.id,
-              habitacionId: _habitacionFiltro,
-            ),
-            builder: (context, snapshot) {
-              var elementos = snapshot.data ?? [];
-              if (_busqueda.isNotEmpty) {
-                elementos = elementos
-                    .where((e) => e.nombre.toLowerCase().contains(_busqueda))
-                    .toList();
-              }
-              return ListView(
-                children: [
-                  _ResumenCasa(casa: widget.casa, refreshTick: widget.refreshTick),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                    child: TextField(
-                      controller: _busquedaCtrl,
-                      decoration: InputDecoration(
-                        hintText: 'Buscar elemento',
-                        prefixIcon: const Icon(Icons.search, size: 20),
-                        isDense: true,
-                      ),
-                      onChanged: (v) =>
-                          setState(() => _busqueda = v.trim().toLowerCase()),
+        // Un único ListView, no un Column con el encabezado fijo arriba y el
+        // listado aparte en un Expanded -- antes el resumen, la búsqueda y los
+        // filtros nunca se iban de la pantalla por mucho que hubiera scroll,
+        // quitándole sitio permanente a los elementos (CEO, octubre 2026: con
+        // muchos elementos, la parte de arriba debe desaparecer progresivamente
+        // al hacer scroll). Ahora todo vive en el mismo scroll: cabecera y
+        // elementos suben juntos, igual que el resto de listas de la app.
+        body: StreamBuilder<List<Habitacion>>(
+          stream: HabitacionService.streamHabitaciones(widget.casa.id),
+          builder: (context, habSnapshot) {
+            final habitaciones = habSnapshot.data ?? const <Habitacion>[];
+            final nombrePorHabitacion = {
+              for (final h in habitaciones) h.id: h.nombre,
+            };
+            return StreamBuilder<List<Elemento>>(
+              stream: ElementoService.streamElementos(
+                widget.casa.id,
+                habitacionId: _habitacionFiltro,
+              ),
+              builder: (context, snapshot) {
+                var elementos = snapshot.data ?? [];
+                if (_busqueda.isNotEmpty) {
+                  elementos = elementos
+                      .where((e) => e.nombre.toLowerCase().contains(_busqueda))
+                      .toList();
+                }
+                return ListView(
+                  padding: EdgeInsets.zero,
+                  children: [
+                    _CabeceraNavy(casa: widget.casa),
+                    _ResumenCasa(
+                      casa: widget.casa,
+                      refreshTick: widget.refreshTick,
                     ),
-                  ),
-                  if (habitaciones.isNotEmpty)
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            ChoiceChip(
-                              label: const Text('Todo'),
-                              selected: _habitacionFiltro == null,
-                              onSelected: (_) =>
-                                  setState(() => _habitacionFiltro = null),
-                            ),
-                            const SizedBox(width: 8),
-                            ...habitaciones.map(
-                              (h) => Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: ChoiceChip(
-                                  label: Text(h.nombre),
-                                  selected: _habitacionFiltro == h.id,
-                                  onSelected: (_) =>
-                                      setState(() => _habitacionFiltro = h.id),
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                      child: TextField(
+                        controller: _busquedaCtrl,
+                        decoration: InputDecoration(
+                          hintText: 'Buscar elemento',
+                          prefixIcon: const Icon(Icons.search, size: 20),
+                          isDense: true,
+                        ),
+                        onChanged: (v) =>
+                            setState(() => _busqueda = v.trim().toLowerCase()),
+                      ),
+                    ),
+                    if (habitaciones.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              ChoiceChip(
+                                label: const Text('Todo'),
+                                selected: _habitacionFiltro == null,
+                                onSelected: (_) =>
+                                    setState(() => _habitacionFiltro = null),
+                              ),
+                              const SizedBox(width: 8),
+                              ...habitaciones.map(
+                                (h) => Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: ChoiceChip(
+                                    label: Text(h.nombre),
+                                    selected: _habitacionFiltro == h.id,
+                                    onSelected: (_) => setState(
+                                      () => _habitacionFiltro = h.id,
+                                    ),
+                                  ),
                                 ),
                               ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    if (elementos.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          children: [
+                            Container(
+                              width: 72,
+                              height: 72,
+                              decoration: BoxDecoration(
+                                color: context.colors.brandTint,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.inventory_2_outlined,
+                                size: 32,
+                                color: context.colors.brand,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Todavía no hay ningún elemento aquí.\nToca "Añadir" para crear el primero.',
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: ReparaSpace.s2,
+                              ),
+                              child: Text(
+                                'Tus elementos',
+                                style: Theme.of(
+                                  context,
+                                ).textTheme.headlineSmall,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            // Un único contenedor con filas internas, no una
+                            // Card por elemento (CEO: "evita acumular
+                            // tarjetas") -- mismo patrón que Historial/
+                            // Documentos en registro_detail_screen.dart y
+                            // elemento_detail_screen.dart.
+                            IosSection(
+                              rows: elementos
+                                  .map(
+                                    (e) => _ElementoRow(
+                                      casa: widget.casa,
+                                      elemento: e,
+                                      ubicacion:
+                                          nombrePorHabitacion[e.habitacionId],
+                                    ),
+                                  )
+                                  .toList(),
                             ),
                           ],
                         ),
                       ),
-                    ),
-                  if (elementos.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        children: [
-                          Container(
-                            width: 72,
-                            height: 72,
-                            decoration: BoxDecoration(
-                              color: context.colors.brandTint,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.inventory_2_outlined,
-                              size: 32,
-                              color: context.colors.brand,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Todavía no hay ningún elemento aquí.\nToca "Añadir" para crear el primero.',
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ],
-                      ),
-                    )
-                  else
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              vertical: ReparaSpace.s2,
-                            ),
-                            child: Text(
-                              'Tus elementos',
-                              style: Theme.of(context).textTheme.headlineSmall,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          // Un único contenedor con filas internas, no una
-                          // Card por elemento (CEO: "evita acumular
-                          // tarjetas") -- mismo patrón que Historial/
-                          // Documentos en registro_detail_screen.dart y
-                          // elemento_detail_screen.dart.
-                          IosSection(
-                            rows: elementos
-                                .map(
-                                  (e) => _ElementoRow(
-                                    casa: widget.casa,
-                                    elemento: e,
-                                    ubicacion:
-                                        nombrePorHabitacion[e.habitacionId],
-                                  ),
-                                )
-                                .toList(),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              );
-            },
-          );
-        },
+                  ],
+                );
+              },
+            );
+          },
+        ),
       ),
     );
   }
@@ -299,7 +308,7 @@ class _ResumenCasa extends StatelessWidget {
   Widget build(BuildContext context) {
     final tick = refreshTick;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, ReparaSpace.s4),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, ReparaSpace.s4),
       child: tick == null
           ? _futureBuilder(context)
           : ValueListenableBuilder<int>(
@@ -321,177 +330,202 @@ class _ResumenCasa extends StatelessWidget {
         RegistroService.registrosConTrabajoPendiente(casa.id),
       ]),
       builder: (context, snapshot) {
-          final garantias = (snapshot.data?[0] as List<Elemento>?) ?? const [];
-          final revisiones = (snapshot.data?[1] as List<Elemento>?) ?? const [];
-          final pendientes =
-              (snapshot.data?[2]
-                  as List<
-                    ({
-                      Elemento elemento,
-                      String registroId,
-                      String registroTitulo,
-                      DateTime fecha,
-                      String? fotoUrl,
-                    })
-                  >?) ??
-              const [];
-          final todoEnOrden = garantias.isEmpty && revisiones.isEmpty;
-          final avisoMasUrgente = _avisoMasUrgente(garantias, revisiones);
+        final garantias = (snapshot.data?[0] as List<Elemento>?) ?? const [];
+        final revisiones = (snapshot.data?[1] as List<Elemento>?) ?? const [];
+        final pendientes =
+            (snapshot.data?[2]
+                as List<
+                  ({
+                    Elemento elemento,
+                    String registroId,
+                    String registroTitulo,
+                    DateTime fecha,
+                    String? fotoUrl,
+                  })
+                >?) ??
+            const [];
+        final avisoMasUrgente = _avisoMasUrgente(garantias, revisiones);
 
-          return Column(
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: _StatCard(
+                    icon: Icons.shield_outlined,
+                    iconColor: context.colors.warning,
+                    numero: garantias.length,
+                    etiqueta: 'Garantías',
+                    destacado: garantias.isNotEmpty,
+                    onTap: () async {
+                      final elementos = await ElementoService.conGarantia(
+                        casa.id,
+                      );
+                      if (context.mounted) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => GarantiasProximasScreen(
+                              casa: casa,
+                              elementos: elementos,
+                              titulo: 'Todas las garantías',
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(width: ReparaSpace.s2),
+                Expanded(
+                  child: _StatCard(
+                    icon: Icons.build_circle_outlined,
+                    iconColor: context.colors.brand,
+                    numero: revisiones.length,
+                    etiqueta: 'Revisión',
+                    destacado: revisiones.isNotEmpty,
+                    onTap: () async {
+                      final elementos =
+                          await ElementoService.conMantenimientoConfigurado(
+                            casa.id,
+                          );
+                      if (context.mounted) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => RevisionesPendientesScreen(
+                              casa: casa,
+                              elementos: elementos,
+                              titulo: 'Todo el mantenimiento',
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(width: ReparaSpace.s2),
+                Expanded(
+                  child: _StatCard(
+                    icon: Icons.hourglass_top_outlined,
+                    iconColor: context.colors.brand,
+                    numero: pendientes.length,
+                    etiqueta: 'En curso',
+                    destacado: pendientes.isNotEmpty,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => TrabajosPendientesScreen(
+                          casa: casa,
+                          items: pendientes,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (avisoMasUrgente != null) ...[
+              const SizedBox(height: ReparaSpace.s3),
+              _BannerAviso(casa: casa, aviso: avisoMasUrgente),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Banner de bienvenida (rediseño visual, noviembre 2026) -- sustituye a la
+/// tarjeta "Todo en orden"/"Hay cosas que revisar": un solo bloque navy desde
+/// la barra de estado (CEO, noviembre 2026: "el icono y REPARA deben vivir
+/// sobre el mismo fondo azul marino que el saludo, no en una barra blanca
+/// aparte") -- SafeArea solo inset-ea el contenido, el Container de fondo
+/// sigue pintando detrás de la barra de estado. Marca + notificaciones +
+/// ajustes arriba, saludo por hora del día (_saludo(), antes en el AppBar)
+/// más el nombre real del usuario (de memberProfiles, que el servidor ya
+/// rellena al crear/unirse a la casa -- nunca un nombre inventado) y el
+/// nombre real de la casa debajo. Sin foto de fondo: Casa no tiene ningún
+/// campo de foto de vivienda, así que en vez de simular una se usa el mismo
+/// degradado de marca que antes solo llevaba la tarjeta de saludo.
+class _CabeceraNavy extends StatelessWidget {
+  const _CabeceraNavy({required this.casa});
+
+  final Casa casa;
+
+  @override
+  Widget build(BuildContext context) {
+    final saludo = _saludo();
+    final nombreUsuario = _nombreUsuarioActual(casa);
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [context.colors.brandStrong, context.colors.brand],
+        ),
+        borderRadius: const BorderRadius.vertical(
+          bottom: Radius.circular(ReparaRadius.lg),
+        ),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 12, 20),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Una sola tarjeta para estado + métricas -- antes eran 4
-              // tarjetas sueltas (estado + 3 tiles) apiladas con huecos entre
-              // ellas, que se leían como piezas independientes en vez de un
-              // resumen único (briefing "REPARA Professional": "deben
-              // percibirse como una unidad coherente").
-              Card(
-                margin: EdgeInsets.zero,
-                clipBehavior: Clip.antiAlias,
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(ReparaSpace.s4),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: context.colors.brandTint,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              todoEnOrden
-                                  ? Icons.home_outlined
-                                  : Icons.home_repair_service_outlined,
-                              color: context.colors.brand,
-                            ),
-                          ),
-                          const SizedBox(width: ReparaSpace.s3),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  todoEnOrden
-                                      ? 'Todo en orden'
-                                      : 'Hay cosas que revisar',
-                                  style: Theme.of(context).textTheme.titleMedium
-                                      ?.copyWith(fontWeight: FontWeight.w700),
-                                ),
-                                Text(
-                                  todoEnOrden
-                                      ? 'Tu vivienda, organizada.'
-                                      : 'Garantías o revisiones que necesitan tu atención.',
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
+              Row(
+                children: [
+                  const Icon(Icons.home_rounded, color: Colors.white, size: 20),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'REPARA',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
                     ),
-                    Divider(height: 1, color: context.colors.border),
-                    IntrinsicHeight(
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: _MetricTile(
-                              icon: Icons.shield_outlined,
-                              iconColor: context.colors.warning,
-                              numero: garantias.length,
-                              numeroColor: context.colors.warningText,
-                              etiqueta: 'Garantías',
-                              onTap: () async {
-                                final elementos =
-                                    await ElementoService.conGarantia(casa.id);
-                                if (context.mounted) {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => GarantiasProximasScreen(
-                                        casa: casa,
-                                        elementos: elementos,
-                                        titulo: 'Todas las garantías',
-                                      ),
-                                    ),
-                                  );
-                                }
-                              },
-                            ),
-                          ),
-                          VerticalDivider(
-                            width: 1,
-                            thickness: 1,
-                            color: context.colors.border,
-                          ),
-                          Expanded(
-                            child: _MetricTile(
-                              icon: Icons.build_circle_outlined,
-                              iconColor: context.colors.brand,
-                              numero: revisiones.length,
-                              numeroColor: context.colors.brand,
-                              etiqueta: 'Revisión',
-                              onTap: () async {
-                                final elementos =
-                                    await ElementoService.conMantenimientoConfigurado(
-                                      casa.id,
-                                    );
-                                if (context.mounted) {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          RevisionesPendientesScreen(
-                                            casa: casa,
-                                            elementos: elementos,
-                                            titulo: 'Todo el mantenimiento',
-                                          ),
-                                    ),
-                                  );
-                                }
-                              },
-                            ),
-                          ),
-                          VerticalDivider(
-                            width: 1,
-                            thickness: 1,
-                            color: context.colors.border,
-                          ),
-                          Expanded(
-                            child: _MetricTile(
-                              icon: Icons.hourglass_top_outlined,
-                              iconColor: context.colors.brand,
-                              numero: pendientes.length,
-                              numeroColor: context.colors.brand,
-                              etiqueta: 'En curso',
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => TrabajosPendientesScreen(
-                                    casa: casa,
-                                    items: pendientes,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                  ),
+                  const Spacer(),
+                  IconTheme.merge(
+                    data: const IconThemeData(color: Colors.white),
+                    child: BotonNotificaciones(modoPro: false, casa: casa),
+                  ),
+                  IconTheme.merge(
+                    data: const IconThemeData(color: Colors.white),
+                    child: BotonAjustes(casa: casa),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Text(
+                nombreUsuario != null && nombreUsuario.isNotEmpty
+                    ? '$saludo, $nombreUsuario'
+                    : saludo,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-              if (avisoMasUrgente != null) ...[
-                const SizedBox(height: ReparaSpace.s3),
-                _BannerAviso(casa: casa, aviso: avisoMasUrgente),
-              ],
+              const SizedBox(height: 4),
+              Text(
+                casa.nombre,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.85),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ],
-          );
-        },
-      );
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -564,52 +598,62 @@ class _BannerAviso extends StatelessWidget {
   }
 }
 
-/// Un tercio de la fila de métricas dentro de la tarjeta única de resumen --
-/// sin Card ni borde propios (antes cada una era su propia tarjeta); el
-/// InkWell ocupa toda la altura de la fila gracias al IntrinsicHeight del
-/// padre, así el área tocable sigue siendo tan grande como antes.
-class _MetricTile extends StatelessWidget {
-  const _MetricTile({
+/// Tarjeta propia por métrica (rediseño visual, noviembre 2026) -- antes las
+/// tres vivían como tercios de una única Card con divisores internos; ahora
+/// cada una es su propia tarjeta redondeada, con fondo tenue cuando
+/// [destacado] (hay algo real que mirar) para que destaque sin inventar un
+/// color nuevo -- reutiliza el mismo [iconColor] semántico que ya tenía cada
+/// métrica, solo como fondo en vez de solo como icono.
+class _StatCard extends StatelessWidget {
+  const _StatCard({
     required this.icon,
     required this.iconColor,
     required this.numero,
-    required this.numeroColor,
     required this.etiqueta,
+    required this.destacado,
     required this.onTap,
   });
 
   final IconData icon;
   final Color iconColor;
   final int numero;
-  final Color numeroColor;
   final String etiqueta;
+  final bool destacado;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      color: destacado ? iconColor.withValues(alpha: 0.08) : null,
       child: InkWell(
         onTap: onTap,
         child: Semantics(
           label: '$etiqueta: $numero',
           button: true,
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon, size: 19, color: iconColor),
-                const SizedBox(height: 6),
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: iconColor.withValues(alpha: 0.14),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, size: 18, color: iconColor),
+                ),
+                const SizedBox(height: 8),
                 Text(
                   '$numero',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontSize: 25,
-                    color: numeroColor,
-                    height: 1,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.headlineSmall?.copyWith(fontSize: 22, height: 1),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 Text(
                   etiqueta.toUpperCase(),
                   textAlign: TextAlign.center,

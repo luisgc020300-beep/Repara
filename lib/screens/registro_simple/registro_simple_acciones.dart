@@ -67,6 +67,11 @@ class _RegistroSimpleAccionesState extends State<RegistroSimpleAcciones> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Text(
+          'Acciones rápidas',
+          style: Theme.of(context).textTheme.headlineSmall,
+        ),
+        const SizedBox(height: 10),
         SizedBox(
           width: double.infinity,
           child: FilledButton.icon(
