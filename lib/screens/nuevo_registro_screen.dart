@@ -81,6 +81,12 @@ class _NuevoRegistroScreenState extends State<_NuevoRegistroScreen> {
   DateTime _fecha = DateTime.now();
   bool _esConProfesional = false;
   bool _pagaAPlazos = false;
+  // CEO, noviembre 2026: "a veces el trabajo no está hecho al registrarlo,
+  // deberías poder poner en qué estado se encuentra de inicio" -- por
+  // defecto true (comportamiento de siempre: se anota algo que ya pasó),
+  // solo para un registro simple -- uno con profesional ya nace "nuevo"
+  // (pendiente de presupuesto/invitación) por su propio flujo.
+  bool _yaRealizado = true;
   bool _guardando = false;
 
   /// Eco visual en el propio campo del mismo error que ya muestra el
@@ -129,7 +135,7 @@ class _NuevoRegistroScreenState extends State<_NuevoRegistroScreen> {
           titulo: titulo,
           estado: _esConProfesional
               ? EstadoRegistro.nuevo
-              : estadoInicialRegistroSimple(coste),
+              : estadoInicialRegistroSimple(coste, yaRealizado: _yaRealizado),
           descripcion: _descripcionCtrl.text.trim().isEmpty
               ? null
               : _descripcionCtrl.text.trim(),
@@ -255,6 +261,18 @@ class _NuevoRegistroScreenState extends State<_NuevoRegistroScreen> {
                   icon: const Icon(Icons.calendar_today_outlined, size: 16),
                   label: Text('${_fecha.day}/${_fecha.month}/${_fecha.year}'),
                 ),
+                if (!_esConProfesional) ...[
+                  const SizedBox(height: ReparaSpace.s2),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('¿Ya se ha realizado el trabajo?'),
+                    subtitle: const Text(
+                      'Desactívalo si todavía está pendiente de hacer',
+                    ),
+                    value: _yaRealizado,
+                    onChanged: (v) => setState(() => _yaRealizado = v),
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: ReparaSpace.s4),

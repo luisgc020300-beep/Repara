@@ -72,4 +72,25 @@ void main() {
       expect(find.byIcon(Icons.check), findsNWidgets(3));
     },
   );
+
+  // CEO, noviembre 2026: "a veces el trabajo no está hecho al registrarlo"
+  // -- enCurso es el nuevo estado inicial para eso, "Trabajo realizado" NO
+  // debe quedar marcado como completado todavía (bug real que este test
+  // habría cogido: con la lógica vieja -- "trabajo realizado" siempre
+  // completo -- este caso ni existía).
+  testWidgets(
+    'en curso (todavía no realizado): ningún paso tiene el check todavía',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildReparaLightTheme(),
+          home: Scaffold(
+            body: RegistroSimpleProgreso(registro: _registro(EstadoRegistro.enCurso)),
+          ),
+        ),
+      );
+
+      expect(find.byIcon(Icons.check), findsNothing);
+    },
+  );
 }

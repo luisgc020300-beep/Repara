@@ -343,4 +343,23 @@ void main() {
       expect(RegistroService.esTrabajoActivo(simpleTerminado), isFalse);
     },
   );
+
+  // CEO, noviembre 2026: un registro simple "todavía no realizado" (enCurso)
+  // debe contar igual que pendientePago -- si no, Inicio no lo avisaría y
+  // se podría archivar el elemento con un trabajo pendiente de hacer colgando.
+  test(
+    'esTrabajoActivo() también es true para un registro simple en enCurso (todavía no realizado)',
+    () {
+      final simpleEnCurso = Registro(
+        id: '',
+        elementoNombre: 'Caldera',
+        tipo: TipoRegistro.compra,
+        esConProfesional: false,
+        titulo: 'Compra',
+        estado: EstadoRegistro.enCurso,
+        fecha: DateTime(2026, 1, 1),
+      );
+      expect(RegistroService.esTrabajoActivo(simpleEnCurso), isTrue);
+    },
+  );
 }

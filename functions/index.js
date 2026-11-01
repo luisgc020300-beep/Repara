@@ -1742,6 +1742,7 @@ function tieneTrabajoActivo(registrosSnap) {
   return registrosSnap.docs.some((d) => {
     const r = d.data();
     return r.estado === 'pendientePago' ||
+      (r.esConProfesional !== true && r.estado === 'enCurso') ||
       (r.esConProfesional === true && r.estado !== 'terminado' && r.estado !== 'archivado');
   });
 }

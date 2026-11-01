@@ -3,12 +3,14 @@
 // Línea de progreso de 3 pasos (CEO, octubre 2026) -- SOLO para un
 // registro simple (sin profesional). Los pasos se derivan siempre de
 // Registro.estado real, nunca se marca nada por su cuenta: un registro
-// simple solo vive en pendientePago o terminado/archivado (ver
+// simple vive en enCurso (CEO, noviembre 2026: "a veces el trabajo no está
+// hecho al registrarlo"), pendientePago o terminado/archivado (ver
 // estadoInicialRegistroSimple/estadoTrasCambioDePago en registro.dart/
-// functions/index.js) -- "trabajo realizado" está completo siempre (un
-// evento simple se anota cuando el trabajo ya ha pasado), "cobro
-// pendiente" es el paso actual mientras el registro siga en
-// pendientePago, y "terminado" solo se alcanza cuando el propio estado
+// functions/index.js) -- "trabajo realizado" es el paso actual mientras
+// siga en enCurso (todavía no se ha marcado como hecho), pasa a completado
+// en cuanto el estado real deja de ser enCurso; "cobro pendiente" es el
+// paso actual solo una vez el trabajo ya está hecho pero el registro sigue
+// en pendientePago, y "terminado" solo se alcanza cuando el propio estado
 // real ya es terminado/archivado (es decir, cuando el pago real lo cubre
 // del todo, ver estadoTrasCambioDePago).
 import 'package:flutter/material.dart';
@@ -25,14 +27,20 @@ class RegistroSimpleProgreso extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final trabajoHecho = registro.estado != EstadoRegistro.enCurso;
     final cobrado =
         registro.estado == EstadoRegistro.terminado ||
         registro.estado == EstadoRegistro.archivado;
     final pasos = <(String, _PasoEstado)>[
-      ('Trabajo realizado', _PasoEstado.completado),
+      (
+        'Trabajo realizado',
+        trabajoHecho ? _PasoEstado.completado : _PasoEstado.actual,
+      ),
       (
         'Cobro pendiente',
-        cobrado ? _PasoEstado.completado : _PasoEstado.actual,
+        cobrado
+            ? _PasoEstado.completado
+            : (trabajoHecho ? _PasoEstado.actual : _PasoEstado.pendiente),
       ),
       ('Terminado', cobrado ? _PasoEstado.completado : _PasoEstado.pendiente),
     ];

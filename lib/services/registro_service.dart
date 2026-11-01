@@ -62,16 +62,19 @@ class RegistroService {
   /// "Trabajo activo o pendiente" en el sentido de sección 25 del spec
   /// (aviso de Inicio) y, desde la auditoría R5 (octubre 2026), también el
   /// criterio que bloquea archivar un elemento: un registro con profesional
-  /// todavía no cerrado, O CUALQUIER registro (con o sin profesional) en
-  /// `pendientePago` -- trabajo hecho pero sin cobrar, CEO octubre 2026, no
-  /// debe poder "olvidarse" una vez el trabajo está físicamente terminado.
-  /// Mismo criterio, repetido server-side en functions/index.js
-  /// (tieneTrabajoActivo) porque la decisión de bloquear el archivado tiene
-  /// que tomarse en servidor, no solo aquí -- esta función de aquí es solo
-  /// para que la UI pueda mostrar u ocultar el botón sin tener que llamar a
-  /// la Cloud Function a ciegas.
+  /// todavía no cerrado, un registro simple todavía sin realizar (`enCurso`,
+  /// CEO noviembre 2026 -- antes un registro simple nacía siempre dando por
+  /// hecho que el trabajo ya había pasado), O CUALQUIER registro (con o sin
+  /// profesional) en `pendientePago` -- trabajo hecho pero sin cobrar, CEO
+  /// octubre 2026, no debe poder "olvidarse" una vez el trabajo está
+  /// físicamente terminado. Mismo criterio, repetido server-side en
+  /// functions/index.js (tieneTrabajoActivo) porque la decisión de bloquear
+  /// el archivado tiene que tomarse en servidor, no solo aquí -- esta
+  /// función de aquí es solo para que la UI pueda mostrar u ocultar el
+  /// botón sin tener que llamar a la Cloud Function a ciegas.
   static bool esTrabajoActivo(Registro r) =>
       r.estado == EstadoRegistro.pendientePago ||
+      (!r.esConProfesional && r.estado == EstadoRegistro.enCurso) ||
       (r.esConProfesional &&
           r.estado != EstadoRegistro.terminado &&
           r.estado != EstadoRegistro.archivado);

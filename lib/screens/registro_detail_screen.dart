@@ -396,6 +396,7 @@ class RegistroDetailScreen extends StatelessWidget {
                   registro: registro,
                   onCompartirResumen: (pagado) =>
                       _compartirResumen(context, registro, pagado),
+                  onFinalizar: () => _finalizar(context, registro),
                 ),
         );
       },
@@ -1265,12 +1266,19 @@ class _CuerpoSimple extends StatelessWidget {
     required this.elementoId,
     required this.registro,
     required this.onCompartirResumen,
+    required this.onFinalizar,
   });
 
   final Casa casa;
   final String elementoId;
   final Registro registro;
   final void Function(double? pagado) onCompartirResumen;
+  // "Marcar como realizado" (CEO, noviembre 2026: "a veces el trabajo no
+  // está hecho al registrarlo") -- solo se usa cuando estado == enCurso;
+  // reutiliza _finalizar/finalizarTrabajoPropietario tal cual, que ya era
+  // genérico (nunca comprobaba esConProfesional) y ya decide terminado vs.
+  // pendientePago según si el coste está cubierto por los pagos.
+  final VoidCallback onFinalizar;
 
   @override
   Widget build(BuildContext context) {
@@ -1302,7 +1310,21 @@ class _CuerpoSimple extends StatelessWidget {
                   elemento: elementoSnap.data,
                 ),
                 RegistroSimpleProgreso(registro: registro),
-                if (registro.estado == EstadoRegistro.pendientePago)
+                if (registro.estado == EstadoRegistro.enCurso)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                    child: AvisoRegistro(
+                      mensaje: 'Todavía no se ha realizado este trabajo.',
+                      acciones: SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          onPressed: onFinalizar,
+                          child: const Text('Marcar como realizado'),
+                        ),
+                      ),
+                    ),
+                  )
+                else if (registro.estado == EstadoRegistro.pendientePago)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
                     child: AvisoRegistro(

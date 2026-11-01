@@ -23,6 +23,21 @@ void main() {
     test('con coste positivo, nace pendientePago -- todavía no hay ningún pago', () {
       expect(estadoInicialRegistroSimple(2000), EstadoRegistro.pendientePago);
     });
+
+    // CEO, noviembre 2026: "a veces el trabajo no está hecho al
+    // registrarlo" -- yaRealizado: false nace enCurso pase lo que pase con
+    // el coste, da igual si hay algo que cobrar o no, porque todavía no hay
+    // nada que hacer con el cobro mientras el trabajo en sí no esté hecho.
+    test('yaRealizado: false nace enCurso, con o sin coste', () {
+      expect(
+        estadoInicialRegistroSimple(2000, yaRealizado: false),
+        EstadoRegistro.enCurso,
+      );
+      expect(
+        estadoInicialRegistroSimple(null, yaRealizado: false),
+        EstadoRegistro.enCurso,
+      );
+    });
   });
 
   group('montoDebidoRegistro()', () {

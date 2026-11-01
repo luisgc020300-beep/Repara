@@ -79,11 +79,20 @@ double? montoDebidoRegistro(Registro r) => r.presupuesto ?? r.coste;
 
 // Un registro simple (sin profesional) solo tiene algo que cobrar si se le
 // puso un coste > 0 al crearlo -- si no, nace "terminado" directo, nunca
-// "pendientePago" sin nada pendiente de verdad.
-EstadoRegistro estadoInicialRegistroSimple(double? coste) =>
-    (coste != null && coste > 0)
-    ? EstadoRegistro.pendientePago
-    : EstadoRegistro.terminado;
+// "pendientePago" sin nada pendiente de verdad. [yaRealizado] = false (CEO,
+// noviembre 2026: "a veces el trabajo no está hecho al registrarlo, deberías
+// poder poner en qué estado se encuentra de inicio") -- nace en enCurso,
+// pendiente de que "Marcar como realizado" lo pase a pendientePago/
+// terminado según toque, igual que hace finalizarTrabajoPropietario.
+EstadoRegistro estadoInicialRegistroSimple(
+  double? coste, {
+  bool yaRealizado = true,
+}) {
+  if (!yaRealizado) return EstadoRegistro.enCurso;
+  return (coste != null && coste > 0)
+      ? EstadoRegistro.pendientePago
+      : EstadoRegistro.terminado;
+}
 
 EstadoRegistro estadoRegistroFromString(String? s) => EstadoRegistro.values
     .firstWhere((t) => t.name == s, orElse: () => EstadoRegistro.nuevo);
