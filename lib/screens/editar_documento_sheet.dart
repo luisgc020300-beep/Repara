@@ -15,6 +15,7 @@ import '../models/documento.dart';
 import '../services/documento_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
+import '../widgets/miniatura_documento.dart';
 import '../widgets/seccion_formulario.dart';
 
 Future<void> mostrarEditarDocumentoSheet(
@@ -143,6 +144,13 @@ class _EditarDocumentoFormState extends State<_EditarDocumentoForm> {
           children: [
             Text('Editar documento', style: Theme.of(context).textTheme.displaySmall),
             const SizedBox(height: ReparaSpace.s4),
+            if (widget.documento.url.isNotEmpty) ...[
+              MiniaturaDocumento(
+                url: widget.documento.url,
+                nombreArchivo: widget.documento.nombreArchivo,
+              ),
+              const SizedBox(height: ReparaSpace.s4),
+            ],
             SeccionFormulario(
               titulo: 'Información del documento',
               children: [

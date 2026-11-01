@@ -131,13 +131,21 @@ Future<void> abrirDocumento(BuildContext context, Documento documento) async {
     AppError.show(context, 'Este documento se guardó solo con datos, sin ningún archivo adjunto.');
     return;
   }
+  await abrirArchivoProtegido(context, documento.url);
+}
+
+/// Mismo gate biométrico de arriba, pero recibiendo la url suelta en vez de
+/// un Documento entero -- lo reutiliza MiniaturaDocumento (CEO, noviembre
+/// 2026) para el comprobante de un Pago, que no es un Documento de la
+/// colección de siempre.
+Future<void> abrirArchivoProtegido(BuildContext context, String url) async {
   if (await SecurityPreferencesService.instance.isDocumentProtectionEnabled()) {
     final verificado = await sl<BiometricService>().authenticate('Verifica tu identidad para abrir este documento') ==
         BiometricAuthResult.success;
     if (!verificado) return;
   }
   if (!context.mounted) return;
-  final uri = Uri.tryParse(documento.url);
+  final uri = Uri.tryParse(url);
   if (uri == null || !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
     if (context.mounted) AppError.show(context, 'No se pudo abrir el documento.');
   }

@@ -1450,6 +1450,7 @@ function validarDatosPago(data) {
   if (typeof data?.concepto === 'string' && data.concepto.trim()) opcionales.concepto = data.concepto.trim().slice(0, 200);
   if (typeof data?.descripcion === 'string' && data.descripcion.trim()) opcionales.descripcion = data.descripcion.trim().slice(0, 1000);
   if (typeof data?.metodo === 'string' && data.metodo) opcionales.metodo = data.metodo;
+  if (typeof data?.comprobante === 'string' && data.comprobante.trim()) opcionales.comprobante = data.comprobante.trim().slice(0, 2000);
   return { importe, fecha: Timestamp.fromMillis(fechaMillis), opcionales };
 }
 
@@ -1484,7 +1485,7 @@ exports.registrarPago = onCall({ region: REGION }, async (request) => {
     if (pagoExistenteSnap && pagoExistenteSnap.exists) {
       const existente = pagoExistenteSnap.data();
       const nuevo = { fecha, importe, ...opcionales, createdBy: uid };
-      const coincide = datosCoinciden(existente, nuevo, ['fecha', 'importe', 'concepto', 'descripcion', 'metodo', 'createdBy']);
+      const coincide = datosCoinciden(existente, nuevo, ['fecha', 'importe', 'concepto', 'descripcion', 'metodo', 'comprobante', 'createdBy']);
       if (coincide) return { ok: true, pagoId: pagoRef.id, yaExistia: true };
       throw new HttpsError('already-exists', 'Ya se registró un pago distinto con este identificador de solicitud. Recarga la pantalla antes de reintentar.');
     }
@@ -1904,6 +1905,7 @@ exports.eliminarRegistro = onCall({ region: REGION }, async (request) => {
 
   await borrarDocumentosDe(casaId, 'registroId', registroId);
   await getStorage().bucket().deleteFiles({ prefix: `casas/${casaId}/elementos/${elementoId}/registros/${registroId}/` });
+  await getStorage().bucket().deleteFiles({ prefix: `casas/${casaId}/documentos/porRegistro/${elementoId}/${registroId}/` });
   await db.recursiveDelete(regRef);
   return { ok: true };
 });
@@ -1931,6 +1933,7 @@ exports.eliminarElemento = onCall({ region: REGION }, async (request) => {
   // filtro los cubre todos sin recorrer los registros uno a uno.
   await borrarDocumentosDe(casaId, 'elementoId', elementoId);
   await getStorage().bucket().deleteFiles({ prefix: `casas/${casaId}/elementos/${elementoId}/` });
+  await getStorage().bucket().deleteFiles({ prefix: `casas/${casaId}/documentos/porRegistro/${elementoId}/${registroId}/` });
   await db.recursiveDelete(elRef);
   return { ok: true };
 });

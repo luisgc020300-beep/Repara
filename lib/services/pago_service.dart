@@ -62,6 +62,7 @@ class PagoService {
       'concepto': pago.concepto,
       'descripcion': pago.descripcion,
       'metodo': pago.metodo?.name,
+      'comprobante': pago.comprobante,
       // ignore: use_null_aware_elements
       if (clientRequestId != null) 'clientRequestId': clientRequestId,
     });
@@ -79,6 +80,7 @@ class PagoService {
       'concepto': pago.concepto,
       'descripcion': pago.descripcion,
       'metodo': pago.metodo?.name,
+      'comprobante': pago.comprobante,
     });
   }
 

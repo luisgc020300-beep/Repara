@@ -24,6 +24,7 @@ class Pago {
     this.concepto,
     this.descripcion,
     this.metodo,
+    this.comprobante,
     this.createdAt,
     this.createdBy,
   });
@@ -34,6 +35,12 @@ class Pago {
   final String? concepto;
   final String? descripcion;
   final MetodoPago? metodo;
+
+  /// Foto/PDF del recibo o justificante escaneado para este pago (CEO,
+  /// noviembre 2026: "igual que Presupuestos y Facturas/Notas, que se vea
+  /// una imagen clicable"). Null cuando el pago se registró a mano, sin
+  /// escanear nada.
+  final String? comprobante;
   final DateTime? createdAt;
   final String? createdBy;
 
@@ -46,6 +53,7 @@ class Pago {
       concepto: data['concepto'] as String?,
       descripcion: data['descripcion'] as String?,
       metodo: metodoPagoFromString(data['metodo'] as String?),
+      comprobante: data['comprobante'] as String?,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
       createdBy: data['createdBy'] as String?,
     );
@@ -57,5 +65,6 @@ class Pago {
         if (concepto != null) 'concepto': concepto,
         if (descripcion != null) 'descripcion': descripcion,
         if (metodo != null) 'metodo': metodo!.name,
+        if (comprobante != null) 'comprobante': comprobante,
       };
 }

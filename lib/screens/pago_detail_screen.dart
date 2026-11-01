@@ -18,6 +18,7 @@ import '../services/pago_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_dialog.dart';
 import '../widgets/app_error.dart';
+import '../widgets/miniatura_documento.dart';
 
 class PagoDetailScreen extends StatefulWidget {
   const PagoDetailScreen({
@@ -31,6 +32,7 @@ class PagoDetailScreen extends StatefulWidget {
     this.conceptoSugerido,
     this.fechaSugerida,
     this.importeSugerido,
+    this.comprobanteSugerido,
     super.key,
   });
 
@@ -61,6 +63,10 @@ class PagoDetailScreen extends StatefulWidget {
   /// antes de guardar, nunca se guarda sin pasar por aquí.
   final DateTime? fechaSugerida;
   final double? importeSugerido;
+  
+  /// URL del recibo/justificante escaneado (ver iniciarEscaneoPago). Solo
+  /// se usa al crear un pago nuevo; al editar manda el de widget.pago.
+  final String? comprobanteSugerido;
 
   @override
   State<PagoDetailScreen> createState() => _PagoDetailScreenState();
@@ -83,6 +89,8 @@ class _PagoDetailScreenState extends State<PagoDetailScreen> {
     text: widget.pago?.descripcion ?? '',
   );
   late MetodoPago? _metodo = widget.pago?.metodo;
+  late final String? _comprobante =
+      widget.pago?.comprobante ?? widget.comprobanteSugerido;
   bool _guardando = false;
 
   /// Generado una sola vez por instancia de esta pantalla (no en cada tap
@@ -162,7 +170,8 @@ class _PagoDetailScreenState extends State<PagoDetailScreen> {
       descripcion: _descripcionCtrl.text.trim().isEmpty
           ? null
           : _descripcionCtrl.text.trim(),
-      metodo: _metodo,
+          metodo: _metodo,
+      comprobante: _comprobante,
     );
     try {
       if (widget.pago == null) {
@@ -509,6 +518,17 @@ class _PagoDetailScreenState extends State<PagoDetailScreen> {
                         : 'Sin descripción',
                     style: TextStyle(color: context.colors.inkMuted),
                   ),
+                  if (_comprobante != null && _comprobante.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              const _LineaPunteada(),
+              const SizedBox(height: 14),
+              _filaEtiqueta(context, 'COMPROBANTE'),
+              const SizedBox(height: 8),
+              MiniaturaDocumento(
+                url: _comprobante,
+                nombreArchivo: 'comprobante',
+              ),
+            ],
           ],
         ),
       ),

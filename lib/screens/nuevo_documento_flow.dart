@@ -338,6 +338,7 @@ Future<void> iniciarEscaneoPago(
   if (confirmadas == null || confirmadas.isEmpty || !context.mounted) return;
 
   SugerenciaIA? sugerencia;
+  String? comprobanteUrl;
   String? errorIA;
   showDialog<void>(
     context: context,
@@ -357,10 +358,22 @@ Future<void> iniciarEscaneoPago(
       ),
     ),
   );
+  // Clasificar y subir arrancan juntos (ambos son awaits sobre Futures ya
+  // en marcha) -- no se combinan con Future.wait porque un fallo de
+  // clasificar no debe tirar también la subida: aunque la IA no acierte a
+  // leer el recibo, el comprobante en sí puede quedar guardado igual.
+  final clasificarFuture = DocumentoService.clasificarConIA(
+    confirmadas,
+  ).timeout(const Duration(seconds: 55));
+  final subirFuture = DocumentoService.subirArchivo(
+    casaId,
+    confirmadas.first.archivo,
+    confirmadas.first.nombre,
+    elementoId: elementoId,
+    registroId: registroId,
+  );
   try {
-    sugerencia = await DocumentoService.clasificarConIA(
-      confirmadas,
-    ).timeout(const Duration(seconds: 55));
+    sugerencia = await clasificarFuture;
   } on FirebaseFunctionsException catch (e) {
     errorIA =
         (e.code == 'resource-exhausted' || e.code == 'unavailable') &&
@@ -370,9 +383,15 @@ Future<void> iniciarEscaneoPago(
   } catch (e) {
     errorIA =
         'No se pudo contactar con el servicio de IA. Puedes rellenar los datos a mano.';
-  } finally {
-    if (context.mounted) Navigator.pop(context);
   }
+  try {
+    comprobanteUrl = await subirFuture;
+  } catch (e) {
+    // No bloquea el flujo -- el pago se puede registrar igual, solo sin
+    // comprobante adjunto.
+    debugPrint('iniciarEscaneoPago: no se pudo subir el comprobante: $e');
+  }
+  if (context.mounted) Navigator.pop(context);
 
   if (!context.mounted) return;
   if (errorIA != null) AppError.show(context, errorIA);
@@ -389,6 +408,7 @@ Future<void> iniciarEscaneoPago(
         editable: true,
         fechaSugerida: sugerencia?.fecha,
         importeSugerido: sugerencia?.importe,
+        comprobanteSugerido: comprobanteUrl,
         conceptoSugerido:
             sugerencia?.proveedor ??
             sugerencia?.descripcionTrabajo ??
