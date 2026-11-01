@@ -145,9 +145,19 @@ class DocumentoService {
       'paginas': paginasCodificadas,
       'elementosDisponibles': elementosDisponibles,
     });
-    final sugerencia = result.data['sugerencia'] as Map<String, dynamic>?;
-    if (sugerencia == null) return null;
-    return SugerenciaIA.fromMap(sugerencia);
+    // Nunca "as Map<String, dynamic>?" directo (CEO, noviembre 2026: el
+    // servidor respondía bien -- status 200, JSON válido, confirmado en
+    // logs -- pero el cliente seguía mostrando "no se pudo contactar"). En
+    // iOS, un mapa anidado que llega por el canal de la plataforma suele
+    // tener tipo real Map<Object?, Object?>, no Map<String, dynamic> --
+    // forzar ese cast revienta con un TypeError que NO es
+    // FirebaseFunctionsException, así que caía en el catch genérico de
+    // iniciarNuevoDocumento() aunque la IA hubiera respondido sin problema.
+    // Map<String, dynamic>.from(...) reconstruye el mapa con el tipo
+    // correcto sin importar cuál fuera el tipo real de origen.
+    final rawSugerencia = result.data['sugerencia'];
+    if (rawSugerencia == null) return null;
+    return SugerenciaIA.fromMap(Map<String, dynamic>.from(rawSugerencia as Map));
   }
 
   static Future<String> crear(String casaId, Documento documento, {required String createdBy}) async {
