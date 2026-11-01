@@ -2129,6 +2129,13 @@ exports.classifyDocument = onCall(
   { region: REGION, secrets: [_anthropicKey], timeoutSeconds: 60 },
   async (request) => {
     if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+    // Trazas de diagnóstico (noviembre 2026): varias llamadas reales no
+    // dejaban NINGÚN log -- ni éxito, ni error, ni siquiera el aviso de
+    // timeout de 45s contra Anthropic -- lo que apunta a que el cuelgue
+    // puede estar ANTES del fetch (p.ej. la transacción de
+    // verificarYRegistrarUsoIA). Estas líneas, fuera de cualquier catch,
+    // se ven pase lo que pase y acotan en qué paso se queda.
+    console.log('classifyDocument: invocado');
 
     // [paginas] es la forma nueva (varias páginas de un mismo documento);
     // se mantiene el nombre antiguo imageBase64/mediaType como fallback para
@@ -2152,7 +2159,9 @@ exports.classifyDocument = onCall(
         throw new HttpsError('invalid-argument', `Formato no admitido: ${p.mediaType}`);
       }
     }
+    console.log(`classifyDocument: validando uso diario (${listaPaginas.length} página/s)`);
     await verificarYRegistrarUsoIA(request.auth.uid);
+    console.log('classifyDocument: uso diario OK, preparando llamada a Anthropic');
 
     // Nombres de elementos existentes en la casa para que la IA pueda
     // sugerir con cuál se relaciona el documento, sin inventar uno que no
@@ -2203,6 +2212,7 @@ Elementos existentes en esta casa: ${listaElementos.length ? listaElementos.join
           : 'Analiza este documento y devuelve solo el JSON pedido.',
     });
 
+    console.log('classifyDocument: llamando a fetch() contra Anthropic');
     let res;
     try {
       res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -2240,6 +2250,7 @@ Elementos existentes en esta casa: ${listaElementos.length ? listaElementos.join
           : 'No se pudo contactar con el servicio de IA.'
       );
     }
+    console.log(`classifyDocument: respuesta de Anthropic recibida, status=${res.status}`);
 
     if (!res.ok) {
       const body = await res.text().catch(() => '');
