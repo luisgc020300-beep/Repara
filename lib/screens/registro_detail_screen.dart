@@ -33,6 +33,7 @@ import '../theme/design_tokens.dart';
 import '../widgets/app_dialog.dart';
 import '../widgets/app_error.dart';
 import '../widgets/boton_ajustes.dart';
+import '../widgets/documento_abrir.dart';
 import '../widgets/estado_registro_chip.dart';
 import '../widgets/historial_timeline.dart';
 import '../widgets/ios_list.dart';
@@ -1234,6 +1235,7 @@ class _DocumentosTab extends StatelessWidget {
                             )
                           : null,
                       showChevron: false,
+                      onTap: () => abrirDocumento(context, d),
                     ),
                   )
                   .toList(),

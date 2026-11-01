@@ -24,6 +24,7 @@ import '../services/elemento_service.dart';
 import '../services/habitacion_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
+import '../widgets/seccion_formulario.dart';
 
 class NuevoElementoScreen extends StatefulWidget {
   const NuevoElementoScreen({
@@ -275,7 +276,7 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
       body: ListView(
         padding: const EdgeInsets.all(ReparaSpace.s4),
         children: [
-          _SeccionFormulario(
+          SeccionFormulario(
             titulo: 'Datos básicos',
             children: [
               TextField(
@@ -319,7 +320,7 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
             ],
           ),
           const SizedBox(height: ReparaSpace.s4),
-          _SeccionFormulario(
+          SeccionFormulario(
             titulo: 'Detalles',
             children: [
               Row(
@@ -413,7 +414,7 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
             ],
           ),
           const SizedBox(height: ReparaSpace.s4),
-          _SeccionFormulario(
+          SeccionFormulario(
             titulo: 'Fechas',
             children: [
               SizedBox(
@@ -444,7 +445,7 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
             ],
           ),
           const SizedBox(height: ReparaSpace.s4),
-          _SeccionFormulario(
+          SeccionFormulario(
             titulo: 'Revisión periódica (opcional)',
             subtitulo:
                 'Repara te avisará cuando toque revisarlo. Puedes escribir el número a mano o pedirle una sugerencia a la IA según el tipo de elemento.',
@@ -491,51 +492,6 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// Agrupa un bloque lógico del formulario en una tarjeta con cabecera --
-/// mismo contenedor con borde fino que usan registro_detail_screen.dart/
-/// elemento_detail_screen.dart/home_tab.dart/casa_tab.dart, aplicado aquí a
-/// secciones de campos en vez de a filas navegables (no encaja IosSection:
-/// esos campos no son filas con chevron, son controles de edición).
-class _SeccionFormulario extends StatelessWidget {
-  const _SeccionFormulario({
-    required this.titulo,
-    required this.children,
-    this.subtitulo,
-  });
-
-  final String titulo;
-  final String? subtitulo;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(ReparaSpace.s4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              titulo,
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: context.colors.brand,
-              ),
-            ),
-            if (subtitulo != null) ...[
-              const SizedBox(height: ReparaSpace.s1),
-              Text(subtitulo!, style: Theme.of(context).textTheme.bodySmall),
-            ],
-            const SizedBox(height: ReparaSpace.s3),
-            ...children,
-          ],
-        ),
       ),
     );
   }

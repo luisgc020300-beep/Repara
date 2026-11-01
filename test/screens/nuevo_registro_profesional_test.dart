@@ -13,7 +13,7 @@
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:repara/screens/nuevo_registro_sheet.dart';
+import 'package:repara/screens/nuevo_registro_screen.dart';
 import 'package:repara/services/registro_service.dart';
 import 'package:repara/theme/design_tokens.dart';
 
@@ -25,7 +25,7 @@ Future<void> _abrirHoja(WidgetTester tester) async {
         builder: (context) => Scaffold(
           body: Center(
             child: FilledButton(
-              onPressed: () => mostrarNuevoRegistroSheet(
+              onPressed: () => abrirNuevoRegistroScreen(
                 context,
                 casaId: 'c1',
                 elementoId: 'e1',
@@ -47,10 +47,22 @@ void main() {
   setUp(() => RegistroService.debugFirestoreOverride = FakeFirebaseFirestore());
   tearDown(() => RegistroService.debugFirestoreOverride = null);
 
+  // Pantalla completa, no hoja compacta (rediseño visual, noviembre 2026) --
+  // "Información económica" (el título de esa sección en ambas ramas, con o
+  // sin profesional) queda fuera del viewport inicial, hay que bajar hasta
+  // ella antes de comprobar lo que hay dentro.
+  Future<void> bajarAInformacionEconomica(WidgetTester tester) =>
+      tester.scrollUntilVisible(
+        find.text('Información económica'),
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+
   testWidgets(
     'con el interruptor desactivado (por defecto), se ven "Coste" y "Profesional"',
     (tester) async {
       await _abrirHoja(tester);
+      await bajarAInformacionEconomica(tester);
 
       expect(find.widgetWithText(TextField, 'Coste (€)'), findsOneWidget);
       expect(find.widgetWithText(TextField, 'Profesional'), findsOneWidget);
@@ -65,6 +77,7 @@ void main() {
 
       await tester.tap(find.text('¿Lo hace un profesional?'));
       await tester.pumpAndSettle();
+      await bajarAInformacionEconomica(tester);
 
       expect(find.widgetWithText(TextField, 'Coste (€)'), findsNothing);
       expect(find.widgetWithText(TextField, 'Profesional'), findsNothing);
@@ -82,6 +95,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('¿Lo hace un profesional?'));
       await tester.pumpAndSettle();
+      await bajarAInformacionEconomica(tester);
 
       expect(find.widgetWithText(TextField, 'Coste (€)'), findsOneWidget);
       expect(find.widgetWithText(TextField, 'Profesional'), findsOneWidget);

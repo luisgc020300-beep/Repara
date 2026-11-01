@@ -24,6 +24,7 @@ import '../theme/design_tokens.dart';
 import '../widgets/app_dialog.dart';
 import '../widgets/app_error.dart';
 import '../widgets/ios_list.dart';
+import '../widgets/seccion_formulario.dart';
 
 Future<void> iniciarNuevoDocumento(
   BuildContext context, {
@@ -746,7 +747,7 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
               ),
             ],
             const SizedBox(height: ReparaSpace.s4),
-            _SeccionRevision(
+            SeccionFormulario(
               titulo: 'Documento original',
               children: [
                 SizedBox(
@@ -785,7 +786,7 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
               ],
             ),
             const SizedBox(height: ReparaSpace.s4),
-            _SeccionRevision(
+            SeccionFormulario(
               titulo: 'Información del documento',
               children: [
                 DropdownButtonFormField<TipoDocumento>(
@@ -856,7 +857,7 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
               ],
             ),
             const SizedBox(height: ReparaSpace.s4),
-            _SeccionRevision(
+            SeccionFormulario(
               titulo: 'Información económica',
               children: [
                 Row(
@@ -900,7 +901,7 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
               ],
             ),
             const SizedBox(height: ReparaSpace.s4),
-            _SeccionRevision(
+            SeccionFormulario(
               titulo: 'Información del trabajo',
               children: [
                 TextField(
@@ -928,7 +929,7 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
               ],
             ),
             const SizedBox(height: ReparaSpace.s4),
-            _SeccionRevision(
+            SeccionFormulario(
               titulo: 'Relación con tu casa',
               children: [
                 // Si ya se abrió el escáner desde la ficha de un elemento/registro
@@ -1117,42 +1118,6 @@ String _tituloElemento(List<Elemento> elementos, String id) {
     if (e.id == id) return e.nombre;
   }
   return 'Elemento de esta ficha';
-}
-
-/// Agrupa un bloque lógico de la revisión en una tarjeta con cabecera --
-/// mismo contenedor con borde fino que usan registro_detail_screen.dart/
-/// elemento_detail_screen.dart/home_tab.dart/casa_tab.dart/nuevo_elemento_
-/// screen.dart, aplicado aquí a los campos de revisión del documento en vez
-/// de a la antigua cabecera suelta sin agrupar.
-class _SeccionRevision extends StatelessWidget {
-  const _SeccionRevision({required this.titulo, required this.children});
-
-  final String titulo;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(ReparaSpace.s4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              titulo,
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: context.colors.brand,
-              ),
-            ),
-            const SizedBox(height: ReparaSpace.s3),
-            ...children,
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 String _nombreTipoDoc(TipoDocumento t) => switch (t) {

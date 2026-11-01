@@ -5,53 +5,21 @@
 // ningún elemento o registro concreto, para que nunca queden invisibles.
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-import '../core/service_locator.dart';
 import '../models/casa.dart';
 import '../models/documento.dart';
 import '../services/documento_service.dart';
-import '../services/security/biometric_service.dart';
-import '../services/security/security_preferences_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_dialog.dart';
 import '../widgets/app_error.dart';
+import '../widgets/documento_abrir.dart';
 import '../widgets/ios_list.dart';
-import 'elemento_detail_screen.dart';
 import 'nuevo_documento_flow.dart';
-import 'registro_detail_screen.dart';
 
 class DocumentosCasaScreen extends StatelessWidget {
   const DocumentosCasaScreen({required this.casa, super.key});
 
   final Casa casa;
-
-  // Breadcrumb tocable al elemento/registro de origen (auditoría de
-  // producto, octubre 2026) -- si no tiene ninguno de los dos, se abre el
-  // propio archivo en vez de no hacer nada al tocarlo.
-  Future<void> _abrir(BuildContext context, Documento d) async {
-    if (d.registroId != null && d.elementoId != null) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => RegistroDetailScreen(casa: casa, elementoId: d.elementoId!, registroId: d.registroId!)));
-      return;
-    }
-    if (d.elementoId != null) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => ElementoDetailScreen(casa: casa, elementoId: d.elementoId!)));
-      return;
-    }
-    // Abrir el archivo en sí (factura, garantía...) es el contenido sensible
-    // -- a diferencia de navegar al elemento/registro de origen, que solo
-    // enseña metadatos (sección 6 de la misión de seguridad local).
-    if (await SecurityPreferencesService.instance.isDocumentProtectionEnabled()) {
-      final verificado = await sl<BiometricService>().authenticate('Verifica tu identidad para abrir este documento') ==
-          BiometricAuthResult.success;
-      if (!verificado) return;
-    }
-    if (!context.mounted) return;
-    final uri = Uri.tryParse(d.url);
-    if (uri == null || !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      if (context.mounted) AppError.show(context, 'No se pudo abrir el documento.');
-    }
-  }
 
   // Mantener pulsado para eliminar -- mismo gesto que el resto de listas
   // de iOS cuando no hay sitio para un botón de borrar permanente en cada
@@ -150,7 +118,7 @@ class DocumentosCasaScreen extends StatelessWidget {
                               ],
                             )
                           : null,
-                      onTap: () => _abrir(context, d),
+                      onTap: () => abrirDocumento(context, d),
                     ),
                   );
                 }).toList(),

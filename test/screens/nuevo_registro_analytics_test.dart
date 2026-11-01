@@ -19,7 +19,7 @@
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:repara/screens/nuevo_registro_sheet.dart';
+import 'package:repara/screens/nuevo_registro_screen.dart';
 import 'package:repara/services/registro_service.dart';
 import 'package:repara/theme/design_tokens.dart';
 
@@ -40,7 +40,7 @@ void main() {
             builder: (context) => Scaffold(
               body: Center(
                 child: FilledButton(
-                  onPressed: () => mostrarNuevoRegistroSheet(
+                  onPressed: () => abrirNuevoRegistroScreen(
                     context,
                     casaId: 'c1',
                     elementoId: 'e1',
@@ -57,11 +57,18 @@ void main() {
       await tester.tap(find.text('Abrir'));
       await tester.pumpAndSettle();
 
-      // Título vacío a propósito -- no se rellena _tituloCtrl.
+      // Título vacío a propósito -- no se rellena _tituloCtrl. Pantalla
+      // completa, no hoja compacta (rediseño visual, noviembre 2026) --
+      // "Guardar" queda fuera del viewport inicial, hay que bajar hasta él.
+      await tester.scrollUntilVisible(
+        find.text('Guardar'),
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.tap(find.text('Guardar'));
       await tester.pumpAndSettle();
 
-      // La hoja sigue abierta (no se guardó nada) y Firestore sigue vacío.
+      // La pantalla sigue abierta (no se guardó nada) y Firestore sigue vacío.
       expect(find.text('Añadir evento'), findsOneWidget);
       final registros = await db
           .collection('casas')

@@ -93,8 +93,15 @@ void main() {
       await tester.tap(find.text('Añadir evento a mano'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Guardar'), findsOneWidget);
       expect(find.widgetWithText(TextField, 'Título (p.ej. Reparación de fuga)'), findsOneWidget);
+      // Pantalla completa, no hoja compacta (rediseño visual, noviembre
+      // 2026) -- "Guardar" queda fuera del viewport inicial.
+      await tester.scrollUntilVisible(
+        find.text('Guardar'),
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('Guardar'), findsOneWidget);
     },
   );
 

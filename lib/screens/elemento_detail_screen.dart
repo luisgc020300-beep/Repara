@@ -35,6 +35,7 @@ import '../theme/design_tokens.dart';
 import '../widgets/app_dialog.dart';
 import '../widgets/app_error.dart';
 import '../widgets/boton_ajustes.dart';
+import '../widgets/documento_abrir.dart';
 import '../widgets/estado_registro_chip.dart' show nombreEstadoRegistro;
 import '../widgets/foto_ampliada_screen.dart';
 import '../widgets/ios_list.dart';
@@ -42,7 +43,7 @@ import '../widgets/pdf_trabajo.dart';
 import 'elemento_resumen_pdf.dart';
 import 'nuevo_documento_flow.dart';
 import 'nuevo_elemento_screen.dart';
-import 'nuevo_registro_sheet.dart';
+import 'nuevo_registro_screen.dart';
 import 'registro_detail_screen.dart';
 
 class ElementoDetailScreen extends StatelessWidget {
@@ -111,7 +112,7 @@ class ElementoDetailScreen extends StatelessWidget {
                     title: 'Añadir evento a mano',
                     onTap: () {
                       Navigator.pop(ctx);
-                      mostrarNuevoRegistroSheet(
+                      abrirNuevoRegistroScreen(
                         context,
                         casaId: casa.id,
                         elementoId: elemento.id,
@@ -1414,6 +1415,7 @@ class _DocumentoTile extends StatelessWidget {
             )
           : null,
       showChevron: false,
+      onTap: () => abrirDocumento(context, documento),
     );
   }
 }
