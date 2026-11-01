@@ -35,6 +35,16 @@ function bloqueoEliminacionActivo(casa) {
 // aunque los tres proyectos usen el mismo patrón de proxy a Anthropic.
 const _anthropicKey = defineSecret('ANTHROPIC_API_KEY');
 
+// El valor guardado en Secret Manager llevaba un BOM (U+FEFF) al principio
+// -- invisible al revisarlo, pero fetch() revienta con "Cannot convert
+// argument to a ByteString" en CADA llamada porque 65279 no cabe en un
+// header HTTP (confirmado en los logs de producción, noviembre 2026: el
+// escaneo con IA llevaba fallando el 100% de las veces). trim() quita
+// también un posible salto de línea final de cuando se pegó el valor.
+function clavesAnthropicLimpia() {
+  return _anthropicKey.value().replace(/^﻿/, '').trim();
+}
+
 // Sin 0/O/1/I/L -- se confunden fácil al leer un código en voz alta o a mano.
 const JOIN_CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 
@@ -2151,7 +2161,7 @@ exports.classifyDocument = onCall(
     // también un elemento.
     const listaElementos = Array.isArray(elementosDisponibles) ? elementosDisponibles.slice(0, 50) : [];
 
-    const apiKey = _anthropicKey.value();
+    const apiKey = clavesAnthropicLimpia();
     if (!apiKey) throw new HttpsError('internal', 'API key no configurada en el servidor.');
 
     const systemPrompt = `Eres un asistente que extrae información de documentos del hogar (facturas, presupuestos, garantías, manuales, contratos) a partir de una o varias fotos/páginas escaneadas del MISMO documento.
@@ -2260,7 +2270,7 @@ exports.sugerirIntervaloMantenimiento = onCall(
     }
     await verificarYRegistrarUsoIA(request.auth.uid);
 
-    const apiKey = _anthropicKey.value();
+    const apiKey = clavesAnthropicLimpia();
     if (!apiKey) throw new HttpsError('internal', 'API key no configurada en el servidor.');
 
     const systemPrompt = `Eres un asistente que sugiere cada cuántos meses conviene revisar o hacer mantenimiento a un aparato o instalación del hogar, a partir de su nombre, marca y modelo.
