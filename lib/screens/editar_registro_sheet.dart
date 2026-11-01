@@ -1,7 +1,7 @@
 // lib/screens/editar_registro_sheet.dart
 //
 // Editar un registro ya creado (título, descripción y, en un registro
-// SIMPLE, también coste y profesional de texto libre) -- gap real
+// SIMPLE, también coste y profesionales) -- gap real
 // encontrado por el CEO: ni nuevo_registro_sheet.dart ni
 // nuevo_elemento_screen.dart ofrecen después ningún sitio para corregir
 // o completar estos datos, y el propio encabezado de
@@ -15,12 +15,19 @@
 // flujo distinta (invitar profesional, presupuestos, Cambios/Pagos), no
 // una simple corrección de datos.
 //
-// En un registro CON profesional, coste y el campo de profesional de
-// texto libre no se muestran aquí: ese dato vive en presupuesto/
+// En un registro CON profesional, coste y el campo de profesionales de
+// contacto no se muestran aquí: ese dato vive en presupuesto/
 // profesionalUid, gestionados por sus propias pantallas (ver
 // _ResumenEconomico y _SeccionInvitarProfesional en
 // registro_detail_screen.dart) -- mostrarlos aquí tentaría a escribir un
 // número que no es el que de verdad cuenta.
+//
+// Profesionales (CEO, noviembre 2026): un evento puede tener más de un
+// profesional, elegidos de la libreta de contactos o escritos a mano (ver
+// selector_profesionales.dart). Además de la lista nueva (`profesionales`)
+// se siguen escribiendo los campos heredados profesionalNombre/
+// profesionalContacto -- nombres unidos y teléfono del primero -- para que
+// listados y notificaciones sigan mostrando algo coherente.
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -78,11 +85,10 @@ class _EditarRegistroFormState extends State<_EditarRegistroForm> {
         ? ''
         : widget.registro.coste!.toStringAsFixed(2).replaceAll('.', ','),
   );
-  late final _profesionalCtrl = TextEditingController(
-    text: widget.registro.profesionalNombre ?? '',
-  );
-  late final _profesionalTelefonoCtrl = TextEditingController(
-    text: widget.registro.profesionalContacto ?? '',
+  // Parte de la lista actual (o, en un registro antiguo, del único
+  // profesional de texto libre -- ver Registro.listaProfesionales).
+  late List<ProfesionalRegistro> _profesionales = List.of(
+    widget.registro.listaProfesionales,
   );
   late final _plazoFrecuenciaCtrl = TextEditingController(
     text: widget.registro.plazoFrecuenciaMeses?.toString() ?? '',
@@ -101,8 +107,6 @@ class _EditarRegistroFormState extends State<_EditarRegistroForm> {
     _tituloCtrl.dispose();
     _descripcionCtrl.dispose();
     _costeCtrl.dispose();
-    _profesionalCtrl.dispose();
-    _profesionalTelefonoCtrl.dispose();
     _plazoFrecuenciaCtrl.dispose();
     _plazoImporteCtrl.dispose();
     super.dispose();
@@ -128,11 +132,14 @@ class _EditarRegistroFormState extends State<_EditarRegistroForm> {
     };
     if (!widget.registro.esConProfesional) {
       final coste = double.tryParse(_costeCtrl.text.replaceAll(',', '.'));
-      final profesional = _profesionalCtrl.text.trim();
-      final telefono = _profesionalTelefonoCtrl.text.trim();
       cambios['coste'] = coste;
-      cambios['profesionalNombre'] = profesional.isEmpty ? null : profesional;
-      cambios['profesionalContacto'] = telefono.isEmpty ? null : telefono;
+      // Lista vacía (no null) cuando se quitan todos -- Registro.fromDoc la
+      // lee igual de bien y así el campo antiguo no "resucita" ningún nombre.
+      cambios['profesionales'] = _profesionales.map((p) => p.toMap()).toList();
+      cambios['profesionalNombre'] = nombresProfesionales(_profesionales);
+      cambios['profesionalContacto'] = telefonoPrincipalProfesionales(
+        _profesionales,
+      );
       final frecuencia = _pagaAPlazos
           ? int.tryParse(_plazoFrecuenciaCtrl.text)
           : null;
@@ -209,34 +216,18 @@ class _EditarRegistroFormState extends State<_EditarRegistroForm> {
             ),
             if (!widget.registro.esConProfesional) ...[
               const SizedBox(height: ReparaSpace.s3),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _costeCtrl,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(labelText: 'Coste (€)'),
-                    ),
-                  ),
-                  const SizedBox(width: ReparaSpace.s3),
-                  Expanded(
-                    child: ProfesionalAutocompleteField(
-                      casaId: widget.casaId,
-                      nombreCtrl: _profesionalCtrl,
-                      telefonoCtrl: _profesionalTelefonoCtrl,
-                    ),
-                  ),
-                ],
+              TextField(
+                controller: _costeCtrl,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(labelText: 'Coste (€)'),
               ),
               const SizedBox(height: ReparaSpace.s3),
-              TextField(
-                controller: _profesionalTelefonoCtrl,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(
-                  labelText: 'Teléfono del profesional (opcional)',
-                ),
+              SelectorProfesionalesField(
+                casaId: widget.casaId,
+                seleccionados: _profesionales,
+                onChanged: (v) => setState(() => _profesionales = v),
               ),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,

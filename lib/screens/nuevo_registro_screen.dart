@@ -24,6 +24,10 @@
 // Profesional/Plazos (ese dato se fija después, desde el propio evento, al
 // invitar al profesional) y nace en estado "nuevo" en vez de "terminado"/
 // "pendientePago".
+//
+// Profesionales (CEO, noviembre 2026): un evento simple puede tener más de
+// un profesional, elegidos de la libreta de contactos o escritos a mano (ver
+// selector_profesionales.dart).
 import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -75,8 +79,7 @@ class _NuevoRegistroScreenState extends State<_NuevoRegistroScreen> {
   final _tituloCtrl = TextEditingController();
   final _descripcionCtrl = TextEditingController();
   final _costeCtrl = TextEditingController();
-  final _profesionalCtrl = TextEditingController();
-  final _profesionalTelefonoCtrl = TextEditingController();
+  List<ProfesionalRegistro> _profesionales = [];
   final _plazoFrecuenciaCtrl = TextEditingController();
   final _plazoImporteCtrl = TextEditingController();
   DateTime _fecha = DateTime.now();
@@ -101,8 +104,6 @@ class _NuevoRegistroScreenState extends State<_NuevoRegistroScreen> {
     _tituloCtrl.dispose();
     _descripcionCtrl.dispose();
     _costeCtrl.dispose();
-    _profesionalCtrl.dispose();
-    _profesionalTelefonoCtrl.dispose();
     _plazoFrecuenciaCtrl.dispose();
     _plazoImporteCtrl.dispose();
     super.dispose();
@@ -124,6 +125,12 @@ class _NuevoRegistroScreenState extends State<_NuevoRegistroScreen> {
     final importePlazo = _pagaAPlazos
         ? double.tryParse(_plazoImporteCtrl.text.replaceAll(',', '.'))
         : null;
+    // Un registro con profesional (esConProfesional) fija su profesional más
+    // tarde, al invitarlo -- aquí la lista solo se guarda en un registro
+    // simple, que es el único que muestra este campo.
+    final profesionales = _esConProfesional
+        ? const <ProfesionalRegistro>[]
+        : _profesionales;
     try {
       await RegistroService.crear(
         widget.casaId,
@@ -141,12 +148,11 @@ class _NuevoRegistroScreenState extends State<_NuevoRegistroScreen> {
               ? null
               : _descripcionCtrl.text.trim(),
           coste: coste,
-          profesionalNombre: _profesionalCtrl.text.trim().isEmpty
-              ? null
-              : _profesionalCtrl.text.trim(),
-          profesionalContacto: _profesionalTelefonoCtrl.text.trim().isEmpty
-              ? null
-              : _profesionalTelefonoCtrl.text.trim(),
+          profesionales: profesionales,
+          // Campos heredados: nombres unidos y teléfono del primero, para que
+          // listados y notificaciones sigan mostrando algo coherente.
+          profesionalNombre: nombresProfesionales(profesionales),
+          profesionalContacto: telefonoPrincipalProfesionales(profesionales),
           // Los dos van juntos -- si falta cualquiera, no se guarda ninguno
           // (ver comentario de plazoFrecuenciaMeses en models/registro.dart).
           plazoFrecuenciaMeses: frecuencia != null && importePlazo != null
@@ -281,36 +287,18 @@ class _NuevoRegistroScreenState extends State<_NuevoRegistroScreen> {
               SeccionFormulario(
                 titulo: 'Información económica',
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _costeCtrl,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          decoration: const InputDecoration(
-                            labelText: 'Coste (€)',
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: ReparaSpace.s3),
-                      Expanded(
-                        child: ProfesionalAutocompleteField(
-                          casaId: widget.casaId,
-                          nombreCtrl: _profesionalCtrl,
-                          telefonoCtrl: _profesionalTelefonoCtrl,
-                        ),
-                      ),
-                    ],
+                  TextField(
+                    controller: _costeCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(labelText: 'Coste (€)'),
                   ),
                   const SizedBox(height: ReparaSpace.s3),
-                  TextField(
-                    controller: _profesionalTelefonoCtrl,
-                    keyboardType: TextInputType.phone,
-                    decoration: const InputDecoration(
-                      labelText: 'Teléfono del profesional (opcional)',
-                    ),
+                  SelectorProfesionalesField(
+                    casaId: widget.casaId,
+                    seleccionados: _profesionales,
+                    onChanged: (v) => setState(() => _profesionales = v),
                   ),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,

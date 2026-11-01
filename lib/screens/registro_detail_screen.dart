@@ -871,6 +871,14 @@ class _ResumenTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Profesionales de contacto del evento (CEO, noviembre 2026). Si ya hay un
+    // profesional vinculado por cuenta (profesionalUid), solo se listan los
+    // de la lista nueva -- el heredado profesionalNombre es justo ese mismo
+    // profesional y ya lo muestra _SeccionInvitarProfesional, así que
+    // listaProfesionales lo duplicaría.
+    final contactosPro = registro.profesionalUid == null
+        ? registro.listaProfesionales
+        : registro.profesionales;
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
       children: [
@@ -914,6 +922,10 @@ class _ResumenTab extends StatelessWidget {
         ],
         Text('Profesional', style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: 8),
+        if (contactosPro.isNotEmpty) ...[
+          _SeccionProfesionales(lista: contactosPro, mostrarTitulo: false),
+          const SizedBox(height: 12),
+        ],
         _SeccionInvitarProfesional(
           casa: casa,
           elementoId: elementoId,
@@ -1358,8 +1370,10 @@ class _CuerpoSimple extends StatelessWidget {
                         ),
                         const SizedBox(height: 20),
                       ],
-                      if (registro.profesionalNombre != null) ...[
-                        _SeccionProfesionalSimple(registro: registro),
+                      if (registro.listaProfesionales.isNotEmpty) ...[
+                        _SeccionProfesionales(
+                          lista: registro.listaProfesionales,
+                        ),
                         const SizedBox(height: 20),
                       ],
                       // 3 categorías en vez de "Pagos"/"Documentos" sueltos
@@ -1536,9 +1550,9 @@ class _SeccionCategoriaDocumentos extends StatelessWidget {
                 Text(titulo, style: Theme.of(context).textTheme.headlineSmall),
                 if (total > 0) ...[
                   const SizedBox(width: 8),
-                  Text(
-                    '${total.toStringAsFixed(0)} €',
-                    style: ReparaText.amount(context).copyWith(fontSize: 15),
+                Text(
+                  '(${total.toStringAsFixed(0)} €)',
+                  style: ReparaText.amount(context).copyWith(fontSize: 15),
                   ),
                 ],
               ],
@@ -1580,42 +1594,68 @@ class _SeccionCategoriaDocumentos extends StatelessWidget {
   }
 }
 
-/// Profesional de texto libre de un registro simple (CEO, noviembre 2026:
-/// "las mismas opciones que hay en Contactos para interactuar con él") --
-/// solo aparece con teléfono guardado (`profesionalContacto`), porque sin
-/// número no hay nada que llamar/escribir. No es un Contacto de la libreta
-/// (nunca se guarda ahí), así que reutiliza las filas de interacción de
-/// contacto_acciones.dart por nombre/teléfono sueltos, no Editar/Eliminar
-/// (eso sí es gestión de la libreta, no de este evento).
-class _SeccionProfesionalSimple extends StatelessWidget {
-  const _SeccionProfesionalSimple({required this.registro});
+/// Profesionales de contacto de un evento (CEO, noviembre 2026: "que
+/// aparezca el nombre del profesional, como 'Fontanero', y que al pulsarlo
+/// salgan todas las opciones"). Cada fila muestra nombre y teléfono; al
+/// pulsarla se despliegan sus acciones (llamar, WhatsApp, reportar un
+/// problema...) -- las mismas filas de contacto_acciones.dart que usaba el
+/// antiguo _SeccionProfesionalSimple, ahora para cada profesional por
+/// separado. Solo aparece la flecha de despliegue si tiene teléfono, porque
+/// sin número no hay nada que llamar/escribir. No son Contactos de la
+/// libreta (nunca se editan desde aquí), así que no hay Editar/Eliminar.
+class _SeccionProfesionales extends StatefulWidget {
+  const _SeccionProfesionales({required this.lista, this.mostrarTitulo = true});
 
-  final Registro registro;
+  final List<ProfesionalRegistro> lista;
+  final bool mostrarTitulo;
+
+  @override
+  State<_SeccionProfesionales> createState() => _SeccionProfesionalesState();
+}
+
+class _SeccionProfesionalesState extends State<_SeccionProfesionales> {
+  int? _abierto;
 
   @override
   Widget build(BuildContext context) {
-    final nombre = registro.profesionalNombre!;
-    final telefono = registro.profesionalContacto;
+    final lista = widget.lista;
+    if (lista.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Profesional', style: Theme.of(context).textTheme.headlineSmall),
-        const SizedBox(height: 8),
+        if (widget.mostrarTitulo) ...[
+          Text(
+            lista.length > 1 ? 'Profesionales' : 'Profesional',
+            style: Theme.of(context).textTheme.headlineSmall,
+          ),
+          const SizedBox(height: 8),
+        ],
         IosSection(
           rows: [
-            IosRow(
-              icon: Icons.person_outline,
-              iconColor: context.colors.brand,
-              title: nombre,
-              subtitle: telefono,
-              showChevron: false,
-            ),
-            if (telefono != null && telefono.isNotEmpty)
-              ...filasInteraccionTelefono(
-                context: context,
-                nombre: nombre,
-                telefono: telefono,
+            for (var i = 0; i < lista.length; i++) ...[
+              IosRow(
+                icon: Icons.person_outline,
+                iconColor: context.colors.brand,
+                title: lista[i].nombre,
+                subtitle: lista[i].telefono,
+                showChevron: false,
+                trailing: (lista[i].telefono ?? '').isEmpty
+                    ? null
+                    : Icon(
+                        _abierto == i ? Icons.expand_less : Icons.expand_more,
+                        color: context.colors.inkMuted,
+                      ),
+                onTap: (lista[i].telefono ?? '').isEmpty
+                    ? null
+                    : () => setState(() => _abierto = _abierto == i ? null : i),
               ),
+              if (_abierto == i)
+                ...filasInteraccionTelefono(
+                  context: context,
+                  nombre: lista[i].nombre,
+                  telefono: lista[i].telefono ?? '',
+                ),
+            ],
           ],
         ),
       ],

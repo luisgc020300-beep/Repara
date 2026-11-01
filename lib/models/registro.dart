@@ -97,6 +97,36 @@ EstadoRegistro estadoInicialRegistroSimple(
 EstadoRegistro estadoRegistroFromString(String? s) => EstadoRegistro.values
     .firstWhere((t) => t.name == s, orElse: () => EstadoRegistro.nuevo);
 
+/// Un profesional asociado a un registro (CEO, noviembre 2026: "un trabajo
+/// lo pueden estar haciendo más de un profesional"). Puede venir de la
+/// libreta de contactos de la casa ([contactoId] != null) o haberse escrito
+/// a mano ([contactoId] == null). No es una cuenta de Repara -- eso sigue
+/// siendo [Registro.profesionalUid].
+class ProfesionalRegistro {
+  const ProfesionalRegistro({
+    required this.nombre,
+    this.telefono,
+    this.contactoId,
+  });
+
+  final String nombre;
+  final String? telefono;
+  final String? contactoId;
+
+  factory ProfesionalRegistro.fromMap(Map<String, dynamic> m) =>
+      ProfesionalRegistro(
+        nombre: m['nombre'] as String? ?? '',
+        telefono: m['telefono'] as String?,
+        contactoId: m['contactoId'] as String?,
+      );
+
+  Map<String, dynamic> toMap() => {
+    'nombre': nombre,
+    if ((telefono ?? '').isNotEmpty) 'telefono': telefono,
+    if (contactoId != null) 'contactoId': contactoId,
+  };
+}
+
 class Registro {
   const Registro({
     required this.id,
@@ -114,6 +144,7 @@ class Registro {
     this.documentoIds = const [],
     this.profesionalNombre,
     this.profesionalContacto,
+    this.profesionales = const [],
     this.profesionalUid,
     this.presupuesto,
     this.plazoFrecuenciaMeses,
@@ -142,8 +173,16 @@ class Registro {
   final String? fotoUrl;
   final List<String> fotoUrls;
   final List<String> documentoIds;
+  // Campos heredados de cuando solo había un profesional de texto libre. Se
+  // siguen escribiendo (nombres unidos con coma y teléfono del primero) para
+  // que listados, notificaciones y el mensaje de compartir sigan mostrando
+  // algo coherente sin cambios -- la fuente de verdad ahora es [profesionales]
+  // (ver [listaProfesionales]).
   final String? profesionalNombre;
   final String? profesionalContacto;
+  // Lista de profesionales (contactos de la libreta o escritos a mano) --
+  // vacía en los registros anteriores a esta mejora.
+  final List<ProfesionalRegistro> profesionales;
   final String? profesionalUid;
   final double? presupuesto;
   // Pago a plazos (CEO, octubre 2026) -- puramente informativo, para que la
@@ -174,6 +213,13 @@ class Registro {
       documentoIds: List<String>.from(data['documentoIds'] as List? ?? []),
       profesionalNombre: data['profesionalNombre'] as String?,
       profesionalContacto: data['profesionalContacto'] as String?,
+      profesionales: (data['profesionales'] as List? ?? [])
+          .map(
+            (e) => ProfesionalRegistro.fromMap(
+              Map<String, dynamic>.from(e as Map),
+            ),
+          )
+          .toList(),
       profesionalUid: data['profesionalUid'] as String?,
       presupuesto: (data['presupuesto'] as num?)?.toDouble(),
       plazoFrecuenciaMeses: (data['plazoFrecuenciaMeses'] as num?)?.toInt(),
@@ -199,6 +245,8 @@ class Registro {
     'documentoIds': documentoIds,
     if (profesionalNombre != null) 'profesionalNombre': profesionalNombre,
     if (profesionalContacto != null) 'profesionalContacto': profesionalContacto,
+    if (profesionales.isNotEmpty)
+      'profesionales': profesionales.map((p) => p.toMap()).toList(),
     if (profesionalUid != null) 'profesionalUid': profesionalUid,
     if (presupuesto != null) 'presupuesto': presupuesto,
     if (plazoFrecuenciaMeses != null)
@@ -213,6 +261,18 @@ class Registro {
   // se ve exactamente igual en la nueva galería, sin ninguna migración de
   // datos.
   List<String> get fotos => fotoUrls.isNotEmpty ? fotoUrls : [?fotoUrl];
+
+  // Profesionales del evento (CEO, noviembre 2026): [profesionales] si ya se
+  // usó la lista nueva; si no, cae al único profesional de texto libre
+  // (profesionalNombre/profesionalContacto) de un registro creado antes de
+  // esta mejora -- mismo criterio de compatibilidad que [fotos], sin
+  // ninguna migración de datos.
+  List<ProfesionalRegistro> get listaProfesionales {
+    if (profesionales.isNotEmpty) return profesionales;
+    final nombre = profesionalNombre;
+    if (nombre == null || nombre.isEmpty) return const [];
+    return [ProfesionalRegistro(nombre: nombre, telefono: profesionalContacto)];
+  }
 
   // Próximo pago estimado: fecha del último pago registrado (o, si todavía
   // no hay ninguno, la fecha de creación del registro) + la frecuencia del

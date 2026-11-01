@@ -188,7 +188,7 @@ void main() {
     },
   );
 
-  Future<void> _tocarAnadirPago(WidgetTester tester) async {
+  Future<void> tocarAnadirPago(WidgetTester tester) async {
     await _prepararConRegistroSimple();
 
     await tester.pumpWidget(
@@ -218,7 +218,7 @@ void main() {
   testWidgets(
     '"Añadir pago" ofrece elegir entre escanear un recibo o rellenarlo a mano -- igual que Presupuestos/Facturas',
     (tester) async {
-      await _tocarAnadirPago(tester);
+      await tocarAnadirPago(tester);
 
       expect(find.text('Escanear'), findsOneWidget);
       expect(find.text('Rellenar a mano'), findsOneWidget);
@@ -228,7 +228,7 @@ void main() {
   testWidgets(
     '"Rellenar a mano" abre el formulario sin ningún tope de presupuesto',
     (tester) async {
-      await _tocarAnadirPago(tester);
+      await tocarAnadirPago(tester);
       await tester.tap(find.text('Rellenar a mano'));
       await tester.pumpAndSettle();
 
@@ -242,7 +242,7 @@ void main() {
   testWidgets(
     '"Escanear" abre el selector de foto/galería/archivo',
     (tester) async {
-      await _tocarAnadirPago(tester);
+      await tocarAnadirPago(tester);
       await tester.tap(find.text('Escanear'));
       await tester.pumpAndSettle();
 
