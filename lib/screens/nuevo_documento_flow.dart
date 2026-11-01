@@ -92,10 +92,12 @@ Future<void> iniciarNuevoDocumento(
       elementosDisponibles: elementos.map((e) => e.nombre).toList(),
     ).timeout(const Duration(seconds: 55));
   } on FirebaseFunctionsException catch (e) {
-    // 'resource-exhausted' es el límite diario de IA -- su mensaje ya es
-    // claro para el usuario, a diferencia del resto de fallos de red.
-    errorIA = e.code == 'resource-exhausted'
-        ? (e.message ?? 'Has alcanzado el límite diario de análisis con IA.')
+    // 'resource-exhausted' (límite diario) y 'unavailable' (sin conexión
+    // con la IA, incluido el timeout de 45s contra Anthropic) ya traen un
+    // mensaje claro del propio servidor -- el resto de códigos cae al
+    // genérico de siempre.
+    errorIA = (e.code == 'resource-exhausted' || e.code == 'unavailable') && e.message != null
+        ? e.message!
         : 'No se pudo contactar con el servicio de IA. Puedes rellenar los datos a mano.';
   } catch (e) {
     errorIA =

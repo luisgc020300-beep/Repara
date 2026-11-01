@@ -2218,10 +2218,27 @@ Elementos existentes en esta casa: ${listaElementos.length ? listaElementos.join
           system: systemPrompt,
           messages: [{ role: 'user', content: contenido }],
         }),
+        // fetch() no tiene timeout propio -- sin esto, si la conexión a
+        // Anthropic se cuelga (sin error, sin respuesta), la función se
+        // queda esperando hasta el límite de la propia Cloud Function
+        // (timeoutSeconds: 60) sin que este catch llegue a ejecutarse ni a
+        // dejar ningún log (confirmado en producción, noviembre 2026: una
+        // llamada sin ningún rastro de fin ni siquiera 75s después). 45s
+        // deja margen bajo esos 60s para que SÍ se registre el motivo real.
+        signal: AbortSignal.timeout(45_000),
       });
     } catch (e) {
-      console.error('classifyDocument fetch error:', e);
-      throw new HttpsError('unavailable', 'No se pudo contactar con el servicio de IA.');
+      const esTimeout = e.name === 'TimeoutError' || e.name === 'AbortError';
+      console.error(
+        `classifyDocument fetch error (timeout=${esTimeout}):`,
+        esTimeout ? e.name : e
+      );
+      throw new HttpsError(
+        'unavailable',
+        esTimeout
+          ? 'El servicio de IA tardó demasiado en responder. Puedes rellenar los datos a mano.'
+          : 'No se pudo contactar con el servicio de IA.'
+      );
     }
 
     if (!res.ok) {
