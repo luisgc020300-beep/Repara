@@ -1245,7 +1245,7 @@ class _DocumentosTab extends StatelessWidget {
                             )
                           : null,
                       showChevron: false,
-                      onTap: () => abrirDocumento(context, d),
+                      onTap: () => mostrarAccionesDocumento(context, casaId: casa.id, documento: d),
                     ),
                   )
                   .toList(),
@@ -1387,6 +1387,7 @@ class _CuerpoSimple extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _SeccionCategoriaDocumentos(
+                                casaId: casa.id,
                                 titulo: 'Presupuestos',
                                 documentos: presupuestos,
                                 emptyMensaje: 'Sin presupuestos todavía.',
@@ -1400,6 +1401,7 @@ class _CuerpoSimple extends StatelessWidget {
                               ),
                               const SizedBox(height: 20),
                               _SeccionCategoriaDocumentos(
+                                casaId: casa.id,
                                 titulo: 'Facturas/Notas',
                                 documentos: facturasNotas,
                                 emptyMensaje: 'Sin facturas ni notas todavía.',
@@ -1507,12 +1509,14 @@ class _CuerpoSimple extends StatelessWidget {
 /// no decide qué pertenece a qué categoría.
 class _SeccionCategoriaDocumentos extends StatelessWidget {
   const _SeccionCategoriaDocumentos({
+    required this.casaId,
     required this.titulo,
     required this.documentos,
     required this.emptyMensaje,
     required this.onAnadir,
   });
 
+  final String casaId;
   final String titulo;
   final List<Documento> documentos;
   final String emptyMensaje;
@@ -1566,7 +1570,7 @@ class _SeccionCategoriaDocumentos extends StatelessWidget {
                           )
                         : null,
                     showChevron: false,
-                    onTap: () => abrirDocumento(context, d),
+                    onTap: () => mostrarAccionesDocumento(context, casaId: casaId, documento: d),
                   ),
                 )
                 .toList(),

@@ -159,6 +159,19 @@ class DocumentoService {
     await _col(casaId).doc(documentoId).update({'estadoIA': EstadoIA.confirmado.name});
   }
 
+  /// Corregir los datos de un documento ya guardado (CEO, noviembre 2026:
+  /// "si he subido uno donde no era o me he equivocado en algo"). Solo los
+  /// campos propios del documento -- nunca el archivo en sí (url/
+  /// nombreArchivo/archivosAdicionales) ni a qué elemento/registro
+  /// pertenece, eso es una reubicación, no una corrección de datos.
+  static Future<void> actualizar(
+    String casaId,
+    String documentoId,
+    Map<String, dynamic> cambios,
+  ) async {
+    await _col(casaId).doc(documentoId).update(cambios);
+  }
+
   static Future<void> eliminar(String casaId, String documentoId) async {
     await _col(casaId).doc(documentoId).delete();
   }

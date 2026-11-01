@@ -662,6 +662,7 @@ class ElementoDetailScreen extends StatelessWidget {
                         rows: documentos
                             .map(
                               (d) => _DocumentoTile(
+                                casaId: casa.id,
                                 documento: d,
                                 registroTitulo: d.registroId != null
                                     ? tituloPorRegistro[d.registroId]
@@ -1420,8 +1421,9 @@ class _TarjetaMantenimiento extends StatelessWidget {
 /// consulta nueva) -- null para un documento sin evento (p.ej. guardado
 /// directamente sobre el elemento) o si ese evento ya no existe.
 class _DocumentoTile extends StatelessWidget {
-  const _DocumentoTile({required this.documento, this.registroTitulo});
+  const _DocumentoTile({required this.casaId, required this.documento, this.registroTitulo});
 
+  final String casaId;
   final Documento documento;
   final String? registroTitulo;
 
@@ -1456,7 +1458,7 @@ class _DocumentoTile extends StatelessWidget {
             )
           : null,
       showChevron: false,
-      onTap: () => abrirDocumento(context, documento),
+      onTap: () => mostrarAccionesDocumento(context, casaId: casaId, documento: documento),
     );
   }
 }

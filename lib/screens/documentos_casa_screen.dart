@@ -10,8 +10,6 @@ import '../models/casa.dart';
 import '../models/documento.dart';
 import '../services/documento_service.dart';
 import '../theme/design_tokens.dart';
-import '../widgets/app_dialog.dart';
-import '../widgets/app_error.dart';
 import '../widgets/documento_abrir.dart';
 import '../widgets/ios_list.dart';
 import 'nuevo_documento_flow.dart';
@@ -20,26 +18,6 @@ class DocumentosCasaScreen extends StatelessWidget {
   const DocumentosCasaScreen({required this.casa, super.key});
 
   final Casa casa;
-
-  // Mantener pulsado para eliminar -- mismo gesto que el resto de listas
-  // de iOS cuando no hay sitio para un botón de borrar permanente en cada
-  // fila (aquí el "trailing" ya está ocupado por el importe/BORRADOR).
-  Future<void> _eliminar(BuildContext context, Documento d) async {
-    final confirmar = await AppDialog.confirmText(
-      context,
-      title: '¿Eliminar este documento?',
-      message: 'Se borrará de forma permanente. No afecta al elemento ni al registro de origen.',
-      confirmLabel: 'Eliminar',
-    );
-    if (!confirmar || !context.mounted) return;
-    try {
-      await DocumentoService.eliminar(casa.id, d.id);
-    } catch (e, st) {
-      if (context.mounted) {
-        AppError.show(context, 'No se pudo eliminar el documento.', error: e, stackTrace: st);
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -94,42 +72,31 @@ class DocumentosCasaScreen extends StatelessWidget {
               IosSection(
                 rows: documentos.map((d) {
                   final borrador = d.estadoIA == EstadoIA.pendiente;
-                  return GestureDetector(
-                    onLongPress: () => _eliminar(context, d),
-                    child: IosRow(
-                      icon: _iconoTipo(d.tipo),
-                      iconColor: context.colors.brand,
-                      title: d.proveedor ?? d.nombreArchivo,
-                      subtitle: d.fecha != null ? DateFormat('d MMM yyyy', 'es_ES').format(d.fecha!) : null,
-                      showChevron: false,
-                      trailing: borrador || d.importe != null
-                          ? Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (borrador)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(color: context.colors.sand.withValues(alpha: 0.4), borderRadius: BorderRadius.circular(ReparaRadius.pill)),
-                                    child: Text('BORRADOR', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, letterSpacing: 0.4, color: context.colors.ink)),
-                                  ),
-                                if (borrador && d.importe != null) const SizedBox(height: 4),
-                                if (d.importe != null) Text('${d.importe!.toStringAsFixed(0)} €', style: ReparaText.amount(context)),
-                              ],
-                            )
-                          : null,
-                      onTap: () => abrirDocumento(context, d),
-                    ),
+                  return IosRow(
+                    icon: _iconoTipo(d.tipo),
+                    iconColor: context.colors.brand,
+                    title: d.proveedor ?? d.nombreArchivo,
+                    subtitle: d.fecha != null ? DateFormat('d MMM yyyy', 'es_ES').format(d.fecha!) : null,
+                    showChevron: false,
+                    trailing: borrador || d.importe != null
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (borrador)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(color: context.colors.sand.withValues(alpha: 0.4), borderRadius: BorderRadius.circular(ReparaRadius.pill)),
+                                  child: Text('BORRADOR', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, letterSpacing: 0.4, color: context.colors.ink)),
+                                ),
+                              if (borrador && d.importe != null) const SizedBox(height: 4),
+                              if (d.importe != null) Text('${d.importe!.toStringAsFixed(0)} €', style: ReparaText.amount(context)),
+                            ],
+                          )
+                        : null,
+                    onTap: () => mostrarAccionesDocumento(context, casaId: casa.id, documento: d),
                   );
                 }).toList(),
-              ),
-              const SizedBox(height: 10),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Text(
-                  'Mantén pulsado un documento para eliminarlo.',
-                  style: TextStyle(fontSize: 12, color: context.colors.inkMuted),
-                ),
               ),
             ],
           );
