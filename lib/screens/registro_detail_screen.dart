@@ -1551,7 +1551,7 @@ class _SeccionCategoriaDocumentos extends StatelessWidget {
                 if (total > 0) ...[
                   const SizedBox(width: 12),
                 Text(
-                  ' (${total.toStringAsFixed(0)} €)',
+                  '(${total.toStringAsFixed(0)} €)',
                   style: ReparaText.amount(context).copyWith(fontSize: 15),
                   ),
                 ],

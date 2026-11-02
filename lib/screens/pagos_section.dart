@@ -55,7 +55,7 @@ class PagosSection extends StatelessWidget {
                     Text('Pagos', style: Theme.of(context).textTheme.headlineSmall),
                     if (total > 0) ...[
                       const SizedBox(width: 12),
-                      Text(' (${total.toStringAsFixed(0)} €)', style: ReparaText.amount(context).copyWith(fontSize: 15)),
+                      Text('(${total.toStringAsFixed(0)} €)', style: ReparaText.amount(context).copyWith(fontSize: 15)),
                     ],
                   ],
                 ),
