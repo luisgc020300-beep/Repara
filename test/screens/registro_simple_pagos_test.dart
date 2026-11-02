@@ -129,7 +129,7 @@ void main() {
   // Pagado/Saldo) que ya tenía un registro con profesional (presupuesto),
   // también para uno simple -- _TarjetaEconomica ya existía, solo faltaba
   // reutilizarla aquí con "Coste" en vez de "Presupuesto".
-  testWidgets(
+    testWidgets(
     'un registro simple con coste y un pago parcial muestra la barra de progreso Coste/Pagado/Saldo',
     (tester) async {
       final db = await _prepararConRegistroSimple();
@@ -160,11 +160,10 @@ void main() {
       expect(find.text('PAGADO'), findsOneWidget);
       expect(find.text('SALDO'), findsOneWidget);
       expect(find.text('2000 €'), findsOneWidget);
-      // "800 €" aparece dos veces a propósito (rediseño "Presupuestos/
-      // Facturas-Notas/Pagos", noviembre 2026): una en esta barra
-      // Coste/Pagado/Saldo y otra en el total que ahora lleva la propia
-      // cabecera de "Pagos" más abajo.
-      expect(find.text('800 €'), findsNWidgets(2));
+      // "800 €" en la barra Coste/Pagado/Saldo y "(800 €)" en el total
+      // que lleva la cabecera de "Pagos" (entre paréntesis).
+      expect(find.text('800 €'), findsOneWidget);
+      expect(find.text('(800 €)'), findsOneWidget);
       expect(find.text('1200 €'), findsOneWidget);
       expect(find.byType(LinearProgressIndicator), findsOneWidget);
     },
