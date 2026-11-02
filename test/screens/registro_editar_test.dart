@@ -25,7 +25,7 @@ import 'package:repara/services/pago_service.dart';
 import 'package:repara/services/presupuesto_service.dart';
 import 'package:repara/services/registro_service.dart';
 import 'package:repara/theme/design_tokens.dart';
-
+import 'package:repara/widgets/selector_profesional_field.dart';
 const _casa = Casa(
   id: 'c1',
   nombre: 'Mi casa',
@@ -119,7 +119,13 @@ void main() {
 
       expect(find.text('Editar evento'), findsWidgets);
       // Prellenado con lo que ya había.
-      expect(find.text('Metalistero'), findsOneWidget);
+      expect(
+  find.descendant(
+    of: find.byType(SelectorProfesionalesField),
+    matching: find.text('Metalistero'),
+  ),
+  findsOneWidget,
+);
 
       await tester.enterText(
         find.widgetWithText(TextField, 'Descripción (opcional)'),
