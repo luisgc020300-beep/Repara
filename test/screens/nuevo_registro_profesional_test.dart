@@ -73,7 +73,7 @@ void main() {
       await bajarAInformacionEconomica(tester);
 
       expect(find.widgetWithText(TextField, 'Coste (€)'), findsOneWidget);
-      expect(find.widgetWithText(TextField, 'Profesional'), findsOneWidget);
+      expect(find.text('Profesionales (opcional)'), findsOneWidget);
       expect(find.text('¿Se paga a plazos?'), findsOneWidget);
     },
   );
@@ -88,7 +88,7 @@ void main() {
       await bajarAInformacionEconomica(tester);
 
       expect(find.widgetWithText(TextField, 'Coste (€)'), findsNothing);
-      expect(find.widgetWithText(TextField, 'Profesional'), findsNothing);
+      expect(find.text('Profesionales (opcional)'), findsNothing);
       expect(find.text('¿Se paga a plazos?'), findsNothing);
       expect(find.textContaining('invita al profesional'), findsOneWidget);
     },
@@ -106,7 +106,7 @@ void main() {
       await bajarAInformacionEconomica(tester);
 
       expect(find.widgetWithText(TextField, 'Coste (€)'), findsOneWidget);
-      expect(find.widgetWithText(TextField, 'Profesional'), findsOneWidget);
+      expect(find.text('Profesionales (opcional)'), findsOneWidget);
       expect(find.text('¿Se paga a plazos?'), findsOneWidget);
     },
   );

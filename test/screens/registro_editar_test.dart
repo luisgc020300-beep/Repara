@@ -119,7 +119,7 @@ void main() {
 
       expect(find.text('Editar evento'), findsWidgets);
       // Prellenado con lo que ya había.
-      expect(find.widgetWithText(TextField, 'Metalistero'), findsOneWidget);
+      expect(find.text('Metalistero'), findsOneWidget);
 
       await tester.enterText(
         find.widgetWithText(TextField, 'Descripción (opcional)'),
@@ -290,7 +290,7 @@ void main() {
       expect(find.widgetWithText(TextField, 'Título'), findsOneWidget);
       expect(find.widgetWithText(TextField, 'Descripción (opcional)'), findsOneWidget);
       expect(find.widgetWithText(TextField, 'Coste (€)'), findsNothing);
-      expect(find.widgetWithText(TextField, 'Profesional'), findsNothing);
+      expect(find.text('Profesionales (opcional)'), findsNothing);
 
       await tester.enterText(
         find.widgetWithText(TextField, 'Descripción (opcional)'),
