@@ -1,16 +1,18 @@
 // lib/screens/pagos_section.dart
 //
 // Lista de pagos de un registro, con fecha e importe a simple vista --
-// tocar uno lleva al detalle completo (PagoDetailScreen). Apartado propio
-// dentro del registro, separado del resumen de progreso (ver
-// widgets/progreso_pago.dart).
+// tocar uno abre un menú (abrir comprobante, editar datos, eliminar).
+// Apartado propio dentro del registro, separado del resumen de progreso
+// (ver widgets/progreso_pago.dart).
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../models/pago.dart';
 import '../services/pago_service.dart';
 import '../theme/design_tokens.dart';
+import '../widgets/app_dialog.dart';
 import '../widgets/app_error.dart';
+import '../widgets/documento_abrir.dart' show abrirArchivoProtegido;
 import '../widgets/ios_list.dart';
 import 'nuevo_documento_flow.dart' show elegirFormaDeAnadirPago;
 import 'pago_detail_screen.dart';
@@ -52,8 +54,8 @@ class PagosSection extends StatelessWidget {
                   children: [
                     Text('Pagos', style: Theme.of(context).textTheme.headlineSmall),
                     if (total > 0) ...[
-                      const SizedBox(width: 8),
-                      Text('${total.toStringAsFixed(0)} €', style: ReparaText.amount(context).copyWith(fontSize: 15)),
+                      const SizedBox(width: 12),
+                      Text(' (${total.toStringAsFixed(0)} €)', style: ReparaText.amount(context).copyWith(fontSize: 15)),
                     ],
                   ],
                 ),
@@ -85,19 +87,15 @@ class PagosSection extends StatelessWidget {
                           subtitle: p.concepto?.isNotEmpty == true ? DateFormat('d MMM yyyy', 'es_ES').format(p.fecha) : null,
                           trailing: Text('${p.importe.toStringAsFixed(2)} €', style: ReparaText.amount(context)),
                           showChevron: false,
-                          onTap: () => Navigator.push(
+                          onTap: () => mostrarAccionesPago(
                             context,
-                            MaterialPageRoute(
-                              builder: (_) => PagoDetailScreen(
-                                casaId: casaId,
-                                elementoId: elementoId,
-                                registroId: registroId,
-                                registroTitulo: registroTitulo,
-                                presupuesto: presupuesto,
-                                editable: editable,
-                                pago: p,
-                              ),
-                            ),
+                            casaId: casaId,
+                            elementoId: elementoId,
+                            registroId: registroId,
+                            registroTitulo: registroTitulo,
+                            presupuesto: presupuesto,
+                            editable: editable,
+                            pago: p,
                           ),
                         ))
                     .toList(),
@@ -106,5 +104,127 @@ class PagosSection extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+/// Menú de un pago: abrir comprobante, editar datos, eliminar. Lo usan
+/// PagosSection (dentro del evento) y la ficha del elemento.
+Future<void> mostrarAccionesPago(
+  BuildContext context, {
+  required String casaId,
+  required String elementoId,
+  required String registroId,
+  required String registroTitulo,
+  required double? presupuesto,
+  required bool editable,
+  required Pago pago,
+}) {
+  final tieneComprobante = (pago.comprobante ?? '').isNotEmpty;
+  return showModalBottomSheet<void>(
+    context: context,
+    builder: (ctx) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          ReparaSpace.s4,
+          ReparaSpace.s2,
+          ReparaSpace.s4,
+          ReparaSpace.s4,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: ReparaSpace.s4),
+              decoration: BoxDecoration(
+                color: ctx.colors.inkMuted.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            IosSection(
+              rows: [
+                if (tieneComprobante)
+                  IosRow(
+                    icon: Icons.open_in_new,
+                    iconColor: ctx.colors.brand,
+                    title: 'Abrir documento',
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      abrirArchivoProtegido(context, pago.comprobante!);
+                    },
+                  ),
+                IosRow(
+                  icon: Icons.edit_outlined,
+                  iconColor: ctx.colors.inkMuted,
+                  title: editable ? 'Editar datos' : 'Ver datos',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => PagoDetailScreen(
+                          casaId: casaId,
+                          elementoId: elementoId,
+                          registroId: registroId,
+                          registroTitulo: registroTitulo,
+                          presupuesto: presupuesto,
+                          editable: editable,
+                          pago: pago,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+            if (editable)
+              IosSection(
+                rows: [
+                  IosRow(
+                    icon: Icons.delete_outline,
+                    iconColor: ctx.colors.errorText,
+                    title: 'Eliminar pago',
+                    titleColor: ctx.colors.errorText,
+                    showChevron: false,
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _eliminarPago(
+                        context,
+                        casaId: casaId,
+                        elementoId: elementoId,
+                        registroId: registroId,
+                        pagoId: pago.id,
+                      );
+                    },
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+Future<void> _eliminarPago(
+  BuildContext context, {
+  required String casaId,
+  required String elementoId,
+  required String registroId,
+  required String pagoId,
+}) async {
+  final confirmar = await AppDialog.confirmText(
+    context,
+    title: '¿Eliminar este pago?',
+    confirmLabel: 'Eliminar',
+  );
+  if (!confirmar || !context.mounted) return;
+  try {
+    await PagoService.eliminar(casaId, elementoId, registroId, pagoId);
+  } catch (e, st) {
+    if (context.mounted) {
+      AppError.show(context, 'No se pudo eliminar el pago.', error: e, stackTrace: st);
+    }
   }
 }

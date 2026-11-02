@@ -9,7 +9,9 @@
 // de una tarjeta (no detrás de un AppBar transparente) y el mantenimiento
 // tiene su propia tarjeta con acciones, igual que la de registro_detail_
 // screen.dart (que lee estos mismos campos del Elemento).
+import 'dart:async';
 import 'dart:io';
+
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_functions/cloud_functions.dart';
@@ -45,6 +47,8 @@ import 'nuevo_documento_flow.dart';
 import 'nuevo_elemento_screen.dart';
 import 'nuevo_registro_screen.dart';
 import 'registro_detail_screen.dart';
+import '../models/pago.dart';
+import 'pagos_section.dart' show mostrarAccionesPago;
 
 class ElementoDetailScreen extends StatelessWidget {
   const ElementoDetailScreen({
@@ -631,50 +635,22 @@ class ElementoDetailScreen extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               StreamBuilder<List<Documento>>(
-                stream: DocumentoService.streamDocumentos(
-                  casa.id,
-                  elementoId: elemento.id,
-                ),
-                builder: (context, snapshot) {
-                  final documentos = snapshot.data ?? [];
-                  if (documentos.isEmpty) {
-                    return const EmptyHint(
-                      message: 'Sin documentos todavía.',
-                      icon: Icons.description_outlined,
-                    );
-                  }
-                  // Título del evento de origen de cada documento (CEO,
-                  // noviembre 2026) -- mismo stream de registros que ya
-                  // alimenta "Historial" arriba, solo que aquí se necesita
-                  // de nuevo para construir el mapa id -> título (los dos
-                  // StreamBuilder están separados, no comparten estado).
-                  return StreamBuilder<List<Registro>>(
-                    stream: RegistroService.streamRegistros(
-                      casa.id,
-                      elemento.id,
-                    ),
-                    builder: (context, registrosSnap) {
-                      final tituloPorRegistro = {
-                        for (final r in registrosSnap.data ?? const <Registro>[])
-                          r.id: r.titulo,
-                      };
-                      return IosSection(
-                        rows: documentos
-                            .map(
-                              (d) => _DocumentoTile(
-                                casaId: casa.id,
-                                documento: d,
-                                registroTitulo: d.registroId != null
-                                    ? tituloPorRegistro[d.registroId]
-                                    : null,
-                              ),
-                            )
-                            .toList(),
-                      );
-                    },
-                  );
-                },
-              ),
+  stream: DocumentoService.streamDocumentos(
+    casa.id,
+    elementoId: elemento.id,
+  ),
+  builder: (context, docSnap) {
+    return StreamBuilder<List<Registro>>(
+      stream: RegistroService.streamRegistros(casa.id, elemento.id),
+      builder: (context, regSnap) => _DocumentosElemento(
+        casaId: casa.id,
+        elementoId: elemento.id,
+        documentos: docSnap.data ?? const <Documento>[],
+        registros: regSnap.data ?? const <Registro>[],
+      ),
+    );
+  },
+),
               const SizedBox(height: 22),
               _AccionesElemento(casa: casa, elemento: elemento),
             ],
@@ -1459,6 +1435,156 @@ class _DocumentoTile extends StatelessWidget {
           : null,
       showChevron: false,
       onTap: () => mostrarAccionesDocumento(context, casaId: casaId, documento: documento),
+    );
+  }
+}
+/// Documentos del elemento + comprobantes de pagos de todos sus eventos, en
+/// una sola lista ordenada por fecha. El pago no es un Documento (su
+/// comprobante vive en el propio pago), así que se escuchan los pagos de
+/// cada evento y se mezclan aquí al pintar, sin duplicar datos.
+class _DocumentosElemento extends StatefulWidget {
+  const _DocumentosElemento({
+    required this.casaId,
+    required this.elementoId,
+    required this.documentos,
+    required this.registros,
+  });
+
+  final String casaId;
+  final String elementoId;
+  final List<Documento> documentos;
+  final List<Registro> registros;
+
+  @override
+  State<_DocumentosElemento> createState() => _DocumentosElementoState();
+}
+
+class _DocumentosElementoState extends State<_DocumentosElemento> {
+  final Map<String, List<Pago>> _pagos = {};
+  final Map<String, StreamSubscription<List<Pago>>> _subs = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _sincronizar();
+  }
+
+  @override
+  void didUpdateWidget(covariant _DocumentosElemento oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _sincronizar();
+  }
+
+  void _sincronizar() {
+    final ids = widget.registros.map((r) => r.id).toSet();
+    for (final id in _subs.keys.where((id) => !ids.contains(id)).toList()) {
+      _subs.remove(id)?.cancel();
+      _pagos.remove(id);
+    }
+    for (final r in widget.registros) {
+      if (_subs.containsKey(r.id)) continue;
+      _subs[r.id] = PagoService.streamPagos(
+        widget.casaId,
+        widget.elementoId,
+        r.id,
+      ).listen(
+        (pagos) {
+          if (mounted) setState(() => _pagos[r.id] = pagos);
+        },
+        onError: (_) {},
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final s in _subs.values) {
+      s.cancel();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tituloPorRegistro = {
+      for (final r in widget.registros) r.id: r.titulo,
+    };
+    final entradas = <(DateTime, Widget)>[
+      for (final d in widget.documentos)
+        (
+          d.fecha ?? d.createdAt ?? DateTime(2000),
+          _DocumentoTile(
+            casaId: widget.casaId,
+            documento: d,
+            registroTitulo: d.registroId != null
+                ? tituloPorRegistro[d.registroId]
+                : null,
+          ),
+        ),
+      for (final r in widget.registros)
+        for (final p in _pagos[r.id] ?? const <Pago>[])
+          if ((p.comprobante ?? '').isNotEmpty)
+            (
+              p.fecha,
+              _PagoDocumentoTile(
+                casaId: widget.casaId,
+                elementoId: widget.elementoId,
+                registro: r,
+                pago: p,
+              ),
+            ),
+    ]..sort((a, b) => b.$1.compareTo(a.$1));
+
+    if (entradas.isEmpty) {
+      return const EmptyHint(
+        message: 'Sin documentos todavía.',
+        icon: Icons.description_outlined,
+      );
+    }
+    return IosSection(rows: entradas.map((e) => e.$2).toList());
+  }
+}
+
+/// Comprobante de un pago, mostrado como un documento más del elemento.
+class _PagoDocumentoTile extends StatelessWidget {
+  const _PagoDocumentoTile({
+    required this.casaId,
+    required this.elementoId,
+    required this.registro,
+    required this.pago,
+  });
+
+  final String casaId;
+  final String elementoId;
+  final Registro registro;
+  final Pago pago;
+
+  @override
+  Widget build(BuildContext context) {
+    final fecha = DateFormat('d MMM yyyy', 'es_ES').format(pago.fecha);
+    final concepto = pago.concepto;
+    return IosRow(
+      icon: Icons.payments_outlined,
+      iconColor: context.colors.brand,
+      title: 'Pago · ${registro.titulo}',
+      subtitle: (concepto != null && concepto.isNotEmpty)
+          ? '$concepto · $fecha'
+          : fecha,
+      trailing: Text(
+        '${pago.importe.toStringAsFixed(0)} €',
+        style: ReparaText.amount(context),
+      ),
+      showChevron: false,
+      onTap: () => mostrarAccionesPago(
+        context,
+        casaId: casaId,
+        elementoId: elementoId,
+        registroId: registro.id,
+        registroTitulo: registro.titulo,
+        presupuesto: registro.presupuesto,
+        editable: true,
+        pago: pago,
+      ),
     );
   }
 }
