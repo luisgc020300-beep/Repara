@@ -2,8 +2,8 @@
 //
 // Agenda (ampliación REPARA Pro, Fase 4, noviembre 2026): el estado vacío
 // es real (no listas fantasma), crear una cita nueva la hace aparecer, y
-// cambiar de vista (Semana/Día/Mes) sigue mostrando los datos reales del
-// día seleccionado.
+// cambiar de vista (Semana/Día) sigue mostrando los datos reales del día
+// seleccionado.
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -41,7 +41,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Nada programado para este día.'), findsOneWidget);
+    // Vista Semana por defecto: cada uno de los 7 días de la semana sin
+    // citas muestra su propio "Sin citas", no un único estado vacío.
+    expect(find.text('Sin citas'), findsNWidgets(7));
   });
 
   testWidgets('crear una cita nueva la hace aparecer en la lista del día', (
@@ -82,7 +84,7 @@ void main() {
       await db.collection('users').doc(_uid).set({'registrosProRefs': []});
       final hoy = DateTime.now();
       await db.collection('profesionales').doc(_uid).collection('citas').add({
-        'titulo': 'Hoy',
+        'titulo': 'Cita de hoy',
         'fecha': Timestamp.fromDate(DateTime(hoy.year, hoy.month, hoy.day, 9)),
         'todoElDia': false,
         'completada': false,
@@ -103,10 +105,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.widgetWithText(ChoiceChip, 'Día'));
+      await tester.tap(find.text('Día'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Hoy'), findsOneWidget);
+      expect(find.text('Cita de hoy'), findsOneWidget);
       expect(find.text('Dentro de dos semanas'), findsNothing);
     },
   );

@@ -19,6 +19,7 @@ class Cita {
     required this.titulo,
     required this.fecha,
     this.todoElDia = false,
+    this.horaFin,
     this.descripcion,
     this.casaId,
     this.elementoId,
@@ -34,6 +35,12 @@ class Cita {
   final String? descripcion;
   final DateTime fecha;
   final bool todoElDia;
+
+  /// Hora de fin (opcional, CEO noviembre 2026: "mismo diseño que
+  /// oficio-ai", que muestra un rango "21:14 -- 22:44" en cada cita).
+  /// Comparte fecha con [fecha] -- solo la hora/minuto importan. Null
+  /// cuando la cita no tiene una duración conocida, o es "todo el día".
+  final DateTime? horaFin;
 
   /// Trabajo al que enlaza esta cita, si lo hay -- los tres van siempre
   /// juntos o ninguno. Null cuando es una cita suelta (p.ej. "visita de
@@ -62,6 +69,7 @@ class Cita {
       descripcion: data['descripcion'] as String?,
       fecha: (data['fecha'] as Timestamp?)?.toDate() ?? DateTime.now(),
       todoElDia: data['todoElDia'] as bool? ?? false,
+      horaFin: (data['horaFin'] as Timestamp?)?.toDate(),
       casaId: data['casaId'] as String?,
       elementoId: data['elementoId'] as String?,
       registroId: data['registroId'] as String?,
@@ -78,6 +86,7 @@ class Cita {
       'descripcion': descripcion,
     'fecha': Timestamp.fromDate(fecha),
     'todoElDia': todoElDia,
+    if (horaFin != null) 'horaFin': Timestamp.fromDate(horaFin!),
     if (casaId != null) 'casaId': casaId,
     if (elementoId != null) 'elementoId': elementoId,
     if (registroId != null) 'registroId': registroId,

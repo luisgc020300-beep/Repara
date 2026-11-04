@@ -3,10 +3,20 @@
 // Agenda (ampliación funcional REPARA Pro, Fase 4 -- CEO, noviembre 2026):
 // planificación puramente personal del profesional -- trabajos
 // programados, visitas, tareas pendientes, cualquier fecha importante.
-// Vistas Semana (con protagonismo, CEO), Día y Mes, todas construidas a
-// mano con widgets normales -- no se añade ningún paquete de calendario
-// nuevo, la app no lo necesitaba hasta ahora y esto no justifica por sí
-// solo una dependencia más.
+// Todo construido a mano con widgets normales -- no se añade ningún
+// paquete de calendario nuevo.
+//
+// Rediseño visual (CEO, noviembre 2026): "mismo diseño que oficio-ai, pero
+// las funcionalidades de REPARA" -- interruptor Semana/Día con check,
+// semana como lista de los 7 días (con las citas de cada uno debajo, no
+// solo del día seleccionado), tarjeta de cita con rango horario, estado
+// vacío de Día con CTA propia. La vista Mes (que oficio-ai no tiene) se
+// conserva -- es una funcionalidad real de REPARA que no hay motivo para
+// quitar -- pero se mueve a un icono de calendario en la cabecera en vez
+// de competir por sitio en el interruptor principal. El naranja de
+// oficio-ai se sustituye por el azul marino de marca de REPARA
+// (context.colors.brandStrong) -- introducir un acento nuevo solo en esta
+// pantalla rompería la consistencia visual del resto de la app (Fase 5).
 //
 // IMPORTANTE -- limitación documentada a propósito: no hay recordatorios
 // push. No existe ninguna infraestructura de notificaciones programadas en
@@ -42,8 +52,17 @@ List<Cita> _citasDelDia(List<Cita> citas, DateTime dia) {
 }
 
 const _nombresDiaCorto = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+const _nombresDiaLargo = [
+  'Lunes',
+  'Martes',
+  'Miércoles',
+  'Jueves',
+  'Viernes',
+  'Sábado',
+  'Domingo',
+];
 
-enum _VistaAgenda { semana, dia, mes }
+enum _VistaAgenda { semana, dia }
 
 class AgendaProTab extends StatefulWidget {
   const AgendaProTab({super.key});
@@ -55,6 +74,14 @@ class AgendaProTab extends StatefulWidget {
 class _AgendaProTabState extends State<AgendaProTab> {
   _VistaAgenda _vista = _VistaAgenda.semana;
   DateTime _diaSeleccionado = _soloFecha(DateTime.now());
+
+  void _irAHoy() =>
+      setState(() => _diaSeleccionado = _soloFecha(DateTime.now()));
+
+  void _verDia(DateTime dia) => setState(() {
+    _diaSeleccionado = dia;
+    _vista = _VistaAgenda.dia;
+  });
 
   Future<void> _nuevaCita() async {
     await showModalBottomSheet<void>(
@@ -79,6 +106,18 @@ class _AgendaProTabState extends State<AgendaProTab> {
         ),
       ),
       builder: (_) => _EditorCitaSheet(cita: cita),
+    );
+  }
+
+  Future<void> _abrirMes() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => VistaMesScreen(
+          diaInicial: _diaSeleccionado,
+          onAbrirCita: _abrirCita,
+        ),
+      ),
     );
   }
 
@@ -107,11 +146,25 @@ class _AgendaProTabState extends State<AgendaProTab> {
             ),
           ],
         ),
-        actions: const [BotonAjustes(modoPro: true)],
+        actions: [
+          TextButton(
+            onPressed: _irAHoy,
+            style: TextButton.styleFrom(foregroundColor: Colors.white),
+            child: const Text('Hoy'),
+          ),
+          IconButton(
+            tooltip: 'Ver mes',
+            icon: const Icon(Icons.calendar_view_month_outlined),
+            onPressed: _abrirMes,
+          ),
+          const BotonAjustes(modoPro: true),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _nuevaCita,
         tooltip: 'Nueva cita',
+        backgroundColor: context.colors.brandStrong,
+        foregroundColor: context.colors.brandOn,
         child: const Icon(Icons.add),
       ),
       body: StreamBuilder<List<Cita>>(
@@ -127,35 +180,14 @@ class _AgendaProTabState extends State<AgendaProTab> {
                   ReparaSpace.s4,
                   ReparaSpace.s2,
                 ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: ChoiceChip(
-                        label: const Text('Semana'),
-                        selected: _vista == _VistaAgenda.semana,
-                        onSelected: (_) =>
-                            setState(() => _vista = _VistaAgenda.semana),
-                      ),
-                    ),
-                    const SizedBox(width: ReparaSpace.s2),
-                    Expanded(
-                      child: ChoiceChip(
-                        label: const Text('Día'),
-                        selected: _vista == _VistaAgenda.dia,
-                        onSelected: (_) =>
-                            setState(() => _vista = _VistaAgenda.dia),
-                      ),
-                    ),
-                    const SizedBox(width: ReparaSpace.s2),
-                    Expanded(
-                      child: ChoiceChip(
-                        label: const Text('Mes'),
-                        selected: _vista == _VistaAgenda.mes,
-                        onSelected: (_) =>
-                            setState(() => _vista = _VistaAgenda.mes),
-                      ),
-                    ),
-                  ],
+                child: _PillToggle(
+                  opciones: const ['Día', 'Semana'],
+                  seleccionado: _vista == _VistaAgenda.dia ? 0 : 1,
+                  onSeleccionado: (i) => setState(
+                    () => _vista = i == 0
+                        ? _VistaAgenda.dia
+                        : _VistaAgenda.semana,
+                  ),
                 ),
               ),
               Expanded(
@@ -165,6 +197,7 @@ class _AgendaProTabState extends State<AgendaProTab> {
                     diaSeleccionado: _diaSeleccionado,
                     onSeleccionarDia: (d) =>
                         setState(() => _diaSeleccionado = d),
+                    onVerDia: _verDia,
                     onAbrirCita: _abrirCita,
                   ),
                   _VistaAgenda.dia => _VistaDia(
@@ -172,13 +205,7 @@ class _AgendaProTabState extends State<AgendaProTab> {
                     dia: _diaSeleccionado,
                     onCambiarDia: (d) => setState(() => _diaSeleccionado = d),
                     onAbrirCita: _abrirCita,
-                  ),
-                  _VistaAgenda.mes => _VistaMes(
-                    citas: citas,
-                    diaSeleccionado: _diaSeleccionado,
-                    onSeleccionarDia: (d) =>
-                        setState(() => _diaSeleccionado = d),
-                    onAbrirCita: _abrirCita,
+                    onNuevaCita: _nuevaCita,
                   ),
                 },
               ),
@@ -190,65 +217,209 @@ class _AgendaProTabState extends State<AgendaProTab> {
   }
 }
 
-Widget _listaDeCitas(
-  BuildContext context,
-  List<Cita> citasDelDia,
-  void Function(Cita) onAbrirCita,
-) {
-  if (citasDelDia.isEmpty) {
-    return const EmptyHint(
-      message: 'Nada programado para este día.',
-      icon: Icons.event_available_outlined,
+/// Interruptor de dos posiciones con fondo tenue y un check en la opción
+/// activa -- mismo patrón visual que el selector Hogar/Pro de Ajustes
+/// (_ModoAppToggle en settings_screen.dart), reaplicado aquí.
+class _PillToggle extends StatelessWidget {
+  const _PillToggle({
+    required this.opciones,
+    required this.seleccionado,
+    required this.onSeleccionado,
+  });
+
+  final List<String> opciones;
+  final int seleccionado;
+  final ValueChanged<int> onSeleccionado;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: context.colors.surfaceMuted,
+        borderRadius: BorderRadius.circular(ReparaRadius.sm),
+      ),
+      child: Row(
+        children: [
+          for (var i = 0; i < opciones.length; i++) ...[
+            if (i > 0) const SizedBox(width: 4),
+            Expanded(
+              child: _Segmento(
+                label: opciones[i],
+                seleccionado: seleccionado == i,
+                onTap: () => onSeleccionado(i),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
-  return ListView(
-    padding: const EdgeInsets.fromLTRB(
-      ReparaSpace.s4,
-      0,
-      ReparaSpace.s4,
-      ReparaSpace.s4,
-    ),
-    children: [
-      IosSection(
-        rows: citasDelDia
-            .map(
-              (c) => IosRow(
-                icon: c.completada
-                    ? Icons.check_circle_outline
-                    : (c.enlazaTrabajo
-                          ? Icons.build_outlined
-                          : Icons.event_outlined),
-                iconColor: c.completada
-                    ? context.colors.success
-                    : context.colors.brand,
-                title: c.titulo,
-                titleColor: c.completada ? context.colors.inkMuted : null,
-                subtitle: [
-                  c.todoElDia
-                      ? 'Todo el día'
-                      : DateFormat('HH:mm').format(c.fecha),
-                  if (c.registroTitulo != null) c.registroTitulo!,
-                ].join(' · '),
-                onTap: () => onAbrirCita(c),
+}
+
+class _Segmento extends StatelessWidget {
+  const _Segmento({
+    required this.label,
+    required this.seleccionado,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool seleccionado;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = seleccionado
+        ? context.colors.brandStrong
+        : context.colors.inkMuted;
+    return Material(
+      color: seleccionado ? context.colors.surface : Colors.transparent,
+      borderRadius: BorderRadius.circular(ReparaRadius.xs),
+      elevation: seleccionado ? 1 : 0,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(ReparaRadius.xs),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 9),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (seleccionado) ...[
+                Icon(Icons.check, size: 15, color: color),
+                const SizedBox(width: 4),
+              ],
+              Text(
+                label,
+                style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
               ),
-            )
-            .toList(),
+            ],
+          ),
+        ),
       ),
-    ],
+    );
+  }
+}
+
+class _CeldaDia extends StatelessWidget {
+  const _CeldaDia({
+    required this.etiqueta,
+    required this.numero,
+    required this.seleccionado,
+    required this.esHoy,
+    required this.tieneCitas,
+    required this.onTap,
+  });
+
+  final String etiqueta;
+  final String numero;
+  final bool seleccionado;
+  final bool esHoy;
+  final bool tieneCitas;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(ReparaRadius.sm),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: ReparaSpace.s1),
+        child: Column(
+          children: [
+            if (etiqueta.isNotEmpty) ...[
+              Text(etiqueta, style: Theme.of(context).textTheme.bodySmall),
+              const SizedBox(height: 4),
+            ],
+            Container(
+              width: 32,
+              height: 32,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: seleccionado
+                    ? context.colors.brandStrong
+                    : (esHoy ? context.colors.brandTint : Colors.transparent),
+                borderRadius: BorderRadius.circular(ReparaRadius.sm),
+              ),
+              child: Text(
+                numero,
+                style: TextStyle(
+                  color: seleccionado
+                      ? context.colors.brandOn
+                      : context.colors.ink,
+                  fontWeight: esHoy || seleccionado
+                      ? FontWeight.w700
+                      : FontWeight.w400,
+                ),
+              ),
+            ),
+            const SizedBox(height: 3),
+            Container(
+              width: 4,
+              height: 4,
+              decoration: BoxDecoration(
+                color: tieneCitas ? context.colors.brand : Colors.transparent,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+Widget _tiraDeDias(
+  BuildContext context,
+  List<DateTime> dias,
+  DateTime diaSeleccionado,
+  List<Cita> citas,
+  ValueChanged<DateTime> onSeleccionarDia,
+) {
+  final hoy = _soloFecha(DateTime.now());
+  return Padding(
+    padding: const EdgeInsets.symmetric(
+      horizontal: ReparaSpace.s3,
+      vertical: ReparaSpace.s2,
+    ),
+    child: Row(
+      children: [
+        for (var i = 0; i < dias.length; i++)
+          Expanded(
+            child: _CeldaDia(
+              etiqueta: _nombresDiaCorto[i],
+              numero: '${dias[i].day}',
+              seleccionado: _mismoDia(dias[i], diaSeleccionado),
+              esHoy: _mismoDia(dias[i], hoy),
+              tieneCitas: _citasDelDia(citas, dias[i]).isNotEmpty,
+              onTap: () => onSeleccionarDia(dias[i]),
+            ),
+          ),
+      ],
+    ),
   );
 }
 
+/// Semana completa como lista de días (CEO: "mismo diseño que oficio-ai")
+/// -- cada uno de los 7 días se ve entero, con sus citas debajo si las
+/// tiene, en vez de solo mostrar el día seleccionado de la tira.
 class _VistaSemana extends StatelessWidget {
   const _VistaSemana({
     required this.citas,
     required this.diaSeleccionado,
     required this.onSeleccionarDia,
+    required this.onVerDia,
     required this.onAbrirCita,
   });
 
   final List<Cita> citas;
   final DateTime diaSeleccionado;
   final ValueChanged<DateTime> onSeleccionarDia;
+  final ValueChanged<DateTime> onVerDia;
   final void Function(Cita) onAbrirCita;
 
   @override
@@ -287,33 +458,28 @@ class _VistaSemana extends StatelessWidget {
             ],
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: ReparaSpace.s3,
-            vertical: ReparaSpace.s2,
-          ),
-          child: Row(
-            children: [
-              for (var i = 0; i < 7; i++)
-                Expanded(
-                  child: _CeldaDia(
-                    etiqueta: _nombresDiaCorto[i],
-                    numero: '${dias[i].day}',
-                    seleccionado: _mismoDia(dias[i], diaSeleccionado),
-                    esHoy: _mismoDia(dias[i], hoy),
-                    tieneCitas: _citasDelDia(citas, dias[i]).isNotEmpty,
-                    onTap: () => onSeleccionarDia(dias[i]),
-                  ),
-                ),
-            ],
-          ),
-        ),
+        _tiraDeDias(context, dias, diaSeleccionado, citas, onSeleccionarDia),
         const SizedBox(height: ReparaSpace.s2),
         Expanded(
-          child: _listaDeCitas(
-            context,
-            _citasDelDia(citas, diaSeleccionado),
-            onAbrirCita,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(
+              ReparaSpace.s4,
+              0,
+              ReparaSpace.s4,
+              ReparaSpace.s4,
+            ),
+            children: [
+              for (final d in dias) ...[
+                _SeccionDia(
+                  dia: d,
+                  esHoy: _mismoDia(d, hoy),
+                  citas: _citasDelDia(citas, d),
+                  onVerDia: () => onVerDia(d),
+                  onAbrirCita: onAbrirCita,
+                ),
+                const SizedBox(height: ReparaSpace.s2),
+              ],
+            ],
           ),
         ),
       ],
@@ -321,68 +487,82 @@ class _VistaSemana extends StatelessWidget {
   }
 }
 
-class _CeldaDia extends StatelessWidget {
-  const _CeldaDia({
-    required this.etiqueta,
-    required this.numero,
-    required this.seleccionado,
+class _SeccionDia extends StatelessWidget {
+  const _SeccionDia({
+    required this.dia,
     required this.esHoy,
-    required this.tieneCitas,
-    required this.onTap,
+    required this.citas,
+    required this.onVerDia,
+    required this.onAbrirCita,
   });
 
-  final String etiqueta;
-  final String numero;
-  final bool seleccionado;
+  final DateTime dia;
   final bool esHoy;
-  final bool tieneCitas;
-  final VoidCallback onTap;
+  final List<Cita> citas;
+  final VoidCallback onVerDia;
+  final void Function(Cita) onAbrirCita;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(ReparaRadius.sm),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: ReparaSpace.s1),
-        child: Column(
-          children: [
-            Text(etiqueta, style: Theme.of(context).textTheme.bodySmall),
-            const SizedBox(height: 4),
-            Container(
-              width: 32,
-              height: 32,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: seleccionado
-                    ? context.colors.brandStrong
-                    : (esHoy ? context.colors.brandTint : Colors.transparent),
-                shape: BoxShape.circle,
-              ),
-              child: Text(
-                numero,
-                style: TextStyle(
-                  color: seleccionado
-                      ? context.colors.brandOn
-                      : context.colors.ink,
-                  fontWeight: esHoy || seleccionado
-                      ? FontWeight.w700
-                      : FontWeight.w400,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        InkWell(
+          onTap: onVerDia,
+          borderRadius: BorderRadius.circular(ReparaRadius.sm),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: ReparaSpace.s1),
+            child: Row(
+              children: [
+                Text(
+                  '${_nombresDiaLargo[dia.weekday - 1]} ${dia.day}',
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
-              ),
+                if (esHoy) ...[
+                  const SizedBox(width: ReparaSpace.s2),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: context.colors.brandTint,
+                      borderRadius: BorderRadius.circular(ReparaRadius.pill),
+                    ),
+                    child: Text(
+                      'HOY',
+                      style: TextStyle(
+                        color: context.colors.brandStrong,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                  ),
+                ],
+                const Spacer(),
+                if (citas.isEmpty)
+                  Text(
+                    'Sin citas',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                Icon(
+                  Icons.chevron_right,
+                  color: context.colors.inkMuted,
+                  size: 20,
+                ),
+              ],
             ),
-            const SizedBox(height: 3),
-            Container(
-              width: 4,
-              height: 4,
-              decoration: BoxDecoration(
-                color: tieneCitas ? context.colors.brand : Colors.transparent,
-                shape: BoxShape.circle,
-              ),
-            ),
-          ],
+          ),
         ),
-      ),
+        if (citas.isNotEmpty) ...[
+          const SizedBox(height: ReparaSpace.s1),
+          for (final c in citas) ...[
+            _TarjetaCita(cita: c, onTap: () => onAbrirCita(c)),
+            const SizedBox(height: ReparaSpace.s1),
+          ],
+        ],
+      ],
     );
   }
 }
@@ -393,15 +573,21 @@ class _VistaDia extends StatelessWidget {
     required this.dia,
     required this.onCambiarDia,
     required this.onAbrirCita,
+    required this.onNuevaCita,
   });
 
   final List<Cita> citas;
   final DateTime dia;
   final ValueChanged<DateTime> onCambiarDia;
   final void Function(Cita) onAbrirCita;
+  final VoidCallback onNuevaCita;
 
   @override
   Widget build(BuildContext context) {
+    final lunes = dia.subtract(Duration(days: dia.weekday - 1));
+    final dias = List.generate(7, (i) => lunes.add(Duration(days: i)));
+    final citasDelDia = _citasDelDia(citas, dia);
+
     return Column(
       children: [
         Padding(
@@ -415,7 +601,7 @@ class _VistaDia extends StatelessWidget {
               ),
               Expanded(
                 child: Text(
-                  DateFormat('EEEE d MMMM', 'es_ES').format(dia),
+                  DateFormat('EEEE d MMM yyyy', 'es_ES').format(dia),
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
@@ -427,132 +613,376 @@ class _VistaDia extends StatelessWidget {
             ],
           ),
         ),
-        if (!_mismoDia(dia, _soloFecha(DateTime.now())))
-          TextButton(
-            onPressed: () => onCambiarDia(_soloFecha(DateTime.now())),
-            child: const Text('Ir a hoy'),
-          ),
+        _tiraDeDias(context, dias, dia, citas, onCambiarDia),
         const SizedBox(height: ReparaSpace.s2),
         Expanded(
-          child: _listaDeCitas(context, _citasDelDia(citas, dia), onAbrirCita),
+          child: citasDelDia.isEmpty
+              ? _EstadoVacioDia(dia: dia, onNuevaCita: onNuevaCita)
+              : ListView(
+                  padding: const EdgeInsets.fromLTRB(
+                    ReparaSpace.s4,
+                    0,
+                    ReparaSpace.s4,
+                    ReparaSpace.s4,
+                  ),
+                  children: [
+                    for (final c in citasDelDia) ...[
+                      _TarjetaCita(cita: c, onTap: () => onAbrirCita(c)),
+                      const SizedBox(height: ReparaSpace.s2),
+                    ],
+                  ],
+                ),
         ),
       ],
     );
   }
 }
 
-class _VistaMes extends StatelessWidget {
-  const _VistaMes({
-    required this.citas,
-    required this.diaSeleccionado,
-    required this.onSeleccionarDia,
-    required this.onAbrirCita,
-  });
+class _EstadoVacioDia extends StatelessWidget {
+  const _EstadoVacioDia({required this.dia, required this.onNuevaCita});
 
-  final List<Cita> citas;
-  final DateTime diaSeleccionado;
-  final ValueChanged<DateTime> onSeleccionarDia;
-  final void Function(Cita) onAbrirCita;
+  final DateTime dia;
+  final VoidCallback onNuevaCita;
 
   @override
   Widget build(BuildContext context) {
-    final primerDiaMes = DateTime(diaSeleccionado.year, diaSeleccionado.month);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(ReparaSpace.s6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: context.colors.brandTint,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.event_available_outlined,
+                size: 32,
+                color: context.colors.brand,
+              ),
+            ),
+            const SizedBox(height: ReparaSpace.s4),
+            Text(
+              'Sin citas este día',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: ReparaSpace.s1),
+            Text(
+              'Programa una cita para ${DateFormat('d MMM yyyy', 'es_ES').format(dia)}.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: ReparaSpace.s4),
+            FilledButton.icon(
+              onPressed: onNuevaCita,
+              style: FilledButton.styleFrom(
+                backgroundColor: context.colors.brandStrong,
+                foregroundColor: context.colors.brandOn,
+              ),
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Nueva cita'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Tarjeta de una cita -- rango horario, título, cliente (casaNombre --
+/// nunca el nombre del propietario, ver decisión de privacidad de Fase 2)
+/// y trabajo/descripción enlazados, con un check para completarla sin
+/// entrar al editor.
+class _TarjetaCita extends StatelessWidget {
+  const _TarjetaCita({required this.cita, required this.onTap});
+
+  final Cita cita;
+  final VoidCallback onTap;
+
+  Future<void> _alternarCompletada(BuildContext context) async {
+    try {
+      await CitaService.marcarCompletada(cita.id, !cita.completada);
+    } catch (e, st) {
+      if (context.mounted) {
+        AppError.show(
+          context,
+          'No se pudo actualizar la cita.',
+          error: e,
+          stackTrace: st,
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final subtitulo = cita.descripcion?.isNotEmpty == true
+        ? cita.descripcion!
+        : cita.registroTitulo;
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(ReparaSpace.s3),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 52,
+                child: cita.todoElDia
+                    ? Text(
+                        'Todo el día',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            DateFormat('HH:mm').format(cita.fecha),
+                            style: Theme.of(context).textTheme.titleSmall
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                          if (cita.horaFin != null)
+                            Text(
+                              DateFormat('HH:mm').format(cita.horaFin!),
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                        ],
+                      ),
+              ),
+              const SizedBox(width: ReparaSpace.s2),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      cita.titulo,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: cita.completada
+                            ? context.colors.inkMuted
+                            : context.colors.ink,
+                        decoration: cita.completada
+                            ? TextDecoration.lineThrough
+                            : null,
+                      ),
+                    ),
+                    if (cita.casaNombre != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        cita.casaNombre!,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                    if (subtitulo != null && subtitulo.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Icon(
+                            cita.enlazaTrabajo
+                                ? Icons.build_outlined
+                                : Icons.notes_outlined,
+                            size: 13,
+                            color: context.colors.inkMuted,
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              subtitulo,
+                              style: Theme.of(context).textTheme.bodySmall,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: cita.completada
+                    ? 'Marcar como pendiente'
+                    : 'Marcar como completada',
+                icon: Icon(
+                  cita.completada
+                      ? Icons.check_circle
+                      : Icons.radio_button_unchecked,
+                  color: cita.completada
+                      ? context.colors.success
+                      : context.colors.inkMuted,
+                ),
+                onPressed: () => _alternarCompletada(context),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Vista Mes -- funcionalidad real de REPARA que oficio-ai no tiene, se
+/// conserva como pantalla propia alcanzable desde el icono de calendario
+/// de la cabecera en vez de competir por sitio en el interruptor principal
+/// Semana/Día.
+class VistaMesScreen extends StatefulWidget {
+  const VistaMesScreen({
+    required this.diaInicial,
+    required this.onAbrirCita,
+    super.key,
+  });
+
+  final DateTime diaInicial;
+  final void Function(Cita) onAbrirCita;
+
+  @override
+  State<VistaMesScreen> createState() => _VistaMesScreenState();
+}
+
+class _VistaMesScreenState extends State<VistaMesScreen> {
+  late DateTime _diaSeleccionado = widget.diaInicial;
+
+  @override
+  Widget build(BuildContext context) {
+    final primerDiaMes = DateTime(
+      _diaSeleccionado.year,
+      _diaSeleccionado.month,
+    );
     final inicioGrid = primerDiaMes.subtract(
       Duration(days: primerDiaMes.weekday - 1),
     );
     final hoy = _soloFecha(DateTime.now());
 
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: ReparaSpace.s4),
-          child: Row(
+    return Scaffold(
+      appBar: AppBar(title: const Text('Agenda · Mes')),
+      body: StreamBuilder<List<Cita>>(
+        stream: CitaService.streamCitas(),
+        builder: (context, snapshot) {
+          final citas = snapshot.data ?? const [];
+          final citasDelDia = _citasDelDia(citas, _diaSeleccionado);
+          return Column(
             children: [
-              IconButton(
-                icon: const Icon(Icons.chevron_left),
-                onPressed: () => onSeleccionarDia(
-                  DateTime(
-                    diaSeleccionado.year,
-                    diaSeleccionado.month - 1,
-                    diaSeleccionado.day,
-                  ),
-                ),
-              ),
-              Expanded(
-                child: Text(
-                  DateFormat('MMMM yyyy', 'es_ES').format(diaSeleccionado),
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.chevron_right),
-                onPressed: () => onSeleccionarDia(
-                  DateTime(
-                    diaSeleccionado.year,
-                    diaSeleccionado.month + 1,
-                    diaSeleccionado.day,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: ReparaSpace.s3),
-          child: Row(
-            children: [
-              for (final n in _nombresDiaCorto)
-                Expanded(
-                  child: Center(
-                    child: Text(
-                      n,
-                      style: Theme.of(context).textTheme.bodySmall,
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: ReparaSpace.s4),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left),
+                      onPressed: () => setState(
+                        () => _diaSeleccionado = DateTime(
+                          _diaSeleccionado.year,
+                          _diaSeleccionado.month - 1,
+                          _diaSeleccionado.day,
+                        ),
+                      ),
                     ),
-                  ),
+                    Expanded(
+                      child: Text(
+                        DateFormat(
+                          'MMMM yyyy',
+                          'es_ES',
+                        ).format(_diaSeleccionado),
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right),
+                      onPressed: () => setState(
+                        () => _diaSeleccionado = DateTime(
+                          _diaSeleccionado.year,
+                          _diaSeleccionado.month + 1,
+                          _diaSeleccionado.day,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-            ],
-          ),
-        ),
-        for (var fila = 0; fila < 6; fila++)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: ReparaSpace.s3),
-            child: Row(
-              children: [
-                for (var col = 0; col < 7; col++)
-                  Expanded(
-                    child: Builder(
-                      builder: (context) {
-                        final d = inicioGrid.add(
-                          Duration(days: fila * 7 + col),
-                        );
-                        final delMes = d.month == diaSeleccionado.month;
-                        return Opacity(
-                          opacity: delMes ? 1 : 0.35,
-                          child: _CeldaDia(
-                            etiqueta: '',
-                            numero: '${d.day}',
-                            seleccionado: _mismoDia(d, diaSeleccionado),
-                            esHoy: _mismoDia(d, hoy),
-                            tieneCitas: _citasDelDia(citas, d).isNotEmpty,
-                            onTap: () => onSeleccionarDia(d),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: ReparaSpace.s3),
+                child: Row(
+                  children: [
+                    for (final n in _nombresDiaCorto)
+                      Expanded(
+                        child: Center(
+                          child: Text(
+                            n,
+                            style: Theme.of(context).textTheme.bodySmall,
                           ),
-                        );
-                      },
-                    ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              for (var fila = 0; fila < 6; fila++)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: ReparaSpace.s3,
                   ),
-              ],
-            ),
-          ),
-        const SizedBox(height: ReparaSpace.s2),
-        Expanded(
-          child: _listaDeCitas(
-            context,
-            _citasDelDia(citas, diaSeleccionado),
-            onAbrirCita,
-          ),
-        ),
-      ],
+                  child: Row(
+                    children: [
+                      for (var col = 0; col < 7; col++)
+                        Expanded(
+                          child: Builder(
+                            builder: (context) {
+                              final d = inicioGrid.add(
+                                Duration(days: fila * 7 + col),
+                              );
+                              final delMes = d.month == _diaSeleccionado.month;
+                              return Opacity(
+                                opacity: delMes ? 1 : 0.35,
+                                child: _CeldaDia(
+                                  etiqueta: '',
+                                  numero: '${d.day}',
+                                  seleccionado: _mismoDia(d, _diaSeleccionado),
+                                  esHoy: _mismoDia(d, hoy),
+                                  tieneCitas: _citasDelDia(citas, d).isNotEmpty,
+                                  onTap: () =>
+                                      setState(() => _diaSeleccionado = d),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: ReparaSpace.s3),
+              Expanded(
+                child: citasDelDia.isEmpty
+                    ? const EmptyHint(
+                        message: 'Nada programado para este día.',
+                        icon: Icons.event_available_outlined,
+                      )
+                    : ListView(
+                        padding: const EdgeInsets.fromLTRB(
+                          ReparaSpace.s4,
+                          0,
+                          ReparaSpace.s4,
+                          ReparaSpace.s4,
+                        ),
+                        children: [
+                          for (final c in citasDelDia) ...[
+                            _TarjetaCita(
+                              cita: c,
+                              onTap: () => widget.onAbrirCita(c),
+                            ),
+                            const SizedBox(height: ReparaSpace.s2),
+                          ],
+                        ],
+                      ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 }
@@ -573,6 +1003,7 @@ class _EditorCitaSheetState extends State<_EditorCitaSheet> {
   late DateTime _fecha;
   late bool _todoElDia;
   late TimeOfDay _hora;
+  TimeOfDay? _horaFin;
   RegistroProRef? _trabajoVinculado;
   bool _guardando = false;
 
@@ -587,6 +1018,9 @@ class _EditorCitaSheetState extends State<_EditorCitaSheet> {
     _fecha = _soloFecha(cita?.fecha ?? widget.fechaInicial ?? DateTime.now());
     _todoElDia = cita?.todoElDia ?? false;
     _hora = cita != null ? TimeOfDay.fromDateTime(cita.fecha) : TimeOfDay.now();
+    _horaFin = cita?.horaFin != null
+        ? TimeOfDay.fromDateTime(cita!.horaFin!)
+        : null;
     if (cita?.enlazaTrabajo == true) {
       _trabajoVinculado = RegistroProRef(
         casaId: cita!.casaId!,
@@ -619,6 +1053,14 @@ class _EditorCitaSheetState extends State<_EditorCitaSheet> {
   Future<void> _elegirHora() async {
     final elegida = await showTimePicker(context: context, initialTime: _hora);
     if (elegida != null) setState(() => _hora = elegida);
+  }
+
+  Future<void> _elegirHoraFin() async {
+    final elegida = await showTimePicker(
+      context: context,
+      initialTime: _horaFin ?? _hora,
+    );
+    if (elegida != null) setState(() => _horaFin = elegida);
   }
 
   Future<void> _elegirTrabajo() async {
@@ -666,6 +1108,15 @@ class _EditorCitaSheetState extends State<_EditorCitaSheet> {
             _hora.hour,
             _hora.minute,
           );
+    final horaFinCompleta = (!_todoElDia && _horaFin != null)
+        ? DateTime(
+            _fecha.year,
+            _fecha.month,
+            _fecha.day,
+            _horaFin!.hour,
+            _horaFin!.minute,
+          )
+        : null;
     final vinculo = _trabajoVinculado;
     final cita = Cita(
       id: widget.cita?.id ?? '',
@@ -675,6 +1126,7 @@ class _EditorCitaSheetState extends State<_EditorCitaSheet> {
           : _descripcionCtrl.text.trim(),
       fecha: fechaCompleta,
       todoElDia: _todoElDia,
+      horaFin: horaFinCompleta,
       casaId: vinculo?.casaId,
       elementoId: vinculo?.elementoId,
       registroId: vinculo?.registroId,
@@ -802,6 +1254,18 @@ class _EditorCitaSheetState extends State<_EditorCitaSheet> {
                   ],
                 ],
               ),
+              if (!_todoElDia) ...[
+                const SizedBox(height: ReparaSpace.s2),
+                OutlinedButton.icon(
+                  onPressed: _elegirHoraFin,
+                  icon: const Icon(Icons.schedule_outlined, size: 16),
+                  label: Text(
+                    _horaFin == null
+                        ? 'Hora de fin (opcional)'
+                        : 'Hasta las ${_horaFin!.format(context)}',
+                  ),
+                ),
+              ],
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Todo el día'),
