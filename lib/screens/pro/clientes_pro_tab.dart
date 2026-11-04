@@ -88,7 +88,7 @@ class ClientesProTab extends StatelessWidget {
             ..sort((a, b) => a.casaNombre.compareTo(b.casaNombre));
 
           return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+            padding: const EdgeInsets.fromLTRB(16, ReparaSpace.s4, 16, 24),
             children: [
               IosSection(
                 rows: clientes

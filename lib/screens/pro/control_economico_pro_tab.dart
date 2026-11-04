@@ -164,7 +164,7 @@ class _ControlEconomicoProTabState extends State<ControlEconomicoProTab> {
               .toList();
 
           return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+            padding: const EdgeInsets.fromLTRB(16, ReparaSpace.s4, 16, 24),
             children: [
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,

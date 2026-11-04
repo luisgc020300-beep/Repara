@@ -67,7 +67,7 @@ class DocumentosCasaScreen extends StatelessWidget {
             );
           }
           return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 90),
+            padding: const EdgeInsets.fromLTRB(16, ReparaSpace.s4, 16, 90),
             children: [
               IosSection(
                 rows: documentos.map((d) {

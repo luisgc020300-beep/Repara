@@ -67,7 +67,7 @@ class InicioProTab extends StatelessWidget {
       ),
       body: TrabajosProAgregadosBuilder(
         builder: (context, trabajos, cargando) => ListView(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+          padding: const EdgeInsets.fromLTRB(16, ReparaSpace.s4, 16, 24),
           children: [
             _KpisHero(trabajos: trabajos),
             const SizedBox(height: ReparaSpace.s5),

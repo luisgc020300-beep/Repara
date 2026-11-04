@@ -106,7 +106,7 @@ class _ContactosTabState extends State<ContactosTab> {
                     )
                     .toList();
           return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 90),
+            padding: const EdgeInsets.fromLTRB(16, ReparaSpace.s4, 16, 90),
             children: [
               Padding(
                 padding: const EdgeInsets.only(bottom: 10),
