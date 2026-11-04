@@ -24,10 +24,13 @@ class InvitacionService {
   @visibleForTesting
   static String? debugUidOverride;
 
-  static FirebaseFirestore get _db => debugFirestoreOverride ?? FirebaseFirestore.instance;
+  static FirebaseFirestore get _db =>
+      debugFirestoreOverride ?? FirebaseFirestore.instance;
   // Ver casa_service.dart: debugFirestoreOverride (no debugUidOverride) es
   // la señal real de "estamos en test", para poder simular uid null aposta.
-  static String? get _uid => debugFirestoreOverride != null ? debugUidOverride : FirebaseAuth.instance.currentUser?.uid;
+  static String? get _uid => debugFirestoreOverride != null
+      ? debugUidOverride
+      : FirebaseAuth.instance.currentUser?.uid;
   static const _region = 'europe-west1';
 
   static Future<ResultadoInvitacion> invitarProfesional({
@@ -37,7 +40,9 @@ class InvitacionService {
     String? emailProfesional,
     String? telefonoProfesional,
   }) async {
-    final callable = FirebaseFunctions.instanceFor(region: _region).httpsCallable('invitarProfesional');
+    final callable = FirebaseFunctions.instanceFor(
+      region: _region,
+    ).httpsCallable('invitarProfesional');
     final result = await callable.call<Map<String, dynamic>>({
       'casaId': casaId,
       'elementoId': elementoId,
@@ -46,24 +51,41 @@ class InvitacionService {
       'telefonoProfesional': ?telefonoProfesional,
     });
     final tipo = result.data['tipo'] as String?;
-    return ResultadoInvitacion(esDirecta: tipo == 'directa', codigo: result.data['codigo'] as String?);
+    return ResultadoInvitacion(
+      esDirecta: tipo == 'directa',
+      codigo: result.data['codigo'] as String?,
+    );
   }
 
   /// Lo llama quien recibe un código de invitación (sección "idea 1" del
   /// bucle viral): no necesita tener cuenta profesional activada de
   /// antemano, esta función la activa si hace falta.
-  static Future<({String casaNombre, String registroTitulo})> canjearCodigo(String codigo) async {
-    final callable = FirebaseFunctions.instanceFor(region: _region).httpsCallable('canjearCodigoInvitacion');
-    final result = await callable.call<Map<String, dynamic>>({'codigo': codigo});
+  static Future<({String casaNombre, String registroTitulo})> canjearCodigo(
+    String codigo,
+  ) async {
+    final callable = FirebaseFunctions.instanceFor(
+      region: _region,
+    ).httpsCallable('canjearCodigoInvitacion');
+    final result = await callable.call<Map<String, dynamic>>({
+      'codigo': codigo,
+    });
     return (
       casaNombre: result.data['casaNombre'] as String? ?? '',
       registroTitulo: result.data['registroTitulo'] as String? ?? '',
     );
   }
 
-  static Future<void> responder(String invitacionId, {required bool aceptar}) async {
-    final callable = FirebaseFunctions.instanceFor(region: _region).httpsCallable('responderInvitacion');
-    await callable.call<Map<String, dynamic>>({'invitacionId': invitacionId, 'aceptar': aceptar});
+  static Future<void> responder(
+    String invitacionId, {
+    required bool aceptar,
+  }) async {
+    final callable = FirebaseFunctions.instanceFor(
+      region: _region,
+    ).httpsCallable('responderInvitacion');
+    await callable.call<Map<String, dynamic>>({
+      'invitacionId': invitacionId,
+      'aceptar': aceptar,
+    });
     // Al aceptar, el servidor añade este registro al claim registrosProId
     // (ver sincronizarClaimsUid) -- refrescar ya el token para que Storage
     // reconozca el acceso sin esperar a la próxima renovación automática.
@@ -73,7 +95,9 @@ class InvitacionService {
   /// Para cuando el profesional invitado nunca responde -- sin esto el
   /// propietario se queda sin ninguna vía para invitar a otra persona.
   static Future<void> cancelar(String invitacionId) async {
-    final callable = FirebaseFunctions.instanceFor(region: _region).httpsCallable('cancelarInvitacion');
+    final callable = FirebaseFunctions.instanceFor(
+      region: _region,
+    ).httpsCallable('cancelarInvitacion');
     await callable.call<Map<String, dynamic>>({'invitacionId': invitacionId});
   }
 
@@ -99,6 +123,35 @@ class InvitacionService {
         .where('estado', isEqualTo: 'pendiente')
         .snapshots()
         .map((s) => s.docs.map(Invitacion.fromDoc).toList())
+        .conRegistroDeErrores();
+  }
+
+  /// Invitaciones ya aceptadas por el profesional actual, para "Actividad
+  /// reciente" del Dashboard Pro (CEO, noviembre 2026). Ordenadas por
+  /// [Invitacion.createdAt] -- el modelo no guarda una fecha de respuesta
+  /// aparte, así que es el mejor proxy disponible sin tocar el modelo ni
+  /// las Cloud Functions (ver nota de alcance en el plan de esta fase). Sin
+  /// orderBy en la propia consulta a propósito -- combinarlo con las dos
+  /// igualdades exigiría un índice compuesto nuevo que habría que
+  /// desplegar; con el puñado de invitaciones que tiene un profesional,
+  /// ordenar en el cliente tras recibir el snapshot es más que suficiente.
+  static Stream<List<Invitacion>> streamAceptadasRecientes({int limite = 10}) {
+    final uid = _uid;
+    if (uid == null) return Stream.value(const []);
+    return _db
+        .collection('invitaciones')
+        .where('profesionalUid', isEqualTo: uid)
+        .where('estado', isEqualTo: 'aceptada')
+        .snapshots()
+        .map((s) {
+          final lista = s.docs.map(Invitacion.fromDoc).toList()
+            ..sort(
+              (a, b) => (b.createdAt ?? DateTime(2000)).compareTo(
+                a.createdAt ?? DateTime(2000),
+              ),
+            );
+          return lista.take(limite).toList();
+        })
         .conRegistroDeErrores();
   }
 }

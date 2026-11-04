@@ -54,6 +54,10 @@ dependencies:
   # Importar contactos del teléfono a la libreta de Contactos de la casa
   # (CEO, noviembre 2026).
   flutter_contacts: ^1.1.9+2
+  # Gráficos de Control económico en REPARA Pro (ampliación funcional, Fase
+  # 2, noviembre 2026) -- puro Dart, sin plugins nativos, único paquete de
+  # gráficos de todo el repo.
+  fl_chart: ^0.69.2
 
 dev_dependencies:
   flutter_test:

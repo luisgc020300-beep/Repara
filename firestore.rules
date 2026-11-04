@@ -41,6 +41,17 @@ service cloud.firestore {
     // Function con Admin SDK, que no pasa por estas reglas).
     match /profesionales/{uid} {
       allow read, write: if isAuth() && isOwner(uid);
+
+      // ── agenda (ampliación funcional REPARA Pro, Fase 4, noviembre 2026) ──
+      // Planificación puramente personal del profesional -- nunca dinero, nunca
+      // datos de un propietario ni de una casa, así que no hace falta pasar por
+      // Cloud Function (mismo criterio que el documento padre, el perfil
+      // profesional, justo arriba). Solo el propio profesional la lee o la
+      // escribe -- ni siquiera el propietario del trabajo al que una cita
+      // pueda enlazar (registroId/casaId/elementoId) tiene acceso aquí.
+      match /citas/{cid} {
+        allow read, write: if isAuth() && isOwner(uid);
+      }
     }
 
     // ── invitaciones (propietario invita a un profesional a UN trabajo) ────────

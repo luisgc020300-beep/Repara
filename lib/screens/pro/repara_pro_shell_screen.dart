@@ -4,10 +4,18 @@
 // pantalla normal desde el Perfil de REPARA Hogar -- misma cuenta, misma
 // sesión, mismo proyecto Firebase; no es una app aparte ni cambia la
 // navegación de Hogar.
+//
+// 5 pestañas (ampliación funcional, Fase 2 y 4 -- CEO, noviembre 2026):
+// Inicio, Trabajos, Clientes, Agenda, Control económico -- el objetivo de
+// navegación final del encargo. "Presupuestos" se retiró como pestaña
+// propia en la Fase 2 (su contenido, agrupado por estado, se mudó dentro
+// de Control económico) para no crecer a 6 pestañas al añadir Agenda aquí.
 import 'package:flutter/material.dart';
 
+import 'agenda_pro_tab.dart';
+import 'clientes_pro_tab.dart';
+import 'control_economico_pro_tab.dart';
 import 'inicio_pro_tab.dart';
-import 'presupuestos_pro_tab.dart';
 import 'trabajos_pro_tab.dart';
 
 class ReparaProShellScreen extends StatefulWidget {
@@ -38,7 +46,9 @@ class _ReparaProShellScreenState extends State<ReparaProShellScreen> {
     const tabs = [
       _KeepAlivePage(child: InicioProTab()),
       _KeepAlivePage(child: TrabajosProTab()),
-      _KeepAlivePage(child: PresupuestosProTab()),
+      _KeepAlivePage(child: ClientesProTab()),
+      _KeepAlivePage(child: AgendaProTab()),
+      _KeepAlivePage(child: ControlEconomicoProTab()),
     ];
     return Scaffold(
       body: PageView(
@@ -47,12 +57,35 @@ class _ReparaProShellScreenState extends State<ReparaProShellScreen> {
         children: tabs,
       ),
       bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
         currentIndex: _index,
         onTap: _cambiarPestana,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.dashboard_outlined), activeIcon: Icon(Icons.dashboard), label: 'Inicio Pro'),
-          BottomNavigationBarItem(icon: Icon(Icons.build_outlined), activeIcon: Icon(Icons.build), label: 'Trabajos'),
-          BottomNavigationBarItem(icon: Icon(Icons.request_quote_outlined), activeIcon: Icon(Icons.request_quote), label: 'Presupuestos'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.dashboard_outlined),
+            activeIcon: Icon(Icons.dashboard),
+            label: 'Inicio',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.build_outlined),
+            activeIcon: Icon(Icons.build),
+            label: 'Trabajos',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.people_outline),
+            activeIcon: Icon(Icons.people),
+            label: 'Clientes',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.event_outlined),
+            activeIcon: Icon(Icons.event),
+            label: 'Agenda',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.pie_chart_outline),
+            activeIcon: Icon(Icons.pie_chart),
+            label: 'Económico',
+          ),
         ],
       ),
     );
@@ -70,7 +103,8 @@ class _KeepAlivePage extends StatefulWidget {
   State<_KeepAlivePage> createState() => _KeepAlivePageState();
 }
 
-class _KeepAlivePageState extends State<_KeepAlivePage> with AutomaticKeepAliveClientMixin {
+class _KeepAlivePageState extends State<_KeepAlivePage>
+    with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
 

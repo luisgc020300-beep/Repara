@@ -937,6 +937,12 @@ class _ResumenTab extends StatelessWidget {
           elementoId: elementoId,
           registroId: registro.id,
           rol: RolEnTrabajo.propietario,
+          registroTitulo: registro.titulo,
+          elementoNombre: registro.elementoNombre,
+          casaNombre: casa.nombre,
+          profesionalNombre: registro.listaProfesionales.isNotEmpty
+              ? registro.listaProfesionales.map((p) => p.nombre).join(', ')
+              : null,
         ),
         const SizedBox(height: 20),
         _TarjetaMantenimiento(

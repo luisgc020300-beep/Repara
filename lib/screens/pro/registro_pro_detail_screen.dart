@@ -113,9 +113,7 @@ class RegistroProDetailScreen extends StatelessWidget {
         if (snapshot.hasError) {
           return Scaffold(
             appBar: AppBar(),
-            body: const Center(
-              child: Text('No se pudo cargar este evento.'),
-            ),
+            body: const Center(child: Text('No se pudo cargar este evento.')),
           );
         }
         final registro = snapshot.data;
@@ -297,6 +295,16 @@ class RegistroProDetailScreen extends StatelessWidget {
                 elementoId: elementoId,
                 registroId: registroId,
                 rol: RolEnTrabajo.profesional,
+                registroTitulo: registro.titulo,
+                elementoNombre: registro.elementoNombre,
+                // El profesional no tiene acceso de lectura a la casa (ver
+                // cabecera del archivo) -- casaNombre queda sin dato aquí,
+                // el PDF simplemente omite esa línea.
+                profesionalNombre: registro.listaProfesionales.isNotEmpty
+                    ? registro.listaProfesionales
+                          .map((p) => p.nombre)
+                          .join(', ')
+                    : null,
               ),
               const SizedBox(height: 20),
               CambiosAlcanceSection(

@@ -20,13 +20,17 @@ import 'dart:convert';
 
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/presupuesto.dart';
 import '../services/analytics_service.dart';
+import '../services/conceptos_frecuentes_service.dart';
 import '../services/presupuesto_service.dart';
 import '../theme/design_tokens.dart';
+import '../widgets/app_dialog.dart';
 import '../widgets/app_error.dart';
+import '../widgets/presupuesto_pdf.dart';
 
 // Plantilla de presupuesto (auditoría de producto, octubre 2026): recuerda
 // en este dispositivo las líneas del último presupuesto creado desde cero
@@ -43,6 +47,10 @@ class PresupuestosSection extends StatelessWidget {
     required this.elementoId,
     required this.registroId,
     required this.rol,
+    this.registroTitulo,
+    this.elementoNombre,
+    this.casaNombre,
+    this.profesionalNombre,
     super.key,
   });
 
@@ -50,6 +58,16 @@ class PresupuestosSection extends StatelessWidget {
   final String elementoId;
   final String registroId;
   final RolEnTrabajo rol;
+
+  /// Contexto para "Descargar PDF" (ampliación Fase 3, noviembre 2026) --
+  /// opcionales porque el lado profesional no tiene acceso de lectura a la
+  /// casa (ver registro_pro_detail_screen.dart), así que [casaNombre] no
+  /// siempre está disponible. Un PDF sin alguno de estos campos simplemente
+  /// omite esa línea, nunca inventa un valor de relleno.
+  final String? registroTitulo;
+  final String? elementoNombre;
+  final String? casaNombre;
+  final String? profesionalNombre;
 
   @override
   Widget build(BuildContext context) {
@@ -105,6 +123,10 @@ class PresupuestosSection extends StatelessWidget {
                   registroId: registroId,
                   presupuesto: p,
                   rol: rol,
+                  registroTitulo: registroTitulo,
+                  elementoNombre: elementoNombre,
+                  casaNombre: casaNombre,
+                  profesionalNombre: profesionalNombre,
                 ),
               ),
           ],
@@ -142,6 +164,10 @@ class _PresupuestoCard extends StatefulWidget {
     required this.registroId,
     required this.presupuesto,
     required this.rol,
+    this.registroTitulo,
+    this.elementoNombre,
+    this.casaNombre,
+    this.profesionalNombre,
   });
 
   final String casaId;
@@ -149,6 +175,10 @@ class _PresupuestoCard extends StatefulWidget {
   final String registroId;
   final Presupuesto presupuesto;
   final RolEnTrabajo rol;
+  final String? registroTitulo;
+  final String? elementoNombre;
+  final String? casaNombre;
+  final String? profesionalNombre;
 
   @override
   State<_PresupuestoCard> createState() => _PresupuestoCardState();
@@ -248,9 +278,32 @@ class _PresupuestoCardState extends State<_PresupuestoCard> {
     }
   }
 
+  Future<void> _descargarPdf(BuildContext context) async {
+    try {
+      await PresupuestoPdf.descargar(
+        context,
+        presupuesto: widget.presupuesto,
+        registroTitulo: widget.registroTitulo ?? 'Presupuesto',
+        elementoNombre: widget.elementoNombre,
+        casaNombre: widget.casaNombre,
+        profesionalNombre: widget.profesionalNombre,
+      );
+    } catch (e, st) {
+      if (context.mounted) {
+        AppError.show(
+          context,
+          'No se pudo generar el PDF.',
+          error: e,
+          stackTrace: st,
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final presupuesto = widget.presupuesto;
+    final fecha = presupuesto.fechaEnvio ?? presupuesto.fechaCreacion;
     return Card(
       margin: const EdgeInsets.only(bottom: ReparaSpace.s2),
       child: Padding(
@@ -261,9 +314,17 @@ class _PresupuestoCardState extends State<_PresupuestoCard> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Presupuesto #${presupuesto.numero} · v${presupuesto.version}',
-                  style: Theme.of(context).textTheme.titleMedium,
+                Expanded(
+                  child: Text(
+                    'Presupuesto #${presupuesto.numero} · v${presupuesto.version}',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Descargar PDF',
+                  icon: const Icon(Icons.picture_as_pdf_outlined, size: 20),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => _descargarPdf(context),
                 ),
                 Container(
                   // Mismas dimensiones (10/4) que la píldora gemela de
@@ -290,6 +351,13 @@ class _PresupuestoCardState extends State<_PresupuestoCard> {
                 ),
               ],
             ),
+            if (fecha != null) ...[
+              const SizedBox(height: 2),
+              Text(
+                DateFormat('d MMM yyyy', 'es_ES').format(fecha),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
             const SizedBox(height: ReparaSpace.s3),
             ...presupuesto.lineas.map(
               (l) => Padding(
@@ -338,6 +406,21 @@ class _PresupuestoCardState extends State<_PresupuestoCard> {
                 ),
               ],
             ),
+            if (presupuesto.notas != null &&
+                presupuesto.notas!.trim().isNotEmpty) ...[
+              const SizedBox(height: ReparaSpace.s3),
+              Text(
+                'Observaciones',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: context.colors.inkMuted,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                presupuesto.notas!.trim(),
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ],
             if (presupuesto.estado == EstadoPresupuesto.borrador &&
                 widget.rol == RolEnTrabajo.profesional) ...[
               const SizedBox(height: ReparaSpace.s3),
@@ -420,6 +503,7 @@ class _EditorPresupuestoSheetState extends State<_EditorPresupuestoSheet> {
   final List<_LineaEnEdicion> _lineas = [_LineaEnEdicion()];
   bool _guardando = false;
   bool _desdePlantilla = false;
+  List<ConceptoFrecuente> _conceptos = const [];
 
   @override
   void initState() {
@@ -427,6 +511,106 @@ class _EditorPresupuestoSheetState extends State<_EditorPresupuestoSheet> {
     // Solo tiene sentido ofrecer la plantilla en un presupuesto desde cero
     // -- una nueva versión ya parte de las líneas del anterior.
     if (widget.presupuestoAnteriorId == null) _cargarPlantilla();
+    // Los conceptos frecuentes, en cambio, son útiles siempre -- también al
+    // crear una nueva versión tras un rechazo.
+    _cargarConceptos();
+  }
+
+  Future<void> _cargarConceptos() async {
+    final conceptos = await ConceptosFrecuentesService.listar();
+    if (mounted) setState(() => _conceptos = conceptos);
+  }
+
+  void _insertarConcepto(ConceptoFrecuente c) {
+    setState(
+      () => _lineas.add(
+        _LineaEnEdicion()
+          ..descripcionCtrl.text = c.nombre
+          ..precioCtrl.text = c.precioUnitario.toStringAsFixed(2)
+          ..ivaCtrl.text = c.ivaPorcentaje.toStringAsFixed(0),
+      ),
+    );
+  }
+
+  Future<void> _eliminarConcepto(ConceptoFrecuente c) async {
+    final confirmar = await AppDialog.confirm(
+      context,
+      title: '¿Quitar "${c.nombre}" de tus conceptos frecuentes?',
+      confirmLabel: 'Quitar',
+      destructive: true,
+    );
+    if (!confirmar) return;
+    await ConceptosFrecuentesService.eliminar(c.nombre);
+    await _cargarConceptos();
+  }
+
+  Future<void> _abrirNuevoConcepto() async {
+    final nombreCtrl = TextEditingController();
+    final precioCtrl = TextEditingController();
+    final ivaCtrl = TextEditingController(text: '21');
+    final guardado = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: AppDialog.shape(),
+        title: const Text('Nuevo concepto frecuente'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nombreCtrl,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Nombre (p.ej. Desplazamiento)',
+              ),
+            ),
+            const SizedBox(height: ReparaSpace.s2),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: precioCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(labelText: 'Precio (€)'),
+                  ),
+                ),
+                const SizedBox(width: ReparaSpace.s2),
+                Expanded(
+                  child: TextField(
+                    controller: ivaCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(labelText: 'IVA %'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+    if (guardado != true || nombreCtrl.text.trim().isEmpty) return;
+    await ConceptosFrecuentesService.guardar(
+      ConceptoFrecuente(
+        nombre: nombreCtrl.text.trim(),
+        precioUnitario:
+            double.tryParse(precioCtrl.text.replaceAll(',', '.')) ?? 0,
+        ivaPorcentaje: double.tryParse(ivaCtrl.text.replaceAll(',', '.')) ?? 21,
+      ),
+    );
+    await _cargarConceptos();
   }
 
   Future<void> _cargarPlantilla() async {
@@ -634,6 +818,36 @@ class _EditorPresupuestoSheetState extends State<_EditorPresupuestoSheet> {
                 ),
               ],
               const SizedBox(height: ReparaSpace.s3),
+              Text(
+                'Conceptos frecuentes',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: context.colors.inkMuted,
+                ),
+              ),
+              const SizedBox(height: ReparaSpace.s1),
+              Wrap(
+                spacing: ReparaSpace.s2,
+                runSpacing: ReparaSpace.s1,
+                children: [
+                  for (final c in _conceptos)
+                    InputChip(
+                      label: Text(c.nombre),
+                      onPressed: () => _insertarConcepto(c),
+                      onDeleted: () => _eliminarConcepto(c),
+                      deleteIconColor: context.colors.inkMuted,
+                    ),
+                  ActionChip(
+                    avatar: Icon(
+                      Icons.add,
+                      size: 16,
+                      color: context.colors.brand,
+                    ),
+                    label: const Text('Nuevo'),
+                    onPressed: _abrirNuevoConcepto,
+                  ),
+                ],
+              ),
+              const SizedBox(height: ReparaSpace.s4),
               ..._lineas.asMap().entries.map((entry) {
                 final i = entry.key;
                 final l = entry.value;
