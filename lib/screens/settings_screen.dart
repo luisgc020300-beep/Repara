@@ -6,26 +6,27 @@
 // compitiendo con este mismo icono -- ahora todo vive aquí, con secciones
 // que aparecen según desde dónde se abre (casa en Hogar, modoPro en Pro).
 //
-// Estilo "lista agrupada" de iOS (a petición del CEO, octubre 2026): secciones
-// con cabecera en mayúsculas, filas dentro de una única tarjeta redondeada
-// con separadores finos e indentados, icono en una insignia de color y
-// chevron a la derecha -- en vez de una Card suelta por fila.
+// Rediseño visual (CEO, noviembre 2026, a partir de un mockup de
+// referencia): tarjetas grandes para "Tu cuenta" y "Tu vivienda", selector
+// Hogar/Pro como interruptor de dos posiciones, y una lista plana de accesos
+// (Tema, Seguridad, Compartir, Descargar PDF, Ayuda, Acerca de) -- cada uno
+// de los cuales antes era una sección entera suelta aquí mismo. Nada de eso
+// se perdió: cada fila de antes vive ahora en su propia pantalla
+// (CuentaScreen, GestionarViviendaScreen, SeguridadScreen, AcercaScreen) o
+// en el interruptor de modo. El icono de engranaje que abre esta pantalla
+// desde las demás (BotonAjustes) no cambia.
 import 'dart:async';
 
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/casa.dart';
 import '../models/profesional.dart';
-import '../services/analytics_service.dart';
-import '../services/casa_service.dart';
-import '../services/cuenta_service.dart';
-import '../services/fcm_service.dart';
 import '../core/service_locator.dart';
-import '../services/invitacion_service.dart';
+import '../services/analytics_service.dart';
 import '../services/profesional_service.dart';
 import '../services/security/biometric_service.dart';
 import '../services/security/security_preferences_service.dart';
@@ -34,26 +35,24 @@ import '../theme/theme_controller.dart';
 import '../widgets/app_dialog.dart';
 import '../widgets/app_error.dart';
 import '../widgets/ios_list.dart';
-import 'documentos_casa_screen.dart';
+import 'acerca_screen.dart';
+import 'cuenta_screen.dart';
 import 'expediente_vivienda_screen.dart';
+import 'gestionar_vivienda_screen.dart';
 import 'pro/repara_pro_shell_screen.dart';
+import 'seguridad_screen.dart';
 
-// URL única con dos secciones (#privacidad / #terminos) -- más fácil de
-// mantener que dos páginas separadas mientras la app es de un único
-// desarrollador. OJO: compartir el enlace desde el menú de la propia página
-// antes de publicar la app en las tiendas, o nadie fuera de esta cuenta
-// podrá abrirlo.
-const _urlLegal = 'https://claude.ai/artifact/G771r2pFWuiAFRXxHA69rC';
+const _emailSoporte = 'luisgc020300@gmail.com';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({this.casa, this.modoPro = false, super.key});
 
-  /// Si no es null, se muestra la sección "Tu casa" (renombrar, miembros,
-  /// código, documentos, activar modo profesional).
+  /// Si no es null, se muestra la tarjeta "Tu vivienda" y la fila
+  /// "Descargar PDF".
   final Casa? casa;
 
-  /// true cuando se abre desde dentro de Repara Pro -- muestra "Tu perfil
-  /// profesional" y "Volver a modo propietario" en vez de la sección de casa.
+  /// true cuando se abre desde dentro de Repara Pro -- el interruptor de
+  /// modo aparece en "Pro" y se muestra "Tu perfil profesional".
   final bool modoPro;
 
   @override
@@ -61,124 +60,8 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  bool _eliminandoCuenta = false;
-  bool _cerrandoTodo = false;
-
-  Future<void> _confirmarCerrarSesionEnTodosLosDispositivos() async {
-    final confirmar = await AppDialog.confirm(
-      context,
-      title: '¿Cerrar sesión en todos los dispositivos?',
-      message: 'Este dispositivo se cierra al momento. Los demás seguirán abiertos hasta una hora más mientras se '
-          'renueva su sesión automáticamente -- no es instantáneo en ellos.',
-      confirmLabel: 'Cerrar en todos',
-    );
-    if (!confirmar || !mounted) return;
-    setState(() => _cerrandoTodo = true);
-    try {
-      await CuentaService.cerrarSesionesEnTodosLosDispositivos();
-      await FcmService.olvidarEsteDispositivo();
-      await FirebaseAuth.instance.signOut();
-      if (!mounted) return;
-      Navigator.of(context).popUntil((route) => route.isFirst);
-    } catch (e, st) {
-      await FirebaseCrashlytics.instance.recordError(e, st);
-      if (mounted) AppError.show(context, 'No se pudo cerrar la sesión en todos los dispositivos.');
-    } finally {
-      if (mounted) setState(() => _cerrandoTodo = false);
-    }
-  }
-
-  Future<void> _confirmarCerrarSesion() async {
-    final confirmar = await AppDialog.confirm(context, title: '¿Cerrar sesión?', confirmLabel: 'Cerrar sesión');
-    if (!confirmar) return;
-    await FcmService.olvidarEsteDispositivo();
-    await FirebaseAuth.instance.signOut();
-    // El StreamBuilder de MaterialApp ya muestra LoginScreen por debajo en
-    // cuanto cambia la sesión, pero esta pantalla (y todo lo que haya encima,
-    // p.ej. el shell de Pro) sigue empujado en la pila -- hay que volver a
-    // la raíz para que se vea.
-    if (!mounted) return;
-    Navigator.of(context).popUntil((route) => route.isFirst);
-  }
-
-  Future<void> _confirmarEliminarCuenta() async {
-    final confirmar = await AppDialog.confirm(
-      context,
-      title: '¿Eliminar tu cuenta?',
-      message: 'Se borra tu perfil y, si eres el único miembro de tu vivienda, también la vivienda entera con su '
-          'historial, documentos y fotos. Si la compartes con alguien más, solo se elimina tu vinculación a ella. '
-          'Esta acción no se puede deshacer.',
-      confirmLabel: 'Eliminar cuenta',
-      destructive: true,
-    );
-    if (!confirmar || !mounted) return;
-
-    setState(() => _eliminandoCuenta = true);
-    try {
-      await CuentaService.eliminarCuenta();
-      await FirebaseAuth.instance.signOut();
-      if (!mounted) return;
-      Navigator.of(context).popUntil((route) => route.isFirst);
-    } on FirebaseFunctionsException catch (e, st) {
-      if (e.code != 'failed-precondition') {
-        await FirebaseCrashlytics.instance.recordError(e, st);
-      }
-      if (mounted) AppError.show(context, e.message ?? 'No se pudo eliminar la cuenta.');
-    } catch (e, st) {
-      await FirebaseCrashlytics.instance.recordError(e, st);
-      if (mounted) AppError.show(context, 'No se pudo eliminar la cuenta. Inténtalo de nuevo.');
-    } finally {
-      if (mounted) setState(() => _eliminandoCuenta = false);
-    }
-  }
-
-  Future<void> _abrirLegal(String ancla) async {
-    final uri = Uri.parse('$_urlLegal#$ancla');
-    try {
-      final abierto = await launchUrl(uri, mode: LaunchMode.externalApplication);
-      if (!abierto && mounted) AppError.show(context, 'No se pudo abrir el enlace.');
-    } catch (e, st) {
-      await FirebaseCrashlytics.instance.recordError(e, st);
-      if (mounted) AppError.show(context, 'No se pudo abrir el enlace.');
-    }
-  }
-
   void _volverAModoPropietario() {
     Navigator.of(context).popUntil((route) => route.isFirst);
-  }
-
-  Future<void> _renombrarCasa(Casa casa) async {
-    final nombre = await AppDialog.promptText(context, title: 'Nombre de la casa', initialValue: casa.nombre);
-    if (nombre == null || nombre.isEmpty || nombre == casa.nombre) return;
-    try {
-      await CasaService.renombrarCasa(casa.id, nombre);
-    } catch (e, st) {
-      await FirebaseCrashlytics.instance.recordError(e, st);
-      if (mounted) AppError.show(context, 'No se pudo renombrar la casa.');
-    }
-  }
-
-  Future<void> _canjearCodigoTrabajo() async {
-    final codigo = await AppDialog.promptText(
-      context,
-      title: 'Código de invitación',
-      hint: 'Ej. AB12CD',
-      confirmLabel: 'Canjear',
-      textCapitalization: TextCapitalization.characters,
-    );
-    if (codigo == null || codigo.isEmpty || !mounted) return;
-    try {
-      final resultado = await InvitacionService.canjearCodigo(codigo);
-      if (mounted) {
-        AppError.showSuccess(
-          context,
-          'Vinculado a "${resultado.registroTitulo}" en ${resultado.casaNombre}. Acéptalo desde Inicio Pro.',
-        );
-      }
-    } catch (e, st) {
-      await FirebaseCrashlytics.instance.recordError(e, st);
-      if (mounted) AppError.show(context, 'Ese código no es válido o ya se ha usado.');
-    }
   }
 
   Future<void> _editarCampoProfesional(String titulo, String? actual, Future<void> Function(String) guardar) async {
@@ -192,6 +75,109 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _abrirSelectorTema(BuildContext context) {
+    return showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(ReparaSpace.s4, ReparaSpace.s2, ReparaSpace.s4, ReparaSpace.s4),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: ReparaSpace.s4),
+                decoration: BoxDecoration(
+                  color: ctx.colors.inkMuted.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              AnimatedBuilder(
+                animation: ThemeController.instance,
+                builder: (context, _) => IosSection(
+                  rows: [
+                    IosRow(
+                      icon: Icons.light_mode_outlined,
+                      iconColor: context.colors.brand,
+                      title: 'Claro',
+                      trailing: _check(context, ThemeController.instance.mode == ThemeMode.light),
+                      selected: ThemeController.instance.mode == ThemeMode.light,
+                      onTap: () {
+                        ThemeController.instance.setMode(ThemeMode.light);
+                        Navigator.pop(ctx);
+                      },
+                    ),
+                    IosRow(
+                      icon: Icons.dark_mode_outlined,
+                      iconColor: context.colors.brand,
+                      title: 'Oscuro',
+                      trailing: _check(context, ThemeController.instance.mode == ThemeMode.dark),
+                      selected: ThemeController.instance.mode == ThemeMode.dark,
+                      onTap: () {
+                        ThemeController.instance.setMode(ThemeMode.dark);
+                        Navigator.pop(ctx);
+                      },
+                    ),
+                    IosRow(
+                      icon: Icons.smartphone_outlined,
+                      iconColor: context.colors.brand,
+                      title: 'Igual que el sistema',
+                      trailing: _check(context, ThemeController.instance.mode == ThemeMode.system),
+                      selected: ThemeController.instance.mode == ThemeMode.system,
+                      onTap: () {
+                        ThemeController.instance.setMode(ThemeMode.system);
+                        Navigator.pop(ctx);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _compartirApp(BuildContext context) async {
+    try {
+      await Share.share(
+        'Llevo el mantenimiento de mi vivienda con REPARA: presupuestos, pagos y documentos de cada reparación, '
+        'todo organizado en un sitio. Pregúntame si quieres probarla.',
+      );
+    } catch (e, st) {
+      await FirebaseCrashlytics.instance.recordError(e, st);
+      if (context.mounted) AppError.show(context, 'No se pudo abrir el selector para compartir.');
+    }
+  }
+
+  Future<void> _abrirSoporte(BuildContext context) async {
+    final uri = Uri(scheme: 'mailto', path: _emailSoporte, query: 'subject=${Uri.encodeComponent('Ayuda con REPARA')}');
+    try {
+      final abierto = await launchUrl(uri);
+      if (!abierto && context.mounted) AppError.show(context, 'No se pudo abrir el correo.');
+    } catch (e, st) {
+      await FirebaseCrashlytics.instance.recordError(e, st);
+      if (context.mounted) AppError.show(context, 'No se pudo abrir el correo.');
+    }
+  }
+
+  String _temaLabel() => switch (ThemeController.instance.mode) {
+    ThemeMode.light => 'Claro',
+    ThemeMode.dark => 'Oscuro',
+    ThemeMode.system => 'Sistema',
+  };
+
+  Widget _valorConChevron(BuildContext context, String texto) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Text(texto, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: context.colors.inkMuted)),
+      const SizedBox(width: 2),
+      Icon(Icons.chevron_right, color: context.colors.inkMuted, size: 20),
+    ],
+  );
+
   @override
   Widget build(BuildContext context) {
     final casa = widget.casa;
@@ -202,97 +188,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
         builder: (context, _) => ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           children: [
-            IosSection(
-              header: 'Apariencia',
-              rows: [
-                IosRow(
-                  icon: Icons.light_mode_outlined,
-                  iconColor: context.colors.brand,
-                  title: 'Claro',
-                  trailing: _check(context, ThemeController.instance.mode == ThemeMode.light),
-                  selected: ThemeController.instance.mode == ThemeMode.light,
-                  onTap: () => ThemeController.instance.setMode(ThemeMode.light),
-                ),
-                IosRow(
-                  icon: Icons.dark_mode_outlined,
-                  iconColor: context.colors.brand,
-                  title: 'Oscuro',
-                  trailing: _check(context, ThemeController.instance.mode == ThemeMode.dark),
-                  selected: ThemeController.instance.mode == ThemeMode.dark,
-                  onTap: () => ThemeController.instance.setMode(ThemeMode.dark),
-                ),
-                IosRow(
-                  icon: Icons.smartphone_outlined,
-                  iconColor: context.colors.brand,
-                  title: 'Igual que el sistema',
-                  trailing: _check(context, ThemeController.instance.mode == ThemeMode.system),
-                  selected: ThemeController.instance.mode == ThemeMode.system,
-                  onTap: () => ThemeController.instance.setMode(ThemeMode.system),
-                ),
-              ],
-            ),
-
-            const _SeccionSeguridad(),
+            _cabecera(context, 'Tu cuenta'),
+            const _CuentaCard(),
 
             if (casa != null) ...[
-              IosSection(
-                header: 'Tu casa',
-                rows: [
-                  IosRow(
-                    icon: Icons.house_outlined,
-                    iconColor: context.colors.brand,
-                    title: casa.nombre,
-                    subtitle: 'Toca para cambiar el nombre',
-                    onTap: () => _renombrarCasa(casa),
-                  ),
-                  IosRow(
-                    icon: Icons.folder_open_outlined,
-                    iconColor: context.colors.brand,
-                    title: 'Documentos',
-                    subtitle: 'Facturas, presupuestos y garantías guardados',
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DocumentosCasaScreen(casa: casa))),
-                  ),
-                  IosRow(
-                    icon: Icons.summarize_outlined,
-                    iconColor: context.colors.brand,
-                    title: 'Expediente de la vivienda',
-                    subtitle: 'Para vender, asegurar o pedir financiación',
-                    onTap: () {
-                      unawaited(AnalyticsService.householdRecordViewed());
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => ExpedienteViviendaScreen(casa: casa)));
-                    },
-                  ),
-                  IosRow(
-                    icon: Icons.group_outlined,
-                    iconColor: context.colors.brand,
-                    title: 'Miembros de esta casa',
-                    subtitle: casa.memberProfiles.values.map((m) => m.displayName).join(', '),
-                  ),
-                  if (casa.joinCode != null)
-                    IosRow(
-                      icon: Icons.key_outlined,
-                      iconColor: context.colors.brand,
-                      title: 'Código para invitar a alguien',
-                      subtitle: casa.joinCode!,
-                    ),
-                ],
-              ),
-              _SeccionTusCasas(casaActivaId: casa.id),
-              _SeccionProfesional(),
-              IosSection(
-                rows: [
-                  IosRow(
-                    icon: Icons.confirmation_number_outlined,
-                    iconColor: context.colors.brand,
-                    title: '¿Tienes un código de invitación?',
-                    subtitle: 'Un cliente te lo habrá pasado para un trabajo suyo',
-                    onTap: _canjearCodigoTrabajo,
-                  ),
-                ],
-              ),
+              _cabecera(context, 'Tu vivienda'),
+              _ViviendaCard(casa: casa),
             ],
 
-            if (widget.modoPro) ...[
+            _cabecera(context, 'Modo de la app'),
+            _ModoAppToggle(modoPro: widget.modoPro, onVolverAHogar: _volverAModoPropietario),
+
+            if (widget.modoPro)
               StreamBuilder<Profesional?>(
                 stream: ProfesionalService.streamPerfilPropio(),
                 builder: (context, snapshot) {
@@ -337,79 +244,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   );
                 },
               ),
-              IosSection(
-                rows: [
+
+            IosSection(
+              rows: [
+                IosRow(
+                  icon: Icons.palette_outlined,
+                  iconColor: context.colors.brand,
+                  title: 'Tema',
+                  trailing: _valorConChevron(context, _temaLabel()),
+                  onTap: () => _abrirSelectorTema(context),
+                ),
+                _FilaSeguridad(valorConChevron: _valorConChevron),
+                IosRow(
+                  icon: Icons.ios_share_outlined,
+                  iconColor: context.colors.brand,
+                  title: 'Compartir REPARA',
+                  onTap: () => _compartirApp(context),
+                ),
+                if (casa != null)
                   IosRow(
-                    icon: Icons.home_outlined,
+                    icon: Icons.download_outlined,
                     iconColor: context.colors.brand,
-                    title: 'Volver a modo propietario',
-                    onTap: _volverAModoPropietario,
+                    title: 'Descargar PDF',
+                    subtitle: 'Dossier de la vivienda',
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ExpedienteViviendaScreen(casa: casa))),
                   ),
-                ],
-              ),
-            ],
-
-            IosSection(
-              header: 'Legal',
-              rows: [
                 IosRow(
-                  icon: Icons.privacy_tip_outlined,
+                  icon: Icons.help_outline,
                   iconColor: context.colors.brand,
-                  title: 'Política de privacidad',
-                  onTap: () => _abrirLegal('privacidad'),
+                  title: 'Ayuda y soporte',
+                  onTap: () => _abrirSoporte(context),
                 ),
                 IosRow(
-                  icon: Icons.description_outlined,
+                  icon: Icons.info_outline,
                   iconColor: context.colors.brand,
-                  title: 'Términos de servicio',
-                  onTap: () => _abrirLegal('terminos'),
-                ),
-              ],
-            ),
-
-            IosSection(
-              rows: [
-                IosRow(
-                  icon: Icons.logout_outlined,
-                  iconColor: context.colors.errorText,
-                  title: 'Cerrar sesión',
-                  titleColor: context.colors.errorText,
-                  showChevron: false,
-                  onTap: _confirmarCerrarSesion,
-                ),
-                IosRow(
-                  icon: Icons.devices_outlined,
-                  iconColor: context.colors.errorText,
-                  title: 'Cerrar sesión en todos los dispositivos',
-                  titleColor: context.colors.errorText,
-                  showChevron: false,
-                  trailing: _cerrandoTodo
-                      ? SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: context.colors.errorText),
-                        )
-                      : null,
-                  onTap: _cerrandoTodo ? null : _confirmarCerrarSesionEnTodosLosDispositivos,
-                ),
-              ],
-            ),
-            IosSection(
-              rows: [
-                IosRow(
-                  icon: Icons.delete_outline,
-                  iconColor: context.colors.errorText,
-                  title: 'Eliminar cuenta',
-                  titleColor: context.colors.errorText,
-                  showChevron: false,
-                  trailing: _eliminandoCuenta
-                      ? SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: context.colors.errorText),
-                        )
-                      : null,
-                  onTap: _eliminandoCuenta ? null : _confirmarEliminarCuenta,
+                  title: 'Acerca de REPARA',
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AcercaScreen())),
                 ),
               ],
             ),
@@ -423,244 +293,176 @@ class _SettingsScreenState extends State<SettingsScreen> {
       seleccionado ? Icon(Icons.check, color: context.colors.brand, size: 20) : null;
 }
 
-/// Ajustes de seguridad local (misión de endurecimiento, octubre 2026).
-/// Puramente local: nunca sustituye a Firebase Auth/reglas. El bloqueo
-/// general de la app al abrirla se quitó (octubre 2026, a petición del CEO:
-/// el propio launcher del móvil ya ofrece "requerir Face ID" por app) --
-/// solo quedan los dos gates puntuales, documentos y acceso a Pro.
-class _SeccionSeguridad extends StatefulWidget {
-  const _SeccionSeguridad();
+Widget _cabecera(BuildContext context, String texto) => Padding(
+  padding: const EdgeInsets.only(left: 6, bottom: 6),
+  child: Text(texto.toUpperCase(), style: Theme.of(context).textTheme.labelSmall?.copyWith(color: context.colors.inkMuted)),
+);
 
-  @override
-  State<_SeccionSeguridad> createState() => _SeccionSeguridadState();
+String _iniciales(User? user) {
+  final nombre = user?.displayName?.trim();
+  if (nombre != null && nombre.isNotEmpty) {
+    final partes = nombre.split(RegExp(r'\s+'));
+    final letras = partes.take(2).map((p) => p.isNotEmpty ? p[0] : '').join();
+    if (letras.isNotEmpty) return letras.toUpperCase();
+  }
+  final email = user?.email;
+  if (email != null && email.isNotEmpty) return email[0].toUpperCase();
+  return '?';
 }
 
-class _SeccionSeguridadState extends State<_SeccionSeguridad> {
-  bool _cargando = true;
-  bool _biometriaDisponible = false;
-  bool _documentosProtegidos = false;
-  bool _proProtegido = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _cargar();
-  }
-
-  Future<void> _cargar() async {
-    final biometria = sl<BiometricService>();
-    final disponible = await biometria.isAvailable();
-    final documentosProtegidos = await SecurityPreferencesService.instance.isDocumentProtectionEnabled();
-    final proProtegido = await SecurityPreferencesService.instance.isProGateEnabled();
-    if (!mounted) return;
-    setState(() {
-      _biometriaDisponible = disponible;
-      _documentosProtegidos = documentosProtegidos;
-      _proProtegido = proProtegido;
-      _cargando = false;
-    });
-  }
-
-  Future<void> _cambiarProProtegido(bool valor) async {
-    setState(() => _proProtegido = valor);
-    await SecurityPreferencesService.instance.setProGateEnabled(valor);
-  }
-
-  Future<void> _cambiarDocumentosProtegidos(bool valor) async {
-    setState(() => _documentosProtegidos = valor);
-    await SecurityPreferencesService.instance.setDocumentProtectionEnabled(valor);
-  }
+/// Tarjeta de entrada a [CuentaScreen] -- avatar con iniciales (o foto si la
+/// cuenta tiene una), nombre y correo.
+class _CuentaCard extends StatelessWidget {
+  const _CuentaCard();
 
   @override
   Widget build(BuildContext context) {
-    if (_cargando) return const SizedBox.shrink();
-    return IosSection(
-      header: 'Seguridad',
-      footer: !_biometriaDisponible
-          ? 'Este dispositivo no tiene biometría configurada (Face ID, huella) o la app no tiene permiso para usarla.'
-          : null,
-      rows: [
-        IosRow(
-          icon: Icons.folder_shared_outlined,
-          iconColor: context.colors.brand,
-          title: 'Proteger documentos sensibles',
-          subtitle: _biometriaDisponible
-              ? 'Pide Face ID/huella antes de abrir una factura o garantía'
-              : 'No disponible en este dispositivo',
-          showChevron: false,
-          trailing: Switch(
-            value: _documentosProtegidos && _biometriaDisponible,
-            onChanged: _biometriaDisponible ? _cambiarDocumentosProtegidos : null,
+    final user = FirebaseAuth.instance.currentUser;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: ReparaSpace.s5),
+      child: Card(
+        margin: EdgeInsets.zero,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CuentaScreen())),
+          child: Padding(
+            padding: const EdgeInsets.all(ReparaSpace.s4),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 22,
+                  backgroundColor: context.colors.brandStrong,
+                  backgroundImage: user?.photoURL != null ? NetworkImage(user!.photoURL!) : null,
+                  child: user?.photoURL == null
+                      ? Text(
+                          _iniciales(user),
+                          style: TextStyle(color: context.colors.brandOn, fontWeight: FontWeight.w700, fontSize: 16),
+                        )
+                      : null,
+                ),
+                const SizedBox(width: ReparaSpace.s3),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        user?.displayName?.isNotEmpty == true ? user!.displayName! : 'Tu cuenta',
+                        style: Theme.of(
+                          context,
+                        ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700, color: context.colors.ink),
+                      ),
+                      if (user?.email != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          user!.email!,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.colors.inkMuted),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: context.colors.inkMuted, size: 20),
+              ],
+            ),
           ),
         ),
-        IosRow(
-          icon: Icons.engineering_outlined,
-          iconColor: context.colors.brand,
-          title: 'Proteger el acceso a Repara Pro',
-          subtitle: _biometriaDisponible
-              ? 'Pide Face ID/huella antes de entrar en modo profesional'
-              : 'No disponible en este dispositivo',
-          showChevron: false,
-          trailing: Switch(
-            value: _proProtegido && _biometriaDisponible,
-            onChanged: _biometriaDisponible ? _cambiarProProtegido : null,
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
 
-/// Selector de varias casas por usuario (octubre 2026, feedback de
-/// producto: gente con más de una propiedad). createCasa/joinCasa ya
-/// guardaban casaIds como array -- esto era solo la UI que faltaba.
-class _SeccionTusCasas extends StatefulWidget {
-  const _SeccionTusCasas({required this.casaActivaId});
+/// Tarjeta de entrada a [GestionarViviendaScreen].
+class _ViviendaCard extends StatelessWidget {
+  const _ViviendaCard({required this.casa});
 
-  final String casaActivaId;
+  final Casa casa;
 
   @override
-  State<_SeccionTusCasas> createState() => _SeccionTusCasasState();
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: ReparaSpace.s5),
+      child: Card(
+        margin: EdgeInsets.zero,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => GestionarViviendaScreen(casa: casa))),
+          child: Padding(
+            padding: const EdgeInsets.all(ReparaSpace.s4),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(color: context.colors.brandTint, borderRadius: BorderRadius.circular(ReparaRadius.sm)),
+                  child: Icon(Icons.house_rounded, color: context.colors.brandStrong, size: 24),
+                ),
+                const SizedBox(width: ReparaSpace.s3),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        casa.nombre,
+                        style: Theme.of(
+                          context,
+                        ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700, color: context.colors.ink),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Gestiona tu vivienda',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.colors.inkMuted),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: context.colors.inkMuted, size: 20),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
-class _SeccionTusCasasState extends State<_SeccionTusCasas> {
+/// Interruptor Hogar/Pro (reemplaza la antigua sección "¿Trabajas como
+/// profesional?" + "Modo profesional"): un solo toque activa el modo
+/// profesional si hace falta y entra directo, respetando el gate biométrico
+/// si está activado (ver SeguridadScreen).
+class _ModoAppToggle extends StatefulWidget {
+  const _ModoAppToggle({required this.modoPro, required this.onVolverAHogar});
+
+  final bool modoPro;
+  final VoidCallback onVolverAHogar;
+
+  @override
+  State<_ModoAppToggle> createState() => _ModoAppToggleState();
+}
+
+class _ModoAppToggleState extends State<_ModoAppToggle> {
   bool _procesando = false;
 
-  Future<void> _cambiarA(String casaId) async {
-    if (casaId == widget.casaActivaId || _procesando) return;
+  Future<void> _entrarEnPro(bool esProfesionalYa) async {
+    if (widget.modoPro || _procesando) return;
     setState(() => _procesando = true);
     try {
-      await CasaService.cambiarCasaActiva(casaId);
-      // Igual que al cerrar sesión: hay que volver a la raíz para que
-      // CasaGateScreen vuelva a ser la pantalla activa y recoja el nuevo
-      // activeCasaId -- si no, esta pantalla de Ajustes (apilada por
-      // encima de la casa anterior) seguiría mostrando datos viejos.
+      if (!esProfesionalYa) {
+        await ProfesionalService.activarModoProfesional();
+        unawaited(AnalyticsService.setEsProfesional(true));
+      }
+      if (await SecurityPreferencesService.instance.isProGateEnabled()) {
+        final verificado =
+            await sl<BiometricService>().authenticate('Verifica tu identidad para entrar en Repara Pro') ==
+            BiometricAuthResult.success;
+        if (!verificado) return;
+      }
       if (!mounted) return;
-      Navigator.of(context).popUntil((route) => route.isFirst);
-    } catch (e, st) {
-      await FirebaseCrashlytics.instance.recordError(e, st);
-      if (mounted) AppError.show(context, 'No se pudo cambiar de casa.');
-    } finally {
-      if (mounted) setState(() => _procesando = false);
-    }
-  }
-
-  Future<void> _crearOtraCasa() async {
-    final nombre = await AppDialog.promptText(context, title: 'Nueva casa', hint: 'p.ej. Casa de la playa', confirmLabel: 'Crear');
-    if (nombre == null || nombre.isEmpty || !mounted) return;
-    setState(() => _procesando = true);
-    try {
-      await CasaService.createCasa(nombre);
-      if (!mounted) return;
-      Navigator.of(context).popUntil((route) => route.isFirst);
-    } catch (e, st) {
-      await FirebaseCrashlytics.instance.recordError(e, st);
-      if (mounted) AppError.show(context, 'No se pudo crear la casa.');
-    } finally {
-      if (mounted) setState(() => _procesando = false);
-    }
-  }
-
-  Future<void> _unirseAOtraCasa() async {
-    final codigo = await AppDialog.promptText(
-      context,
-      title: 'Código de la casa',
-      hint: 'Ej. AB12CD',
-      confirmLabel: 'Unirme',
-      textCapitalization: TextCapitalization.characters,
-    );
-    if (codigo == null || codigo.isEmpty || !mounted) return;
-    setState(() => _procesando = true);
-    try {
-      await CasaService.joinCasa(codigo);
-      if (!mounted) return;
-      Navigator.of(context).popUntil((route) => route.isFirst);
-    } catch (e, st) {
-      await FirebaseCrashlytics.instance.recordError(e, st);
-      if (mounted) AppError.show(context, 'Ese código no es válido o ya se ha usado.');
-    } finally {
-      if (mounted) setState(() => _procesando = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<List<String>>(
-      stream: CasaService.streamCasaIds(),
-      builder: (context, snapshot) {
-        final casaIds = snapshot.data ?? [widget.casaActivaId];
-        return IosSection(
-          header: 'Tus casas',
-          rows: [
-            for (final id in casaIds)
-              FutureBuilder<Casa?>(
-                future: CasaService.obtenerCasa(id),
-                builder: (context, snap) {
-                  final activa = id == widget.casaActivaId;
-                  return IosRow(
-                    icon: Icons.house_outlined,
-                    iconColor: context.colors.brand,
-                    title: snap.data?.nombre ?? '…',
-                    showChevron: false,
-                    selected: activa,
-                    trailing: activa ? Icon(Icons.check, color: context.colors.brand) : null,
-                    onTap: _procesando ? null : () => _cambiarA(id),
-                  );
-                },
-              ),
-            IosRow(
-              icon: Icons.add_home_outlined,
-              iconColor: context.colors.brand,
-              title: 'Crear otra casa',
-              showChevron: false,
-              onTap: _procesando ? null : _crearOtraCasa,
-            ),
-            IosRow(
-              icon: Icons.key_outlined,
-              iconColor: context.colors.brand,
-              title: 'Unirme a otra casa con código',
-              showChevron: false,
-              onTap: _procesando ? null : _unirseAOtraCasa,
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-/// Autoservicio de rol (sección 5 del spec: una persona puede tener varios
-/// roles). Activar el modo profesional no cambia nada de Repara Hogar --
-/// solo añade un acceso nuevo a Repara Pro desde aquí mismo.
-class _SeccionProfesional extends StatefulWidget {
-  @override
-  State<_SeccionProfesional> createState() => _SeccionProfesionalState();
-}
-
-class _SeccionProfesionalState extends State<_SeccionProfesional> {
-  bool _activando = false;
-
-  Future<void> _entrarEnModoPro() async {
-    if (await SecurityPreferencesService.instance.isProGateEnabled()) {
-      final verificado =
-          await sl<BiometricService>().authenticate('Verifica tu identidad para entrar en Repara Pro') ==
-              BiometricAuthResult.success;
-      if (!verificado) return;
-    }
-    if (!mounted) return;
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const ReparaProShellScreen()));
-  }
-
-  Future<void> _activar() async {
-    setState(() => _activando = true);
-    try {
-      await ProfesionalService.activarModoProfesional();
-      unawaited(AnalyticsService.setEsProfesional(true));
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const ReparaProShellScreen()));
     } catch (e, st) {
       await FirebaseCrashlytics.instance.recordError(e, st);
       if (mounted) AppError.show(context, 'No se pudo activar el modo profesional.');
     } finally {
-      if (mounted) setState(() => _activando = false);
+      if (mounted) setState(() => _procesando = false);
     }
   }
 
@@ -670,35 +472,119 @@ class _SeccionProfesionalState extends State<_SeccionProfesional> {
       stream: ProfesionalService.streamEsProfesional(),
       builder: (context, snapshot) {
         final esProfesional = snapshot.data ?? false;
-        if (!esProfesional) {
-          return IosSection(
-            rows: [
-              IosRow(
-                icon: Icons.engineering_outlined,
-                iconColor: context.colors.brand,
-                title: '¿Trabajas como profesional?',
-                subtitle: 'Activa el modo profesional para gestionar trabajos que te inviten',
-                showChevron: false,
-                trailing: _activando
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                    : TextButton(onPressed: _activar, child: const Text('Activar')),
-              ),
-            ],
-          );
-        }
-        return IosSection(
-          rows: [
-            IosRow(
-              icon: Icons.engineering_outlined,
-              iconColor: context.colors.brand,
-              title: 'Modo profesional',
-              subtitle: 'Ver tus trabajos, clientes y presupuestos',
-              onTap: _entrarEnModoPro,
+        return Padding(
+          padding: const EdgeInsets.only(bottom: ReparaSpace.s5),
+          child: Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(color: context.colors.surfaceMuted, borderRadius: BorderRadius.circular(ReparaRadius.sm)),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _Segmento(
+                    icon: Icons.home_outlined,
+                    label: 'Hogar',
+                    selected: !widget.modoPro,
+                    onTap: widget.modoPro ? widget.onVolverAHogar : null,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: _Segmento(
+                    icon: Icons.work_outline,
+                    label: 'Pro',
+                    selected: widget.modoPro,
+                    loading: _procesando,
+                    onTap: widget.modoPro ? null : () => _entrarEnPro(esProfesional),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         );
       },
     );
   }
 }
 
+class _Segmento extends StatelessWidget {
+  const _Segmento({required this.icon, required this.label, required this.selected, this.onTap, this.loading = false});
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback? onTap;
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? context.colors.brandStrong : context.colors.inkMuted;
+    return Material(
+      color: selected ? context.colors.surface : Colors.transparent,
+      borderRadius: BorderRadius.circular(ReparaRadius.xs),
+      elevation: selected ? 1 : 0,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(ReparaRadius.xs),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 9),
+          child: loading
+              ? SizedBox(
+                  height: 18,
+                  child: Center(child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: color))),
+                )
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(icon, size: 18, color: color),
+                    const SizedBox(width: 6),
+                    Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 14)),
+                  ],
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Fila "Seguridad" de la lista plana -- resume con una palabra si hay algún
+/// bloqueo activado y navega a [SeguridadScreen] para el detalle/los switches.
+class _FilaSeguridad extends StatefulWidget {
+  const _FilaSeguridad({required this.valorConChevron});
+
+  final Widget Function(BuildContext, String) valorConChevron;
+
+  @override
+  State<_FilaSeguridad> createState() => _FilaSeguridadState();
+}
+
+class _FilaSeguridadState extends State<_FilaSeguridad> {
+  bool _cargando = true;
+  bool _activado = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargar();
+  }
+
+  Future<void> _cargar() async {
+    final documentos = await SecurityPreferencesService.instance.isDocumentProtectionEnabled();
+    final pro = await SecurityPreferencesService.instance.isProGateEnabled();
+    if (!mounted) return;
+    setState(() {
+      _activado = documentos || pro;
+      _cargando = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return IosRow(
+      icon: Icons.lock_outline,
+      iconColor: context.colors.brand,
+      title: 'Seguridad',
+      trailing: _cargando ? null : widget.valorConChevron(context, _activado ? 'Bloqueo activado' : 'Desactivado'),
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SeguridadScreen())),
+    );
+  }
+}
