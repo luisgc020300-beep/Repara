@@ -97,7 +97,9 @@ Future<void> iniciarNuevoDocumento(
     // con la IA, incluido el timeout de 45s contra Anthropic) ya traen un
     // mensaje claro del propio servidor -- el resto de códigos cae al
     // genérico de siempre.
-    errorIA = (e.code == 'resource-exhausted' || e.code == 'unavailable') && e.message != null
+    errorIA =
+        (e.code == 'resource-exhausted' || e.code == 'unavailable') &&
+            e.message != null
         ? e.message!
         : 'No se pudo contactar con el servicio de IA. Puedes rellenar los datos a mano.';
   } catch (e) {
@@ -216,7 +218,8 @@ Future<void> elegirFormaDeAnadirDocumento(
               icon: Icons.edit_outlined,
               iconColor: ctx.colors.brand,
               title: 'Rellenar a mano',
-              subtitle: 'Sin escanear nada -- p.ej. lo que te han dicho de palabra',
+              subtitle:
+                  'Sin escanear nada -- p.ej. lo que te han dicho de palabra',
               onTap: () {
                 Navigator.pop(ctx);
                 iniciarNuevoDocumentoManual(
@@ -1436,4 +1439,3 @@ String _tituloElemento(List<Elemento> elementos, String id) {
   }
   return 'Elemento de esta ficha';
 }
-

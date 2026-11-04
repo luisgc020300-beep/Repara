@@ -1,4 +1,4 @@
-// lib/widgets/selector_profesionales.dart
+// lib/widgets/selector_profesional_field.dart
 //
 // Selector múltiple de profesionales para un evento (CEO, noviembre 2026:
 // "un trabajo lo pueden estar haciendo más de un profesional, quiero poder
@@ -75,6 +75,9 @@ class _SelectorProfesionalesFieldState
       contactos = await ContactoService.streamContactos(widget.casaId).first;
     } catch (e) {
       // Sin acceso a la libreta -- se sigue pudiendo añadir a mano.
+      debugPrint(
+        'SelectorProfesionalesField: no se pudo leer la libreta de contactos: $e',
+      );
     }
     if (!mounted) return;
     setState(() => _cargando = false);

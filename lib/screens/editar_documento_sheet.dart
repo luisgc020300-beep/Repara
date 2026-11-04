@@ -27,9 +27,12 @@ Future<void> mostrarEditarDocumentoSheet(
     context: context,
     isScrollControlled: true,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(ReparaRadius.lg)),
+      borderRadius: BorderRadius.vertical(
+        top: Radius.circular(ReparaRadius.lg),
+      ),
     ),
-    builder: (ctx) => _EditarDocumentoForm(casaId: casaId, documento: documento),
+    builder: (ctx) =>
+        _EditarDocumentoForm(casaId: casaId, documento: documento),
   );
 }
 
@@ -45,20 +48,39 @@ class _EditarDocumentoForm extends StatefulWidget {
 
 class _EditarDocumentoFormState extends State<_EditarDocumentoForm> {
   late TipoDocumento _tipo = widget.documento.tipo;
-  late final _numeroCtrl = TextEditingController(text: widget.documento.numeroReferencia ?? '');
-  late final _proveedorCtrl = TextEditingController(text: widget.documento.proveedor ?? '');
-  late final _nifCtrl = TextEditingController(text: widget.documento.nifCif ?? '');
-  late final _baseCtrl = TextEditingController(text: _formatoImporte(widget.documento.baseImponible));
-  late final _impuestosCtrl = TextEditingController(text: _formatoImporte(widget.documento.impuestos));
-  late final _importeCtrl = TextEditingController(text: _formatoImporte(widget.documento.importe));
-  late final _descripcionCtrl = TextEditingController(text: widget.documento.descripcionTrabajo ?? '');
-  late final _garantiaCtrl = TextEditingController(text: widget.documento.garantiaTexto ?? '');
-  late final _observacionesCtrl = TextEditingController(text: widget.documento.observaciones ?? '');
+  late final _numeroCtrl = TextEditingController(
+    text: widget.documento.numeroReferencia ?? '',
+  );
+  late final _proveedorCtrl = TextEditingController(
+    text: widget.documento.proveedor ?? '',
+  );
+  late final _nifCtrl = TextEditingController(
+    text: widget.documento.nifCif ?? '',
+  );
+  late final _baseCtrl = TextEditingController(
+    text: _formatoImporte(widget.documento.baseImponible),
+  );
+  late final _impuestosCtrl = TextEditingController(
+    text: _formatoImporte(widget.documento.impuestos),
+  );
+  late final _importeCtrl = TextEditingController(
+    text: _formatoImporte(widget.documento.importe),
+  );
+  late final _descripcionCtrl = TextEditingController(
+    text: widget.documento.descripcionTrabajo ?? '',
+  );
+  late final _garantiaCtrl = TextEditingController(
+    text: widget.documento.garantiaTexto ?? '',
+  );
+  late final _observacionesCtrl = TextEditingController(
+    text: widget.documento.observaciones ?? '',
+  );
   late DateTime? _fecha = widget.documento.fecha;
   late DateTime? _fechaVencimiento = widget.documento.fechaVencimiento;
   bool _guardando = false;
 
-  static String _formatoImporte(double? v) => v == null ? '' : v.toStringAsFixed(2).replaceAll('.', ',');
+  static String _formatoImporte(double? v) =>
+      v == null ? '' : v.toStringAsFixed(2).replaceAll('.', ',');
 
   @override
   void dispose() {
@@ -93,7 +115,8 @@ class _EditarDocumentoFormState extends State<_EditarDocumentoForm> {
 
   double? _num(TextEditingController c) =>
       double.tryParse(c.text.replaceAll(',', '.'));
-  String? _texto(TextEditingController c) => c.text.trim().isEmpty ? null : c.text.trim();
+  String? _texto(TextEditingController c) =>
+      c.text.trim().isEmpty ? null : c.text.trim();
 
   Future<void> _guardar() async {
     if (_guardando) return;
@@ -117,11 +140,20 @@ class _EditarDocumentoFormState extends State<_EditarDocumentoForm> {
       'observaciones': _texto(_observacionesCtrl),
     };
     try {
-      await DocumentoService.actualizar(widget.casaId, widget.documento.id, cambios);
+      await DocumentoService.actualizar(
+        widget.casaId,
+        widget.documento.id,
+        cambios,
+      );
       if (mounted) Navigator.pop(context);
     } catch (e, st) {
       if (mounted) {
-        AppError.show(context, 'No se pudieron guardar los cambios.', error: e, stackTrace: st);
+        AppError.show(
+          context,
+          'No se pudieron guardar los cambios.',
+          error: e,
+          stackTrace: st,
+        );
       }
     } finally {
       if (mounted) setState(() => _guardando = false);
@@ -142,7 +174,10 @@ class _EditarDocumentoFormState extends State<_EditarDocumentoForm> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Editar documento', style: Theme.of(context).textTheme.displaySmall),
+            Text(
+              'Editar documento',
+              style: Theme.of(context).textTheme.displaySmall,
+            ),
             const SizedBox(height: ReparaSpace.s4),
             if (widget.documento.url.isNotEmpty) ...[
               MiniaturaDocumento(
@@ -158,14 +193,21 @@ class _EditarDocumentoFormState extends State<_EditarDocumentoForm> {
                   initialValue: _tipo,
                   decoration: const InputDecoration(labelText: 'Tipo'),
                   items: TipoDocumento.values
-                      .map((t) => DropdownMenuItem(value: t, child: Text(nombreTipoDocumento(t))))
+                      .map(
+                        (t) => DropdownMenuItem(
+                          value: t,
+                          child: Text(nombreTipoDocumento(t)),
+                        ),
+                      )
                       .toList(),
                   onChanged: (v) => setState(() => _tipo = v ?? _tipo),
                 ),
                 const SizedBox(height: ReparaSpace.s3),
                 TextField(
                   controller: _numeroCtrl,
-                  decoration: const InputDecoration(labelText: 'Número de factura/referencia'),
+                  decoration: const InputDecoration(
+                    labelText: 'Número de factura/referencia',
+                  ),
                 ),
                 const SizedBox(height: ReparaSpace.s3),
                 Row(
@@ -173,8 +215,15 @@ class _EditarDocumentoFormState extends State<_EditarDocumentoForm> {
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: () => _elegirFecha(vencimiento: false),
-                        icon: const Icon(Icons.calendar_today_outlined, size: 16),
-                        label: Text(_fecha == null ? 'Fecha' : '${_fecha!.day}/${_fecha!.month}/${_fecha!.year}'),
+                        icon: const Icon(
+                          Icons.calendar_today_outlined,
+                          size: 16,
+                        ),
+                        label: Text(
+                          _fecha == null
+                              ? 'Fecha'
+                              : '${_fecha!.day}/${_fecha!.month}/${_fecha!.year}',
+                        ),
                       ),
                     ),
                     const SizedBox(width: ReparaSpace.s3),
@@ -194,12 +243,16 @@ class _EditarDocumentoFormState extends State<_EditarDocumentoForm> {
                 const SizedBox(height: ReparaSpace.s3),
                 TextField(
                   controller: _proveedorCtrl,
-                  decoration: const InputDecoration(labelText: 'Profesional / empresa emisora'),
+                  decoration: const InputDecoration(
+                    labelText: 'Profesional / empresa emisora',
+                  ),
                 ),
                 const SizedBox(height: ReparaSpace.s3),
                 TextField(
                   controller: _nifCtrl,
-                  decoration: const InputDecoration(labelText: 'NIF/CIF (opcional)'),
+                  decoration: const InputDecoration(
+                    labelText: 'NIF/CIF (opcional)',
+                  ),
                 ),
               ],
             ),
@@ -212,16 +265,24 @@ class _EditarDocumentoFormState extends State<_EditarDocumentoForm> {
                     Expanded(
                       child: TextField(
                         controller: _baseCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        decoration: const InputDecoration(labelText: 'Base imponible (€)'),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: 'Base imponible (€)',
+                        ),
                       ),
                     ),
                     const SizedBox(width: ReparaSpace.s3),
                     Expanded(
                       child: TextField(
                         controller: _impuestosCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        decoration: const InputDecoration(labelText: 'Impuestos (€)'),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: 'Impuestos (€)',
+                        ),
                       ),
                     ),
                   ],
@@ -229,9 +290,13 @@ class _EditarDocumentoFormState extends State<_EditarDocumentoForm> {
                 const SizedBox(height: ReparaSpace.s3),
                 TextField(
                   controller: _importeCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   style: const TextStyle(fontWeight: FontWeight.w700),
-                  decoration: const InputDecoration(labelText: 'Importe total (€)'),
+                  decoration: const InputDecoration(
+                    labelText: 'Importe total (€)',
+                  ),
                 ),
               ],
             ),
@@ -243,12 +308,16 @@ class _EditarDocumentoFormState extends State<_EditarDocumentoForm> {
                   controller: _descripcionCtrl,
                   minLines: 1,
                   maxLines: 3,
-                  decoration: const InputDecoration(labelText: 'Descripción del servicio/reparación'),
+                  decoration: const InputDecoration(
+                    labelText: 'Descripción del servicio/reparación',
+                  ),
                 ),
                 const SizedBox(height: ReparaSpace.s3),
                 TextField(
                   controller: _garantiaCtrl,
-                  decoration: const InputDecoration(labelText: 'Garantía indicada (opcional)'),
+                  decoration: const InputDecoration(
+                    labelText: 'Garantía indicada (opcional)',
+                  ),
                 ),
                 const SizedBox(height: ReparaSpace.s3),
                 TextField(
@@ -266,7 +335,10 @@ class _EditarDocumentoFormState extends State<_EditarDocumentoForm> {
                   ? SizedBox(
                       width: 20,
                       height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: context.colors.brandOn),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: context.colors.brandOn,
+                      ),
                     )
                   : const Text('Guardar cambios'),
             ),

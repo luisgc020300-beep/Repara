@@ -13,7 +13,10 @@ enum MetodoPago { bizum, transferencia, efectivo, tarjeta, otro }
 
 MetodoPago? metodoPagoFromString(String? s) {
   if (s == null) return null;
-  return MetodoPago.values.firstWhere((m) => m.name == s, orElse: () => MetodoPago.otro);
+  return MetodoPago.values.firstWhere(
+    (m) => m.name == s,
+    orElse: () => MetodoPago.otro,
+  );
 }
 
 class Pago {
@@ -60,11 +63,11 @@ class Pago {
   }
 
   Map<String, dynamic> toMap() => {
-        'fecha': Timestamp.fromDate(fecha),
-        'importe': importe,
-        if (concepto != null) 'concepto': concepto,
-        if (descripcion != null) 'descripcion': descripcion,
-        if (metodo != null) 'metodo': metodo!.name,
-        if (comprobante != null) 'comprobante': comprobante,
-      };
+    'fecha': Timestamp.fromDate(fecha),
+    'importe': importe,
+    if (concepto != null) 'concepto': concepto,
+    if (descripcion != null) 'descripcion': descripcion,
+    if (metodo != null) 'metodo': metodo!.name,
+    if (comprobante != null) 'comprobante': comprobante,
+  };
 }

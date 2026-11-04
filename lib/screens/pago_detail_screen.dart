@@ -63,7 +63,7 @@ class PagoDetailScreen extends StatefulWidget {
   /// antes de guardar, nunca se guarda sin pasar por aquí.
   final DateTime? fechaSugerida;
   final double? importeSugerido;
-  
+
   /// URL del recibo/justificante escaneado (ver iniciarEscaneoPago). Solo
   /// se usa al crear un pago nuevo; al editar manda el de widget.pago.
   final String? comprobanteSugerido;
@@ -170,7 +170,7 @@ class _PagoDetailScreenState extends State<PagoDetailScreen> {
       descripcion: _descripcionCtrl.text.trim().isEmpty
           ? null
           : _descripcionCtrl.text.trim(),
-          metodo: _metodo,
+      metodo: _metodo,
       comprobante: _comprobante,
     );
     try {
@@ -518,7 +518,7 @@ class _PagoDetailScreenState extends State<PagoDetailScreen> {
                         : 'Sin descripción',
                     style: TextStyle(color: context.colors.inkMuted),
                   ),
-                  if (_comprobante != null && _comprobante.isNotEmpty) ...[
+            if (_comprobante != null && _comprobante.isNotEmpty) ...[
               const SizedBox(height: 14),
               const _LineaPunteada(),
               const SizedBox(height: 14),

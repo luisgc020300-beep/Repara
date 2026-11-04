@@ -1257,7 +1257,11 @@ class _DocumentosTab extends StatelessWidget {
                             )
                           : null,
                       showChevron: false,
-                      onTap: () => mostrarAccionesDocumento(context, casaId: casa.id, documento: d),
+                      onTap: () => mostrarAccionesDocumento(
+                        context,
+                        casaId: casa.id,
+                        documento: d,
+                      ),
                     ),
                   )
                   .toList(),
@@ -1390,7 +1394,8 @@ class _CuerpoSimple extends StatelessWidget {
                           registroId: registro.id,
                         ),
                         builder: (context, snapshot) {
-                          final documentos = snapshot.data ?? const <Documento>[];
+                          final documentos =
+                              snapshot.data ?? const <Documento>[];
                           final presupuestos = documentos
                               .where((d) => d.tipo == TipoDocumento.presupuesto)
                               .toList();
@@ -1475,9 +1480,9 @@ class _CuerpoSimple extends StatelessWidget {
                       // quiere verlo lo despliegue, si no, no") -- antes
                       // siempre visible entre la tarjeta económica y Pagos.
                       Theme(
-                        data: Theme.of(context).copyWith(
-                          dividerColor: Colors.transparent,
-                        ),
+                        data: Theme.of(
+                          context,
+                        ).copyWith(dividerColor: Colors.transparent),
                         child: ExpansionTile(
                           tilePadding: EdgeInsets.zero,
                           title: Row(
@@ -1490,7 +1495,9 @@ class _CuerpoSimple extends StatelessWidget {
                               const SizedBox(width: 6),
                               Text(
                                 'Historial',
-                                style: Theme.of(context).textTheme.headlineSmall,
+                                style: Theme.of(
+                                  context,
+                                ).textTheme.headlineSmall,
                               ),
                             ],
                           ),
@@ -1538,7 +1545,10 @@ class _SeccionCategoriaDocumentos extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final total = documentos.fold<double>(0, (acc, d) => acc + (d.importe ?? 0));
+    final total = documentos.fold<double>(
+      0,
+      (acc, d) => acc + (d.importe ?? 0),
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1550,9 +1560,9 @@ class _SeccionCategoriaDocumentos extends StatelessWidget {
                 Text(titulo, style: Theme.of(context).textTheme.headlineSmall),
                 if (total > 0) ...[
                   const SizedBox(width: 12),
-                Text(
-                  '(${total.toStringAsFixed(0)} €)',
-                  style: ReparaText.amount(context).copyWith(fontSize: 15),
+                  Text(
+                    '(${total.toStringAsFixed(0)} €)',
+                    style: ReparaText.amount(context).copyWith(fontSize: 15),
                   ),
                 ],
               ],
@@ -1584,7 +1594,11 @@ class _SeccionCategoriaDocumentos extends StatelessWidget {
                           )
                         : null,
                     showChevron: false,
-                    onTap: () => mostrarAccionesDocumento(context, casaId: casaId, documento: d),
+                    onTap: () => mostrarAccionesDocumento(
+                      context,
+                      casaId: casaId,
+                      documento: d,
+                    ),
                   ),
                 )
                 .toList(),

@@ -1,17 +1,18 @@
 // lib/screens/pagos_section.dart
 //
 // Lista de pagos de un registro, con fecha e importe a simple vista --
-// tocar uno abre un menú (abrir comprobante, editar datos, eliminar).
-// Apartado propio dentro del registro, separado del resumen de progreso
-// (ver widgets/progreso_pago.dart).
+// tocar uno abre un menú (abrir comprobante, editar datos). Eliminar un
+// pago vive solo dentro de "Editar datos" (PagoDetailScreen) -- no se
+// repite aquí, mismo criterio que registro_simple_acciones.dart ("se
+// quitaron de aquí porque duplicaban"). Apartado propio dentro del
+// registro, separado del resumen de progreso (ver widgets/progreso_pago.dart).
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../models/pago.dart';
 import '../services/pago_service.dart';
 import '../theme/design_tokens.dart';
-import '../widgets/app_dialog.dart';
-import '../widgets/app_error.dart';
+import '../widgets/app_error.dart' show EmptyHint;
 import '../widgets/documento_abrir.dart' show abrirArchivoProtegido;
 import '../widgets/ios_list.dart';
 import 'nuevo_documento_flow.dart' show elegirFormaDeAnadirPago;
@@ -52,10 +53,18 @@ class PagosSection extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text('Pagos', style: Theme.of(context).textTheme.headlineSmall),
+                    Text(
+                      'Pagos',
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
                     if (total > 0) ...[
                       const SizedBox(width: 12),
-                      Text('(${total.toStringAsFixed(0)} €)', style: ReparaText.amount(context).copyWith(fontSize: 15)),
+                      Text(
+                        '(${total.toStringAsFixed(0)} €)',
+                        style: ReparaText.amount(
+                          context,
+                        ).copyWith(fontSize: 15),
+                      ),
                     ],
                   ],
                 ),
@@ -76,28 +85,40 @@ class PagosSection extends StatelessWidget {
               ],
             ),
             if (pagos.isEmpty)
-              const EmptyHint(message: 'Sin pagos registrados todavía.', icon: Icons.payments_outlined)
+              const EmptyHint(
+                message: 'Sin pagos registrados todavía.',
+                icon: Icons.payments_outlined,
+              )
             else
               IosSection(
                 rows: pagos
-                    .map((p) => IosRow(
-                          icon: Icons.payments_outlined,
-                          iconColor: context.colors.brand,
-                          title: p.concepto?.isNotEmpty == true ? p.concepto! : DateFormat('d MMM yyyy', 'es_ES').format(p.fecha),
-                          subtitle: p.concepto?.isNotEmpty == true ? DateFormat('d MMM yyyy', 'es_ES').format(p.fecha) : null,
-                          trailing: Text('${p.importe.toStringAsFixed(2)} €', style: ReparaText.amount(context)),
-                          showChevron: false,
-                          onTap: () => mostrarAccionesPago(
-                            context,
-                            casaId: casaId,
-                            elementoId: elementoId,
-                            registroId: registroId,
-                            registroTitulo: registroTitulo,
-                            presupuesto: presupuesto,
-                            editable: editable,
-                            pago: p,
-                          ),
-                        ))
+                    .map(
+                      (p) => IosRow(
+                        icon: Icons.payments_outlined,
+                        iconColor: context.colors.brand,
+                        title: p.concepto?.isNotEmpty == true
+                            ? p.concepto!
+                            : DateFormat('d MMM yyyy', 'es_ES').format(p.fecha),
+                        subtitle: p.concepto?.isNotEmpty == true
+                            ? DateFormat('d MMM yyyy', 'es_ES').format(p.fecha)
+                            : null,
+                        trailing: Text(
+                          '${p.importe.toStringAsFixed(2)} €',
+                          style: ReparaText.amount(context),
+                        ),
+                        showChevron: false,
+                        onTap: () => mostrarAccionesPago(
+                          context,
+                          casaId: casaId,
+                          elementoId: elementoId,
+                          registroId: registroId,
+                          registroTitulo: registroTitulo,
+                          presupuesto: presupuesto,
+                          editable: editable,
+                          pago: p,
+                        ),
+                      ),
+                    )
                     .toList(),
               ),
           ],
@@ -178,53 +199,9 @@ Future<void> mostrarAccionesPago(
                 ),
               ],
             ),
-            if (editable)
-              IosSection(
-                rows: [
-                  IosRow(
-                    icon: Icons.delete_outline,
-                    iconColor: ctx.colors.errorText,
-                    title: 'Eliminar pago',
-                    titleColor: ctx.colors.errorText,
-                    showChevron: false,
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      _eliminarPago(
-                        context,
-                        casaId: casaId,
-                        elementoId: elementoId,
-                        registroId: registroId,
-                        pagoId: pago.id,
-                      );
-                    },
-                  ),
-                ],
-              ),
           ],
         ),
       ),
     ),
   );
-}
-
-Future<void> _eliminarPago(
-  BuildContext context, {
-  required String casaId,
-  required String elementoId,
-  required String registroId,
-  required String pagoId,
-}) async {
-  final confirmar = await AppDialog.confirmText(
-    context,
-    title: '¿Eliminar este pago?',
-    confirmLabel: 'Eliminar',
-  );
-  if (!confirmar || !context.mounted) return;
-  try {
-    await PagoService.eliminar(casaId, elementoId, registroId, pagoId);
-  } catch (e, st) {
-    if (context.mounted) {
-      AppError.show(context, 'No se pudo eliminar el pago.', error: e, stackTrace: st);
-    }
-  }
 }

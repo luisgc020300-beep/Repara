@@ -12,7 +12,6 @@
 import 'dart:async';
 import 'dart:io';
 
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -402,9 +401,7 @@ class ElementoDetailScreen extends StatelessWidget {
         if (snapshot.hasError) {
           return Scaffold(
             appBar: AppBar(),
-            body: const Center(
-              child: Text('No se pudo cargar este elemento.'),
-            ),
+            body: const Center(child: Text('No se pudo cargar este elemento.')),
           );
         }
         final elemento = snapshot.data;
@@ -635,22 +632,25 @@ class ElementoDetailScreen extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               StreamBuilder<List<Documento>>(
-  stream: DocumentoService.streamDocumentos(
-    casa.id,
-    elementoId: elemento.id,
-  ),
-  builder: (context, docSnap) {
-    return StreamBuilder<List<Registro>>(
-      stream: RegistroService.streamRegistros(casa.id, elemento.id),
-      builder: (context, regSnap) => _DocumentosElemento(
-        casaId: casa.id,
-        elementoId: elemento.id,
-        documentos: docSnap.data ?? const <Documento>[],
-        registros: regSnap.data ?? const <Registro>[],
-      ),
-    );
-  },
-),
+                stream: DocumentoService.streamDocumentos(
+                  casa.id,
+                  elementoId: elemento.id,
+                ),
+                builder: (context, docSnap) {
+                  return StreamBuilder<List<Registro>>(
+                    stream: RegistroService.streamRegistros(
+                      casa.id,
+                      elemento.id,
+                    ),
+                    builder: (context, regSnap) => _DocumentosElemento(
+                      casaId: casa.id,
+                      elementoId: elemento.id,
+                      documentos: docSnap.data ?? const <Documento>[],
+                      registros: regSnap.data ?? const <Registro>[],
+                    ),
+                  );
+                },
+              ),
               const SizedBox(height: 22),
               _AccionesElemento(casa: casa, elemento: elemento),
             ],
@@ -860,7 +860,10 @@ class _AccionesElementoState extends State<_AccionesElemento> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Compartir y exportar', style: Theme.of(context).textTheme.headlineSmall),
+        Text(
+          'Compartir y exportar',
+          style: Theme.of(context).textTheme.headlineSmall,
+        ),
         const SizedBox(height: 10),
         SizedBox(
           width: double.infinity,
@@ -899,10 +902,7 @@ class _AccionesElementoState extends State<_AccionesElemento> {
 /// misma comprobación en servidor -- este widget nunca confía solo en
 /// deshabilitar el botón.
 class _ArchivarElementoButton extends StatefulWidget {
-  const _ArchivarElementoButton({
-    required this.casaId,
-    required this.elemento,
-  });
+  const _ArchivarElementoButton({required this.casaId, required this.elemento});
 
   final String casaId;
   final Elemento elemento;
@@ -995,7 +995,8 @@ class _ArchivarElementoButtonState extends State<_ArchivarElementoButton> {
         if (tieneTrabajoActivo) {
           return IconButton(
             icon: _icono(Icons.archive_outlined),
-            tooltip: 'No se puede archivar: tiene trabajo activo o pendiente de pago',
+            tooltip:
+                'No se puede archivar: tiene trabajo activo o pendiente de pago',
             onPressed: null,
           );
         }
@@ -1052,7 +1053,8 @@ class _EliminarElementoButton extends StatefulWidget {
   final Elemento elemento;
 
   @override
-  State<_EliminarElementoButton> createState() => _EliminarElementoButtonState();
+  State<_EliminarElementoButton> createState() =>
+      _EliminarElementoButtonState();
 }
 
 class _EliminarElementoButtonState extends State<_EliminarElementoButton> {
@@ -1106,10 +1108,15 @@ class _EliminarElementoButtonState extends State<_EliminarElementoButton> {
     // defecto -- si se llega a tocar en ese instante, el servidor lo
     // rechaza igual con un mensaje claro.
     return StreamBuilder<List<Registro>>(
-      stream: RegistroService.streamRegistros(widget.casaId, widget.elemento.id),
+      stream: RegistroService.streamRegistros(
+        widget.casaId,
+        widget.elemento.id,
+      ),
       builder: (context, snapshot) {
-        final tieneRegistroConProfesional = (snapshot.data ?? const <Registro>[])
-            .any((r) => r.esConProfesional);
+        final tieneRegistroConProfesional =
+            (snapshot.data ?? const <Registro>[]).any(
+              (r) => r.esConProfesional,
+            );
         final icono = _procesando
             ? SizedBox(
                 width: 20,
@@ -1397,7 +1404,11 @@ class _TarjetaMantenimiento extends StatelessWidget {
 /// consulta nueva) -- null para un documento sin evento (p.ej. guardado
 /// directamente sobre el elemento) o si ese evento ya no existe.
 class _DocumentoTile extends StatelessWidget {
-  const _DocumentoTile({required this.casaId, required this.documento, this.registroTitulo});
+  const _DocumentoTile({
+    required this.casaId,
+    required this.documento,
+    this.registroTitulo,
+  });
 
   final String casaId;
   final Documento documento;
@@ -1434,10 +1445,15 @@ class _DocumentoTile extends StatelessWidget {
             )
           : null,
       showChevron: false,
-      onTap: () => mostrarAccionesDocumento(context, casaId: casaId, documento: documento),
+      onTap: () => mostrarAccionesDocumento(
+        context,
+        casaId: casaId,
+        documento: documento,
+      ),
     );
   }
 }
+
 /// Documentos del elemento + comprobantes de pagos de todos sus eventos, en
 /// una sola lista ordenada por fecha. El pago no es un Documento (su
 /// comprobante vive en el propio pago), así que se escuchan los pagos de
@@ -1483,16 +1499,19 @@ class _DocumentosElementoState extends State<_DocumentosElemento> {
     }
     for (final r in widget.registros) {
       if (_subs.containsKey(r.id)) continue;
-      _subs[r.id] = PagoService.streamPagos(
-        widget.casaId,
-        widget.elementoId,
-        r.id,
-      ).listen(
-        (pagos) {
-          if (mounted) setState(() => _pagos[r.id] = pagos);
-        },
-        onError: (_) {},
-      );
+      _subs[r.id] =
+          PagoService.streamPagos(
+            widget.casaId,
+            widget.elementoId,
+            r.id,
+          ).listen(
+            (pagos) {
+              if (mounted) setState(() => _pagos[r.id] = pagos);
+            },
+            onError: (e) => debugPrint(
+              '_DocumentosElemento: fallo leyendo pagos de ${r.id}: $e',
+            ),
+          );
     }
   }
 
@@ -1588,4 +1607,3 @@ class _PagoDocumentoTile extends StatelessWidget {
     );
   }
 }
-

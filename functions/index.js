@@ -1933,7 +1933,11 @@ exports.eliminarElemento = onCall({ region: REGION }, async (request) => {
   // filtro los cubre todos sin recorrer los registros uno a uno.
   await borrarDocumentosDe(casaId, 'elementoId', elementoId);
   await getStorage().bucket().deleteFiles({ prefix: `casas/${casaId}/elementos/${elementoId}/` });
-  await getStorage().bucket().deleteFiles({ prefix: `casas/${casaId}/documentos/porRegistro/${elementoId}/${registroId}/` });
+  // Se borra el elemento ENTERO, no un registro concreto -- a diferencia de
+  // eliminarRegistro (arriba), aquí no hay un registroId sobre el que
+  // acotar el prefijo: hace falta cubrir los comprobantes de pago de TODOS
+  // los registros de este elemento de una vez.
+  await getStorage().bucket().deleteFiles({ prefix: `casas/${casaId}/documentos/porRegistro/${elementoId}/` });
   await db.recursiveDelete(elRef);
   return { ok: true };
 });

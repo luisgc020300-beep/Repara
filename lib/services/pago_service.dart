@@ -28,10 +28,15 @@ class PagoService {
   @visibleForTesting
   static FirebaseFirestore? debugFirestoreOverride;
 
-  static FirebaseFirestore get _db => debugFirestoreOverride ?? FirebaseFirestore.instance;
+  static FirebaseFirestore get _db =>
+      debugFirestoreOverride ?? FirebaseFirestore.instance;
   static const _region = 'europe-west1';
 
-  static CollectionReference<Map<String, dynamic>> _col(String casaId, String elementoId, String registroId) => _db
+  static CollectionReference<Map<String, dynamic>> _col(
+    String casaId,
+    String elementoId,
+    String registroId,
+  ) => _db
       .collection('casas')
       .doc(casaId)
       .collection('elementos')
@@ -40,7 +45,11 @@ class PagoService {
       .doc(registroId)
       .collection('pagos');
 
-  static Stream<List<Pago>> streamPagos(String casaId, String elementoId, String registroId) {
+  static Stream<List<Pago>> streamPagos(
+    String casaId,
+    String elementoId,
+    String registroId,
+  ) {
     return _col(casaId, elementoId, registroId)
         .orderBy('fecha', descending: true)
         .snapshots()
@@ -51,8 +60,16 @@ class PagoService {
   /// [clientRequestId]: generado UNA SOLA VEZ por intento lógico de guardado
   /// (ver lib/core/idempotency.dart) -- un reintento de red que reutilice el
   /// mismo valor no duplica el pago en servidor.
-  static Future<void> crear(String casaId, String elementoId, String registroId, Pago pago, {String? clientRequestId}) async {
-    final callable = FirebaseFunctions.instanceFor(region: _region).httpsCallable('registrarPago');
+  static Future<void> crear(
+    String casaId,
+    String elementoId,
+    String registroId,
+    Pago pago, {
+    String? clientRequestId,
+  }) async {
+    final callable = FirebaseFunctions.instanceFor(
+      region: _region,
+    ).httpsCallable('registrarPago');
     await callable.call<Map<String, dynamic>>({
       'casaId': casaId,
       'elementoId': elementoId,
@@ -68,8 +85,16 @@ class PagoService {
     });
   }
 
-  static Future<void> actualizar(String casaId, String elementoId, String registroId, String pagoId, Pago pago) async {
-    final callable = FirebaseFunctions.instanceFor(region: _region).httpsCallable('actualizarPago');
+  static Future<void> actualizar(
+    String casaId,
+    String elementoId,
+    String registroId,
+    String pagoId,
+    Pago pago,
+  ) async {
+    final callable = FirebaseFunctions.instanceFor(
+      region: _region,
+    ).httpsCallable('actualizarPago');
     await callable.call<Map<String, dynamic>>({
       'casaId': casaId,
       'elementoId': elementoId,
@@ -84,8 +109,15 @@ class PagoService {
     });
   }
 
-  static Future<void> eliminar(String casaId, String elementoId, String registroId, String pagoId) async {
-    final callable = FirebaseFunctions.instanceFor(region: _region).httpsCallable('eliminarPago');
+  static Future<void> eliminar(
+    String casaId,
+    String elementoId,
+    String registroId,
+    String pagoId,
+  ) async {
+    final callable = FirebaseFunctions.instanceFor(
+      region: _region,
+    ).httpsCallable('eliminarPago');
     await callable.call<Map<String, dynamic>>({
       'casaId': casaId,
       'elementoId': elementoId,
@@ -97,14 +129,26 @@ class PagoService {
   /// Lectura puntual (no stream) usada antes de finalizar un registro, para
   /// avisar si falta algo por pagar sin tener que mantener un segundo campo
   /// cacheado en el propio registro que pudiera desincronizarse.
-  static Future<double> totalPagado(String casaId, String elementoId, String registroId) async {
+  static Future<double> totalPagado(
+    String casaId,
+    String elementoId,
+    String registroId,
+  ) async {
     final snap = await _col(casaId, elementoId, registroId).get();
-    return snap.docs.fold<double>(0, (acc, d) => acc + ((d.data()['importe'] as num?)?.toDouble() ?? 0));
+    return snap.docs.fold<double>(
+      0,
+      (acc, d) => acc + ((d.data()['importe'] as num?)?.toDouble() ?? 0),
+    );
   }
 
   /// Lectura puntual de un pago concreto -- usada al abrir la notificación
   /// de "te han registrado un pago" (ver notificaciones_screen.dart).
-  static Future<Pago?> obtenerPago(String casaId, String elementoId, String registroId, String pagoId) async {
+  static Future<Pago?> obtenerPago(
+    String casaId,
+    String elementoId,
+    String registroId,
+    String pagoId,
+  ) async {
     final doc = await _col(casaId, elementoId, registroId).doc(pagoId).get();
     return doc.exists ? Pago.fromDoc(doc) : null;
   }

@@ -74,7 +74,11 @@ Future<void> mostrarAccionesDocumento(
                   title: 'Editar datos',
                   onTap: () {
                     Navigator.pop(ctx);
-                    mostrarEditarDocumentoSheet(context, casaId: casaId, documento: documento);
+                    mostrarEditarDocumentoSheet(
+                      context,
+                      casaId: casaId,
+                      documento: documento,
+                    );
                   },
                 ),
               ],
@@ -89,7 +93,11 @@ Future<void> mostrarAccionesDocumento(
                   showChevron: false,
                   onTap: () {
                     Navigator.pop(ctx);
-                    _eliminarDocumento(context, casaId: casaId, documento: documento);
+                    _eliminarDocumento(
+                      context,
+                      casaId: casaId,
+                      documento: documento,
+                    );
                   },
                 ),
               ],
@@ -109,7 +117,8 @@ Future<void> _eliminarDocumento(
   final confirmar = await AppDialog.confirmText(
     context,
     title: '¿Eliminar este documento?',
-    message: 'Se borrará de forma permanente. No afecta al elemento ni al registro de origen.',
+    message:
+        'Se borrará de forma permanente. No afecta al elemento ni al registro de origen.',
     confirmLabel: 'Eliminar',
   );
   if (!confirmar || !context.mounted) return;
@@ -117,7 +126,12 @@ Future<void> _eliminarDocumento(
     await DocumentoService.eliminar(casaId, documento.id);
   } catch (e, st) {
     if (context.mounted) {
-      AppError.show(context, 'No se pudo eliminar el documento.', error: e, stackTrace: st);
+      AppError.show(
+        context,
+        'No se pudo eliminar el documento.',
+        error: e,
+        stackTrace: st,
+      );
     }
   }
 }
@@ -128,7 +142,10 @@ Future<void> abrirDocumento(BuildContext context, Documento documento) async {
   // no un fallo de subida. Nada que abrir, así que ni siquiera se pide el
   // gate biométrico.
   if (documento.url.isEmpty) {
-    AppError.show(context, 'Este documento se guardó solo con datos, sin ningún archivo adjunto.');
+    AppError.show(
+      context,
+      'Este documento se guardó solo con datos, sin ningún archivo adjunto.',
+    );
     return;
   }
   await abrirArchivoProtegido(context, documento.url);
@@ -140,13 +157,18 @@ Future<void> abrirDocumento(BuildContext context, Documento documento) async {
 /// colección de siempre.
 Future<void> abrirArchivoProtegido(BuildContext context, String url) async {
   if (await SecurityPreferencesService.instance.isDocumentProtectionEnabled()) {
-    final verificado = await sl<BiometricService>().authenticate('Verifica tu identidad para abrir este documento') ==
+    final verificado =
+        await sl<BiometricService>().authenticate(
+          'Verifica tu identidad para abrir este documento',
+        ) ==
         BiometricAuthResult.success;
     if (!verificado) return;
   }
   if (!context.mounted) return;
   final uri = Uri.tryParse(url);
-  if (uri == null || !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-    if (context.mounted) AppError.show(context, 'No se pudo abrir el documento.');
+  if (uri == null ||
+      !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+    if (context.mounted)
+      AppError.show(context, 'No se pudo abrir el documento.');
   }
 }
