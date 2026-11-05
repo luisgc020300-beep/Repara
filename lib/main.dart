@@ -5,11 +5,13 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -65,9 +67,29 @@ Future<void> _registrarRetornoSiProcede() async {
   }
 }
 
+// Conexión a los emuladores locales de Firebase (nunca a producción) --
+// SOLO cuando se compila con `--dart-define=USE_EMULATOR=true`. Pensado
+// para auditorías visuales/funcionales de verdad sin tocar datos reales de
+// clientes (noviembre 2026) -- en cualquier build normal esta constante es
+// `false` y este bloque entero queda eliminado en tiempo de compilación,
+// cero impacto en producción.
+const bool _usarEmulador = bool.fromEnvironment('USE_EMULATOR');
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  if (_usarEmulador) {
+    FirebaseFirestore.instance.useFirestoreEmulator('127.0.0.1', 8080);
+    await FirebaseAuth.instance.useAuthEmulator('127.0.0.1', 9099);
+    await FirebaseStorage.instance.useStorageEmulator('127.0.0.1', 9199);
+    // Todas las Cloud Functions reales se llaman con
+    // FirebaseFunctions.instanceFor(region: 'europe-west1'), nunca con la
+    // instancia por defecto (us-central1) -- apuntar solo esta última al
+    // emulador las habría dejado llamando a producción en silencio.
+    FirebaseFunctions.instanceFor(
+      region: 'europe-west1',
+    ).useFunctionsEmulator('127.0.0.1', 5001);
+  }
   await initializeDateFormatting('es_ES');
   Intl.defaultLocale = 'es_ES';
 

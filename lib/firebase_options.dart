@@ -16,12 +16,15 @@ import 'package:flutter/foundation.dart'
 /// ```
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
-    if (kIsWeb) {
-      throw UnsupportedError(
-        'DefaultFirebaseOptions have not been configured for web - '
-        'you can reconfigure this by running the FlutterFire CLI again.',
-      );
-    }
+    // web: placeholder añadido para la auditoría visual/funcional de
+    // noviembre 2026 (sin emulador Android/iOS disponible en este entorno,
+    // "flutter run -d chrome" es la única vía para ejecutar la app de
+    // verdad) -- NUNCA generado por FlutterFire CLI, y pensado solo para
+    // usarse con USE_EMULATOR=true (ver main.dart), donde el apiKey real no
+    // importa porque Auth/Firestore/Storage/Functions se redirigen todos al
+    // emulador local. Si algún día se publica un build web real, hay que
+    // sustituir esto ejecutando `flutterfire configure` de verdad.
+    if (kIsWeb) return web;
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
         return android;
@@ -64,5 +67,19 @@ class DefaultFirebaseOptions {
     projectId: 'repara-hogar-app',
     storageBucket: 'repara-hogar-app.firebasestorage.app',
     iosBundleId: 'com.riskrunner.repara',
+  );
+
+  // Solo para pruebas locales contra el Emulator Suite (ver comentario en
+  // currentPlatform) -- apiKey no es real, y projectId es deliberadamente
+  // "repara-test" (el mismo que usan functions-tests/firestore-tests), NO
+  // el proyecto real "repara-hogar-app" -- así ni un fallo de configuración
+  // puede llegar a tocar datos de producción, porque ni siquiera apunta al
+  // mismo proyecto.
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyFakeKeyOnlyValidAgainstLocalEmulator00',
+    appId: '1:199074592333:web:0000000000000000084e04',
+    messagingSenderId: '199074592333',
+    projectId: 'repara-test',
+    storageBucket: 'repara-test.firebasestorage.app',
   );
 }
