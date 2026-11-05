@@ -71,6 +71,10 @@ class InvitacionHogarService {
     String invitacionId, {
     required bool aceptar,
     String? casaId,
+    // Elemento ya existente al que debe pertenecer el nuevo registro
+    // (p.ej. "Pérgolas") -- si no se indica, el servidor crea uno nuevo con
+    // el título del trabajo (ver responderInvitacionHogar).
+    String? elementoId,
   }) async {
     final callable = FirebaseFunctions.instanceFor(
       region: _region,
@@ -79,6 +83,7 @@ class InvitacionHogarService {
       'invitacionId': invitacionId,
       'aceptar': aceptar,
       'casaId': ?casaId,
+      'elementoId': ?elementoId,
     });
     final vinculo = result.data['vinculo'] as Map<String, dynamic>?;
     if (vinculo == null) return null;

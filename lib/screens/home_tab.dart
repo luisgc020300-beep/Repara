@@ -314,13 +314,77 @@ class _SolicitudProfesionalCardState
     extends State<_SolicitudProfesionalCard> {
   bool _respondiendo = false;
 
-  Future<void> _responder(bool aceptar) async {
+  /// Antes de aceptar, el propietario elige a qué Elemento pertenece este
+  /// trabajo -- uno ya existente (p.ej. "Pérgolas", si el trabajo es una
+  /// reparación de algo que ya tenía registrado) o uno nuevo. Sin esto,
+  /// aceptar creaba SIEMPRE un Elemento nuevo con el título del trabajo,
+  /// duplicando Elementos que ya existían (hallazgo de uso real, noviembre
+  /// 2026).
+  Future<void> _elegirElementoYAceptar() async {
+    final elementos = await ElementoService.streamElementos(widget.casa.id).first;
+    if (!mounted) return;
+    // "null" explícito = crear uno nuevo; el modal se cierra sin elegir
+    // (pop sin valor) = cancelar, no se acepta nada todavía.
+    final eligeCrearNuevo = Object();
+    final elegido = await showModalBottomSheet<Object?>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.only(top: ReparaSpace.s3),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: ReparaSpace.s4),
+                child: Text(
+                  '¿A qué elemento pertenece "${widget.solicitud.titulo}"?',
+                  style: Theme.of(ctx).textTheme.titleMedium,
+                ),
+              ),
+              const SizedBox(height: ReparaSpace.s2),
+              ListTile(
+                leading: Icon(Icons.add, color: ctx.colors.brand),
+                title: const Text('Crear un elemento nuevo'),
+                onTap: () => Navigator.pop(ctx, eligeCrearNuevo),
+              ),
+              if (elementos.isNotEmpty) ...[
+                const Divider(height: 1),
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      for (final e in elementos)
+                        IosRow(
+                          icon: Icons.inventory_2_outlined,
+                          iconColor: ctx.colors.brand,
+                          title: e.nombre,
+                          onTap: () => Navigator.pop(ctx, e.id),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+    if (elegido == null || !mounted) return;
+    await _responder(
+      true,
+      elementoId: elegido == eligeCrearNuevo ? null : elegido as String,
+    );
+  }
+
+  Future<void> _responder(bool aceptar, {String? elementoId}) async {
     setState(() => _respondiendo = true);
     try {
       final vinculo = await InvitacionHogarService.responder(
         widget.solicitud.id,
         aceptar: aceptar,
         casaId: aceptar ? widget.casa.id : null,
+        elementoId: elementoId,
       );
       if (aceptar && vinculo != null && mounted) {
         await Navigator.push<void>(
@@ -388,7 +452,7 @@ class _SolicitudProfesionalCardState
                       const SizedBox(width: ReparaSpace.s2),
                       Expanded(
                         child: FilledButton(
-                          onPressed: () => _responder(true),
+                          onPressed: _elegirElementoYAceptar,
                           child: const Text('Aceptar'),
                         ),
                       ),

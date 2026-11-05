@@ -794,7 +794,7 @@ exports.canjearCodigoInvitacionHogar = onCall({ region: REGION }, async (request
 exports.responderInvitacionHogar = onCall({ region: REGION }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
   const uid = request.auth.uid;
-  const { invitacionId, aceptar, casaId } = request.data || {};
+  const { invitacionId, aceptar, casaId, elementoId } = request.data || {};
   if (!invitacionId || typeof aceptar !== 'boolean') {
     throw new HttpsError('invalid-argument', 'Faltan datos.');
   }
@@ -824,12 +824,30 @@ exports.responderInvitacionHogar = onCall({ region: REGION }, async (request) =>
       throw new HttpsError('permission-denied', 'No perteneces a esa casa.');
     }
 
-    const elementoRef = db.collection('casas').doc(casaId).collection('elementos').doc();
-    tx.set(elementoRef, { nombre: inv.titulo, createdAt: FieldValue.serverTimestamp() });
+    // [elementoId] (auditoría de uso real, noviembre 2026): el propietario
+    // puede elegir un Elemento ya existente (p.ej. "Pérgolas") en vez de
+    // que esto cree siempre uno nuevo llamado igual que el trabajo -- antes
+    // SIEMPRE creaba un Elemento nuevo, generando duplicados confusos
+    // cuando el trabajo era, de hecho, una reparación de algo que el
+    // propietario ya tenía registrado. Sin [elementoId], se mantiene el
+    // comportamiento anterior (crear uno nuevo) para cuando de verdad no
+    // hay ningún Elemento al que pertenezca.
+    let elementoRef;
+    let elementoNombre;
+    if (elementoId) {
+      elementoRef = db.collection('casas').doc(casaId).collection('elementos').doc(elementoId);
+      const elementoSnap = await tx.get(elementoRef);
+      if (!elementoSnap.exists) throw new HttpsError('not-found', 'Ese elemento ya no existe.');
+      elementoNombre = elementoSnap.data().nombre || inv.titulo;
+    } else {
+      elementoRef = db.collection('casas').doc(casaId).collection('elementos').doc();
+      elementoNombre = inv.titulo;
+      tx.set(elementoRef, { nombre: elementoNombre, createdAt: FieldValue.serverTimestamp() });
+    }
 
     const registroRefNuevo = elementoRef.collection('registros').doc();
     tx.set(registroRefNuevo, {
-      elementoNombre: inv.titulo,
+      elementoNombre,
       tipo: inv.tipo || 'otro',
       esConProfesional: true,
       titulo: inv.titulo,
@@ -848,7 +866,7 @@ exports.responderInvitacionHogar = onCall({ region: REGION }, async (request) =>
     const vinculo = {
       casaId,
       elementoId: elementoRef.id,
-      elementoNombre: inv.titulo,
+      elementoNombre,
       registroId: registroRefNuevo.id,
       registroTitulo: inv.titulo,
       casaNombre: casaSnap.data().nombre || 'Una casa',

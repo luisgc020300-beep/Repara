@@ -195,3 +195,50 @@ test('8. no se puede invitar dos veces sobre un trabajo ya vinculado', async () 
   });
   assert.equal(error?.status, 'FAILED_PRECONDITION');
 });
+
+// Hallazgo de uso real (noviembre 2026): aceptar creaba SIEMPRE un Elemento
+// nuevo con el título del trabajo, aunque el propietario ya tuviera un
+// Elemento al que de verdad pertenecía (p.ej. "Pérgolas") -- duplicaba
+// Elementos sin necesidad. [elementoId] deja elegir uno ya existente.
+test('9. aceptar con un elementoId ya existente reutiliza ese Elemento en vez de crear uno nuevo', async () => {
+  const pro = await crearUsuario();
+  const propietario = await crearUsuario();
+  const casaId = idUnico('casa');
+  const elementoExistenteId = idUnico('elemento');
+  await db.collection('casas').doc(casaId).set({ nombre: 'Piso de Luis', ownerUid: propietario.uid, members: [propietario.uid] });
+  await db.collection('casas').doc(casaId).collection('elementos').doc(elementoExistenteId).set({ nombre: 'Pérgolas' });
+  const trabajoId = await sembrarTrabajoPrivado(pro.uid, { titulo: 'Reparación pérgola' });
+
+  const { result: invResult } = await llamar('invitarClienteAHogar', pro.idToken, {
+    trabajoProfesionalId: trabajoId, emailCliente: propietario.email,
+  });
+  const { error, result } = await llamar('responderInvitacionHogar', propietario.idToken, {
+    invitacionId: invResult.invitacionId, aceptar: true, casaId, elementoId: elementoExistenteId,
+  });
+  assert.equal(error, undefined);
+  assert.equal(result.vinculo.elementoId, elementoExistenteId, 'debe usar el Elemento existente, no crear uno nuevo');
+  assert.equal(result.vinculo.elementoNombre, 'Pérgolas');
+
+  const elementosSnap = await db.collection('casas').doc(casaId).collection('elementos').get();
+  assert.equal(elementosSnap.size, 1, 'no debe haber creado ningún Elemento nuevo');
+
+  const registro = await leerRegistro(casaId, elementoExistenteId, result.vinculo.registroId);
+  assert.equal(registro.titulo, 'Reparación pérgola');
+  assert.equal(registro.elementoNombre, 'Pérgolas');
+});
+
+test('10. aceptar con un elementoId que no existe falla con not-found', async () => {
+  const pro = await crearUsuario();
+  const propietario = await crearUsuario();
+  const casaId = idUnico('casa');
+  await db.collection('casas').doc(casaId).set({ nombre: 'Casa', ownerUid: propietario.uid, members: [propietario.uid] });
+  const trabajoId = await sembrarTrabajoPrivado(pro.uid);
+  const { result: invResult } = await llamar('invitarClienteAHogar', pro.idToken, {
+    trabajoProfesionalId: trabajoId, emailCliente: propietario.email,
+  });
+
+  const { error } = await llamar('responderInvitacionHogar', propietario.idToken, {
+    invitacionId: invResult.invitacionId, aceptar: true, casaId, elementoId: 'elemento-fantasma',
+  });
+  assert.equal(error?.status, 'NOT_FOUND');
+});
