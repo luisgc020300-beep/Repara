@@ -27,6 +27,7 @@ class Cita {
     this.registroTitulo,
     this.casaNombre,
     this.completada = false,
+    this.compartida = false,
     this.createdAt,
   });
 
@@ -56,6 +57,14 @@ class Cita {
   final String? casaNombre;
 
   final bool completada;
+
+  /// Visible de solo lectura para el propietario del trabajo al que enlaza
+  /// (noviembre 2026, "avisos inteligentes + registro de actividad
+  /// compartido") -- solo tiene efecto cuando [enlazaTrabajo] es true; una
+  /// cita suelta nunca es compartible porque no hay ningún trabajo al que
+  /// asociar el permiso de lectura (ver firestore.rules). El profesional
+  /// sigue siendo el único que la crea/edita/cancela.
+  final bool compartida;
   final DateTime? createdAt;
 
   bool get enlazaTrabajo =>
@@ -76,6 +85,7 @@ class Cita {
       registroTitulo: data['registroTitulo'] as String?,
       casaNombre: data['casaNombre'] as String?,
       completada: data['completada'] as bool? ?? false,
+      compartida: data['compartida'] as bool? ?? false,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
     );
   }
@@ -93,5 +103,6 @@ class Cita {
     if (registroTitulo != null) 'registroTitulo': registroTitulo,
     if (casaNombre != null) 'casaNombre': casaNombre,
     'completada': completada,
+    'compartida': compartida,
   };
 }

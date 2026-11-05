@@ -51,6 +51,30 @@ service cloud.firestore {
       // pueda enlazar (registroId/casaId/elementoId) tiene acceso aquí.
       match /citas/{cid} {
         allow read, write: if isAuth() && isOwner(uid);
+
+        // ── citas compartidas (noviembre 2026, "avisos inteligentes +
+        // registro de actividad compartido") ──────────────────────────────
+        // Permiso de lectura AÑADIDO, nunca sustituye al de arriba: el
+        // propietario del trabajo al que la cita enlaza puede leerla, pero
+        // solo cuando el propio profesional la marcó compartida=true -- y
+        // nunca puede escribirla, ni siquiera marcarla compartida él mismo.
+        // El profesional sigue siendo el único escritor de su agenda.
+        allow read: if isAuth() && resource.data.compartida == true
+            && resource.data.casaId != null && isMember(resource.data.casaId);
+      }
+
+      // ── clientes y trabajos privados (Fase 1, noviembre 2026) ──────────────
+      // Agenda de clientes/trabajos propia del profesional, sin ninguna casa ni
+      // propietario detrás todavía (corrige el hallazgo más crítico de la
+      // auditoría funcional: un profesional no podía registrar nada por
+      // iniciativa propia). Mismo criterio que /citas justo arriba -- puramente
+      // del profesional, nadie más necesita confiar en estos datos en esta
+      // fase, así que no hace falta Cloud Function.
+      match /clientesPro/{clienteId} {
+        allow read, write: if isAuth() && isOwner(uid);
+      }
+      match /trabajosPro/{trabajoId} {
+        allow read, write: if isAuth() && isOwner(uid);
       }
     }
 

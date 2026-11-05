@@ -5,14 +5,21 @@
 
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { onDocumentCreated, onDocumentWritten } = require('firebase-functions/v2/firestore');
+const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { defineSecret } = require('firebase-functions/params');
-const { initializeApp } = require('firebase-admin/app');
+const { initializeApp, getApps } = require('firebase-admin/app');
 const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestore');
 const { getAuth } = require('firebase-admin/auth');
 const { getMessaging } = require('firebase-admin/messaging');
 const { getStorage } = require('firebase-admin/storage');
 
-initializeApp();
+// Guard idempotente (noviembre 2026): en producción nunca hay una app por
+// defecto ya creada, así que esto sigue llamando a initializeApp() exacto
+// igual que antes -- el único caso que cambia es functions-tests/, que
+// necesita requerir este archivo directamente para probar
+// _enviarRecordatoriosParaTests() (no es una Cloud Function invocable por
+// HTTP) y ya ha inicializado su propia app por defecto en helpers.js.
+if (!getApps().length) initializeApp();
 const db = getFirestore();
 
 const REGION = 'europe-west1';
@@ -527,7 +534,7 @@ exports.responderInvitacion = onCall({ region: REGION }, async (request) => {
 
   const invitacionRef = db.collection('invitaciones').doc(invitacionId);
 
-  await db.runTransaction(async (tx) => {
+  const inv = await db.runTransaction(async (tx) => {
     const invSnap = await tx.get(invitacionRef);
     if (!invSnap.exists) throw new HttpsError('not-found', 'La invitación ya no existe.');
     const inv = invSnap.data();
@@ -577,8 +584,22 @@ exports.responderInvitacion = onCall({ region: REGION }, async (request) => {
         }),
       }, { merge: true });
     }
+    registrarHistorial(regRef, {
+      tx, actorUid: uid, actorNombre: nombreProfesional, entidad: 'invitacion', entidadId: invitacionId,
+      accion: aceptar ? 'aceptada' : 'rechazada',
+    });
+    return inv;
   });
   if (aceptar) await sincronizarClaimsUid(uid);
+
+  if (inv.propietarioUid) {
+    await crearNotificacion(inv.propietarioUid, aceptar ? 'invitacion_aceptada' : 'invitacion_rechazada',
+      aceptar ? 'Invitación aceptada' : 'Invitación rechazada',
+      aceptar
+        ? `El profesional ha aceptado tu invitación para "${inv.registroTitulo}".`
+        : `El profesional ha rechazado tu invitación para "${inv.registroTitulo}".`,
+      { casaId: inv.casaId, elementoId: inv.elementoId, registroId: inv.registroId });
+  }
 
   return { ok: true };
 });
@@ -871,8 +892,50 @@ exports.cerrarSesionesEnTodosLosDispositivos = onCall({ region: REGION }, async 
 
 // =============================================================================
 // Helpers compartidos — notificaciones internas.
+// Preferencias (sección 6 del encargo de avisos inteligentes, noviembre
+// 2026): cada tipo cae en una categoría; el usuario puede apagar una
+// categoría entera (ni interna ni push) o solo la push global (sigue
+// guardándose la interna). Los tipos de TIPOS_OBLIGATORIOS (seguridad/
+// permisos) nunca se silencian, pase lo que pase en users/{uid}.notifPrefs.
 // =============================================================================
+const CATEGORIA_POR_TIPO = {
+  presupuesto_enviado: 'presupuestos',
+  presupuesto_aceptado: 'presupuestos',
+  presupuesto_rechazado: 'presupuestos',
+  presupuesto_sin_respuesta: 'presupuestos',
+  cambio_alcance_solicitado: 'cambios',
+  cambio_alcance_aprobado: 'cambios',
+  cambio_alcance_rechazado: 'cambios',
+  cambio_alcance_cancelado: 'cambios',
+  trabajo_finalizado: 'cambios',
+  trabajo_pendiente_confirmacion: 'cambios',
+  trabajo_finalizacion_rechazada: 'cambios',
+  elemento_archivado: 'cambios',
+  elemento_restaurado: 'cambios',
+  pago_registrado: 'pagos',
+  cita_creada: 'citas',
+  cita_modificada: 'citas',
+  cita_cancelada: 'citas',
+  recordatorio_cita_cliente: 'citas',
+  recordatorio_cita_profesional: 'citas',
+  documento_anadido_cliente: 'documentos',
+  documento_anadido_profesional: 'documentos',
+  invitacion_aceptada: 'seguridad',
+  invitacion_rechazada: 'seguridad',
+};
+
+// Seguridad/permisos -- la sección 6 del encargo pide explícitamente que
+// estos "no se confundan con recordatorios opcionales": siempre se crean y
+// siempre se empujan, sin mirar ninguna preferencia.
+const TIPOS_OBLIGATORIOS = new Set(['invitacion_aceptada', 'invitacion_rechazada']);
+
 async function crearNotificacion(uid, tipo, titulo, cuerpo, extra) {
+  const obligatoria = TIPOS_OBLIGATORIOS.has(tipo);
+  const userSnap = obligatoria ? null : await db.collection('users').doc(uid).get();
+  const prefs = userSnap?.data()?.notifPrefs || {};
+  const categoria = CATEGORIA_POR_TIPO[tipo];
+  if (!obligatoria && categoria && prefs[categoria] === false) return; // categoría apagada -- ni interna ni push
+
   await db.collection('notificaciones').add({
     uid,
     tipo,
@@ -882,6 +945,7 @@ async function crearNotificacion(uid, tipo, titulo, cuerpo, extra) {
     createdAt: FieldValue.serverTimestamp(),
     ...(extra || {}),
   });
+  if (!obligatoria && prefs.pushHabilitado === false) return; // solo push desactivada -- la interna ya quedó guardada
   await enviarPush(uid, tipo, titulo, cuerpo, extra);
 }
 
@@ -996,6 +1060,17 @@ function registroRef(casaId, elementoId, registroId) {
   return db.collection('casas').doc(casaId).collection('elementos').doc(elementoId).collection('registros').doc(registroId);
 }
 
+// Mismo conjunto que estadoControlado() en firestore.rules -- hasta ahora
+// cada Cloud Function de cambios de alcance repetía su propia lista a mano
+// (||/=== encadenados) y habían divergido en dos direcciones distintas
+// (auditoría funcional, noviembre 2026): crearCambioAlcance no bloqueaba
+// pendientePago, mientras que responderCambioAlcance/cancelarCambioAlcance
+// no bloqueaban pendienteConfirmacion. Un solo punto de verdad evita que
+// vuelvan a desincronizarse.
+function estadoControlado(estado) {
+  return estado === 'terminado' || estado === 'archivado' || estado === 'pendienteConfirmacion' || estado === 'pendientePago';
+}
+
 // =============================================================================
 // HISTORIAL append-only — casas/{cid}/elementos/{eid}/registros/{rid}/historial
 // Incremento de octubre 2026: antes no existía ningún evento separado del
@@ -1007,10 +1082,11 @@ function registroRef(casaId, elementoId, registroId) {
 // responderPresupuesto/responderCambioAlcance), el registro de historial se
 // confirma atómicamente junto con el resto de la escritura; si no, se añade
 // aparte con un .add() normal.
-function registrarHistorial(regRef, { tx, actorUid, entidad, entidadId, accion, estadoAnterior, estadoNuevo, importe, version, motivo }) {
+function registrarHistorial(regRef, { tx, actorUid, actorNombre, entidad, entidadId, accion, estadoAnterior, estadoNuevo, importe, version, motivo }) {
   const ref = regRef.collection('historial').doc();
   const datos = {
     actorUid: actorUid || null,
+    actorNombre: actorNombre || null,
     entidad,
     entidadId,
     accion,
@@ -1026,6 +1102,22 @@ function registrarHistorial(regRef, { tx, actorUid, entidad, entidadId, accion, 
     return;
   }
   return ref.set(datos);
+}
+
+// Resuelve un nombre para mostrar en el historial (sección 3.3 del encargo:
+// "Nombre o identidad que debe mostrarse") -- nunca se guarda el uid a
+// secas como texto visible. casaData ya debe venir leída (evita una lectura
+// extra cuando la función que llama ya tiene la casa en memoria).
+function nombreActorPropietario(casaData, uid) {
+  return casaData?.memberProfiles?.[uid]?.displayName || null;
+}
+
+async function nombreActorProfesional(uid) {
+  const [userSnap, profSnap] = await Promise.all([
+    db.collection('users').doc(uid).get(),
+    db.collection('profesionales').doc(uid).get(),
+  ]);
+  return (profSnap.exists && profSnap.data().nombreComercial) || (userSnap.exists && userSnap.data().displayName) || null;
 }
 
 async function getRegistroOThrow(casaId, elementoId, registroId) {
@@ -1320,7 +1412,7 @@ exports.crearCambioAlcance = onCall({ region: REGION }, async (request) => {
   // Tampoco mientras está pendiente de confirmación (modelo de dos pasos):
   // no tiene sentido pedir más alcance sobre algo que el propio profesional
   // acaba de decir que ha terminado.
-  if (registro.estado === 'terminado' || registro.estado === 'archivado' || registro.estado === 'pendienteConfirmacion') {
+  if (estadoControlado(registro.estado)) {
     throw new HttpsError('failed-precondition', 'Este registro ya está finalizado o pendiente de confirmación, no se pueden solicitar cambios de alcance.');
   }
   const importeBruto = importeAdicional == null ? null : Number(importeAdicional);
@@ -1642,7 +1734,7 @@ exports.responderCambioAlcance = onCall({ region: REGION }, async (request) => {
     // incrementando `presupuesto` vía FieldValue.increment() después de
     // cerrado -- desincronizando el importe mostrado.
     const estadoRegistro = registroSnap.exists ? registroSnap.data().estado : null;
-    if (estadoRegistro === 'terminado' || estadoRegistro === 'archivado' || estadoRegistro === 'pendientePago') {
+    if (estadoControlado(estadoRegistro)) {
       throw new HttpsError('failed-precondition', 'Este registro ya está finalizado, no se pueden responder cambios de alcance.');
     }
     if (!snap.exists) throw new HttpsError('not-found', 'El cambio de alcance no existe.');
@@ -1698,10 +1790,10 @@ exports.cancelarCambioAlcance = onCall({ region: REGION }, async (request) => {
   // cerrado que responderCambioAlcance ya aplica -- sin él, se podía
   // cancelar una solicitud pendiente sobre un registro ya finalizado (la UI
   // ya lo evita con registroCerrado, pero el servidor no lo exigía).
-  await db.runTransaction(async (tx) => {
+  const cambio = await db.runTransaction(async (tx) => {
     const [registroSnap, snap] = await Promise.all([tx.get(regRef), tx.get(ref)]);
     const estadoRegistro = registroSnap.exists ? registroSnap.data().estado : null;
-    if (estadoRegistro === 'terminado' || estadoRegistro === 'archivado' || estadoRegistro === 'pendientePago') {
+    if (estadoControlado(estadoRegistro)) {
       throw new HttpsError('failed-precondition', 'Este registro ya está finalizado, no se puede cancelar la solicitud.');
     }
     if (!snap.exists) throw new HttpsError('not-found', 'No existe.');
@@ -1713,7 +1805,16 @@ exports.cancelarCambioAlcance = onCall({ region: REGION }, async (request) => {
       tx, actorUid: uid, entidad: 'cambioAlcance', entidadId: cambioAlcanceId, accion: 'cancelado',
       estadoAnterior: 'pendiente', estadoNuevo: 'cancelado', importe: cambio.importeAdicional,
     });
+    return cambio;
   });
+
+  const casaSnap = await db.collection('casas').doc(casaId).get();
+  for (const memberUid of casaSnap.data()?.members || []) {
+    if (memberUid === uid) continue;
+    await crearNotificacion(memberUid, 'cambio_alcance_cancelado',
+      'Cambio de alcance cancelado', `"${cambio.titulo}" se ha cancelado antes de responderse.`,
+      { casaId, elementoId, registroId, cambioAlcanceId });
+  }
   return { ok: true };
 });
 
@@ -1808,7 +1909,27 @@ exports.archivarElemento = onCall({ region: REGION }, async (request) => {
       throw new HttpsError('failed-precondition', 'Este elemento tiene un saldo pendiente de pago -- no se puede archivar todavía.');
     }
     tx.update(elRef, { archivado: true, archivadoAt: FieldValue.serverTimestamp(), archivadoPorUid: uid });
+    // El historial vive bajo cada registro, no bajo el elemento -- una
+    // entrada por registro para que la cronología de cada trabajo concreto
+    // refleje que se archivó junto con el resto (antes no quedaba ningún
+    // rastro de esta acción).
+    for (const d of registrosSnap.docs) {
+      registrarHistorial(d.ref, {
+        tx, actorUid: uid, entidad: 'registro', entidadId: d.id, accion: 'elementoArchivado',
+      });
+    }
   });
+  // Un único aviso por el elemento entero (no uno por cada registro que
+  // contenga) -- evita que archivar un elemento con varios trabajos sature
+  // de notificaciones casi idénticas al resto de la casa.
+  const elSnap = await elRef.get();
+  const casaSnap = await db.collection('casas').doc(casaId).get();
+  for (const memberUid of casaSnap.data()?.members || []) {
+    if (memberUid === uid) continue;
+    await crearNotificacion(memberUid, 'elemento_archivado',
+      'Elemento archivado', `"${elSnap.data()?.nombre || 'Un elemento'}" se ha archivado.`,
+      { casaId, elementoId });
+  }
   return { ok: true };
 });
 
@@ -1828,6 +1949,19 @@ exports.restaurarElemento = onCall({ region: REGION }, async (request) => {
     archivadoAt: FieldValue.delete(),
     archivadoPorUid: FieldValue.delete(),
   });
+  const registrosSnap = await elRef.collection('registros').get();
+  for (const d of registrosSnap.docs) {
+    await registrarHistorial(d.ref, {
+      actorUid: uid, entidad: 'registro', entidadId: d.id, accion: 'elementoRestaurado',
+    });
+  }
+  const casaSnap = await db.collection('casas').doc(casaId).get();
+  for (const memberUid of casaSnap.data()?.members || []) {
+    if (memberUid === uid) continue;
+    await crearNotificacion(memberUid, 'elemento_restaurado',
+      'Elemento restaurado', `"${elSnap.data()?.nombre || 'Un elemento'}" ha vuelto a estar activo.`,
+      { casaId, elementoId });
+  }
   return { ok: true };
 });
 
@@ -1982,6 +2116,10 @@ exports.finalizarTrabajoPropietario = onCall({ region: REGION }, async (request)
       estado: cubierto ? 'terminado' : 'pendientePago',
       estadoPrevioAPendiente: FieldValue.delete(),
     });
+    registrarHistorial(regRef, {
+      tx, actorUid: uid, entidad: 'registro', entidadId: registroId, accion: 'confirmado',
+      estadoAnterior: data.estado, estadoNuevo: cubierto ? 'terminado' : 'pendientePago',
+    });
     return { ...data, cubierto };
   });
 
@@ -2029,6 +2167,10 @@ exports.marcarTrabajoFinalizadoProfesional = onCall({ region: REGION }, async (r
       throw new HttpsError('failed-precondition', 'Este registro ya está pendiente de confirmación o finalizado.');
     }
     tx.update(regRef, { estado: 'pendienteConfirmacion', estadoPrevioAPendiente: data.estado });
+    registrarHistorial(regRef, {
+      tx, actorUid: uid, entidad: 'registro', entidadId: registroId, accion: 'pendienteConfirmacion',
+      estadoAnterior: data.estado, estadoNuevo: 'pendienteConfirmacion',
+    });
     return data;
   });
 
@@ -2061,6 +2203,10 @@ exports.rechazarFinalizacionProfesional = onCall({ region: REGION }, async (requ
     // controlado (p.ej. "terminado") por esta vía.
     const vuelveA = _ESTADOS_PREVIOS_VALIDOS.includes(data.estadoPrevioAPendiente) ? data.estadoPrevioAPendiente : 'enCurso';
     tx.update(regRef, { estado: vuelveA, estadoPrevioAPendiente: FieldValue.delete() });
+    registrarHistorial(regRef, {
+      tx, actorUid: uid, entidad: 'registro', entidadId: registroId, accion: 'finalizacionRechazada',
+      estadoAnterior: 'pendienteConfirmacion', estadoNuevo: vuelveA,
+    });
     return data;
   });
 
@@ -2094,7 +2240,7 @@ exports.onPagoCreado = onDocumentCreated(
     if (!registro.profesionalUid) return; // sin profesional en la app, nadie a quien avisar
 
     await crearNotificacion(registro.profesionalUid, 'pago_registrado',
-      'Nuevo pago registrado', `Te han registrado un pago de ${Number(pago.importe || 0).toFixed(2)} € en "${registro.titulo}".`,
+      'Nuevo pago registrado', `Te han registrado un pago de ${pago.importe.toFixed(2)} € en "${registro.titulo}".`,
       { casaId, elementoId, registroId, pagoId });
   }
 );
@@ -2121,6 +2267,221 @@ exports.onPagoEscritoHistorial = onDocumentWritten(
     });
   }
 );
+
+// Documentos/fotos se escriben directo desde el cliente (firestore.rules
+// permite create tanto a miembros como al profesional de ese registro
+// concreto) -- igual que con los pagos, dejar rastro en el historial y
+// avisar al lado que no lo subió necesita Admin SDK, así que es un trigger,
+// no una Cloud Function que llame el cliente. Solo actúa si el documento
+// cuelga de un registro concreto (uno suelto de la casa/elemento, sin
+// registroId, no tiene "al otro lado" a quien avisar) y ese registro tiene
+// un profesional vinculado -- documento añadido (noviembre 2026).
+exports.onDocumentoCreado = onDocumentCreated(
+  { region: REGION, document: 'casas/{casaId}/documentos/{did}' },
+  async (event) => {
+    const doc = event.data?.data();
+    if (!doc) return;
+    const { casaId, did } = event.params;
+    if (!doc.registroId || !doc.elementoId) return;
+
+    const regRef = registroRef(casaId, doc.elementoId, doc.registroId);
+    const registroSnap = await regRef.get();
+    if (!registroSnap.exists) return;
+    const registro = registroSnap.data();
+    if (!registro.profesionalUid) return;
+
+    await registrarHistorial(regRef, {
+      actorUid: doc.createdBy || null, entidad: 'documento', entidadId: did, accion: 'añadido',
+    });
+
+    if (doc.createdBy === registro.profesionalUid) {
+      // Tipo distinto del de la rama de abajo (aunque el texto sea
+      // parecido) -- misma razón que recordatorio_cita_cliente/profesional:
+      // esParaProfesional clasifica por TIPO, no por destinatario, y esta
+      // misma cuenta puede ser propietaria de una casa y profesional en
+      // otra a la vez (ver notificacion.dart).
+      const casaSnap = await db.collection('casas').doc(casaId).get();
+      for (const memberUid of casaSnap.data()?.members || []) {
+        await crearNotificacion(memberUid, 'documento_anadido_cliente',
+          'Nuevo documento', `El profesional ha añadido "${doc.nombreArchivo}" a "${registro.titulo}".`,
+          { casaId, elementoId: doc.elementoId, registroId: doc.registroId });
+      }
+    } else {
+      await crearNotificacion(registro.profesionalUid, 'documento_anadido_profesional',
+        'Nuevo documento', `Se ha añadido "${doc.nombreArchivo}" a "${registro.titulo}".`,
+        { casaId, elementoId: doc.elementoId, registroId: doc.registroId });
+    }
+  }
+);
+
+// =============================================================================
+// CITAS COMPARTIDAS (noviembre 2026, "avisos inteligentes + registro de
+// actividad compartido"): la agenda (profesionales/{uid}/citas) se sigue
+// escribiendo directo desde el cliente -- sigue siendo puramente personal
+// del profesional, él decide qué comparte -- pero avisar al propietario y
+// dejar constancia en SU historial exige Admin SDK (firestore.rules
+// deniega directamente la escritura de notificaciones/historial desde
+// cualquier cliente), así que, igual que con pagos y documentos, es un
+// trigger sobre la propia escritura, no una Cloud Function que llame el
+// profesional. Solo actúa cuando la cita enlaza un trabajo Y está marcada
+// compartida=true en algún momento de la transición -- una cita puramente
+// privada nunca pasa por aquí de forma visible (before/after con
+// compartida=false en los dos lados no genera nada).
+// =============================================================================
+exports.onCitaEscrita = onDocumentWritten(
+  { region: REGION, document: 'profesionales/{profesionalUid}/citas/{citaId}' },
+  async (event) => {
+    const { profesionalUid, citaId } = event.params;
+    const before = event.data?.before?.exists ? event.data.before.data() : null;
+    const after = event.data?.after?.exists ? event.data.after.data() : null;
+
+    const enlazaTrabajo = (c) => c && c.casaId && c.elementoId && c.registroId;
+    const compartidaAntes = before?.compartida === true && enlazaTrabajo(before);
+    const compartidaAhora = after?.compartida === true && enlazaTrabajo(after);
+    if (!compartidaAntes && !compartidaAhora) return; // nunca fue visible para el propietario
+
+    let accion;
+    if (!compartidaAntes && compartidaAhora) accion = 'creada';
+    else if (compartidaAntes && !compartidaAhora) accion = 'cancelada';
+    else {
+      // Las dos versiones estaban compartidas -- solo es un evento nuevo si
+      // cambió algo que el propietario ya vio (fecha/hora/título), nunca por
+      // marcar completada o editar la descripción interna.
+      const fechaAntes = before.fecha?.toMillis?.() ?? null;
+      const fechaAhora = after.fecha?.toMillis?.() ?? null;
+      const horaFinAntes = before.horaFin?.toMillis?.() ?? null;
+      const horaFinAhora = after.horaFin?.toMillis?.() ?? null;
+      if (fechaAntes === fechaAhora && horaFinAntes === horaFinAhora && before.titulo === after.titulo) {
+        return;
+      }
+      accion = 'modificada';
+    }
+
+    const datos = compartidaAhora ? after : before;
+    const regRef = registroRef(datos.casaId, datos.elementoId, datos.registroId);
+    const actorNombre = await nombreActorProfesional(profesionalUid);
+    await registrarHistorial(regRef, {
+      actorUid: profesionalUid, actorNombre, entidad: 'cita', entidadId: citaId, accion,
+    });
+
+    const casaSnap = await db.collection('casas').doc(datos.casaId).get();
+    const fechaTexto = accion !== 'cancelada' && after?.fecha
+      ? after.fecha.toDate().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })
+      : null;
+    const mensaje = mensajeCitaCompartida(accion, datos.registroTitulo, fechaTexto);
+    for (const memberUid of casaSnap.data()?.members || []) {
+      await crearNotificacion(memberUid,
+        accion === 'creada' ? 'cita_creada' : accion === 'modificada' ? 'cita_modificada' : 'cita_cancelada',
+        'Visita programada', mensaje,
+        { casaId: datos.casaId, elementoId: datos.elementoId, registroId: datos.registroId });
+    }
+  }
+);
+
+function mensajeCitaCompartida(accion, registroTitulo, fechaTexto) {
+  if (accion === 'cancelada') return `Se ha cancelado la visita programada para "${registroTitulo}".`;
+  if (accion === 'modificada') return `La visita para "${registroTitulo}" ahora es el ${fechaTexto}.`;
+  return `Visita programada para "${registroTitulo}" el ${fechaTexto}.`;
+}
+
+// =============================================================================
+// RECORDATORIOS PROGRAMADOS (noviembre 2026, "avisos inteligentes"). Primera
+// Cloud Function de este proyecto disparada por reloj (Cloud Scheduler) en
+// vez de por una acción de usuario o una escritura -- hasta ahora no existía
+// ninguna infraestructura de este tipo. Cada sub-tarea es "auto-sanadora":
+// si el dato deja de cumplir la condición (se respondió el presupuesto, se
+// canceló la cita) sencillamente deja de aparecer en la siguiente consulta,
+// sin que haga falta ningún job de cancelación aparte. La deduplicación usa
+// un marcador en el propio documento -- nunca se manda el mismo aviso dos
+// veces para el mismo dato, y cambiar ese dato (p.ej. la fecha de una cita)
+// invalida el marcador anterior sin ningún paso manual.
+//
+// LIMITACIÓN DECLARADA (sección 16/informe final): esta sesión no despliega
+// Cloud Functions, así que esto solo se ha podido probar invocando
+// enviarRecordatoriosParaTests() directamente contra el emulador con una
+// fecha inyectada -- nunca contra el paso real del tiempo ni el scheduler
+// real de Cloud Scheduler. La fiabilidad en producción exige desplegar y
+// vigilar los primeros ciclos reales, igual que ya está pendiente con las
+// claves APNs de FCM.
+// =============================================================================
+const VENTANA_RECORDATORIO_CITA_MIN = 120;
+const DIAS_PRESUPUESTO_SIN_RESPUESTA = 3;
+
+async function recordarCitasProximas(ahoraMs) {
+  const limite = Timestamp.fromMillis(ahoraMs + VENTANA_RECORDATORIO_CITA_MIN * 60 * 1000);
+  const snap = await db.collectionGroup('citas')
+    .where('compartida', '==', true)
+    .where('fecha', '>=', Timestamp.fromMillis(ahoraMs))
+    .where('fecha', '<=', limite)
+    .get();
+  for (const d of snap.docs) {
+    const cita = d.data();
+    if (!cita.casaId || !cita.elementoId || !cita.registroId) continue;
+    const marcaFecha = cita.fecha.toMillis();
+    if (cita.recordatorioEnviadoPara === marcaFecha) continue;
+    await d.ref.update({ recordatorioEnviadoPara: marcaFecha });
+
+    const profesionalUid = d.ref.parent.parent.id;
+    const casaSnap = await db.collection('casas').doc(cita.casaId).get();
+    for (const memberUid of casaSnap.data()?.members || []) {
+      await crearNotificacion(memberUid, 'recordatorio_cita_cliente',
+        'Visita próxima', `Tienes una visita programada para "${cita.registroTitulo || 'tu vivienda'}" en breve.`,
+        { casaId: cita.casaId, elementoId: cita.elementoId, registroId: cita.registroId });
+    }
+    await crearNotificacion(profesionalUid, 'recordatorio_cita_profesional',
+      'Visita próxima', `Tienes una visita programada para "${cita.registroTitulo || 'un trabajo'}" en breve.`,
+      { casaId: cita.casaId, elementoId: cita.elementoId, registroId: cita.registroId });
+  }
+}
+
+async function recordarPresupuestosSinRespuesta(ahoraMs) {
+  const limite = Timestamp.fromMillis(ahoraMs - DIAS_PRESUPUESTO_SIN_RESPUESTA * 24 * 60 * 60 * 1000);
+  const snap = await db.collectionGroup('presupuestos')
+    .where('estado', '==', 'enviado')
+    .where('fechaEnvio', '<=', limite)
+    .get();
+  for (const d of snap.docs) {
+    const p = d.data();
+    if (p.recordatorioSinRespuestaEnviado === true) continue;
+    await d.ref.update({ recordatorioSinRespuestaEnviado: true });
+
+    // Ruta: casas/{cid}/elementos/{eid}/registros/{rid}/presupuestos/{pid}.
+    // Cada .parent sube un nivel (doc -> su colección -> el doc padre de esa
+    // colección); subir dos niveles desde el propio documento da su padre.
+    const regRefObj = d.ref.parent.parent; // registros/{rid}
+    const registroSnap = await regRefObj.get();
+    if (!registroSnap.exists) continue;
+    const elementoRefObj = regRefObj.parent.parent; // elementos/{eid}
+    const casaRefObj = elementoRefObj.parent.parent; // casas/{cid}
+    const casaId = casaRefObj.id;
+    const elementoId = elementoRefObj.id;
+    const casaSnap = await db.collection('casas').doc(casaId).get();
+    for (const memberUid of casaSnap.data()?.members || []) {
+      await crearNotificacion(memberUid, 'presupuesto_sin_respuesta',
+        'Presupuesto pendiente', `Todavía no has respondido al presupuesto de "${registroSnap.data().titulo}".`,
+        { casaId, elementoId, registroId: regRefObj.id, presupuestoId: d.id });
+    }
+  }
+}
+
+exports.enviarRecordatorios = onSchedule({ region: REGION, schedule: 'every 30 minutes' }, async () => {
+  const ahoraMs = Date.now();
+  await Promise.all([
+    recordarCitasProximas(ahoraMs),
+    recordarPresupuestosSinRespuesta(ahoraMs),
+  ]);
+});
+
+// Punto de entrada de solo test (ver limitación declarada arriba) -- nunca
+// se expone como Cloud Function propia, solo lo llaman directamente los
+// tests de functions-tests/ contra el emulador con un ahoraMs inyectado,
+// para no depender del paso real del tiempo.
+exports._enviarRecordatoriosParaTests = async (ahoraMs) => {
+  await Promise.all([
+    recordarCitasProximas(ahoraMs),
+    recordarPresupuestosSinRespuesta(ahoraMs),
+  ]);
+};
 
 // =============================================================================
 // 3. CLASIFICAR DOCUMENTO CON IA

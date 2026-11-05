@@ -126,6 +126,40 @@ test('6. una solicitud rechazada no puede aprobarse después', async () => {
   assert.equal(registro.presupuesto ?? 100, 100);
 });
 
+// Corrección de la asimetría detectada en la auditoría funcional (noviembre
+// 2026): crearCambioAlcance no bloqueaba pendientePago aunque
+// responderCambioAlcance/cancelarCambioAlcance sí lo hacían; y estas dos no
+// bloqueaban pendienteConfirmacion aunque crearCambioAlcance sí. Las tres
+// usan ahora el mismo helper estadoControlado() -- estos tests cubren
+// exactamente los dos huecos que antes dejaban pasar.
+test('6b. crearCambioAlcance rechaza sobre un registro pendiente de pago', async () => {
+  const owner = await crearUsuario();
+  const pro = await crearUsuario();
+  const { casaId, elementoId, registroId } = await sembrarRegistro({ ownerUid: owner.uid, estado: 'pendientePago', profesionalUid: pro.uid });
+
+  const { error } = await llamar('crearCambioAlcance', pro.idToken, { casaId, elementoId, registroId, titulo: 'Más tubería', importeAdicional: 80 });
+  assert.equal(error?.status, 'FAILED_PRECONDITION');
+
+  const cambios = await leerCambios(casaId, elementoId, registroId);
+  assert.equal(cambios.length, 0, 'no debe haberse creado ninguna solicitud');
+});
+
+test('7b. responderCambioAlcance rechaza sobre un registro pendiente de confirmación', async () => {
+  const owner = await crearUsuario();
+  const pro = await crearUsuario();
+  const { casaId, elementoId, registroId } = await sembrarRegistro({ ownerUid: owner.uid, estado: 'nuevo', presupuesto: 100, profesionalUid: pro.uid });
+  const { result } = await llamar('crearCambioAlcance', pro.idToken, { casaId, elementoId, registroId, titulo: 'Más tubería', importeAdicional: 80 });
+
+  await db.collection('casas').doc(casaId).collection('elementos').doc(elementoId)
+    .collection('registros').doc(registroId).update({ estado: 'pendienteConfirmacion' });
+
+  const { error } = await llamar('responderCambioAlcance', owner.idToken, { casaId, elementoId, registroId, cambioAlcanceId: result.cambioAlcanceId, aprobar: true });
+  assert.equal(error?.status, 'FAILED_PRECONDITION');
+
+  const registro = await leerRegistro(casaId, elementoId, registroId);
+  assert.equal(registro.presupuesto, 100, 'no debe haberse incrementado');
+});
+
 test('7. un usuario que no pertenece a la casa no puede aprobar cambios ajenos', async () => {
   const owner = await crearUsuario();
   const pro = await crearUsuario();
@@ -192,6 +226,22 @@ test('11. no se puede cancelar una solicitud pendiente si el registro ya está f
   // directamente, Admin SDK, sin pasar por esa función.
   await db.collection('casas').doc(casaId).collection('elementos').doc(elementoId)
     .collection('registros').doc(registroId).update({ estado: 'terminado' });
+
+  const { error } = await llamar('cancelarCambioAlcance', pro.idToken, { casaId, elementoId, registroId, cambioAlcanceId: result.cambioAlcanceId });
+  assert.equal(error?.status, 'FAILED_PRECONDITION');
+
+  const cambios = await leerCambios(casaId, elementoId, registroId);
+  assert.equal(cambios[0].estado, 'pendiente', 'un intento rechazado no debe cambiar el estado');
+});
+
+test('11b. no se puede cancelar una solicitud pendiente si el registro está pendiente de confirmación', async () => {
+  const owner = await crearUsuario();
+  const pro = await crearUsuario();
+  const { casaId, elementoId, registroId } = await sembrarRegistro({ ownerUid: owner.uid, estado: 'nuevo', profesionalUid: pro.uid });
+  const { result } = await llamar('crearCambioAlcance', pro.idToken, { casaId, elementoId, registroId, titulo: 'Más tubería', importeAdicional: 80 });
+
+  await db.collection('casas').doc(casaId).collection('elementos').doc(elementoId)
+    .collection('registros').doc(registroId).update({ estado: 'pendienteConfirmacion' });
 
   const { error } = await llamar('cancelarCambioAlcance', pro.idToken, { casaId, elementoId, registroId, cambioAlcanceId: result.cambioAlcanceId });
   assert.equal(error?.status, 'FAILED_PRECONDITION');

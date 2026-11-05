@@ -47,6 +47,30 @@
         { "fieldPath": "habitacionId", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "trabajosPro",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clienteId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "citas",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "compartida", "order": "ASCENDING" },
+        { "fieldPath": "fecha", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "presupuestos",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "estado", "order": "ASCENDING" },
+        { "fieldPath": "fechaEnvio", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

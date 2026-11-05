@@ -35,4 +35,41 @@ class NotificacionService {
   static Future<void> marcarLeida(String notificacionId) async {
     await _db.collection('notificaciones').doc(notificacionId).update({'leida': true});
   }
+
+  /// "Marcar todas como leídas" (sección 2.6 del encargo de avisos
+  /// inteligentes) -- batched, cada escritura individual sigue tocando solo
+  /// `leida` (lo único que permite firestore.rules), así que no hace falta
+  /// ningún permiso nuevo.
+  static Future<void> marcarTodasLeidas(List<String> notificacionIds) async {
+    if (notificacionIds.isEmpty) return;
+    final batch = _db.batch();
+    for (final id in notificacionIds) {
+      batch.update(_db.collection('notificaciones').doc(id), {'leida': true});
+    }
+    await batch.commit();
+  }
+
+  /// Preferencias de notificación (sección 6) -- dato puramente personal del
+  /// propio usuario, sin ninguna regla nueva (users/{uid} ya es de solo
+  /// isOwner). Las claves ausentes se tratan como `true` (todo activado por
+  /// defecto) -- nunca al revés, para que una cuenta recién creada siga
+  /// recibiendo avisos sin tener que entrar primero a activarlos a mano.
+  static Stream<Map<String, dynamic>> streamPreferencias() {
+    final uid = _uid;
+    if (uid == null) return Stream.value(const {});
+    return _db
+        .collection('users')
+        .doc(uid)
+        .snapshots()
+        .map((s) => (s.data()?['notifPrefs'] as Map<String, dynamic>?) ?? const {})
+        .conRegistroDeErrores();
+  }
+
+  static Future<void> actualizarPreferencia(String clave, bool activada) async {
+    final uid = _uid;
+    if (uid == null) return;
+    await _db.collection('users').doc(uid).set({
+      'notifPrefs': {clave: activada},
+    }, SetOptions(merge: true));
+  }
 }

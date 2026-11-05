@@ -20,6 +20,10 @@ import '../theme/design_tokens.dart';
 import '../widgets/boton_ajustes.dart';
 import '../widgets/ios_list.dart';
 
+DateTime _soloFecha(DateTime d) => DateTime(d.year, d.month, d.day);
+
+bool _mismoDia(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
+
 class NotificacionesScreen extends StatelessWidget {
   const NotificacionesScreen({required this.modoPro, this.casa, super.key});
 
@@ -69,9 +73,65 @@ class NotificacionesScreen extends StatelessWidget {
               ),
             );
           }
+
+          final noLeidas = notificaciones.where((n) => !n.leida).toList();
+          final hoy = _soloFecha(DateTime.now());
+          final ayer = hoy.subtract(const Duration(days: 1));
+          final deHoy = <Notificacion>[];
+          final deAyer = <Notificacion>[];
+          final anteriores = <Notificacion>[];
+          for (final n in notificaciones) {
+            final fecha = n.createdAt;
+            if (fecha != null && _mismoDia(fecha, hoy)) {
+              deHoy.add(n);
+            } else if (fecha != null && _mismoDia(fecha, ayer)) {
+              deAyer.add(n);
+            } else {
+              anteriores.add(n);
+            }
+          }
+
           return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-            children: [IosSection(rows: notificaciones.map((n) => _filaNotificacion(context, n, () => _abrirTrabajo(context, n))).toList())],
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        noLeidas.isEmpty
+                            ? 'Todo al día'
+                            : '${noLeidas.length} sin leer',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                    if (noLeidas.isNotEmpty)
+                      TextButton(
+                        onPressed: () => NotificacionService.marcarTodasLeidas(
+                          noLeidas.map((n) => n.id).toList(),
+                        ),
+                        child: const Text('Marcar todas como leídas'),
+                      ),
+                  ],
+                ),
+              ),
+              if (deHoy.isNotEmpty)
+                IosSection(
+                  header: 'Hoy',
+                  rows: deHoy.map((n) => _filaNotificacion(context, n, () => _abrirTrabajo(context, n))).toList(),
+                ),
+              if (deAyer.isNotEmpty)
+                IosSection(
+                  header: 'Ayer',
+                  rows: deAyer.map((n) => _filaNotificacion(context, n, () => _abrirTrabajo(context, n))).toList(),
+                ),
+              if (anteriores.isNotEmpty)
+                IosSection(
+                  header: 'Anteriores',
+                  rows: anteriores.map((n) => _filaNotificacion(context, n, () => _abrirTrabajo(context, n))).toList(),
+                ),
+            ],
           );
         },
       ),
@@ -80,7 +140,11 @@ class NotificacionesScreen extends StatelessWidget {
 }
 
 Widget _filaNotificacion(BuildContext context, Notificacion n, VoidCallback onTap) {
-  final color = n.leida ? context.colors.inkMuted : context.colors.brand;
+  // Leída se apaga a gris sin importar el tipo (ya se distingue por estar
+  // en negrita o no); no leída se colorea por categoría -- verde lo
+  // positivo, naranja lo que pide atención, rojo solo lo negativo/rechazado,
+  // azul de marca el resto (informativo neutral) -- sección 4.1 del encargo.
+  final color = n.leida ? context.colors.inkMuted : _colorTipo(context, n.tipo);
   return IosRow(
     icon: _iconoTipo(n.tipo),
     iconColor: color,
@@ -104,11 +168,54 @@ Widget _filaNotificacion(BuildContext context, Notificacion n, VoidCallback onTa
 }
 
 IconData _iconoTipo(String tipo) => switch (tipo) {
-      'presupuesto_enviado' || 'presupuesto_aceptado' || 'presupuesto_rechazado' => Icons.request_quote_outlined,
-      'cambio_alcance_solicitado' || 'cambio_alcance_aprobado' || 'cambio_alcance_rechazado' => Icons.rule_outlined,
+      'presupuesto_enviado' || 'presupuesto_aceptado' || 'presupuesto_rechazado' || 'presupuesto_sin_respuesta' =>
+        Icons.request_quote_outlined,
+      'cambio_alcance_solicitado' || 'cambio_alcance_aprobado' || 'cambio_alcance_rechazado' || 'cambio_alcance_cancelado' =>
+        Icons.rule_outlined,
       'trabajo_finalizado' => Icons.check_circle_outline,
       'trabajo_pendiente_confirmacion' => Icons.hourglass_top_outlined,
       'trabajo_finalizacion_rechazada' => Icons.undo_outlined,
+      'elemento_archivado' => Icons.archive_outlined,
+      'elemento_restaurado' => Icons.unarchive_outlined,
       'pago_registrado' => Icons.payments_outlined,
+      'cita_creada' || 'cita_modificada' || 'recordatorio_cita_cliente' || 'recordatorio_cita_profesional' =>
+        Icons.event_outlined,
+      'cita_cancelada' => Icons.event_busy_outlined,
+      'documento_anadido_cliente' || 'documento_anadido_profesional' => Icons.description_outlined,
+      'invitacion_aceptada' || 'invitacion_rechazada' => Icons.person_add_alt_outlined,
       _ => Icons.notifications_outlined,
     };
+
+const _tiposNegativos = {
+  'presupuesto_rechazado',
+  'cambio_alcance_rechazado',
+  'cambio_alcance_cancelado',
+  'trabajo_finalizacion_rechazada',
+  'invitacion_rechazada',
+  'cita_cancelada',
+};
+
+const _tiposDeAtencion = {
+  'trabajo_pendiente_confirmacion',
+  'presupuesto_sin_respuesta',
+  'recordatorio_cita_cliente',
+  'recordatorio_cita_profesional',
+  'elemento_archivado',
+};
+
+const _tiposPositivos = {
+  'presupuesto_aceptado',
+  'cambio_alcance_aprobado',
+  'trabajo_finalizado',
+  'pago_registrado',
+  'invitacion_aceptada',
+  'cita_creada',
+  'elemento_restaurado',
+};
+
+Color _colorTipo(BuildContext context, String tipo) {
+  if (_tiposNegativos.contains(tipo)) return context.colors.errorText;
+  if (_tiposDeAtencion.contains(tipo)) return context.colors.warningText;
+  if (_tiposPositivos.contains(tipo)) return context.colors.success;
+  return context.colors.brand;
+}

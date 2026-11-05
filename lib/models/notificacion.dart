@@ -27,6 +27,13 @@ const _tiposParaProfesional = {
   // habría llevado a la pantalla del propietario (a la que no tiene acceso)
   // en vez de a la suya (hallazgo de auditoría, misión de seguridad).
   'trabajo_finalizacion_rechazada',
+  // Avisos inteligentes (noviembre 2026): mismo criterio que arriba -- el
+  // recordatorio/aviso va dirigido al profesional en estos dos casos
+  // concretos, aunque el tipo hermano (recordatorio_cita_cliente/
+  // documento_anadido_cliente) exista para la otra cuenta en la misma
+  // situación.
+  'recordatorio_cita_profesional',
+  'documento_anadido_profesional',
 };
 
 bool tipoEsParaProfesional(String tipo) => _tiposParaProfesional.contains(tipo);

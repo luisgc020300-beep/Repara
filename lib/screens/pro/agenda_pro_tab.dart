@@ -1005,6 +1005,7 @@ class _EditorCitaSheetState extends State<_EditorCitaSheet> {
   late TimeOfDay _hora;
   TimeOfDay? _horaFin;
   RegistroProRef? _trabajoVinculado;
+  late bool _compartida;
   bool _guardando = false;
 
   bool get _esEdicion => widget.cita != null;
@@ -1021,6 +1022,7 @@ class _EditorCitaSheetState extends State<_EditorCitaSheet> {
     _horaFin = cita?.horaFin != null
         ? TimeOfDay.fromDateTime(cita!.horaFin!)
         : null;
+    _compartida = cita?.compartida ?? false;
     if (cita?.enlazaTrabajo == true) {
       _trabajoVinculado = RegistroProRef(
         casaId: cita!.casaId!,
@@ -1133,6 +1135,10 @@ class _EditorCitaSheetState extends State<_EditorCitaSheet> {
       registroTitulo: vinculo?.registroTitulo,
       casaNombre: vinculo?.casaNombre,
       completada: widget.cita?.completada ?? false,
+      // compartida solo tiene sentido si enlaza un trabajo -- si se quita
+      // el vínculo, se desactiva sola en vez de dejar un permiso de
+      // lectura "huérfano" que apuntaría a nada.
+      compartida: vinculo != null && _compartida,
     );
     try {
       if (_esEdicion) {
@@ -1282,6 +1288,16 @@ class _EditorCitaSheetState extends State<_EditorCitaSheet> {
                       : _trabajoVinculado!.registroTitulo,
                 ),
               ),
+              if (_trabajoVinculado != null)
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Compartir con el cliente'),
+                  subtitle: const Text(
+                    'Verá la fecha y hora en REPARA Hogar y recibirá un recordatorio.',
+                  ),
+                  value: _compartida,
+                  onChanged: (v) => setState(() => _compartida = v),
+                ),
               const SizedBox(height: ReparaSpace.s4),
               FilledButton(
                 onPressed: _guardando ? null : _guardar,

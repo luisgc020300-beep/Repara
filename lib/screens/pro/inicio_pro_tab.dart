@@ -541,6 +541,22 @@ String _tituloHistorial(HistorialEvento h) {
     EntidadHistorial.presupuesto => 'Presupuesto ${h.accion}$importe',
     EntidadHistorial.cambioAlcance => 'Cambio de alcance ${h.accion}$importe',
     EntidadHistorial.pago => 'Pago ${h.accion}$importe',
+    EntidadHistorial.registro => switch (h.accion) {
+      'confirmado' => 'Trabajo confirmado',
+      'pendienteConfirmacion' => 'Marcado como terminado',
+      'finalizacionRechazada' => 'Finalización rechazada',
+      'elementoArchivado' => 'Elemento archivado',
+      'elementoRestaurado' => 'Elemento restaurado',
+      _ => 'Trabajo actualizado',
+    },
+    EntidadHistorial.invitacion =>
+      h.accion == 'aceptada' ? 'Invitación aceptada' : 'Invitación rechazada',
+    EntidadHistorial.documento => 'Documento añadido',
+    EntidadHistorial.cita => switch (h.accion) {
+      'modificada' => 'Cita modificada',
+      'cancelada' => 'Cita cancelada',
+      _ => 'Cita programada',
+    },
     EntidadHistorial.desconocida => h.accion,
   };
 }
@@ -549,6 +565,10 @@ IconData _iconoHistorial(EntidadHistorial e) => switch (e) {
   EntidadHistorial.presupuesto => Icons.request_quote_outlined,
   EntidadHistorial.cambioAlcance => Icons.swap_horiz,
   EntidadHistorial.pago => Icons.payments_outlined,
+  EntidadHistorial.registro => Icons.task_alt,
+  EntidadHistorial.invitacion => Icons.person_add_alt_outlined,
+  EntidadHistorial.documento => Icons.description_outlined,
+  EntidadHistorial.cita => Icons.event_outlined,
   EntidadHistorial.desconocida => Icons.info_outline,
 };
 

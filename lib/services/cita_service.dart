@@ -15,6 +15,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/cita.dart';
 import 'stream_error_logging.dart';
+import 'stream_sharing.dart';
 
 class CitaService {
   /// Seams de solo test -- nunca se asignan en código de producción. Ver
@@ -48,6 +49,36 @@ class CitaService {
         .snapshots()
         .map((s) => s.docs.map(Cita.fromDoc).toList())
         .conRegistroDeErrores();
+  }
+
+  /// Lado Hogar (noviembre 2026): lee la agenda de UN profesional concreto
+  /// -- no la del uid autenticado, por eso no usa [_col] -- filtrando solo
+  /// las citas de este trabajo. [compartida] se filtra en cliente: como
+  /// mucho hay un puñado de citas por trabajo, no merece un índice
+  /// compuesto nuevo solo para esto. firestore.rules es quien de verdad
+  /// protege el acceso -- una cita no compartida de este mismo trabajo
+  /// simplemente no llega aquí (el propietario no tiene permiso de
+  /// lectura sobre ella), así que el filtro de cliente es solo una
+  /// comodidad, no la barrera de seguridad real.
+  static Stream<List<Cita>> streamCitasCompartidas({
+    required String profesionalUid,
+    required String registroId,
+  }) {
+    return _db
+        .collection('profesionales')
+        .doc(profesionalUid)
+        .collection('citas')
+        .where('registroId', isEqualTo: registroId)
+        .snapshots()
+        .map(
+          (s) => s.docs
+              .map(Cita.fromDoc)
+              .where((c) => c.compartida)
+              .toList()
+            ..sort((a, b) => a.fecha.compareTo(b.fecha)),
+        )
+        .conRegistroDeErrores()
+        .compartido('citasCompartidas:$profesionalUid:$registroId');
   }
 
   static Future<void> crear(Cita cita) async {

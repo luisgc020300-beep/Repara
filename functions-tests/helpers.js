@@ -121,6 +121,42 @@ async function leerPagos(casaId, elementoId, registroId) {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
+async function leerHistorial(casaId, elementoId, registroId) {
+  const snap = await db
+    .collection('casas').doc(casaId)
+    .collection('elementos').doc(elementoId)
+    .collection('registros').doc(registroId)
+    .collection('historial').get();
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
+async function leerNotificaciones(uid) {
+  const snap = await db.collection('notificaciones').where('uid', '==', uid).get();
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
+// Avisos inteligentes (noviembre 2026): historial/notificaciones de
+// onCitaEscrita/onDocumentoCreado/onPagoCreado se generan en un TRIGGER de
+// Firestore, no dentro de la petición HTTP que escribe el documento -- el
+// emulador confirma la escritura antes de que el trigger haya terminado de
+// ejecutarse. Sondea hasta que condicionAsync() devuelva algo "truthy" (o
+// hasta agotar el plazo, que entonces lanza con el último valor visto para
+// que el test falle con un mensaje útil en vez de un timeout opaco).
+// 12s de plazo por defecto (no 5s): la PRIMERA vez que un trigger concreto
+// se invoca en una sesión del emulador, este tiene que arrancar su
+// contenedor en frío -- ya se ha visto tardar varios segundos solo en eso,
+// antes de que el handler real llegue a ejecutarse.
+async function esperarA(condicionAsync, { timeoutMs = 12000, intervaloMs = 150 } = {}) {
+  const limite = Date.now() + timeoutMs;
+  let ultimoValor;
+  while (Date.now() < limite) {
+    ultimoValor = await condicionAsync();
+    if (ultimoValor) return ultimoValor;
+    await new Promise((r) => setTimeout(r, intervaloMs));
+  }
+  throw new Error(`esperarA: no se cumplió la condición en ${timeoutMs}ms (último valor: ${JSON.stringify(ultimoValor)})`);
+}
+
 // Crea una casa directamente (Admin SDK, salta firestore.rules) con el
 // propietario y los miembros exactos que pida el test -- usado por los
 // tests de eliminarCuenta (auditoría R10, octubre 2026), que necesitan
@@ -173,6 +209,9 @@ module.exports = {
   sembrarRegistro,
   leerRegistro,
   leerPagos,
+  leerHistorial,
+  leerNotificaciones,
+  esperarA,
   crearCasa,
   fijarCasaIds,
   subirArchivoStorage,

@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/historial_evento.dart';
 import 'stream_error_logging.dart';
+import 'stream_sharing.dart';
 
 class HistorialService {
   /// Seam de solo test -- nunca se asigna en código de producción. Ver
@@ -34,6 +35,7 @@ class HistorialService {
         .orderBy('timestamp', descending: true)
         .snapshots()
         .map((s) => s.docs.map(HistorialEvento.fromDoc).toList())
-        .conRegistroDeErrores();
+        .conRegistroDeErrores()
+        .compartido('historial:$casaId:$elementoId:$registroId');
   }
 }

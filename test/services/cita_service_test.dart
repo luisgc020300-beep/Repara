@@ -151,4 +151,78 @@ void main() {
       expect(cita.registroTitulo, 'Instalación caldera');
     },
   );
+
+  test(
+    'compartida es false por defecto y se conserva al guardarla en true (citas compartidas, noviembre 2026)',
+    () async {
+      final db = FakeFirebaseFirestore();
+      CitaService.debugFirestoreOverride = db;
+      CitaService.debugUidOverride = _uid;
+
+      await CitaService.crear(
+        Cita(
+          id: '',
+          titulo: 'Visita',
+          fecha: DateTime(2026, 11, 20, 10),
+          casaId: 'c1',
+          elementoId: 'e1',
+          registroId: 'r1',
+          compartida: true,
+        ),
+      );
+
+      final cita = (await CitaService.streamCitas().first).single;
+      expect(cita.compartida, isTrue);
+    },
+  );
+
+  test(
+    'streamCitasCompartidas() solo devuelve, de un profesional concreto y un registro concreto, las que están compartidas',
+    () async {
+      final db = FakeFirebaseFirestore();
+      CitaService.debugFirestoreOverride = db;
+      CitaService.debugUidOverride = _uid;
+
+      await CitaService.crear(
+        Cita(
+          id: '',
+          titulo: 'Compartida de r1',
+          fecha: DateTime(2026, 11, 20, 10),
+          casaId: 'c1',
+          elementoId: 'e1',
+          registroId: 'r1',
+          compartida: true,
+        ),
+      );
+      await CitaService.crear(
+        Cita(
+          id: '',
+          titulo: 'Privada de r1',
+          fecha: DateTime(2026, 11, 21, 10),
+          casaId: 'c1',
+          elementoId: 'e1',
+          registroId: 'r1',
+          compartida: false,
+        ),
+      );
+      await CitaService.crear(
+        Cita(
+          id: '',
+          titulo: 'Compartida de otro registro',
+          fecha: DateTime(2026, 11, 22, 10),
+          casaId: 'c1',
+          elementoId: 'e1',
+          registroId: 'r2',
+          compartida: true,
+        ),
+      );
+
+      final citas = await CitaService.streamCitasCompartidas(
+        profesionalUid: _uid,
+        registroId: 'r1',
+      ).first;
+      expect(citas, hasLength(1));
+      expect(citas.single.titulo, 'Compartida de r1');
+    },
+  );
 }

@@ -388,6 +388,64 @@ describe('historial -- append-only, mismo criterio de lectura que presupuestos/c
   });
 });
 
+describe('citas compartidas -- lectura añadida para el propietario del trabajo, nunca escritura (noviembre 2026)', () => {
+  it('ALLOW: el propietario del trabajo lee una cita compartida=true que enlaza su registro', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `profesionales/${PRO}/citas`, 'cita-1'), {
+        titulo: 'Visita', fecha: new Date(), compartida: true,
+        casaId: CASA_A, elementoId: ELEMENTO_A1, registroId: REGISTRO_A1,
+      });
+    });
+    await assertSucceeds(getDoc(doc(as(OWNER_A), `profesionales/${PRO}/citas`, 'cita-1')));
+  });
+
+  it('ALLOW: otro miembro de la misma casa también la lee (no solo quien la creó)', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `profesionales/${PRO}/citas`, 'cita-1'), {
+        titulo: 'Visita', fecha: new Date(), compartida: true,
+        casaId: CASA_A, elementoId: ELEMENTO_A1, registroId: REGISTRO_A1,
+      });
+    });
+    await assertSucceeds(getDoc(doc(as(MIEMBRO_A2), `profesionales/${PRO}/citas`, 'cita-1')));
+  });
+
+  it('DENY: el propietario NO lee una cita del mismo profesional que no está compartida', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `profesionales/${PRO}/citas`, 'cita-privada'), {
+        titulo: 'Nota personal', fecha: new Date(), compartida: false,
+        casaId: CASA_A, elementoId: ELEMENTO_A1, registroId: REGISTRO_A1,
+      });
+    });
+    await assertFails(getDoc(doc(as(OWNER_A), `profesionales/${PRO}/citas`, 'cita-privada')));
+  });
+
+  it('DENY: un usuario externo (ni miembro de esa casa) no lee una cita compartida ajena', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `profesionales/${PRO}/citas`, 'cita-1'), {
+        titulo: 'Visita', fecha: new Date(), compartida: true,
+        casaId: CASA_A, elementoId: ELEMENTO_A1, registroId: REGISTRO_A1,
+      });
+    });
+    await assertFails(getDoc(doc(as(OWNER_B), `profesionales/${PRO}/citas`, 'cita-1')));
+  });
+
+  it('DENY: el propietario no puede escribir ni editar la cita, ni siquiera para compartirla él mismo', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `profesionales/${PRO}/citas`, 'cita-privada'), {
+        titulo: 'Nota personal', fecha: new Date(), compartida: false,
+        casaId: CASA_A, elementoId: ELEMENTO_A1, registroId: REGISTRO_A1,
+      });
+    });
+    await assertFails(updateDoc(doc(as(OWNER_A), `profesionales/${PRO}/citas`, 'cita-privada'), { compartida: true }));
+  });
+
+  it('ALLOW: el propio profesional sigue leyendo y escribiendo su agenda sin restricción', async () => {
+    await assertSucceeds(setDoc(doc(as(PRO), `profesionales/${PRO}/citas`, 'cita-propia'), {
+      titulo: 'Tarea', fecha: new Date(), compartida: false,
+    }));
+  });
+});
+
 describe('pagos -- create/update/delete solo vía Cloud Function', () => {
   // DATA-1 (auditoría de integridad económica, octubre 2026): create/update
   // pasaron de ser escritura directa del cliente a exigir Cloud Function
