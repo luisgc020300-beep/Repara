@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/presupuesto.dart';
 import 'stream_error_logging.dart';
+import 'stream_sharing.dart';
 
 class PresupuestoService {
   /// Seam de solo test -- nunca se asigna en código de producción. Ver
@@ -31,7 +32,8 @@ class PresupuestoService {
         .orderBy('fechaCreacion', descending: true)
         .snapshots()
         .map((s) => s.docs.map(Presupuesto.fromDoc).toList())
-        .conRegistroDeErrores();
+        .conRegistroDeErrores()
+        .compartido('presupuestos:$casaId:$elementoId:$registroId');
   }
 
   /// Todas las escrituras pasan por Cloud Functions -- ver

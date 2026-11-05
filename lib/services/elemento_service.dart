@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/elemento.dart';
 import 'stream_error_logging.dart';
+import 'stream_sharing.dart';
 
 class ElementoService {
   /// Seam de solo test -- nunca se asigna en código de producción. Ver
@@ -101,7 +102,8 @@ class ElementoService {
         .doc(elementoId)
         .snapshots()
         .map((d) => d.exists ? Elemento.fromDoc(d) : null)
-        .conRegistroDeErrores();
+        .conRegistroDeErrores()
+        .compartido('elemento:$casaId:$elementoId');
   }
 
   static Future<String> crear(String casaId, Elemento elemento) async {

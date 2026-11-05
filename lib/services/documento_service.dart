@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/documento.dart';
 import 'stream_error_logging.dart';
+import 'stream_sharing.dart';
 
 class SugerenciaIA {
   const SugerenciaIA({
@@ -94,7 +95,11 @@ class DocumentoService {
     Query<Map<String, dynamic>> q = _col(casaId).orderBy('createdAt', descending: true);
     if (elementoId != null) q = q.where('elementoId', isEqualTo: elementoId);
     if (registroId != null) q = q.where('registroId', isEqualTo: registroId);
-    return q.snapshots().map((s) => s.docs.map(Documento.fromDoc).toList()).conRegistroDeErrores();
+    return q
+        .snapshots()
+        .map((s) => s.docs.map(Documento.fromDoc).toList())
+        .conRegistroDeErrores()
+        .compartido('documentos:$casaId:${elementoId ?? ''}:${registroId ?? ''}');
   }
 
   /// Todos los documentos de la casa -- incluye los borradores sin elemento

@@ -39,6 +39,7 @@ import 'acerca_screen.dart';
 import 'cuenta_screen.dart';
 import 'expediente_vivienda_screen.dart';
 import 'gestionar_vivienda_screen.dart';
+import 'notificaciones_preferencias_screen.dart';
 import 'pro/repara_pro_shell_screen.dart';
 import 'seguridad_screen.dart';
 
@@ -255,6 +256,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onTap: () => _abrirSelectorTema(context),
                 ),
                 _FilaSeguridad(valorConChevron: _valorConChevron),
+                IosRow(
+                  icon: Icons.notifications_outlined,
+                  iconColor: context.colors.brand,
+                  title: 'Notificaciones',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const NotificacionesPreferenciasScreen()),
+                  ),
+                ),
                 IosRow(
                   icon: Icons.ios_share_outlined,
                   iconColor: context.colors.brand,
@@ -518,28 +528,43 @@ class _Segmento extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = selected ? context.colors.brandStrong : context.colors.inkMuted;
-    return Material(
-      color: selected ? context.colors.surface : Colors.transparent,
-      borderRadius: BorderRadius.circular(ReparaRadius.xs),
-      elevation: selected ? 1 : 0,
-      child: InkWell(
+    // Semantics propio con container:true (auditoría visual/accesibilidad,
+    // noviembre 2026): sin esto, los dos segmentos vecinos de este
+    // interruptor (Hogar/Pro) se fusionaban en un único nodo de
+    // accesibilidad "Hogar Pro" -- un lector de pantalla no podía
+    // distinguirlos ni saber cuál estaba activo. excludeSemantics en el
+    // contenido visual evita que el icono/texto internos vuelvan a
+    // filtrarse como nodos sueltos.
+    return Semantics(
+      container: true,
+      button: true,
+      selected: selected,
+      label: label,
+      child: Material(
+        color: selected ? context.colors.surface : Colors.transparent,
         borderRadius: BorderRadius.circular(ReparaRadius.xs),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 9),
-          child: loading
-              ? SizedBox(
-                  height: 18,
-                  child: Center(child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: color))),
-                )
-              : Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(icon, size: 18, color: color),
-                    const SizedBox(width: 6),
-                    Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 14)),
-                  ],
-                ),
+        elevation: selected ? 1 : 0,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(ReparaRadius.xs),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 9),
+            child: ExcludeSemantics(
+              child: loading
+                  ? SizedBox(
+                      height: 18,
+                      child: Center(child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: color))),
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(icon, size: 18, color: color),
+                        const SizedBox(width: 6),
+                        Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 14)),
+                      ],
+                    ),
+            ),
+          ),
         ),
       ),
     );

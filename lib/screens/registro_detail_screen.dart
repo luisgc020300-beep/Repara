@@ -16,6 +16,7 @@ import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../models/casa.dart';
+import '../models/cita.dart';
 import '../models/documento.dart';
 import '../models/elemento.dart';
 import '../models/historial_evento.dart';
@@ -23,6 +24,7 @@ import '../models/invitacion.dart';
 import '../models/pago.dart';
 import '../models/registro.dart';
 import '../services/analytics_service.dart';
+import '../services/cita_service.dart';
 import '../services/documento_service.dart';
 import '../services/elemento_service.dart';
 import '../services/historial_service.dart';
@@ -414,6 +416,7 @@ class _TarjetaEconomica extends StatelessWidget {
     required this.presupuesto,
     required this.pagado,
     this.etiquetaTotal = 'Presupuesto',
+    super.key,
   });
 
   final double presupuesto;
@@ -636,13 +639,24 @@ class _CuerpoConProfesionalState extends State<_CuerpoConProfesional> {
               child: Column(
                 children: [
                   RegistroCabecera(
+                    key: const ValueKey('cabecera'),
                     casa: casa,
                     elementoId: elementoId,
                     registro: registro,
                     elemento: elemento,
                   ),
+                  // Keys explícitas desde aquí hasta el pie de página --
+                  // mismo motivo que en _ResumenTab: los dos avisos y la
+                  // tarjeta económica de más abajo son condicionales (el
+                  // estado del registro o si ya tiene presupuesto pueden
+                  // cambiar mientras la pantalla está abierta, vía el
+                  // StreamBuilder<Registro?> de arriba), y sin clave
+                  // desplazarían -- y podrían hacer perder el estado de
+                  // -- el TabBarView de más abajo, con los 4 streams de
+                  // sus pestañas.
                   if (registro.estado == EstadoRegistro.pendienteConfirmacion)
                     Padding(
+                      key: const ValueKey('aviso-pendiente-confirmacion'),
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
                       child: AvisoRegistro(
                         mensaje:
@@ -673,6 +687,7 @@ class _CuerpoConProfesionalState extends State<_CuerpoConProfesional> {
                   // pago.
                   if (registro.estado == EstadoRegistro.pendientePago)
                     Padding(
+                      key: const ValueKey('aviso-pendiente-pago'),
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
                       child: AvisoRegistro(
                         mensaje:
@@ -682,10 +697,12 @@ class _CuerpoConProfesionalState extends State<_CuerpoConProfesional> {
                     ),
                   if (registro.presupuesto != null)
                     _TarjetaEconomica(
+                      key: const ValueKey('tarjeta-economica'),
                       presupuesto: registro.presupuesto!,
                       pagado: totalPagado,
                     ),
                   Container(
+                    key: const ValueKey('tab-bar'),
                     decoration: BoxDecoration(
                       border: Border(
                         bottom: BorderSide(color: context.colors.border),
@@ -733,15 +750,18 @@ class _CuerpoConProfesionalState extends State<_CuerpoConProfesional> {
                     ),
                   ),
                   Expanded(
+                    key: const ValueKey('tab-bar-view'),
                     child: TabBarView(
                       children: [
                         _ResumenTab(
+                          key: const ValueKey('tab-resumen'),
                           casa: casa,
                           elementoId: elementoId,
                           registro: registro,
                           elemento: elemento,
                         ),
                         SingleChildScrollView(
+                          key: const ValueKey('tab-cambios'),
                           padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
                           child: CambiosAlcanceSection(
                             casaId: casa.id,
@@ -755,6 +775,7 @@ class _CuerpoConProfesionalState extends State<_CuerpoConProfesional> {
                           ),
                         ),
                         SingleChildScrollView(
+                          key: const ValueKey('tab-pagos'),
                           padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
                           child: PagosSection(
                             casaId: casa.id,
@@ -766,6 +787,7 @@ class _CuerpoConProfesionalState extends State<_CuerpoConProfesional> {
                           ),
                         ),
                         _DocumentosTab(
+                          key: const ValueKey('tab-documentos'),
                           casa: casa,
                           elementoId: elementoId,
                           registro: registro,
@@ -774,6 +796,7 @@ class _CuerpoConProfesionalState extends State<_CuerpoConProfesional> {
                     ),
                   ),
                   SafeArea(
+                    key: const ValueKey('pie-acciones'),
                     top: false,
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
@@ -862,6 +885,7 @@ class _ResumenTab extends StatelessWidget {
     required this.elementoId,
     required this.registro,
     this.elemento,
+    super.key,
   });
 
   final Casa casa;
@@ -916,23 +940,55 @@ class _ResumenTab extends StatelessWidget {
         if (registro.descripcion != null) ...[
           Text(
             registro.descripcion!,
+            key: const ValueKey('resumen-descripcion'),
             style: Theme.of(context).textTheme.bodyLarge,
           ),
           const SizedBox(height: 20),
         ],
-        Text('Profesional', style: Theme.of(context).textTheme.headlineSmall),
+        Text(
+          'Profesional',
+          key: const ValueKey('resumen-titulo-profesional'),
+          style: Theme.of(context).textTheme.headlineSmall,
+        ),
         const SizedBox(height: 8),
+        // Cada sección de aquí abajo lleva su propia Key explícita --
+        // auditoría de estabilidad (noviembre 2026): sin ella, en cuanto
+        // cualquiera de los bloques condicionales de más arriba (este
+        // `descripcion`, `contactosPro`, `profesionalUid`...) cambia de
+        // presente a ausente (o al revés) mientras la pantalla está
+        // abierta, la lista cambia de longitud y Flutter -- al no tener
+        // forma de distinguir estos widgets sin clave más que por su
+        // posición -- reconcilia mal: cada StreamBuilder de estas
+        // secciones puede acabar reconstruido desde cero (perdiendo su
+        // suscripción en marcha) o, peor, "heredando" por error el
+        // estado de otra sección vecina. Con clave, Flutter siempre
+        // encuentra el Element correcto sin importar cuánto se desplace
+        // en la lista.
         if (contactosPro.isNotEmpty) ...[
-          _SeccionProfesionales(lista: contactosPro, mostrarTitulo: false),
+          _SeccionProfesionales(
+            key: const ValueKey('resumen-profesionales'),
+            lista: contactosPro,
+            mostrarTitulo: false,
+          ),
           const SizedBox(height: 12),
         ],
         _SeccionInvitarProfesional(
+          key: const ValueKey('resumen-invitar-profesional'),
           casa: casa,
           elementoId: elementoId,
           registro: registro,
         ),
+        if (registro.profesionalUid != null) ...[
+          const SizedBox(height: 20),
+          _SeccionProximaVisita(
+            key: const ValueKey('resumen-proxima-visita'),
+            profesionalUid: registro.profesionalUid!,
+            registroId: registro.id,
+          ),
+        ],
         const SizedBox(height: 20),
         PresupuestosSection(
+          key: const ValueKey('resumen-presupuestos'),
           casaId: casa.id,
           elementoId: elementoId,
           registroId: registro.id,
@@ -946,12 +1002,14 @@ class _ResumenTab extends StatelessWidget {
         ),
         const SizedBox(height: 20),
         _TarjetaMantenimiento(
+          key: const ValueKey('resumen-mantenimiento'),
           casa: casa,
           elementoId: elementoId,
           elemento: elemento,
         ),
         const SizedBox(height: 20),
         _SeccionHistorial(
+          key: const ValueKey('resumen-historial'),
           casa: casa,
           elementoId: elementoId,
           registro: registro,
@@ -971,6 +1029,7 @@ class _TarjetaMantenimiento extends StatelessWidget {
     required this.casa,
     required this.elementoId,
     required this.elemento,
+    super.key,
   });
 
   final Casa casa;
@@ -1057,12 +1116,25 @@ class _TarjetaMantenimiento extends StatelessWidget {
 /// reales de presupuestos/cambios/pagos (historial_service.dart). El cierre
 /// nunca lleva fecha porque no existe ningún timestamp real de cuándo
 /// ocurrió -- se muestra sin inventar una.
-class _SeccionHistorial extends StatelessWidget {
+enum _FiltroHistorial { todo, presupuestos, cambios, pagos, documentos, finalizacion, citas }
+
+String _nombreFiltroHistorial(_FiltroHistorial f) => switch (f) {
+  _FiltroHistorial.todo => 'Todo',
+  _FiltroHistorial.presupuestos => 'Presupuestos',
+  _FiltroHistorial.cambios => 'Cambios',
+  _FiltroHistorial.pagos => 'Pagos',
+  _FiltroHistorial.documentos => 'Documentos',
+  _FiltroHistorial.finalizacion => 'Finalización',
+  _FiltroHistorial.citas => 'Citas',
+};
+
+class _SeccionHistorial extends StatefulWidget {
   const _SeccionHistorial({
     required this.casa,
     required this.elementoId,
     required this.registro,
     this.mostrarTitulo = true,
+    super.key,
   });
 
   final Casa casa;
@@ -1075,11 +1147,18 @@ class _SeccionHistorial extends StatelessWidget {
   final bool mostrarTitulo;
 
   @override
+  State<_SeccionHistorial> createState() => _SeccionHistorialState();
+}
+
+class _SeccionHistorialState extends State<_SeccionHistorial> {
+  _FiltroHistorial _filtro = _FiltroHistorial.todo;
+
+  @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (mostrarTitulo) ...[
+        if (widget.mostrarTitulo) ...[
           Row(
             children: [
               Icon(Icons.show_chart, size: 16, color: context.colors.inkMuted),
@@ -1094,39 +1173,83 @@ class _SeccionHistorial extends StatelessWidget {
         ],
         StreamBuilder<List<HistorialEvento>>(
           stream: HistorialService.streamHistorial(
-            casa.id,
-            elementoId,
-            registro.id,
+            widget.casa.id,
+            widget.elementoId,
+            widget.registro.id,
           ),
           builder: (context, snapshot) {
             final eventos = snapshot.data ?? [];
-            final items = <TimelineItem>[
-              if (registro.estado == EstadoRegistro.terminado ||
-                  registro.estado == EstadoRegistro.archivado)
+            // Finalización/archivado se sintetizan a partir del estado
+            // actual SOLO para registros antiguos que se cerraron antes de
+            // que estas transiciones empezaran a dejar su propio evento en
+            // el historial (noviembre 2026) -- si ya existe un evento real
+            // de entidad "registro", se confía en él y no se duplica.
+            final yaTieneEventoDeRegistro = eventos.any(
+              (e) => e.entidad == EntidadHistorial.registro,
+            );
+            final todos = <TimelineItem>[
+              if (!yaTieneEventoDeRegistro &&
+                  (widget.registro.estado == EstadoRegistro.terminado ||
+                      widget.registro.estado == EstadoRegistro.archivado))
                 TimelineItem(
-                  titulo: registro.estado == EstadoRegistro.archivado
+                  titulo: widget.registro.estado == EstadoRegistro.archivado
                       ? 'Evento archivado'
                       : 'Trabajo finalizado',
                   subtitulo: 'Marcado como terminado',
                   icono: Icons.task_alt,
                   color: context.colors.success,
+                  categoria: 'finalizacion',
                 ),
-              if (registro.estado == EstadoRegistro.pendientePago)
+              if (!yaTieneEventoDeRegistro &&
+                  widget.registro.estado == EstadoRegistro.pendientePago)
                 TimelineItem(
                   titulo: 'Trabajo confirmado',
                   subtitulo: 'Pendiente de cobrar del todo',
                   icono: Icons.hourglass_top_outlined,
                   color: context.colors.warningText,
+                  categoria: 'finalizacion',
                 ),
               ...eventos.map((e) => _eventoATimelineItem(context, e)),
             ];
-            if (items.isEmpty) {
+            if (todos.isEmpty) {
               return const EmptyHint(
                 message: 'Sin actividad registrada todavía.',
                 icon: Icons.show_chart,
               );
             }
-            return HistorialTimeline(items: items);
+            final items = _filtro == _FiltroHistorial.todo
+                ? todos
+                : todos
+                    .where((i) => i.categoria == _filtro.name)
+                    .toList();
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (final f in _FiltroHistorial.values) ...[
+                        ChoiceChip(
+                          label: Text(_nombreFiltroHistorial(f)),
+                          selected: _filtro == f,
+                          onSelected: (_) => setState(() => _filtro = f),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (items.isEmpty)
+                  EmptyHint(
+                    message: 'Nada en "${_nombreFiltroHistorial(_filtro)}" todavía.',
+                    icon: Icons.filter_alt_off_outlined,
+                  )
+                else
+                  HistorialTimeline(items: items),
+              ],
+            );
           },
         ),
       ],
@@ -1152,12 +1275,15 @@ class _SeccionHistorial extends StatelessWidget {
         };
         return TimelineItem(
           titulo: titulo,
-          subtitulo: importeTexto,
+          subtitulo: e.motivo ?? importeTexto,
           fechaTexto: fecha,
+          fecha: e.timestamp,
+          autor: e.actorNombre,
           icono: Icons.request_quote_outlined,
           color: e.accion == 'rechazado'
               ? context.colors.errorText
               : context.colors.success,
+          categoria: 'presupuestos',
         );
       case EntidadHistorial.cambioAlcance:
         final titulo = switch (e.accion) {
@@ -1170,10 +1296,13 @@ class _SeccionHistorial extends StatelessWidget {
           titulo: titulo,
           subtitulo: e.motivo ?? importeTexto,
           fechaTexto: fecha,
+          fecha: e.timestamp,
+          autor: e.actorNombre,
           icono: Icons.rule_outlined,
           color: (e.accion == 'rechazado' || e.accion == 'cancelado')
               ? context.colors.errorText
               : context.colors.success,
+          categoria: 'cambios',
         );
       case EntidadHistorial.pago:
         final titulo = switch (e.accion) {
@@ -1185,15 +1314,84 @@ class _SeccionHistorial extends StatelessWidget {
           titulo: titulo,
           subtitulo: importeTexto,
           fechaTexto: fecha,
+          fecha: e.timestamp,
+          autor: e.actorNombre,
           icono: Icons.payments_outlined,
           color: e.accion == 'eliminado'
               ? context.colors.errorText
               : context.colors.success,
+          categoria: 'pagos',
+        );
+      case EntidadHistorial.registro:
+        final titulo = switch (e.accion) {
+          'confirmado' => 'Trabajo confirmado',
+          'pendienteConfirmacion' => 'Profesional marca como terminado',
+          'finalizacionRechazada' => 'Finalización rechazada',
+          'elementoArchivado' => 'Elemento archivado',
+          'elementoRestaurado' => 'Elemento restaurado',
+          _ => 'Trabajo actualizado',
+        };
+        return TimelineItem(
+          titulo: titulo,
+          fechaTexto: fecha,
+          fecha: e.timestamp,
+          autor: e.actorNombre,
+          icono: e.accion == 'finalizacionRechazada'
+              ? Icons.undo_outlined
+              : Icons.task_alt,
+          color: e.accion == 'finalizacionRechazada'
+              ? context.colors.errorText
+              : context.colors.success,
+          categoria: 'finalizacion',
+        );
+      case EntidadHistorial.invitacion:
+        final titulo = e.accion == 'aceptada'
+            ? 'Invitación aceptada'
+            : 'Invitación rechazada';
+        return TimelineItem(
+          titulo: titulo,
+          fechaTexto: fecha,
+          fecha: e.timestamp,
+          autor: e.actorNombre,
+          icono: Icons.person_add_alt_outlined,
+          color: e.accion == 'aceptada'
+              ? context.colors.success
+              : context.colors.errorText,
+          categoria: 'cambios',
+        );
+      case EntidadHistorial.documento:
+        return TimelineItem(
+          titulo: 'Documento añadido',
+          fechaTexto: fecha,
+          fecha: e.timestamp,
+          autor: e.actorNombre,
+          icono: Icons.description_outlined,
+          color: context.colors.brand,
+          categoria: 'documentos',
+        );
+      case EntidadHistorial.cita:
+        final titulo = switch (e.accion) {
+          'modificada' => 'Cita modificada',
+          'cancelada' => 'Cita cancelada',
+          _ => 'Cita programada',
+        };
+        return TimelineItem(
+          titulo: titulo,
+          fechaTexto: fecha,
+          fecha: e.timestamp,
+          autor: e.actorNombre,
+          icono: Icons.event_outlined,
+          color: e.accion == 'cancelada'
+              ? context.colors.errorText
+              : context.colors.success,
+          categoria: 'citas',
         );
       case EntidadHistorial.desconocida:
         return TimelineItem(
           titulo: e.accion,
           fechaTexto: fecha,
+          fecha: e.timestamp,
+          autor: e.actorNombre,
           icono: Icons.circle_outlined,
           color: context.colors.inkMuted,
         );
@@ -1206,6 +1404,7 @@ class _DocumentosTab extends StatelessWidget {
     required this.casa,
     required this.elementoId,
     required this.registro,
+    super.key,
   });
 
   final Casa casa;
@@ -1356,12 +1555,14 @@ class _CuerpoSimple extends StatelessWidget {
                     ),
                   ),
                 Padding(
+                  key: const ValueKey('simple-cuerpo'),
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       if (registro.descripcion != null) ...[
                         Text(
+                          key: const ValueKey('simple-descripcion'),
                           registro.descripcion!,
                           style: Theme.of(context).textTheme.bodyLarge,
                         ),
@@ -1372,8 +1573,16 @@ class _CuerpoSimple extends StatelessWidget {
                       // profesional (_TarjetaEconomica/presupuesto) --
                       // "Coste" en vez de "Presupuesto" es la única
                       // diferencia real.
+                      // Keys explícitas de aquí en adelante -- mismo
+                      // motivo que en _ResumenTab/_CuerpoConProfesional:
+                      // `coste`/`listaProfesionales` pueden pasar de
+                      // ausentes a presentes mientras la pantalla está
+                      // abierta, y sin clave eso desplazaría y podría
+                      // romper el StreamBuilder de Documentos y
+                      // PagosSection de más abajo.
                       if (coste != null && coste > 0) ...[
                         _TarjetaEconomica(
+                          key: const ValueKey('simple-tarjeta-economica'),
                           presupuesto: coste,
                           pagado: totalPagado,
                           etiquetaTotal: 'Coste',
@@ -1382,6 +1591,7 @@ class _CuerpoSimple extends StatelessWidget {
                       ],
                       if (registro.listaProfesionales.isNotEmpty) ...[
                         _SeccionProfesionales(
+                          key: const ValueKey('simple-profesionales'),
                           lista: registro.listaProfesionales,
                         ),
                         const SizedBox(height: 20),
@@ -1395,6 +1605,7 @@ class _CuerpoSimple extends StatelessWidget {
                       // real (eso sigue siendo exclusivo del registro CON
                       // profesional, ver presupuestos_section.dart).
                       StreamBuilder<List<Documento>>(
+                        key: const ValueKey('simple-documentos'),
                         stream: DocumentoService.streamDocumentos(
                           casa.id,
                           registroId: registro.id,
@@ -1456,6 +1667,7 @@ class _CuerpoSimple extends StatelessWidget {
                       // registrarPago ya nunca ha exigido esConProfesional,
                       // solo lo usaba quien construía la pantalla.
                       PagosSection(
+                        key: const ValueKey('simple-pagos'),
                         casaId: casa.id,
                         elementoId: elementoId,
                         registroId: registro.id,
@@ -1623,8 +1835,80 @@ class _SeccionCategoriaDocumentos extends StatelessWidget {
 /// separado. Solo aparece la flecha de despliegue si tiene teléfono, porque
 /// sin número no hay nada que llamar/escribir. No son Contactos de la
 /// libreta (nunca se editan desde aquí), así que no hay Editar/Eliminar.
+/// "Tienes una visita programada" (sección 2.2 del encargo de avisos
+/// inteligentes, noviembre 2026) -- la única cita que el propietario puede
+/// ver es la que el propio profesional marcó compartida=true (ver
+/// firestore.rules); esta sección desaparece sola si no hay ninguna futura,
+/// nunca muestra una pasada ni una cancelada.
+class _SeccionProximaVisita extends StatelessWidget {
+  const _SeccionProximaVisita({
+    required this.profesionalUid,
+    required this.registroId,
+    super.key,
+  });
+
+  final String profesionalUid;
+  final String registroId;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<Cita>>(
+      stream: CitaService.streamCitasCompartidas(
+        profesionalUid: profesionalUid,
+        registroId: registroId,
+      ),
+      builder: (context, snapshot) {
+        final ahora = DateTime.now();
+        final proxima = (snapshot.data ?? [])
+            .where((c) => c.fecha.isAfter(ahora))
+            .toList();
+        if (proxima.isEmpty) return const SizedBox.shrink();
+        final cita = proxima.first;
+        final fechaTexto = cita.todoElDia
+            ? DateFormat('d MMM yyyy', 'es_ES').format(cita.fecha)
+            : DateFormat('d MMM yyyy · HH:mm', 'es_ES').format(cita.fecha);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Próxima visita', style: Theme.of(context).textTheme.headlineSmall),
+            const SizedBox(height: 8),
+            Card(
+              margin: EdgeInsets.zero,
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  children: [
+                    Icon(Icons.event_outlined, color: context.colors.brand),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            cita.titulo,
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          Text(fechaTexto, style: Theme.of(context).textTheme.bodySmall),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
 class _SeccionProfesionales extends StatefulWidget {
-  const _SeccionProfesionales({required this.lista, this.mostrarTitulo = true});
+  const _SeccionProfesionales({
+    required this.lista,
+    this.mostrarTitulo = true,
+    super.key,
+  });
 
   final List<ProfesionalRegistro> lista;
   final bool mostrarTitulo;
@@ -1746,6 +2030,7 @@ class _SeccionInvitarProfesional extends StatefulWidget {
     required this.casa,
     required this.elementoId,
     required this.registro,
+    super.key,
   });
 
   final Casa casa;

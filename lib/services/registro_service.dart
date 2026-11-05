@@ -15,6 +15,7 @@ import '../models/registro.dart';
 import 'elemento_service.dart';
 import 'pago_service.dart';
 import 'stream_error_logging.dart';
+import 'stream_sharing.dart';
 
 class RegistroService {
   /// Seam de solo test -- nunca se asigna en código de producción. Ver
@@ -56,7 +57,8 @@ class RegistroService {
         .doc(registroId)
         .snapshots()
         .map((d) => d.exists ? Registro.fromDoc(d) : null)
-        .conRegistroDeErrores();
+        .conRegistroDeErrores()
+        .compartido('registro:$casaId:$elementoId:$registroId');
   }
 
   /// "Trabajo activo o pendiente" en el sentido de sección 25 del spec

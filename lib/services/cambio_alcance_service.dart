@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/cambio_alcance.dart';
 import 'stream_error_logging.dart';
+import 'stream_sharing.dart';
 
 class CambioAlcanceService {
   /// Seam de solo test -- nunca se asigna en código de producción. Ver
@@ -45,7 +46,8 @@ class CambioAlcanceService {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((s) => s.docs.map(CambioAlcance.fromDoc).toList())
-        .conRegistroDeErrores();
+        .conRegistroDeErrores()
+        .compartido('cambios:$casaId:$elementoId:$registroId');
   }
 
   /// [clientRequestId]: generado UNA SOLA VEZ por intento lógico de envío

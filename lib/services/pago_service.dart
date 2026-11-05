@@ -19,6 +19,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/pago.dart';
 import 'stream_error_logging.dart';
+import 'stream_sharing.dart';
 
 class PagoService {
   /// Seam de solo test -- nunca se asigna en código de producción. Ver
@@ -54,7 +55,8 @@ class PagoService {
         .orderBy('fecha', descending: true)
         .snapshots()
         .map((s) => s.docs.map(Pago.fromDoc).toList())
-        .conRegistroDeErrores();
+        .conRegistroDeErrores()
+        .compartido('pagos:$casaId:$elementoId:$registroId');
   }
 
   /// [clientRequestId]: generado UNA SOLA VEZ por intento lógico de guardado

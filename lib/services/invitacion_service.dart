@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/invitacion.dart';
 import 'stream_error_logging.dart';
+import 'stream_sharing.dart';
 
 /// Resultado de invitarProfesional: 'directa' si ya existía una cuenta
 /// profesional con ese email (invitación normal); 'abierta' si no existía
@@ -110,7 +111,8 @@ class InvitacionService {
         .limit(1)
         .snapshots()
         .map((s) => s.docs.isEmpty ? null : Invitacion.fromDoc(s.docs.first))
-        .conRegistroDeErrores();
+        .conRegistroDeErrores()
+        .compartido('invitacionUltima:$registroId');
   }
 
   /// Invitaciones pendientes de respuesta para el profesional actual.

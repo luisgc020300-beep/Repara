@@ -187,8 +187,19 @@ class RegistroProDetailScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 16),
+              // Keys explícitas desde aquí -- mismo motivo que en
+              // registro_detail_screen.dart (auditoría de estabilidad,
+              // noviembre 2026): estos bloques son condicionales y pueden
+              // cambiar de presentes a ausentes mientras el profesional
+              // tiene la pantalla abierta (el registro.estado o
+              // descripcion llegan por el StreamBuilder<Registro?> de
+              // arriba); sin clave, eso desplaza PresupuestosSection/
+              // CambiosAlcanceSection/PagosSection/ProgresoPago de más
+              // abajo y Flutter puede reconciliarlos mal, perdiendo sus
+              // datos igual que en el lado de Hogar.
               if (registro.estado == EstadoRegistro.pendienteConfirmacion) ...[
                 const AvisoRegistro(
+                  key: ValueKey('pro-aviso-pendiente-confirmacion'),
                   mensaje:
                       'Esperando a que el propietario confirme que está terminado.',
                 ),
@@ -196,6 +207,7 @@ class RegistroProDetailScreen extends StatelessWidget {
               ],
               if (registro.estado == EstadoRegistro.pendientePago) ...[
                 const AvisoRegistro(
+                  key: ValueKey('pro-aviso-pendiente-pago'),
                   mensaje:
                       'Trabajo confirmado -- falta que se registre el pago para cerrarlo del todo.',
                 ),
@@ -204,6 +216,7 @@ class RegistroProDetailScreen extends StatelessWidget {
               if (registro.descripcion != null) ...[
                 Text(
                   registro.descripcion!,
+                  key: const ValueKey('pro-descripcion'),
                   style: Theme.of(context).textTheme.bodyLarge,
                 ),
                 const SizedBox(height: 16),
@@ -260,6 +273,7 @@ class RegistroProDetailScreen extends StatelessWidget {
               if (registro.presupuesto != null) ...[
                 const SizedBox(height: 16),
                 Card(
+                  key: const ValueKey('pro-presupuesto-acordado'),
                   margin: EdgeInsets.zero,
                   clipBehavior: Clip.antiAlias,
                   child: Padding(
@@ -291,6 +305,7 @@ class RegistroProDetailScreen extends StatelessWidget {
               ],
               const SizedBox(height: 20),
               PresupuestosSection(
+                key: const ValueKey('pro-presupuestos'),
                 casaId: casaId,
                 elementoId: elementoId,
                 registroId: registroId,
@@ -308,6 +323,7 @@ class RegistroProDetailScreen extends StatelessWidget {
               ),
               const SizedBox(height: 20),
               CambiosAlcanceSection(
+                key: const ValueKey('pro-cambios'),
                 casaId: casaId,
                 elementoId: elementoId,
                 registroId: registroId,
@@ -319,6 +335,7 @@ class RegistroProDetailScreen extends StatelessWidget {
               ),
               const SizedBox(height: 20),
               PagosSection(
+                key: const ValueKey('pro-pagos'),
                 casaId: casaId,
                 elementoId: elementoId,
                 registroId: registroId,
@@ -347,6 +364,7 @@ class RegistroProDetailScreen extends StatelessWidget {
                 ],
               ),
               StreamBuilder<List<Documento>>(
+                key: const ValueKey('pro-documentos'),
                 stream: DocumentoService.streamDocumentos(
                   casaId,
                   registroId: registroId,
