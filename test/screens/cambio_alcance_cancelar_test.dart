@@ -18,8 +18,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repara/screens/cambio_alcance_section.dart';
 import 'package:repara/screens/presupuestos_section.dart' show RolEnTrabajo;
-import 'package:repara/services/cambio_alcance_service.dart';
 import 'package:repara/theme/design_tokens.dart';
+import 'package:repara_core/cambio_alcance_service.dart';
 
 const _casaId = 'c1';
 const _elementoId = 'e1';

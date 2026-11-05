@@ -1,10 +1,10 @@
 // lib/widgets/boton_notificaciones.dart
 import 'package:flutter/material.dart';
 import 'package:repara_core/notificacion.dart';
+import 'package:repara_core/notificacion_service.dart';
 
 import '../models/casa.dart';
 import '../screens/notificaciones_screen.dart';
-import '../services/notificacion_service.dart';
 
 class BotonNotificaciones extends StatelessWidget {
   const BotonNotificaciones({required this.modoPro, this.casa, super.key});

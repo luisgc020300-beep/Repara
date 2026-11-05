@@ -8,8 +8,8 @@
 // functions/index.js). Los avisos de seguridad/permisos (invitación
 // aceptada/rechazada) no aparecen aquí: nunca se pueden silenciar.
 import 'package:flutter/material.dart';
+import 'package:repara_core/notificacion_service.dart';
 
-import '../services/notificacion_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/ios_list.dart';
 

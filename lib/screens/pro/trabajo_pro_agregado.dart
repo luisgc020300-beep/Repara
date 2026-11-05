@@ -25,15 +25,15 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:repara_core/cambio_alcance.dart';
+import 'package:repara_core/cambio_alcance_service.dart';
 import 'package:repara_core/pago.dart';
 import 'package:repara_core/presupuesto.dart';
+import 'package:repara_core/presupuesto_service.dart';
 import 'package:repara_core/profesional.dart';
+import 'package:repara_core/profesional_service.dart';
 import 'package:repara_core/registro.dart';
 
-import '../../services/cambio_alcance_service.dart';
 import '../../services/pago_service.dart';
-import '../../services/presupuesto_service.dart';
-import '../../services/profesional_service.dart';
 import '../../services/registro_service.dart';
 
 /// Agrupación visual del tablero de Trabajos sobre EstadoRegistro +

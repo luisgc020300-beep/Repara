@@ -12,13 +12,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:repara_core/historial_evento.dart';
+import 'package:repara_core/historial_service.dart';
 import 'package:repara_core/invitacion.dart';
+import 'package:repara_core/invitacion_service.dart';
 import 'package:repara_core/profesional.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../services/analytics_service.dart';
-import '../../services/historial_service.dart';
-import '../../services/invitacion_service.dart';
 import '../../theme/design_tokens.dart';
 import '../../widgets/app_error.dart';
 import '../../widgets/boton_ajustes.dart';

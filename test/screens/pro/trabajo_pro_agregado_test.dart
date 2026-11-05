@@ -11,11 +11,11 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repara/screens/pro/trabajo_pro_agregado.dart';
-import 'package:repara/services/cambio_alcance_service.dart';
 import 'package:repara/services/pago_service.dart';
-import 'package:repara/services/presupuesto_service.dart';
-import 'package:repara/services/profesional_service.dart';
 import 'package:repara/services/registro_service.dart';
+import 'package:repara_core/cambio_alcance_service.dart';
+import 'package:repara_core/presupuesto_service.dart';
+import 'package:repara_core/profesional_service.dart';
 
 const _uid = 'pro-1';
 

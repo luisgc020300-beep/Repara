@@ -15,16 +15,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:repara/models/casa.dart';
 import 'package:repara/screens/registro_detail_screen.dart';
-import 'package:repara/services/cambio_alcance_service.dart';
-import 'package:repara/services/documento_service.dart';
 import 'package:repara/services/elemento_service.dart';
-import 'package:repara/services/historial_service.dart';
-import 'package:repara/services/invitacion_service.dart';
 import 'package:repara/services/pago_service.dart';
-import 'package:repara/services/presupuesto_service.dart';
 import 'package:repara/services/registro_service.dart';
 import 'package:repara/theme/design_tokens.dart';
 import 'package:repara/widgets/galeria_fotos_screen.dart';
+import 'package:repara_core/cambio_alcance_service.dart';
+import 'package:repara_core/documento_service.dart';
+import 'package:repara_core/historial_service.dart';
+import 'package:repara_core/invitacion_service.dart';
+import 'package:repara_core/presupuesto_service.dart';
 
 const _casa = Casa(
   id: 'c1',

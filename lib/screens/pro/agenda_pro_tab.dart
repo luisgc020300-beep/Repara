@@ -27,10 +27,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:repara_core/cita.dart';
+import 'package:repara_core/cita_service.dart';
 import 'package:repara_core/profesional.dart';
+import 'package:repara_core/profesional_service.dart';
 
-import '../../services/cita_service.dart';
-import '../../services/profesional_service.dart';
 import '../../theme/design_tokens.dart';
 import '../../widgets/app_dialog.dart';
 import '../../widgets/app_error.dart';

@@ -21,6 +21,11 @@ dependencies:
   # Modelos de dominio (Grupo 2 de la Fase 1) -- misma versión que la app
   # principal.
   cloud_firestore: ^6.1.2
+  # Servicios compartidos (Grupo 3 de la Fase 1) -- mismas versiones que la
+  # app principal.
+  cloud_functions: 6.0.7
+  firebase_auth: ^6.1.4
+  firebase_storage: ^13.0.5
 
 dev_dependencies:
   flutter_test:

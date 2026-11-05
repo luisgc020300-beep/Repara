@@ -14,12 +14,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:repara/screens/pro/registro_pro_detail_screen.dart';
-import 'package:repara/services/cambio_alcance_service.dart';
-import 'package:repara/services/documento_service.dart';
 import 'package:repara/services/pago_service.dart';
-import 'package:repara/services/presupuesto_service.dart';
 import 'package:repara/services/registro_service.dart';
 import 'package:repara/theme/design_tokens.dart';
+import 'package:repara_core/cambio_alcance_service.dart';
+import 'package:repara_core/documento_service.dart';
+import 'package:repara_core/presupuesto_service.dart';
 import 'package:repara_core/stream_sharing.dart';
 
 const _casaId = 'casa-1';

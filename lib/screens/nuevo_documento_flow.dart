@@ -13,11 +13,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:repara_core/documento.dart';
+import 'package:repara_core/documento_service.dart';
 import 'package:repara_core/registro.dart';
 
 import '../models/elemento.dart';
 import '../services/analytics_service.dart';
-import '../services/documento_service.dart';
 import '../services/elemento_service.dart';
 import '../services/registro_service.dart';
 import '../theme/design_tokens.dart';

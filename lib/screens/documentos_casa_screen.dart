@@ -6,9 +6,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:repara_core/documento.dart';
+import 'package:repara_core/documento_service.dart';
 
 import '../models/casa.dart';
-import '../services/documento_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/documento_abrir.dart';
 import '../widgets/ios_list.dart';

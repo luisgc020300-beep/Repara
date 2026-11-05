@@ -17,11 +17,11 @@
 // pulsado en el listado de la casa; editar no existía en ningún sitio.
 import 'package:flutter/material.dart';
 import 'package:repara_core/documento.dart';
+import 'package:repara_core/documento_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/service_locator.dart';
 import '../screens/editar_documento_sheet.dart';
-import '../services/documento_service.dart';
 import '../services/security/biometric_service.dart';
 import '../services/security/security_preferences_service.dart';
 import '../theme/design_tokens.dart';

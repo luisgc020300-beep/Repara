@@ -11,8 +11,8 @@
 // reubicación, no una corrección de datos.
 import 'package:flutter/material.dart';
 import 'package:repara_core/documento.dart';
+import 'package:repara_core/documento_service.dart';
 
-import '../services/documento_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
 import '../widgets/miniatura_documento.dart';

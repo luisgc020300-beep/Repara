@@ -7,7 +7,7 @@
 // ninguna clave guardada.
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:repara/services/notificacion_service.dart';
+import 'package:repara_core/notificacion_service.dart';
 
 const _uid = 'owner-1';
 

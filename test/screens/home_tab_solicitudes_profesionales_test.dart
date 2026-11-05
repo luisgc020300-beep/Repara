@@ -14,13 +14,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:repara/models/casa.dart';
 import 'package:repara/screens/home_tab.dart';
-import 'package:repara/services/documento_service.dart';
 import 'package:repara/services/elemento_service.dart';
 import 'package:repara/services/habitacion_service.dart';
 import 'package:repara/services/invitacion_hogar_service.dart';
-import 'package:repara/services/notificacion_service.dart';
 import 'package:repara/services/registro_service.dart';
 import 'package:repara/theme/design_tokens.dart';
+import 'package:repara_core/documento_service.dart';
+import 'package:repara_core/notificacion_service.dart';
 
 const _casa = Casa(
   id: 'c1',
