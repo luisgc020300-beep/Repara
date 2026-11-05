@@ -12,10 +12,10 @@ import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:repara_core/documento.dart';
+import 'package:repara_core/registro.dart';
 
-import '../models/documento.dart';
 import '../models/elemento.dart';
-import '../models/registro.dart';
 import '../services/analytics_service.dart';
 import '../services/documento_service.dart';
 import '../services/elemento_service.dart';

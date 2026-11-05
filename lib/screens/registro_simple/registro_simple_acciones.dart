@@ -8,10 +8,10 @@
 // Descargar PDF se muestran como botones llenos (FilledButton), no como
 // filas de lista, a petición explícita del CEO.
 import 'package:flutter/material.dart';
+import 'package:repara_core/pago.dart';
+import 'package:repara_core/registro.dart';
 
 import '../../models/casa.dart';
-import '../../models/pago.dart';
-import '../../models/registro.dart';
 import '../../widgets/app_error.dart';
 import 'registro_resumen_pdf.dart';
 

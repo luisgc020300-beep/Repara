@@ -6,8 +6,8 @@
 // pantalla llevaba su propia copia de _nombreEstado/_EstadoChip (octubre
 // 2026: se consolidan aquí para no divergir con el tiempo).
 import 'package:flutter/material.dart';
+import 'package:repara_core/registro.dart';
 
-import '../models/registro.dart';
 import '../theme/design_tokens.dart';
 
 String nombreEstadoRegistro(EstadoRegistro e) => switch (e) {

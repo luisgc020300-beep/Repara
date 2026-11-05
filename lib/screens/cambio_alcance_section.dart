@@ -24,9 +24,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:repara_core/cambio_alcance.dart';
 
 import '../core/idempotency.dart';
-import '../models/cambio_alcance.dart';
 import '../screens/presupuestos_section.dart' show RolEnTrabajo;
 import '../services/analytics_service.dart';
 import '../services/cambio_alcance_service.dart';

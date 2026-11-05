@@ -22,9 +22,8 @@
 // formal con líneas/IVA protegido por Cloud Function sigue siendo, siempre,
 // el que ya existe para trabajos compartidos (ver PresupuestosSection).
 import 'package:cloud_firestore/cloud_firestore.dart';
-
-import 'profesional.dart';
-import 'registro.dart';
+import 'package:repara_core/profesional.dart';
+import 'package:repara_core/registro.dart';
 
 enum EstadoTrabajoProfesional { abierto, enCurso, terminado }
 

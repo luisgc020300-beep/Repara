@@ -10,9 +10,9 @@
 // nuevo_registro_screen.dart y editar_registro_sheet.dart). Los contactos se
 // cargan al pulsarlo, una sola vez, no con un stream abierto todo el rato.
 import 'package:flutter/material.dart';
+import 'package:repara_core/registro.dart';
 
 import '../models/contacto.dart';
-import '../models/registro.dart';
 import '../services/contacto_service.dart';
 import '../theme/design_tokens.dart';
 

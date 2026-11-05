@@ -3,10 +3,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:repara_core/invitacion.dart';
 import 'package:repara_core/stream_error_logging.dart';
 import 'package:repara_core/stream_sharing.dart';
-
-import '../models/invitacion.dart';
 
 /// Resultado de invitarProfesional: 'directa' si ya existía una cuenta
 /// profesional con ese email (invitación normal); 'abierta' si no existía

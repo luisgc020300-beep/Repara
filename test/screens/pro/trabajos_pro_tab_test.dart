@@ -8,7 +8,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:repara/models/registro.dart';
 import 'package:repara/models/trabajo_profesional.dart';
 import 'package:repara/screens/pro/trabajos_pro_tab.dart';
 import 'package:repara/services/cambio_alcance_service.dart';
@@ -18,6 +17,7 @@ import 'package:repara/services/profesional_service.dart';
 import 'package:repara/services/registro_service.dart';
 import 'package:repara/services/trabajo_profesional_service.dart';
 import 'package:repara/theme/design_tokens.dart';
+import 'package:repara_core/registro.dart';
 
 const _uid = 'pro-1';
 

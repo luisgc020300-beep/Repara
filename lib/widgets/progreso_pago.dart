@@ -9,8 +9,8 @@
 // presupuesto formal aceptado en la app o de lo que el propietario
 // escribió a mano al crear el registro.
 import 'package:flutter/material.dart';
+import 'package:repara_core/pago.dart';
 
-import '../models/pago.dart';
 import '../services/pago_service.dart';
 import '../theme/design_tokens.dart';
 

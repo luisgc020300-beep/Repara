@@ -11,11 +11,8 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:repara/models/cambio_alcance.dart';
 import 'package:repara/models/casa.dart';
 import 'package:repara/models/elemento.dart';
-import 'package:repara/models/pago.dart';
-import 'package:repara/models/registro.dart';
 import 'package:repara/screens/elemento_detail_screen.dart';
 import 'package:repara/screens/elemento_resumen_pdf.dart';
 import 'package:repara/services/cambio_alcance_service.dart';
@@ -26,6 +23,9 @@ import 'package:repara/services/pago_service.dart';
 import 'package:repara/services/registro_service.dart';
 import 'package:repara/theme/design_tokens.dart';
 import 'package:repara/widgets/pdf_trabajo.dart';
+import 'package:repara_core/cambio_alcance.dart';
+import 'package:repara_core/pago.dart';
+import 'package:repara_core/registro.dart';
 
 const _casa = Casa(
   id: 'c1',

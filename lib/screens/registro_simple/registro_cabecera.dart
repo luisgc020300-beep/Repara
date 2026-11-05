@@ -18,10 +18,10 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:repara_core/registro.dart';
 
 import '../../models/casa.dart';
 import '../../models/elemento.dart';
-import '../../models/registro.dart';
 import '../../services/registro_service.dart';
 import '../../theme/design_tokens.dart';
 import '../../widgets/app_error.dart';

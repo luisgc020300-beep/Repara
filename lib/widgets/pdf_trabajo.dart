@@ -11,10 +11,10 @@ import 'dart:typed_data';
 
 import 'package:intl/intl.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:repara_core/cambio_alcance.dart';
+import 'package:repara_core/pago.dart';
+import 'package:repara_core/registro.dart';
 
-import '../models/cambio_alcance.dart';
-import '../models/pago.dart';
-import '../models/registro.dart';
 import 'estado_registro_chip.dart' show nombreEstadoRegistro;
 import 'pdf_estilo.dart';
 

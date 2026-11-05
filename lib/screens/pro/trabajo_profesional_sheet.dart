@@ -6,10 +6,10 @@
 // selector que permite elegir uno existente o crear uno nuevo sin salir
 // del formulario.
 import 'package:flutter/material.dart';
+import 'package:repara_core/registro.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../models/cliente_profesional.dart';
-import '../../models/registro.dart';
 import '../../models/trabajo_profesional.dart';
 import '../../services/cliente_profesional_service.dart';
 import '../../services/trabajo_profesional_service.dart';

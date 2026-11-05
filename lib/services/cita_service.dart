@@ -12,10 +12,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:repara_core/cita.dart';
 import 'package:repara_core/stream_error_logging.dart';
 import 'package:repara_core/stream_sharing.dart';
-
-import '../models/cita.dart';
 
 class CitaService {
   /// Seams de solo test -- nunca se asignan en código de producción. Ver

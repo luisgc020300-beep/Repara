@@ -6,8 +6,8 @@
 // profesional, ver presupuestos_section.dart).
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:repara/models/presupuesto.dart';
 import 'package:repara/widgets/presupuesto_pdf.dart';
+import 'package:repara_core/presupuesto.dart';
 
 void main() {
   // testWidgets, no test: cargarTemaPdfUnicode() carga la fuente como asset

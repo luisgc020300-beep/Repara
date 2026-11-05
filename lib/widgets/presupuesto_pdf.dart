@@ -13,8 +13,8 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:repara_core/presupuesto.dart';
 
-import '../models/presupuesto.dart';
 import 'pdf_estilo.dart';
 import 'pdf_fuente_unicode.dart';
 

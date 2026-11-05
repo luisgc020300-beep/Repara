@@ -5,10 +5,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
+import 'package:repara_core/cambio_alcance.dart';
 import 'package:repara_core/stream_error_logging.dart';
 import 'package:repara_core/stream_sharing.dart';
-
-import '../models/cambio_alcance.dart';
 
 class CambioAlcanceService {
   /// Seam de solo test -- nunca se asigna en código de producción. Ver

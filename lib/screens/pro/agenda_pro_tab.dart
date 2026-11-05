@@ -26,9 +26,9 @@
 // funcionan de verdad. Queda documentado como trabajo futuro, no simulado.
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:repara_core/cita.dart';
+import 'package:repara_core/profesional.dart';
 
-import '../../models/cita.dart';
-import '../../models/profesional.dart';
 import '../../services/cita_service.dart';
 import '../../services/profesional_service.dart';
 import '../../theme/design_tokens.dart';

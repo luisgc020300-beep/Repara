@@ -10,9 +10,9 @@ import 'dart:async';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:repara_core/pago.dart';
 
 import '../core/idempotency.dart';
-import '../models/pago.dart';
 import '../services/analytics_service.dart';
 import '../services/pago_service.dart';
 import '../theme/design_tokens.dart';

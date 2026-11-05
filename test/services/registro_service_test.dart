@@ -8,10 +8,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:repara/models/registro.dart';
 import 'package:repara/services/elemento_service.dart';
 import 'package:repara/services/registro_service.dart';
+import 'package:repara_core/registro.dart';
 
 void main() {
   const casaId = 'casa-1';

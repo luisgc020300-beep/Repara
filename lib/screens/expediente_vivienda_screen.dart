@@ -13,13 +13,13 @@ import 'dart:async';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:repara_core/cambio_alcance.dart';
+import 'package:repara_core/documento.dart';
+import 'package:repara_core/registro.dart';
 import 'package:share_plus/share_plus.dart';
 
-import '../models/cambio_alcance.dart';
 import '../models/casa.dart';
-import '../models/documento.dart';
 import '../models/elemento.dart';
-import '../models/registro.dart';
 import '../services/analytics_service.dart';
 import '../services/cambio_alcance_service.dart';
 import '../services/documento_service.dart';

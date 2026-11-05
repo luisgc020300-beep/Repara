@@ -23,12 +23,12 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:repara_core/documento.dart';
+import 'package:repara_core/registro.dart';
 
 import '../models/casa.dart';
-import '../models/documento.dart';
 import '../models/elemento.dart';
 import '../models/habitacion.dart';
-import '../models/registro.dart';
 import '../widgets/pdf_estilo.dart';
 import '../widgets/pdf_fuente_unicode.dart';
 import '../widgets/pdf_imagenes.dart';

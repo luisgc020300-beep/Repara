@@ -32,8 +32,8 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:repara_core/registro.dart';
 
-import '../models/registro.dart';
 import '../services/analytics_service.dart';
 import '../services/registro_service.dart';
 import '../theme/design_tokens.dart';

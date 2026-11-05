@@ -8,7 +8,7 @@
 // cubre en functions-tests/payments.test.js, fuera del alcance de un test
 // Dart.
 import 'package:flutter_test/flutter_test.dart';
-import 'package:repara/models/registro.dart';
+import 'package:repara_core/registro.dart';
 
 void main() {
   group('estadoInicialRegistroSimple()', () {

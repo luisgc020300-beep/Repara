@@ -24,12 +24,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:repara_core/cambio_alcance.dart';
+import 'package:repara_core/pago.dart';
+import 'package:repara_core/presupuesto.dart';
+import 'package:repara_core/profesional.dart';
+import 'package:repara_core/registro.dart';
 
-import '../../models/cambio_alcance.dart';
-import '../../models/pago.dart';
-import '../../models/presupuesto.dart';
-import '../../models/profesional.dart';
-import '../../models/registro.dart';
 import '../../services/cambio_alcance_service.dart';
 import '../../services/pago_service.dart';
 import '../../services/presupuesto_service.dart';

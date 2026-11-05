@@ -24,15 +24,15 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:repara/models/cambio_alcance.dart';
 import 'package:repara/models/casa.dart';
-import 'package:repara/models/documento.dart';
 import 'package:repara/models/elemento.dart';
 import 'package:repara/models/habitacion.dart';
-import 'package:repara/models/pago.dart';
-import 'package:repara/models/registro.dart';
 import 'package:repara/screens/expediente_vivienda_pdf.dart';
 import 'package:repara/widgets/pdf_trabajo.dart';
+import 'package:repara_core/cambio_alcance.dart';
+import 'package:repara_core/documento.dart';
+import 'package:repara_core/pago.dart';
+import 'package:repara_core/registro.dart';
 
 const _casa = Casa(
   id: 'c1',

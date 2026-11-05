@@ -5,10 +5,9 @@
 // aquí ningún método de escritura a propósito.
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:repara_core/historial_evento.dart';
 import 'package:repara_core/stream_error_logging.dart';
 import 'package:repara_core/stream_sharing.dart';
-
-import '../models/historial_evento.dart';
 
 class HistorialService {
   /// Seam de solo test -- nunca se asigna en código de producción. Ver

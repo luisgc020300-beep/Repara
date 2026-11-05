@@ -8,9 +8,9 @@
 // no necesitar leer el elemento).
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:repara_core/documento.dart';
+import 'package:repara_core/registro.dart';
 
-import '../../models/documento.dart';
-import '../../models/registro.dart';
 import '../../services/documento_service.dart';
 import '../../services/pago_service.dart';
 import '../../services/registro_service.dart';

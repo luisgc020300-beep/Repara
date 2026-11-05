@@ -4,8 +4,8 @@
 // tanto para la lista interna (notificaciones_screen.dart) como para tocar
 // una notificación push de FCM (fcm_service.dart), para no duplicarla.
 import 'package:flutter/material.dart';
+import 'package:repara_core/notificacion.dart';
 
-import '../models/notificacion.dart';
 import '../screens/pago_detail_screen.dart';
 import '../screens/pro/registro_pro_detail_screen.dart';
 import '../screens/registro_detail_screen.dart';

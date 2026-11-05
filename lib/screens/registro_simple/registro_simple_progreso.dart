@@ -14,8 +14,8 @@
 // real ya es terminado/archivado (es decir, cuando el pago real lo cubre
 // del todo, ver estadoTrasCambioDePago).
 import 'package:flutter/material.dart';
+import 'package:repara_core/registro.dart';
 
-import '../../models/registro.dart';
 import '../../theme/design_tokens.dart';
 
 enum _PasoEstado { completado, actual, pendiente }

@@ -2,9 +2,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:repara_core/notificacion.dart';
 import 'package:repara_core/stream_error_logging.dart';
-
-import '../models/notificacion.dart';
 
 class NotificacionService {
   /// Seams de solo test -- nunca se asignan en código de producción. Ver

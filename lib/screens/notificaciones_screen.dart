@@ -10,9 +10,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:repara_core/notificacion.dart';
 
 import '../models/casa.dart';
-import '../models/notificacion.dart';
 import '../services/analytics_service.dart';
 import '../services/notificacion_router.dart';
 import '../services/notificacion_service.dart';

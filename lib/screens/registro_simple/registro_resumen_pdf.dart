@@ -15,10 +15,10 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:repara_core/pago.dart';
+import 'package:repara_core/registro.dart';
 
 import '../../models/casa.dart';
-import '../../models/pago.dart';
-import '../../models/registro.dart';
 import '../../widgets/estado_registro_chip.dart';
 import '../../widgets/pdf_fuente_unicode.dart';
 

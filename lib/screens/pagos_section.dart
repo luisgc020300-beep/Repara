@@ -8,8 +8,8 @@
 // registro, separado del resumen de progreso (ver widgets/progreso_pago.dart).
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:repara_core/pago.dart';
 
-import '../models/pago.dart';
 import '../services/pago_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart' show EmptyHint;

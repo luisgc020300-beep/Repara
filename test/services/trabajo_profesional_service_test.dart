@@ -6,9 +6,9 @@
 // por uid (mismo criterio que cliente_profesional_service_test.dart).
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:repara/models/registro.dart';
 import 'package:repara/models/trabajo_profesional.dart';
 import 'package:repara/services/trabajo_profesional_service.dart';
+import 'package:repara_core/registro.dart';
 
 const _uid = 'pro-1';
 const _otroUid = 'pro-2';

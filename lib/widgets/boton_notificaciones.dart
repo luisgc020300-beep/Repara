@@ -1,8 +1,8 @@
 // lib/widgets/boton_notificaciones.dart
 import 'package:flutter/material.dart';
+import 'package:repara_core/notificacion.dart';
 
 import '../models/casa.dart';
-import '../models/notificacion.dart';
 import '../screens/notificaciones_screen.dart';
 import '../services/notificacion_service.dart';
 

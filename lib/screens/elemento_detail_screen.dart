@@ -18,14 +18,15 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:repara_core/cambio_alcance.dart';
+import 'package:repara_core/documento.dart';
+import 'package:repara_core/pago.dart';
+import 'package:repara_core/registro.dart';
 import 'package:share_plus/share_plus.dart';
 
-import '../models/cambio_alcance.dart';
 import '../models/casa.dart';
-import '../models/documento.dart';
 import '../models/elemento.dart';
 import '../models/habitacion.dart';
-import '../models/registro.dart';
 import '../services/cambio_alcance_service.dart';
 import '../services/documento_service.dart';
 import '../services/elemento_service.dart';
@@ -45,9 +46,8 @@ import 'elemento_resumen_pdf.dart';
 import 'nuevo_documento_flow.dart';
 import 'nuevo_elemento_screen.dart';
 import 'nuevo_registro_screen.dart';
-import 'registro_detail_screen.dart';
-import '../models/pago.dart';
 import 'pagos_section.dart' show mostrarAccionesPago;
+import 'registro_detail_screen.dart';
 
 class ElementoDetailScreen extends StatelessWidget {
   const ElementoDetailScreen({

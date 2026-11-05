@@ -9,9 +9,9 @@
 // FakeFirebaseFirestore, el widget es puro (solo lee Registro.estado).
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:repara/models/registro.dart';
 import 'package:repara/screens/registro_simple/registro_simple_progreso.dart';
 import 'package:repara/theme/design_tokens.dart';
+import 'package:repara_core/registro.dart';
 
 Registro _registro(EstadoRegistro estado) => Registro(
   id: 'r1',

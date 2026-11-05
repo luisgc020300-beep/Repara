@@ -10,7 +10,7 @@
 // services/notificacion_router.dart) -- un tipo nuevo sin clasificar aquí
 // es exactamente la misma clase de bug.
 import 'package:flutter_test/flutter_test.dart';
-import 'package:repara/models/notificacion.dart';
+import 'package:repara_core/notificacion.dart';
 
 void main() {
   group('tipoEsParaProfesional', () {

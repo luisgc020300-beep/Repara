@@ -15,8 +15,8 @@
 // Deliberadamente SIN teléfono/email del propietario -- decisión del CEO,
 // noviembre 2026: se mantiene la privacidad actual.
 import 'package:flutter/material.dart';
+import 'package:repara_core/presupuesto.dart';
 
-import '../../models/presupuesto.dart';
 import '../../theme/design_tokens.dart';
 import '../../widgets/app_error.dart';
 import '../../widgets/ios_list.dart';

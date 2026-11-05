@@ -6,8 +6,8 @@
 // (mismo criterio que el resto de servicios Pro con este seam).
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:repara/models/cita.dart';
 import 'package:repara/services/cita_service.dart';
+import 'package:repara_core/cita.dart';
 
 const _uid = 'pro-1';
 

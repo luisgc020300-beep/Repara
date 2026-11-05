@@ -21,9 +21,9 @@ import 'dart:convert';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:repara_core/presupuesto.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../models/presupuesto.dart';
 import '../services/analytics_service.dart';
 import '../services/conceptos_frecuentes_service.dart';
 import '../services/presupuesto_service.dart';
