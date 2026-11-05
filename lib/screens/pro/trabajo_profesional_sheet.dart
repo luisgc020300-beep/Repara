@@ -6,6 +6,7 @@
 // selector que permite elegir uno existente o crear uno nuevo sin salir
 // del formulario.
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../models/cliente_profesional.dart';
 import '../../models/registro.dart';
@@ -16,6 +17,7 @@ import '../../theme/design_tokens.dart';
 import '../../widgets/app_error.dart';
 import '../../widgets/ios_list.dart';
 import 'cliente_profesional_sheet.dart';
+import 'registro_pro_detail_screen.dart';
 
 Future<void> mostrarEditorTrabajoProfesional(
   BuildContext context, {
@@ -148,6 +150,17 @@ class _EditorTrabajoProfesionalSheetState
     }
   }
 
+  Future<void> _mostrarVincularHogar(TrabajoProfesional trabajo) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(ReparaRadius.lg)),
+      ),
+      builder: (_) => _VincularHogarSheet(trabajo: trabajo),
+    );
+  }
+
   Future<void> _elegirFecha() async {
     final elegida = await showDatePicker(
       context: context,
@@ -217,6 +230,55 @@ class _EditorTrabajoProfesionalSheetState
 
   @override
   Widget build(BuildContext context) {
+    // Vinculado a REPARA Hogar (Fase 2): el Registro real es la fuente de
+    // verdad a partir de aquí -- estado/presupuesto/pagos se gestionan
+    // desde ahí, no desde este editor privado. Solo lectura + acceso
+    // directo al trabajo real.
+    final vinculo = widget.existente?.vinculo;
+    if (vinculo != null) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(ReparaSpace.s5),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(widget.existente!.titulo, style: Theme.of(context).textTheme.displaySmall),
+              const SizedBox(height: ReparaSpace.s2),
+              IosSection(
+                rows: [
+                  IosRow(
+                    icon: Icons.link,
+                    iconColor: context.colors.success,
+                    title: 'Vinculado a REPARA Hogar',
+                    subtitle: 'en ${vinculo.casaNombre}',
+                    showChevron: false,
+                  ),
+                ],
+              ),
+              const SizedBox(height: ReparaSpace.s3),
+              FilledButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.push<void>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => RegistroProDetailScreen(
+                        casaId: vinculo.casaId,
+                        elementoId: vinculo.elementoId,
+                        registroId: vinculo.registroId,
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.open_in_new, size: 18),
+                label: const Text('Abrir el trabajo vinculado'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     final clienteFijo = widget.clienteId != null || _esEdicion;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -318,6 +380,14 @@ class _EditorTrabajoProfesionalSheetState
                       : '${_fechaProgramada!.day}/${_fechaProgramada!.month}/${_fechaProgramada!.year}',
                 ),
               ),
+              if (_esEdicion) ...[
+                const SizedBox(height: ReparaSpace.s3),
+                OutlinedButton.icon(
+                  onPressed: () => _mostrarVincularHogar(widget.existente!),
+                  icon: const Icon(Icons.link, size: 16),
+                  label: const Text('Vincular con REPARA Hogar'),
+                ),
+              ],
               const SizedBox(height: ReparaSpace.s4),
               FilledButton(
                 onPressed: _guardando ? null : _guardar,
@@ -332,6 +402,168 @@ class _EditorTrabajoProfesionalSheetState
                       )
                     : Text(_esEdicion ? 'Guardar cambios' : 'Crear trabajo'),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Vincular un trabajo privado con una cuenta real de REPARA Hogar (Fase 2,
+/// noviembre 2026) -- mismo formulario/patrón que _SeccionInvitarProfesional
+/// en registro_detail_screen.dart (email o teléfono, invitación directa o
+/// código abierto), en la dirección inversa.
+class _VincularHogarSheet extends StatefulWidget {
+  const _VincularHogarSheet({required this.trabajo});
+
+  final TrabajoProfesional trabajo;
+
+  @override
+  State<_VincularHogarSheet> createState() => _VincularHogarSheetState();
+}
+
+class _VincularHogarSheetState extends State<_VincularHogarSheet> {
+  final _emailCtrl = TextEditingController();
+  final _telefonoCtrl = TextEditingController();
+  bool _enviando = false;
+  String? _ultimoCodigoGenerado;
+
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    _telefonoCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _compartirCodigo(String codigo) async {
+    final mensaje =
+        'Voy a llevar "${widget.trabajo.titulo}" en Repara, así tienes todo el historial, '
+        'presupuestos y fotos organizados en un solo sitio.\n'
+        'Descárgate la app, crea tu cuenta y, cuando te pida un código de invitación, introduce: $codigo';
+    if (!mounted) return;
+    try {
+      await Share.share(
+        mensaje,
+        sharePositionOrigin: Offset.zero & MediaQuery.of(context).size,
+      );
+    } catch (e) {
+      // El código ya se generó y se muestra en pantalla -- que falle el
+      // selector de compartir no debe parecer que la invitación falló.
+    }
+  }
+
+  Future<void> _invitar() async {
+    final email = _emailCtrl.text.trim();
+    final telefono = _telefonoCtrl.text.trim();
+    if (email.isEmpty && telefono.isEmpty) return;
+    setState(() => _enviando = true);
+    try {
+      final resultado = await TrabajoProfesionalService.invitarAHogar(
+        trabajoProfesionalId: widget.trabajo.id,
+        emailCliente: email.isEmpty ? null : email,
+        telefonoCliente: telefono.isEmpty ? null : telefono,
+      );
+      _emailCtrl.clear();
+      _telefonoCtrl.clear();
+      if (resultado.esDirecta) {
+        if (mounted) {
+          AppError.showSuccess(context, 'Invitación enviada.');
+          Navigator.pop(context);
+        }
+      } else if (mounted) {
+        setState(() => _ultimoCodigoGenerado = resultado.codigo);
+        await _compartirCodigo(resultado.codigo!);
+      }
+    } catch (e, st) {
+      if (mounted) {
+        AppError.show(
+          context,
+          'No se pudo enviar la invitación.',
+          error: e,
+          stackTrace: st,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _enviando = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: ReparaSpace.s5,
+          right: ReparaSpace.s5,
+          top: ReparaSpace.s5,
+          bottom: ReparaSpace.s5 + MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Vincular con REPARA Hogar',
+                style: Theme.of(context).textTheme.displaySmall,
+              ),
+              const SizedBox(height: ReparaSpace.s1),
+              Text(
+                'Tu cliente verá este trabajo, su estado, presupuesto y cualquier cambio directamente en su cuenta de Repara.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: ReparaSpace.s3),
+              if (_ultimoCodigoGenerado != null) ...[
+                Row(
+                  children: [
+                    Icon(Icons.qr_code_2_outlined, color: context.colors.brand),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Código para compartir: $_ultimoCodigoGenerado',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(letterSpacing: 1),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.share_outlined, size: 20),
+                      tooltip: 'Compartir código',
+                      onPressed: () => _compartirCodigo(_ultimoCodigoGenerado!),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: ReparaSpace.s2),
+                FilledButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Listo'),
+                ),
+              ] else ...[
+                TextField(
+                  controller: _emailCtrl,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(labelText: 'Email de tu cliente'),
+                ),
+                const SizedBox(height: ReparaSpace.s2),
+                TextField(
+                  controller: _telefonoCtrl,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(labelText: 'o teléfono (opcional)'),
+                ),
+                const SizedBox(height: ReparaSpace.s3),
+                FilledButton(
+                  onPressed: _enviando ? null : _invitar,
+                  child: _enviando
+                      ? SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: context.colors.brandOn,
+                          ),
+                        )
+                      : const Text('Enviar invitación'),
+                ),
+              ],
             ],
           ),
         ),

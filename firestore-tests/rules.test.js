@@ -99,6 +99,11 @@ beforeEach(async () => {
       propietarioUid: OWNER_A, profesionalUid: PRO, casaId: CASA_A, elementoId: ELEMENTO_A1, elementoNombre: 'Elemento A1',
       registroId: REGISTRO_A1, registroTitulo: 'Registro A1', casaNombre: 'Casa A', profesionalEmail: 'pro@x.com', estado: 'pendiente',
     });
+    // Fase 2 (noviembre 2026) -- dirección inversa: el profesional invita,
+    // el propietario responde.
+    await setDoc(doc(db, 'invitacionesHogar', 'inv-hogar-1'), {
+      propietarioUid: OWNER_A, profesionalUid: PRO, titulo: 'Trabajo privado', estado: 'pendiente',
+    });
   });
 });
 
@@ -574,6 +579,44 @@ describe('invitaciones -- solo las dos partes implicadas, y el profesional solo 
 
   it('DENY: un profesional ajeno no puede responder una invitación que no es suya', async () => {
     await assertFails(updateDoc(doc(as(PRO_AJENO), 'invitaciones', 'inv-a1'), { estado: 'aceptada' }));
+  });
+});
+
+describe('invitacionesHogar -- dirección inversa (Fase 2): el profesional invita, el propietario responde', () => {
+  it('ALLOW: el propietario invitado lee la invitación', async () => {
+    await assertSucceeds(getDoc(doc(as(OWNER_A), 'invitacionesHogar', 'inv-hogar-1')));
+  });
+
+  it('ALLOW: el profesional que invitó lee la invitación', async () => {
+    await assertSucceeds(getDoc(doc(as(PRO), 'invitacionesHogar', 'inv-hogar-1')));
+  });
+
+  it('DENY: un tercero sin relación no puede leer la invitación', async () => {
+    await assertFails(getDoc(doc(as(EXTRANO), 'invitacionesHogar', 'inv-hogar-1')));
+  });
+
+  it('ALLOW: el propietario invitado puede aceptarla (cambiar solo "estado")', async () => {
+    await assertSucceeds(updateDoc(doc(as(OWNER_A), 'invitacionesHogar', 'inv-hogar-1'), { estado: 'aceptada' }));
+  });
+
+  it('DENY: el profesional que invitó no puede cambiar el estado (solo responde el propietario)', async () => {
+    await assertFails(updateDoc(doc(as(PRO), 'invitacionesHogar', 'inv-hogar-1'), { estado: 'aceptada' }));
+  });
+
+  it('DENY: un propietario ajeno no puede responder una invitación que no es suya', async () => {
+    await assertFails(updateDoc(doc(as(OWNER_B), 'invitacionesHogar', 'inv-hogar-1'), { estado: 'aceptada' }));
+  });
+
+  it('DENY: nadie crea una invitación directamente (solo invitarClienteAHogar/canjearCodigoInvitacionHogar)', async () => {
+    await assertFails(addDoc(collection(as(PRO), 'invitacionesHogar'), { propietarioUid: OWNER_A, profesionalUid: PRO, estado: 'pendiente' }));
+  });
+
+  it('DENY: nadie lee invitacionesHogarAbiertas directamente', async () => {
+    await assertFails(getDoc(doc(as(PRO), 'invitacionesHogarAbiertas', 'CUALQUIERA')));
+  });
+
+  it('DENY: nadie escribe invitacionesHogarAbiertas directamente', async () => {
+    await assertFails(setDoc(doc(as(PRO), 'invitacionesHogarAbiertas', 'FALSO1'), { estado: 'pendiente_registro' }));
   });
 });
 

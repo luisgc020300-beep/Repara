@@ -20,6 +20,7 @@ import 'package:repara/screens/home_tab.dart';
 import 'package:repara/services/documento_service.dart';
 import 'package:repara/services/elemento_service.dart';
 import 'package:repara/services/habitacion_service.dart';
+import 'package:repara/services/invitacion_hogar_service.dart';
 import 'package:repara/services/notificacion_service.dart';
 import 'package:repara/services/registro_service.dart';
 import 'package:repara/theme/design_tokens.dart';
@@ -57,6 +58,8 @@ void main() {
     DocumentoService.debugFirestoreOverride = null;
     NotificacionService.debugFirestoreOverride = null;
     NotificacionService.debugUidOverride = null;
+    InvitacionHogarService.debugFirestoreOverride = null;
+    InvitacionHogarService.debugUidOverride = null;
   });
 
   testWidgets(
@@ -91,6 +94,10 @@ void main() {
       // curso" en sí).
       NotificacionService.debugFirestoreOverride = db;
       NotificacionService.debugUidOverride = 'u1';
+      // _SolicitudesProfesionales (Fase 2) necesita esto por el mismo
+      // motivo que BotonNotificaciones arriba.
+      InvitacionHogarService.debugFirestoreOverride = db;
+      InvitacionHogarService.debugUidOverride = 'u1';
 
       final refreshTick = ValueNotifier<int>(0);
       addTearDown(refreshTick.dispose);

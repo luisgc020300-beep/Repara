@@ -16,16 +16,20 @@ import 'package:intl/intl.dart';
 import '../models/casa.dart';
 import '../models/elemento.dart';
 import '../models/habitacion.dart';
+import '../models/invitacion_hogar.dart';
 import '../services/elemento_service.dart';
 import '../services/habitacion_service.dart';
+import '../services/invitacion_hogar_service.dart';
 import '../services/registro_service.dart';
 import '../theme/design_tokens.dart';
+import '../widgets/app_error.dart';
 import '../widgets/boton_ajustes.dart';
 import '../widgets/boton_notificaciones.dart';
 import '../widgets/ios_list.dart';
 import 'elemento_detail_screen.dart';
 import 'garantias_proximas_screen.dart';
 import 'menu_anadir.dart';
+import 'registro_detail_screen.dart' show RegistroDetailScreen;
 import 'revisiones_pendientes_screen.dart';
 import 'trabajos_pendientes_screen.dart';
 
@@ -130,6 +134,7 @@ class _HomeTabState extends State<HomeTab> {
                   padding: EdgeInsets.zero,
                   children: [
                     _CabeceraNavy(casa: widget.casa),
+                    _SolicitudesProfesionales(casa: widget.casa),
                     _ResumenCasa(
                       casa: widget.casa,
                       refreshTick: widget.refreshTick,
@@ -247,6 +252,149 @@ class _HomeTabState extends State<HomeTab> {
               },
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+/// "Solicitudes de profesionales" (Fase 2, noviembre 2026): un profesional
+/// quiere vincular un trabajo privado suyo a esta cuenta. Espejo de
+/// "Invitaciones pendientes" en inicio_pro_tab.dart, pero solo se muestra
+/// si hay alguna -- a diferencia de Inicio Pro, aquí no tiene sentido un
+/// bloque permanente de "no tienes solicitudes" (CEO: "destacar lo que de
+/// verdad necesita atención"). Al aceptar, se usa SIEMPRE la casa que se
+/// está viendo (widget.casa) -- si el propietario tiene más de una casa y
+/// quiere este trabajo en otra, tiene que cambiar de casa primero.
+class _SolicitudesProfesionales extends StatelessWidget {
+  const _SolicitudesProfesionales({required this.casa});
+
+  final Casa casa;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<InvitacionHogar>>(
+      stream: InvitacionHogarService.streamPendientesParaMi(),
+      builder: (context, snapshot) {
+        final solicitudes = snapshot.data ?? const [];
+        if (solicitudes.isEmpty) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Solicitudes de profesionales',
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 8),
+              ...solicitudes.map(
+                (s) => _SolicitudProfesionalCard(solicitud: s, casa: casa),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _SolicitudProfesionalCard extends StatefulWidget {
+  const _SolicitudProfesionalCard({required this.solicitud, required this.casa});
+
+  final InvitacionHogar solicitud;
+  final Casa casa;
+
+  @override
+  State<_SolicitudProfesionalCard> createState() =>
+      _SolicitudProfesionalCardState();
+}
+
+class _SolicitudProfesionalCardState
+    extends State<_SolicitudProfesionalCard> {
+  bool _respondiendo = false;
+
+  Future<void> _responder(bool aceptar) async {
+    setState(() => _respondiendo = true);
+    try {
+      final vinculo = await InvitacionHogarService.responder(
+        widget.solicitud.id,
+        aceptar: aceptar,
+        casaId: aceptar ? widget.casa.id : null,
+      );
+      if (aceptar && vinculo != null && mounted) {
+        await Navigator.push<void>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => RegistroDetailScreen(
+              casa: widget.casa,
+              elementoId: vinculo.elementoId,
+              registroId: vinculo.registroId,
+            ),
+          ),
+        );
+      }
+    } catch (e, st) {
+      if (mounted) {
+        AppError.show(
+          context,
+          'No se pudo responder a la solicitud.',
+          error: e,
+          stackTrace: st,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _respondiendo = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: ReparaSpace.s2),
+      child: Padding(
+        padding: const EdgeInsets.all(ReparaSpace.s4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.solicitud.titulo,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: ReparaSpace.s1),
+            Text(
+              widget.solicitud.profesionalNombre != null
+                  ? 'de ${widget.solicitud.profesionalNombre} -- se guardará en "${widget.casa.nombre}"'
+                  : 'se guardará en "${widget.casa.nombre}"',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: ReparaSpace.s3),
+            _respondiendo
+                ? const Center(
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => _responder(false),
+                          child: const Text('Rechazar'),
+                        ),
+                      ),
+                      const SizedBox(width: ReparaSpace.s2),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: () => _responder(true),
+                          child: const Text('Aceptar'),
+                        ),
+                      ),
+                    ],
+                  ),
+          ],
         ),
       ),
     );

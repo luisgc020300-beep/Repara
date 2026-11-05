@@ -2,13 +2,26 @@
 //
 // Trabajos privados del profesional (Fase 1, noviembre 2026). Escritura
 // directa a Firestore, sin Cloud Function -- mismo criterio que
-// CitaService/ClienteProfesionalService.
+// CitaService/ClienteProfesionalService. invitarAHogar/cancelarInvitacionHogar
+// (Fase 2) sí pasan por Cloud Function -- vinculan con una cuenta real de
+// otra persona, igual de sensible que invitarProfesional.
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/trabajo_profesional.dart';
 import 'stream_error_logging.dart';
+
+/// Resultado de invitarAHogar -- mismo shape que ResultadoInvitacion
+/// (invitacion_service.dart), duplicado a propósito: son conceptos
+/// distintos (invitar a un profesional vs. invitar a un propietario) que no
+/// deben acoplarse solo porque hoy compartan forma.
+class ResultadoInvitacionHogar {
+  const ResultadoInvitacionHogar({required this.esDirecta, this.codigo});
+  final bool esDirecta;
+  final String? codigo;
+}
 
 class TrabajoProfesionalService {
   /// Seams de solo test -- nunca se asignan en código de producción. Ver
@@ -88,5 +101,36 @@ class TrabajoProfesionalService {
     final col = _col();
     if (col == null) return;
     await col.doc(trabajoId).delete();
+  }
+
+  static const _region = 'europe-west1';
+
+  static Future<ResultadoInvitacionHogar> invitarAHogar({
+    required String trabajoProfesionalId,
+    String? emailCliente,
+    String? telefonoCliente,
+  }) async {
+    final callable = FirebaseFunctions.instanceFor(
+      region: _region,
+    ).httpsCallable('invitarClienteAHogar');
+    final result = await callable.call<Map<String, dynamic>>({
+      'trabajoProfesionalId': trabajoProfesionalId,
+      'emailCliente': ?emailCliente,
+      'telefonoCliente': ?telefonoCliente,
+    });
+    final tipo = result.data['tipo'] as String?;
+    return ResultadoInvitacionHogar(
+      esDirecta: tipo == 'directa',
+      codigo: result.data['codigo'] as String?,
+    );
+  }
+
+  static Future<void> cancelarInvitacionHogar(String invitacionId) async {
+    final callable = FirebaseFunctions.instanceFor(
+      region: _region,
+    ).httpsCallable('cancelarInvitacionHogar');
+    await callable.call<Map<String, dynamic>>({
+      'invitacionId': invitacionId,
+    });
   }
 }

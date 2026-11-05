@@ -21,7 +21,15 @@ Future<void> abrirDestinoNotificacion(
   String? registroId,
   String? pagoId,
 }) async {
-  if (casaId == null || elementoId == null || registroId == null || !context.mounted) return;
+  if (!context.mounted) return;
+  // Todavía no hay ningún registro real al que ir -- la invitación está
+  // pendiente, y ya se ve de forma prominente en la nueva sección
+  // "Solicitudes de profesionales" de Inicio. Basta con volver ahí.
+  if (tipo == 'invitacion_hogar_recibida') {
+    Navigator.popUntil(context, (route) => route.isFirst);
+    return;
+  }
+  if (casaId == null || elementoId == null || registroId == null) return;
   final modoPro = tipoEsParaProfesional(tipo);
 
   // "Te han registrado un pago" lleva directo al detalle de ESE pago, no

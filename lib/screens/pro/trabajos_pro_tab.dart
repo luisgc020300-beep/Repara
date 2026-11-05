@@ -317,11 +317,14 @@ class _ListaPorTrabajo extends StatelessWidget {
             rows: privados
                 .map(
                   (t) => IosRow(
-                    icon: Icons.build_outlined,
-                    iconColor: context.colors.brand,
+                    icon: t.estaVinculado ? Icons.link : Icons.build_outlined,
+                    iconColor: t.estaVinculado
+                        ? context.colors.success
+                        : context.colors.brand,
                     title: t.titulo,
-                    subtitle:
-                        '${t.clienteNombre} · ${nombreEstadoTrabajoProfesional(t.estado)}',
+                    subtitle: t.estaVinculado
+                        ? '${t.clienteNombre} · Vinculado a REPARA Hogar'
+                        : '${t.clienteNombre} · ${nombreEstadoTrabajoProfesional(t.estado)}',
                     onTap: () =>
                         mostrarEditorTrabajoProfesional(context, existente: t),
                   ),

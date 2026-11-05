@@ -353,6 +353,28 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // ── invitacionesHogar (profesional invita a un propietario a vincular un
+    // trabajo privado -- Fase 2, noviembre 2026, dirección inversa de
+    // "invitaciones" de arriba) ─────────────────────────────────────────────
+    match /invitacionesHogar/{iid} {
+      allow read: if isAuth() && (resource.data.propietarioUid == request.auth.uid || resource.data.profesionalUid == request.auth.uid);
+      // Solo se crean vía Cloud Function (invitarClienteAHogar/
+      // canjearCodigoInvitacionHogar) -- el cliente nunca crea esto directamente.
+      allow create: if false;
+      // El propietario invitado puede aceptar/rechazar -- nada más. La
+      // creación del Elemento/Registro reales ocurre en la propia Cloud
+      // Function (responderInvitacionHogar), nunca aquí.
+      allow update: if isAuth() && resource.data.propietarioUid == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado']);
+      allow delete: if false;
+    }
+
+    // ── invitacionesHogarAbiertas (código para propietarios sin cuenta
+    // todavía -- mismo criterio que invitacionesAbiertas) ──────────────────
+    match /invitacionesHogarAbiertas/{codigo} {
+      allow read, write: if false;
+    }
+
     // ── usoIA (límite diario de llamadas a la IA por usuario) ───────────────
     // Solo lo leen/escriben las Cloud Functions con Admin SDK -- el cliente
     // nunca necesita ni debe tocar su propio contador.

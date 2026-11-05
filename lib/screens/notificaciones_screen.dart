@@ -183,6 +183,8 @@ IconData _iconoTipo(String tipo) => switch (tipo) {
       'cita_cancelada' => Icons.event_busy_outlined,
       'documento_anadido_cliente' || 'documento_anadido_profesional' => Icons.description_outlined,
       'invitacion_aceptada' || 'invitacion_rechazada' => Icons.person_add_alt_outlined,
+      'invitacion_hogar_recibida' || 'invitacion_hogar_aceptada' || 'invitacion_hogar_rechazada' =>
+        Icons.link_outlined,
       _ => Icons.notifications_outlined,
     };
 
@@ -192,6 +194,7 @@ const _tiposNegativos = {
   'cambio_alcance_cancelado',
   'trabajo_finalizacion_rechazada',
   'invitacion_rechazada',
+  'invitacion_hogar_rechazada',
   'cita_cancelada',
 };
 
@@ -201,6 +204,7 @@ const _tiposDeAtencion = {
   'recordatorio_cita_cliente',
   'recordatorio_cita_profesional',
   'elemento_archivado',
+  'invitacion_hogar_recibida',
 };
 
 const _tiposPositivos = {
@@ -209,6 +213,7 @@ const _tiposPositivos = {
   'trabajo_finalizado',
   'pago_registrado',
   'invitacion_aceptada',
+  'invitacion_hogar_aceptada',
   'cita_creada',
   'elemento_restaurado',
 };

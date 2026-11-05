@@ -2,7 +2,14 @@
 //
 // Trabajo privado del profesional (Fase 1, noviembre 2026) -- siempre
 // ligado a un ClienteProfesional, vive en profesionales/{uid}/trabajosPro.
-// Sin vinculación con REPARA Hogar todavía (Fase 2, no implementada aquí).
+//
+// [vinculo] (Fase 2, noviembre 2026): una vez el propietario acepta la
+// invitación de responderInvitacionHogar, este trabajo privado deja de ser
+// la fuente de verdad -- [vinculo] apunta al Registro real (dentro de la
+// casa del propietario) que a partir de ahí lleva estado/presupuesto/pagos/
+// notificaciones/citas de verdad. El documento privado se queda tal cual,
+// como referencia de cómo empezó, pero su editor pasa a ser de solo
+// lectura (ver trabajo_profesional_sheet.dart).
 //
 // [estado] es deliberadamente un enum nuevo y simple, NO EstadoRegistro: ese
 // modelo asume dos partes que deben confirmarse mutuamente (propietario +
@@ -16,6 +23,7 @@
 // el que ya existe para trabajos compartidos (ver PresupuestosSection).
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'profesional.dart';
 import 'registro.dart';
 
 enum EstadoTrabajoProfesional { abierto, enCurso, terminado }
@@ -47,6 +55,7 @@ class TrabajoProfesional {
     this.fechaProgramada,
     this.createdAt,
     this.updatedAt,
+    this.vinculo,
   });
 
   final String id;
@@ -68,6 +77,12 @@ class TrabajoProfesional {
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
+  /// Solo lo escribe responderInvitacionHogar (Admin SDK) -- ver
+  /// functions/index.js. No null a partir de ese momento.
+  final RegistroProRef? vinculo;
+
+  bool get estaVinculado => vinculo != null;
+
   factory TrabajoProfesional.fromDoc(
     DocumentSnapshot<Map<String, dynamic>> doc,
   ) {
@@ -85,6 +100,9 @@ class TrabajoProfesional {
       fechaProgramada: (data['fechaProgramada'] as Timestamp?)?.toDate(),
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
+      vinculo: data['vinculo'] is Map
+          ? RegistroProRef.fromMap(Map<String, dynamic>.from(data['vinculo'] as Map))
+          : null,
     );
   }
 

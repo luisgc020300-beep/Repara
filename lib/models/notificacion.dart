@@ -34,6 +34,13 @@ const _tiposParaProfesional = {
   // situación.
   'recordatorio_cita_profesional',
   'documento_anadido_profesional',
+  // Vincular Cliente/Trabajo privado a REPARA Hogar (Fase 2, noviembre
+  // 2026): quien invita es el profesional, así que la respuesta del
+  // propietario (aceptada/rechazada) es un aviso PARA él -- la invitación
+  // en sí (invitacion_hogar_recibida) va al propietario, por eso no está
+  // aquí.
+  'invitacion_hogar_aceptada',
+  'invitacion_hogar_rechazada',
 };
 
 bool tipoEsParaProfesional(String tipo) => _tiposParaProfesional.contains(tipo);

@@ -627,6 +627,283 @@ exports.cancelarInvitacion = onCall({ region: REGION }, async (request) => {
   return { ok: true };
 });
 
+// =============================================================================
+// VINCULAR UN TRABAJO/CLIENTE PRIVADO DEL PROFESIONAL A UNA CUENTA REAL DE
+// REPARA HOGAR (Fase 2, noviembre 2026). Espejo exacto de la invitación de
+// arriba (3b/3b-bis/3c/3d) pero invertida: aquí es el PROFESIONAL quien
+// invita al PROPIETARIO a vincular un `TrabajoProfesional` suyo (CRM
+// privado, sin ninguna relación con cuentas reales hasta ahora -- ver
+// lib/models/trabajo_profesional.dart) con su cuenta real de REPARA Hogar.
+//
+// Al aceptar NO se construye ningún sistema de notificaciones/historial/
+// citas paralelo para trabajos privados: se crea un Elemento + Registro
+// REAL dentro de la casa del propietario (con profesionalUid ya puesto,
+// porque ambas partes ya han dado su consentimiento explícito) y, a partir
+// de ahí, se reutiliza el 100% de la infraestructura ya existente
+// (crearNotificacion, registrarHistorial, onCitaEscrita, onDocumentoCreado,
+// onPagoCreado...). El TrabajoProfesional original se queda como está, solo
+// con un campo `vinculo` apuntando al registro real -- deja de ser la
+// fuente de verdad, pero no se borra (es el historial propio del
+// profesional de cómo empezó ese trabajo).
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// 4a. INVITAR a un cliente privado a vincular un trabajo -- la llama el
+// profesional desde la ficha de un TrabajoProfesional suyo. Mismo patrón
+// que invitarProfesional: si el email corresponde a una cuenta real ya
+// existente, invitación directa; si no, código abierto para compartir a
+// mano (motor del bucle viral, ver CLAUDE.md -- aquí en la dirección que
+// de verdad importa: el profesional trae a SUS clientes a la app).
+// -----------------------------------------------------------------------------
+exports.invitarClienteAHogar = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+  const profesionalUid = request.auth.uid;
+  const { trabajoProfesionalId, emailCliente, telefonoCliente } = request.data || {};
+  const email = typeof emailCliente === 'string' ? emailCliente.trim().toLowerCase() : '';
+  const telefono = typeof telefonoCliente === 'string' ? telefonoCliente.trim() : '';
+  if (!trabajoProfesionalId || (!email && !telefono)) {
+    throw new HttpsError('invalid-argument', 'Faltan datos para la invitación.');
+  }
+
+  const trabajoRef = db.collection('profesionales').doc(profesionalUid).collection('trabajosPro').doc(trabajoProfesionalId);
+  const trabajoSnap = await trabajoRef.get();
+  if (!trabajoSnap.exists) throw new HttpsError('not-found', 'El trabajo no existe.');
+  const trabajo = trabajoSnap.data();
+  if (trabajo.vinculo) {
+    throw new HttpsError('failed-precondition', 'Este trabajo ya está vinculado a una cuenta de REPARA Hogar.');
+  }
+
+  const profesionalNombre = await nombreActorProfesional(profesionalUid);
+  const datosTrabajo = {
+    trabajoProfesionalId,
+    clienteId: trabajo.clienteId || null,
+    clienteNombre: trabajo.clienteNombre || '',
+    titulo: trabajo.titulo || '',
+    descripcion: trabajo.descripcion || null,
+    tipo: trabajo.tipo || 'otro',
+    presupuestoEstimado: trabajo.presupuestoEstimado ?? null,
+    fechaProgramada: trabajo.fechaProgramada || null,
+    profesionalUid,
+    profesionalNombre,
+  };
+
+  let propietarioUid = null;
+  if (email) {
+    try {
+      const usuarioAuth = await getAuth().getUserByEmail(email);
+      if (usuarioAuth.uid === profesionalUid) {
+        throw new HttpsError('invalid-argument', 'No puedes invitarte a ti mismo.');
+      }
+      propietarioUid = usuarioAuth.uid;
+    } catch (e) {
+      if (e instanceof HttpsError) throw e;
+      // getUserByEmail lanza si no existe cuenta con ese email -- se trata
+      // igual que "sin cuenta todavía": cae al código abierto.
+    }
+  }
+
+  if (propietarioUid) {
+    const invitacionRef = db.collection('invitacionesHogar').doc();
+    await invitacionRef.set({
+      ...datosTrabajo,
+      propietarioUid,
+      clienteEmail: email,
+      estado: 'pendiente',
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    await crearNotificacion(propietarioUid, 'invitacion_hogar_recibida',
+      'Un profesional quiere compartir un trabajo contigo',
+      `${profesionalNombre || 'Un profesional'} quiere vincular "${datosTrabajo.titulo}" a tu cuenta de REPARA.`,
+      { invitacionHogarId: invitacionRef.id });
+    return { ok: true, tipo: 'directa', invitacionId: invitacionRef.id };
+  }
+
+  const codigo = await generarCodigoInvitacionUnico();
+  await db.collection('invitacionesHogarAbiertas').doc(codigo).set({
+    ...datosTrabajo,
+    contactoEmail: email || null,
+    contactoTelefono: telefono || null,
+    estado: 'pendiente_registro',
+    createdAt: FieldValue.serverTimestamp(),
+    expiraEn: Timestamp.fromMillis(Date.now() + 30 * 24 * 60 * 60 * 1000),
+  });
+  return { ok: true, tipo: 'abierta', codigo };
+});
+
+// -----------------------------------------------------------------------------
+// 4b. CANJEAR UN CÓDIGO DE INVITACIÓN ABIERTA (lado propietario) -- mismo
+// patrón que canjearCodigoInvitacion, en la otra dirección: no exige tener
+// cuenta ya "activada" de ningún tipo, cualquier cuenta de Repara sirve.
+// -----------------------------------------------------------------------------
+exports.canjearCodigoInvitacionHogar = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+  const uid = request.auth.uid;
+  const raw = typeof request.data?.codigo === 'string' ? request.data.codigo : '';
+  const codigo = raw.trim().toUpperCase();
+  if (!codigo) throw new HttpsError('invalid-argument', 'Código inválido.');
+  await verificarYRegistrarIntentoCodigo(uid, 'canjearCodigoInvitacionHogar');
+
+  const abiertaRef = db.collection('invitacionesHogarAbiertas').doc(codigo);
+
+  const resultado = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(abiertaRef);
+    if (!snap.exists) throw new HttpsError('not-found', 'No existe ninguna invitación con ese código.');
+    const inv = snap.data();
+    if (inv.estado !== 'pendiente_registro') {
+      throw new HttpsError('failed-precondition', 'Este código ya se ha usado.');
+    }
+    if (inv.expiraEn && inv.expiraEn.toMillis() < Date.now()) {
+      throw new HttpsError('failed-precondition', 'Este código ha caducado. Pide uno nuevo.');
+    }
+    if (inv.profesionalUid === uid) {
+      throw new HttpsError('invalid-argument', 'No puedes canjear tu propia invitación.');
+    }
+
+    const invitacionRef = db.collection('invitacionesHogar').doc();
+    tx.set(invitacionRef, {
+      trabajoProfesionalId: inv.trabajoProfesionalId,
+      clienteId: inv.clienteId || null,
+      clienteNombre: inv.clienteNombre || '',
+      titulo: inv.titulo,
+      descripcion: inv.descripcion || null,
+      tipo: inv.tipo || 'otro',
+      presupuestoEstimado: inv.presupuestoEstimado ?? null,
+      fechaProgramada: inv.fechaProgramada || null,
+      profesionalUid: inv.profesionalUid,
+      profesionalNombre: inv.profesionalNombre || null,
+      propietarioUid: uid,
+      clienteEmail: inv.contactoEmail || '',
+      estado: 'pendiente',
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    tx.update(abiertaRef, { estado: 'canjeado', propietarioUidCanjeo: uid });
+
+    return { titulo: inv.titulo, profesionalNombre: inv.profesionalNombre || null };
+  });
+
+  return { ok: true, ...resultado };
+});
+
+// -----------------------------------------------------------------------------
+// 4c. RESPONDER (lado propietario). Al aceptar: crea un Elemento + Registro
+// reales dentro de la casa que el propietario ya eligió en el cliente,
+// vincula profesionalUid de inmediato (las dos partes ya han dado su
+// consentimiento: el profesional al invitar, el propietario al aceptar) y
+// marca el TrabajoProfesional original como vinculado.
+// -----------------------------------------------------------------------------
+exports.responderInvitacionHogar = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+  const uid = request.auth.uid;
+  const { invitacionId, aceptar, casaId } = request.data || {};
+  if (!invitacionId || typeof aceptar !== 'boolean') {
+    throw new HttpsError('invalid-argument', 'Faltan datos.');
+  }
+  if (aceptar && !casaId) throw new HttpsError('invalid-argument', 'Falta la casa donde guardar el trabajo.');
+
+  const invitacionRef = db.collection('invitacionesHogar').doc(invitacionId);
+
+  const resultado = await db.runTransaction(async (tx) => {
+    const invSnap = await tx.get(invitacionRef);
+    if (!invSnap.exists) throw new HttpsError('not-found', 'La invitación ya no existe.');
+    const inv = invSnap.data();
+    if (inv.propietarioUid !== uid) {
+      throw new HttpsError('permission-denied', 'Esta invitación no es tuya.');
+    }
+    if (inv.estado !== 'pendiente') {
+      throw new HttpsError('failed-precondition', 'Esta invitación ya se respondió.');
+    }
+
+    if (!aceptar) {
+      tx.update(invitacionRef, { estado: 'rechazada' });
+      return { inv };
+    }
+
+    const casaRef = db.collection('casas').doc(casaId);
+    const casaSnap = await tx.get(casaRef);
+    if (!casaSnap.exists || !(casaSnap.data().members || []).includes(uid)) {
+      throw new HttpsError('permission-denied', 'No perteneces a esa casa.');
+    }
+
+    const elementoRef = db.collection('casas').doc(casaId).collection('elementos').doc();
+    tx.set(elementoRef, { nombre: inv.titulo, createdAt: FieldValue.serverTimestamp() });
+
+    const registroRefNuevo = elementoRef.collection('registros').doc();
+    tx.set(registroRefNuevo, {
+      elementoNombre: inv.titulo,
+      tipo: inv.tipo || 'otro',
+      esConProfesional: true,
+      titulo: inv.titulo,
+      estado: inv.presupuestoEstimado ? 'presupuestado' : 'nuevo',
+      fecha: inv.fechaProgramada || Timestamp.now(),
+      descripcion: inv.descripcion || null,
+      profesionalUid: inv.profesionalUid,
+      profesionalNombre: inv.profesionalNombre || null,
+      presupuesto: inv.presupuestoEstimado ?? null,
+      createdAt: FieldValue.serverTimestamp(),
+      createdBy: uid,
+    });
+
+    tx.update(invitacionRef, { estado: 'aceptada' });
+
+    const vinculo = {
+      casaId,
+      elementoId: elementoRef.id,
+      elementoNombre: inv.titulo,
+      registroId: registroRefNuevo.id,
+      registroTitulo: inv.titulo,
+      casaNombre: casaSnap.data().nombre || 'Una casa',
+      fotoUrl: null,
+    };
+    if (inv.trabajoProfesionalId) {
+      tx.update(
+        db.collection('profesionales').doc(inv.profesionalUid).collection('trabajosPro').doc(inv.trabajoProfesionalId),
+        { vinculo },
+      );
+    }
+    tx.set(db.collection('users').doc(inv.profesionalUid), {
+      registrosProRefs: FieldValue.arrayUnion(vinculo),
+    }, { merge: true });
+
+    registrarHistorial(registroRefNuevo, {
+      tx, actorUid: uid, entidad: 'invitacion', entidadId: invitacionId, accion: 'aceptada',
+    });
+
+    return { inv, vinculo };
+  });
+
+  await crearNotificacion(resultado.inv.profesionalUid,
+    aceptar ? 'invitacion_hogar_aceptada' : 'invitacion_hogar_rechazada',
+    aceptar ? 'Invitación aceptada' : 'Invitación rechazada',
+    aceptar
+      ? `Tu cliente ha aceptado vincular "${resultado.inv.titulo}" -- ya puedes gestionarlo como un trabajo normal.`
+      : `Tu cliente ha rechazado vincular "${resultado.inv.titulo}".`,
+    resultado.vinculo
+      ? { casaId: resultado.vinculo.casaId, elementoId: resultado.vinculo.elementoId, registroId: resultado.vinculo.registroId }
+      : {});
+
+  return { ok: true, vinculo: resultado.vinculo || null };
+});
+
+// -----------------------------------------------------------------------------
+// 4d. CANCELAR UNA INVITACIÓN PENDIENTE (lado profesional).
+// -----------------------------------------------------------------------------
+exports.cancelarInvitacionHogar = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+  const uid = request.auth.uid;
+  const { invitacionId } = request.data || {};
+  if (!invitacionId) throw new HttpsError('invalid-argument', 'Faltan datos.');
+
+  const ref = db.collection('invitacionesHogar').doc(invitacionId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpsError('not-found', 'La invitación ya no existe.');
+  const inv = snap.data();
+  if (inv.profesionalUid !== uid) throw new HttpsError('permission-denied', 'Solo quien invitó puede cancelarla.');
+  if (inv.estado !== 'pendiente') throw new HttpsError('failed-precondition', 'Esta invitación ya se respondió.');
+
+  await ref.update({ estado: 'cancelada' });
+  return { ok: true };
+});
+
 // -----------------------------------------------------------------------------
 // 3e. ELIMINAR CUENTA -- derecho de supresión (RGPD) + requisito de Apple
 // (guideline 5.1.1(v)) y Google Play: si se puede crear cuenta desde la
@@ -922,12 +1199,18 @@ const CATEGORIA_POR_TIPO = {
   documento_anadido_profesional: 'documentos',
   invitacion_aceptada: 'seguridad',
   invitacion_rechazada: 'seguridad',
+  invitacion_hogar_recibida: 'seguridad',
+  invitacion_hogar_aceptada: 'seguridad',
+  invitacion_hogar_rechazada: 'seguridad',
 };
 
 // Seguridad/permisos -- la sección 6 del encargo pide explícitamente que
 // estos "no se confundan con recordatorios opcionales": siempre se crean y
 // siempre se empujan, sin mirar ninguna preferencia.
-const TIPOS_OBLIGATORIOS = new Set(['invitacion_aceptada', 'invitacion_rechazada']);
+const TIPOS_OBLIGATORIOS = new Set([
+  'invitacion_aceptada', 'invitacion_rechazada',
+  'invitacion_hogar_recibida', 'invitacion_hogar_aceptada', 'invitacion_hogar_rechazada',
+]);
 
 async function crearNotificacion(uid, tipo, titulo, cuerpo, extra) {
   const obligatoria = TIPOS_OBLIGATORIOS.has(tipo);
