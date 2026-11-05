@@ -7,9 +7,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:repara_core/stream_error_logging.dart';
 
 import '../models/cliente_profesional.dart';
-import 'stream_error_logging.dart';
 
 class ClienteProfesionalService {
   /// Seams de solo test -- nunca se asignan en código de producción. Ver

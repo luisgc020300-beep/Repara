@@ -11,7 +11,7 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:repara/services/stream_sharing.dart';
+import 'package:repara_core/stream_sharing.dart';
 
 void main() {
   test('dos llamadas con la misma clave devuelven la misma instancia', () {

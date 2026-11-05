@@ -6,9 +6,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:repara_core/stream_error_logging.dart';
 
 import '../models/invitacion_hogar.dart';
-import 'stream_error_logging.dart';
 
 /// Resultado de responderInvitacionHogar al aceptar: dónde quedó guardado
 /// el trabajo real (casa/elemento/registro), para poder navegar allí

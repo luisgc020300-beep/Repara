@@ -11,6 +11,12 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # Fase 1 de la separación Hogar/Pro (ver informe de arquitectura, sección
+  # 14): paquete compartido de modelos/servicios/utilidades, aún vacío salvo
+  # las utilidades de streams movidas en el Grupo 1.
+  repara_core:
+    path: packages/repara_core
+
   cupertino_icons: ^1.0.8
 
   # Firebase — mismas versiones que RiskRunner/Convive (mismo desarrollador,

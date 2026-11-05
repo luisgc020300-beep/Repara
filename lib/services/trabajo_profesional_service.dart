@@ -9,9 +9,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:repara_core/stream_error_logging.dart';
 
 import '../models/trabajo_profesional.dart';
-import 'stream_error_logging.dart';
 
 /// Resultado de invitarAHogar -- mismo shape que ResultadoInvitacion
 /// (invitacion_service.dart), duplicado a propósito: son conceptos

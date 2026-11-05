@@ -1,9 +1,9 @@
 // lib/services/contacto_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:repara_core/stream_error_logging.dart';
 
 import '../models/contacto.dart';
-import 'stream_error_logging.dart';
 
 class ContactoService {
   /// Seam de solo test -- nunca se asigna en código de producción. Ver

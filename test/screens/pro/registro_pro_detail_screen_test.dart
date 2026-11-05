@@ -19,8 +19,8 @@ import 'package:repara/services/documento_service.dart';
 import 'package:repara/services/pago_service.dart';
 import 'package:repara/services/presupuesto_service.dart';
 import 'package:repara/services/registro_service.dart';
-import 'package:repara/services/stream_sharing.dart';
 import 'package:repara/theme/design_tokens.dart';
+import 'package:repara_core/stream_sharing.dart';
 
 const _casaId = 'casa-1';
 const _elementoId = 'elem-1';

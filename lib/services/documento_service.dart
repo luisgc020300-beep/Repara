@@ -6,10 +6,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
+import 'package:repara_core/stream_error_logging.dart';
+import 'package:repara_core/stream_sharing.dart';
 
 import '../models/documento.dart';
-import 'stream_error_logging.dart';
-import 'stream_sharing.dart';
 
 class SugerenciaIA {
   const SugerenciaIA({

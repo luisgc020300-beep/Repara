@@ -15,6 +15,10 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # stream_error_logging.dart (Grupo 1 de la Fase 1) -- misma versión que la
+  # app principal para evitar divergencia de dependencias compartidas.
+  firebase_crashlytics: ^5.0.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
