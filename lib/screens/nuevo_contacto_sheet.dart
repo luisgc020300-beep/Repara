@@ -11,7 +11,7 @@ import 'package:flutter/material.dart';
 
 import '../models/contacto.dart';
 import '../services/contacto_service.dart';
-import '../theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 import '../widgets/app_error.dart';
 
 Future<void> mostrarNuevoContactoSheet(

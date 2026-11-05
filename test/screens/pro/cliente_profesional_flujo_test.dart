@@ -13,7 +13,7 @@ import 'package:repara/services/cliente_profesional_service.dart';
 import 'package:repara/services/pago_service.dart';
 import 'package:repara/services/registro_service.dart';
 import 'package:repara/services/trabajo_profesional_service.dart';
-import 'package:repara/theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 import 'package:repara_core/cambio_alcance_service.dart';
 import 'package:repara_core/presupuesto_service.dart';
 import 'package:repara_core/profesional_service.dart';

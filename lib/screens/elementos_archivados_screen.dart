@@ -13,7 +13,7 @@ import 'package:intl/intl.dart';
 import '../models/casa.dart';
 import '../models/elemento.dart';
 import '../services/elemento_service.dart';
-import '../theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 import '../widgets/app_error.dart';
 import 'elemento_detail_screen.dart';
 

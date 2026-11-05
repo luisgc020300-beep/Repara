@@ -30,7 +30,7 @@ import 'package:repara_core/cambio_alcance_service.dart';
 
 import '../core/idempotency.dart';
 import '../screens/presupuestos_section.dart' show RolEnTrabajo;
-import '../theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 import '../widgets/app_dialog.dart';
 import '../widgets/app_error.dart';
 import '../widgets/ios_list.dart';

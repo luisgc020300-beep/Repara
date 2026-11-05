@@ -24,7 +24,7 @@ import '../core/service_locator.dart';
 import '../screens/editar_documento_sheet.dart';
 import '../services/security/biometric_service.dart';
 import '../services/security/security_preferences_service.dart';
-import '../theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 import 'app_dialog.dart';
 import 'app_error.dart';
 import 'ios_list.dart';

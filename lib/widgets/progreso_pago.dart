@@ -12,7 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:repara_core/pago.dart';
 
 import '../services/pago_service.dart';
-import '../theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 
 class ProgresoPago extends StatelessWidget {
   const ProgresoPago({required this.casaId, required this.elementoId, required this.registroId, required this.presupuesto, super.key});

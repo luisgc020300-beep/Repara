@@ -13,7 +13,7 @@ import 'package:repara_core/analytics_service.dart';
 
 import '../services/casa_service.dart';
 import '../services/fcm_service.dart';
-import '../theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 import '../widgets/app_error.dart';
 
 class OnboardingCasaScreen extends StatefulWidget {

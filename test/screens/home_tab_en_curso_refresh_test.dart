@@ -21,7 +21,7 @@ import 'package:repara/services/elemento_service.dart';
 import 'package:repara/services/habitacion_service.dart';
 import 'package:repara/services/invitacion_hogar_service.dart';
 import 'package:repara/services/registro_service.dart';
-import 'package:repara/theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 import 'package:repara_core/documento_service.dart';
 import 'package:repara_core/notificacion_service.dart';
 

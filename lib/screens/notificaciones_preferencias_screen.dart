@@ -10,7 +10,7 @@
 import 'package:flutter/material.dart';
 import 'package:repara_core/notificacion_service.dart';
 
-import '../theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 import '../widgets/ios_list.dart';
 
 const _categorias = [

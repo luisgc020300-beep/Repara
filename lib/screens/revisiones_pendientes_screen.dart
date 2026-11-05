@@ -7,7 +7,7 @@ import 'package:intl/intl.dart';
 
 import '../models/casa.dart';
 import '../models/elemento.dart';
-import '../theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 import '../widgets/ios_list.dart';
 import 'elemento_detail_screen.dart';
 

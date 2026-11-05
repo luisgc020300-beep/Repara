@@ -8,7 +8,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 
 class TimelineItem {
   const TimelineItem({

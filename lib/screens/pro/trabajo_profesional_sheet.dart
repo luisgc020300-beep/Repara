@@ -13,7 +13,7 @@ import '../../models/cliente_profesional.dart';
 import '../../models/trabajo_profesional.dart';
 import '../../services/cliente_profesional_service.dart';
 import '../../services/trabajo_profesional_service.dart';
-import '../../theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 import '../../widgets/app_error.dart';
 import '../../widgets/ios_list.dart';
 import 'cliente_profesional_sheet.dart';

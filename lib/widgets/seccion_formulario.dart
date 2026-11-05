@@ -9,7 +9,7 @@
 // (elemento, evento a mano, documento escaneado) se vean exactamente igual.
 import 'package:flutter/material.dart';
 
-import '../theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 
 class SeccionFormulario extends StatelessWidget {
   const SeccionFormulario({

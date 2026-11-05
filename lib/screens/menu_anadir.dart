@@ -7,7 +7,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/casa.dart';
-import '../theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 import '../widgets/ios_list.dart';
 import 'nuevo_documento_flow.dart';
 import 'nuevo_elemento_screen.dart';

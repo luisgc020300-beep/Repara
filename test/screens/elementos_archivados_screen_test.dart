@@ -11,7 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:repara/models/casa.dart';
 import 'package:repara/screens/elementos_archivados_screen.dart';
 import 'package:repara/services/elemento_service.dart';
-import 'package:repara/theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 
 const _casa = Casa(
   id: 'c1',

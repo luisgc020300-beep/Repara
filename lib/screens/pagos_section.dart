@@ -11,7 +11,7 @@ import 'package:intl/intl.dart';
 import 'package:repara_core/pago.dart';
 
 import '../services/pago_service.dart';
-import '../theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 import '../widgets/app_error.dart' show EmptyHint;
 import '../widgets/documento_abrir.dart' show abrirArchivoProtegido;
 import '../widgets/ios_list.dart';

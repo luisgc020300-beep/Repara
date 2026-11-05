@@ -24,7 +24,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/trabajo_profesional.dart';
 import '../../services/trabajo_profesional_service.dart';
-import '../../theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 import '../../widgets/app_error.dart';
 import '../../widgets/boton_ajustes.dart';
 import '../../widgets/ios_list.dart';

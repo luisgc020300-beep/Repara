@@ -9,7 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repara/screens/pro/registro_pro_detail_screen.dart';
 import 'package:repara/services/registro_service.dart';
-import 'package:repara/theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 
 void main() {
   tearDown(() => RegistroService.debugFirestoreOverride = null);

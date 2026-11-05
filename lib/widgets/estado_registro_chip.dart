@@ -8,7 +8,7 @@
 import 'package:flutter/material.dart';
 import 'package:repara_core/registro.dart';
 
-import '../theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 
 String nombreEstadoRegistro(EstadoRegistro e) => switch (e) {
       EstadoRegistro.nuevo => 'Nuevo',

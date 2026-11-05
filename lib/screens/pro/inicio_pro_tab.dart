@@ -19,7 +19,7 @@ import 'package:repara_core/invitacion_service.dart';
 import 'package:repara_core/profesional.dart';
 import 'package:share_plus/share_plus.dart';
 
-import '../../theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 import '../../widgets/app_error.dart';
 import '../../widgets/boton_ajustes.dart';
 import '../../widgets/boton_notificaciones.dart';

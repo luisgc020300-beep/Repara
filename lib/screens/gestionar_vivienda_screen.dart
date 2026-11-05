@@ -13,7 +13,7 @@ import 'package:repara_core/invitacion_service.dart';
 
 import '../models/casa.dart';
 import '../services/casa_service.dart';
-import '../theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 import '../widgets/app_dialog.dart';
 import '../widgets/app_error.dart';
 import '../widgets/ios_list.dart';

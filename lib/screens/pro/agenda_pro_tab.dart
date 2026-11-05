@@ -31,7 +31,7 @@ import 'package:repara_core/cita_service.dart';
 import 'package:repara_core/profesional.dart';
 import 'package:repara_core/profesional_service.dart';
 
-import '../../theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 import '../../widgets/app_dialog.dart';
 import '../../widgets/app_error.dart';
 import '../../widgets/boton_ajustes.dart';

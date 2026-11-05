@@ -11,7 +11,7 @@ import 'package:flutter/material.dart';
 
 import '../services/cuenta_service.dart';
 import '../services/fcm_service.dart';
-import '../theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 import '../widgets/app_dialog.dart';
 import '../widgets/app_error.dart';
 import '../widgets/ios_list.dart';

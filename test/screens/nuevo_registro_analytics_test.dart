@@ -22,7 +22,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:repara/screens/nuevo_registro_screen.dart';
 import 'package:repara/services/contacto_service.dart';
 import 'package:repara/services/registro_service.dart';
-import 'package:repara/theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 
 void main() {
   tearDown(() {

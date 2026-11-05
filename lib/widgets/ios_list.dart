@@ -9,7 +9,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
-import '../theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 
 class IosSection extends StatelessWidget {
   const IosSection({this.header, this.footer, required this.rows, super.key});

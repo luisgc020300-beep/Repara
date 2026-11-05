@@ -30,7 +30,7 @@ import '../core/service_locator.dart';
 import '../models/casa.dart';
 import '../services/security/biometric_service.dart';
 import '../services/security/security_preferences_service.dart';
-import '../theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 import '../theme/theme_controller.dart';
 import '../widgets/app_dialog.dart';
 import '../widgets/app_error.dart';

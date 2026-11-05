@@ -9,7 +9,7 @@ import 'package:repara_core/documento.dart';
 import 'package:repara_core/documento_service.dart';
 
 import '../models/casa.dart';
-import '../theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 import '../widgets/documento_abrir.dart';
 import '../widgets/ios_list.dart';
 import 'nuevo_documento_flow.dart';

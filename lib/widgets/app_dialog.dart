@@ -9,7 +9,7 @@
 // llama, igual que antes (rediseño "REPARA Professional", octubre 2026).
 import 'package:flutter/material.dart';
 
-import '../theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 
 class AppDialog {
   AppDialog._();

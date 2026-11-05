@@ -9,7 +9,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/cliente_profesional.dart';
 import '../../services/cliente_profesional_service.dart';
-import '../../theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 import '../../widgets/app_error.dart';
 
 Future<String?> mostrarEditorClienteProfesional(

@@ -10,7 +10,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repara/screens/registro_simple/registro_simple_progreso.dart';
-import 'package:repara/theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 import 'package:repara_core/registro.dart';
 
 Registro _registro(EstadoRegistro estado) => Registro(

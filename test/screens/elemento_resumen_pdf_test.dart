@@ -19,7 +19,7 @@ import 'package:repara/services/elemento_service.dart';
 import 'package:repara/services/habitacion_service.dart';
 import 'package:repara/services/pago_service.dart';
 import 'package:repara/services/registro_service.dart';
-import 'package:repara/theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 import 'package:repara/widgets/pdf_trabajo.dart';
 import 'package:repara_core/cambio_alcance.dart';
 import 'package:repara_core/cambio_alcance_service.dart';

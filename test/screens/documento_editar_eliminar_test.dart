@@ -17,7 +17,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:repara/models/casa.dart';
 import 'package:repara/screens/documentos_casa_screen.dart';
-import 'package:repara/theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 import 'package:repara_core/documento_service.dart';
 
 const _casa = Casa(

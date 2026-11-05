@@ -14,7 +14,7 @@ import 'package:repara_core/registro.dart';
 
 import '../models/contacto.dart';
 import '../services/contacto_service.dart';
-import '../theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 
 /// Nombres de todos los profesionales unidos con coma, o null si no hay
 /// ninguno -- es lo que se guarda en el campo heredado

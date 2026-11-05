@@ -15,7 +15,7 @@ import 'package:repara_core/pago.dart';
 
 import '../core/idempotency.dart';
 import '../services/pago_service.dart';
-import '../theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 import '../widgets/app_dialog.dart';
 import '../widgets/app_error.dart';
 import '../widgets/miniatura_documento.dart';

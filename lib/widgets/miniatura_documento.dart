@@ -11,7 +11,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
-import '../theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 import 'documento_abrir.dart';
 import 'foto_ampliada_screen.dart';
 

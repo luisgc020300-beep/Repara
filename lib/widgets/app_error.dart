@@ -2,7 +2,7 @@
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
 
-import '../theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 
 /// Feedback de error compartido para acciones de escritura -- sin esto, un
 /// fallo de red deja al usuario sin saber si su acción se guardó o no.

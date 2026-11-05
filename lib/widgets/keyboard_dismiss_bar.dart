@@ -7,7 +7,7 @@
 // salvo adivinar dónde tocar fuera del campo.
 import 'package:flutter/material.dart';
 
-import '../theme/design_tokens.dart';
+import 'package:repara_core/design_tokens.dart';
 
 class KeyboardDismissBar extends StatelessWidget {
   const KeyboardDismissBar({required this.child, super.key});
