@@ -13,8 +13,6 @@ import 'package:repara_core/registro.dart';
 import 'package:repara_core/stream_error_logging.dart';
 import 'package:repara_core/stream_sharing.dart';
 
-import '../models/elemento.dart';
-import 'elemento_service.dart';
 import 'pago_service.dart';
 
 class RegistroService {
@@ -300,57 +298,5 @@ class RegistroService {
           ),
         )
         .conRegistroDeErrores();
-  }
-
-  /// Botón "Trabajos pendientes" de Inicio: una fila por cada REGISTRO
-  /// pendiente, no una por elemento (CEO, octubre 2026) -- antes, si un
-  /// mismo elemento tenía varios registros pendientes a la vez (p.ej. dos
-  /// instalaciones y una reforma, todas sobre "Pérgolas"), solo se
-  /// mostraba la más antigua y el resto desaparecía sin ningún aviso de
-  /// que había más. Lectura puntual (no stream) recorriendo la
-  /// subcolección de registros de cada elemento -- un registro nunca vive
-  /// en una colección a nivel de casa, así que no hay una única consulta
-  /// que lo traiga todo de golpe (mismo patrón que
-  /// ExpedienteViviendaScreen._todosLosRegistros). Ordenado por fecha
-  /// ascendente: el que lleva más tiempo esperando sale primero.
-  static Future<
-    List<
-      ({
-        Elemento elemento,
-        String registroId,
-        String registroTitulo,
-        DateTime fecha,
-        String? fotoUrl,
-      })
-    >
-  >
-  registrosConTrabajoPendiente(String casaId) async {
-    final elementos = await ElementoService.streamElementos(casaId).first;
-    final resultado =
-        <
-          ({
-            Elemento elemento,
-            String registroId,
-            String registroTitulo,
-            DateTime fecha,
-            String? fotoUrl,
-          })
-        >[];
-    for (final elemento in elementos) {
-      final registros = await streamRegistros(casaId, elemento.id).first;
-      for (final r in registros.where(esTrabajoActivo)) {
-        resultado.add((
-          elemento: elemento,
-          registroId: r.id,
-          registroTitulo: r.titulo,
-          fecha: r.fecha,
-          // r.fotos cubre el evento con una sola foto (fotoUrl heredado) y
-          // con varias (fotoUrls) -- ver Registro.fotos.
-          fotoUrl: r.fotos.isNotEmpty ? r.fotos.first : null,
-        ));
-      }
-    }
-    resultado.sort((a, b) => a.fecha.compareTo(b.fecha));
-    return resultado;
   }
 }

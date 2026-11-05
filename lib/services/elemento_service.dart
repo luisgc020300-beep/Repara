@@ -9,6 +9,7 @@ import 'package:repara_core/stream_error_logging.dart';
 import 'package:repara_core/stream_sharing.dart';
 
 import '../models/elemento.dart';
+import 'registro_service.dart';
 
 class ElementoService {
   /// Seam de solo test -- nunca se asigna en código de producción. Ver
@@ -301,5 +302,66 @@ class ElementoService {
       intervaloMeses: (result.data['intervaloMeses'] as num?)?.toInt(),
       motivo: result.data['motivo'] as String?,
     );
+  }
+
+  /// Botón "Trabajos pendientes" de Inicio: una fila por cada REGISTRO
+  /// pendiente, no una por elemento (CEO, octubre 2026) -- antes, si un
+  /// mismo elemento tenía varios registros pendientes a la vez (p.ej. dos
+  /// instalaciones y una reforma, todas sobre "Pérgolas"), solo se
+  /// mostraba la más antigua y el resto desaparecía sin ningún aviso de
+  /// que había más. Lectura puntual (no stream) recorriendo la
+  /// subcolección de registros de cada elemento -- un registro nunca vive
+  /// en una colección a nivel de casa, así que no hay una única consulta
+  /// que lo traiga todo de golpe (mismo patrón que
+  /// ExpedienteViviendaScreen._todosLosRegistros). Ordenado por fecha
+  /// ascendente: el que lleva más tiempo esperando sale primero.
+  ///
+  /// Trasladado desde RegistroService (Fase 1, Grupo 6A, noviembre 2026):
+  /// es un cruce de Elemento + Registro, pero su única razón de ser es
+  /// exclusiva de Hogar (el banner de "Trabajos pendientes" de Inicio), así
+  /// que vive aquí para que RegistroService pueda extraerse a repara_core
+  /// sin arrastrar Elemento/ElementoService.
+  static Future<
+    List<
+      ({
+        Elemento elemento,
+        String registroId,
+        String registroTitulo,
+        DateTime fecha,
+        String? fotoUrl,
+      })
+    >
+  >
+  registrosConTrabajoPendiente(String casaId) async {
+    final elementos = await streamElementos(casaId).first;
+    final resultado =
+        <
+          ({
+            Elemento elemento,
+            String registroId,
+            String registroTitulo,
+            DateTime fecha,
+            String? fotoUrl,
+          })
+        >[];
+    for (final elemento in elementos) {
+      final registros = await RegistroService.streamRegistros(
+        casaId,
+        elemento.id,
+      ).first;
+      for (final r in registros.where(RegistroService.esTrabajoActivo)) {
+        resultado.add((
+          elemento: elemento,
+          registroId: r.id,
+          registroTitulo: r.titulo,
+          fecha: r.fecha,
+          // r.fotos cubre el evento con una sola foto (fotoUrl heredado) y
+          // con varias (fotoUrls) -- ver Registro.fotos.
+          fotoUrl: r.fotos.isNotEmpty ? r.fotos.first : null,
+        ));
+      }
+    }
+    resultado.sort((a, b) => a.fecha.compareTo(b.fecha));
+    return resultado;
   }
 }

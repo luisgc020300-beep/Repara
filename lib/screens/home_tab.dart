@@ -20,7 +20,6 @@ import '../models/invitacion_hogar.dart';
 import '../services/elemento_service.dart';
 import '../services/habitacion_service.dart';
 import '../services/invitacion_hogar_service.dart';
-import '../services/registro_service.dart';
 import 'package:repara_core/design_tokens.dart';
 import '../widgets/app_error.dart';
 import '../widgets/boton_ajustes.dart';
@@ -539,7 +538,7 @@ class _ResumenCasa extends StatelessWidget {
       future: Future.wait([
         ElementoService.conGarantiaProximaAVencer(casa.id),
         ElementoService.conRevisionPendiente(casa.id),
-        RegistroService.registrosConTrabajoPendiente(casa.id),
+        ElementoService.registrosConTrabajoPendiente(casa.id),
       ]),
       builder: (context, snapshot) {
         final garantias = (snapshot.data?[0] as List<Elemento>?) ?? const [];
