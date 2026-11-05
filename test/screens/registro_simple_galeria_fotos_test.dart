@@ -25,7 +25,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:repara/models/casa.dart';
 import 'package:repara/screens/registro_detail_screen.dart';
 import 'package:repara/services/elemento_service.dart';
-import 'package:repara/services/pago_service.dart';
+import 'package:repara_core/pago_service.dart';
 import 'package:repara/services/registro_service.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara/widgets/galeria_fotos_screen.dart';

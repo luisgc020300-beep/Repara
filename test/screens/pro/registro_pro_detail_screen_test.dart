@@ -14,7 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:repara/screens/pro/registro_pro_detail_screen.dart';
-import 'package:repara/services/pago_service.dart';
+import 'package:repara_core/pago_service.dart';
 import 'package:repara/services/registro_service.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_core/cambio_alcance_service.dart';

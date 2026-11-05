@@ -8,7 +8,7 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repara/screens/pro/inicio_pro_tab.dart';
-import 'package:repara/services/pago_service.dart';
+import 'package:repara_core/pago_service.dart';
 import 'package:repara/services/registro_service.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_core/cambio_alcance_service.dart';

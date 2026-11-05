@@ -10,7 +10,7 @@ import '../screens/pago_detail_screen.dart';
 import '../screens/pro/registro_pro_detail_screen.dart';
 import '../screens/registro_detail_screen.dart';
 import 'casa_service.dart';
-import 'pago_service.dart';
+import 'package:repara_core/pago_service.dart';
 import 'registro_service.dart';
 
 Future<void> abrirDestinoNotificacion(

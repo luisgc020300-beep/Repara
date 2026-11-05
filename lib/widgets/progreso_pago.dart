@@ -11,7 +11,7 @@
 import 'package:flutter/material.dart';
 import 'package:repara_core/pago.dart';
 
-import '../services/pago_service.dart';
+import 'package:repara_core/pago_service.dart';
 import 'package:repara_core/design_tokens.dart';
 
 class ProgresoPago extends StatelessWidget {
