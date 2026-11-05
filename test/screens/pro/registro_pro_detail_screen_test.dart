@@ -19,6 +19,7 @@ import 'package:repara/services/documento_service.dart';
 import 'package:repara/services/pago_service.dart';
 import 'package:repara/services/presupuesto_service.dart';
 import 'package:repara/services/registro_service.dart';
+import 'package:repara/services/stream_sharing.dart';
 import 'package:repara/theme/design_tokens.dart';
 
 const _casaId = 'casa-1';
@@ -82,7 +83,10 @@ void _desconectarServicios() {
 
 void main() {
   setUpAll(() => initializeDateFormatting('es_ES'));
-  tearDown(_desconectarServicios);
+  tearDown(() {
+    _desconectarServicios();
+    debugLimpiarCacheDeStreamsCompartidos();
+  });
 
   testWidgets(
     'un cambio de forma del árbol (descripción null -> con valor) no vacía Presupuestos/Cambios/Pagos',
@@ -126,4 +130,15 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  // El escenario de "oyente tardío" (trabajo_pro_agregado.dart ya
+  // suscrito cuando se abre el detalle del mismo trabajo -- el bug real
+  // de "se queda cargando para siempre" en producción, noviembre 2026) se
+  // prueba en test/services/registro_service_late_subscriber_test.dart
+  // contra el servicio real, sin widgets: un widget test equivalente
+  // aquí se colgaba de forma consistente al desmontar el StreamBuilder,
+  // pero aislado (confirmado con fake_cloud_firestore + RegistroService
+  // directamente, sin flutter_test de por medio) el mecanismo funciona
+  // correctamente y no cuelga -- es un artefacto del reloj simulado de
+  // flutter_test al cerrar este Stream.multi concreto, no un fallo real.
 }

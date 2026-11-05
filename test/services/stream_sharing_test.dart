@@ -93,6 +93,68 @@ void main() {
     await sub2.cancel();
   });
 
+  test(
+    'un oyente que se suscribe DESPUÉS de que ya haya llegado un valor lo recibe de inmediato '
+    '(bug real: REPARA Pro se quedaba cargando al entrar a un trabajo porque la lista ya estaba '
+    'suscrita desde antes y el detalle, al llegar tarde, nunca recibía el snapshot inicial)',
+    () async {
+      final origen = StreamController<int>.broadcast();
+      final compartido = origen.stream.compartido('trabajo-tardio');
+
+      // El "primer oyente" -- como trabajo_pro_agregado.dart, que mantiene
+      // su suscripción abierta mientras la pestaña Trabajos está montada.
+      final recibidosTemprano = <int>[];
+      final subTemprano = compartido.listen(recibidosTemprano.add);
+
+      origen.add(1);
+      await Future<void>.delayed(Duration.zero);
+      expect(recibidosTemprano, [1]);
+
+      // El "oyente tardío" -- como el StreamBuilder<Registro?> de
+      // RegistroProDetailScreen, que se suscribe a la MISMA clave después
+      // de que el valor 1 ya haya llegado. Debe recibirlo YA, sin esperar
+      // a un snapshot nuevo que puede no llegar nunca.
+      final recibidosTardio = <int>[];
+      final subTardio = compartido.listen(recibidosTardio.add);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        recibidosTardio,
+        [1],
+        reason: 'debe repetir el último valor conocido al suscribirse, como hace Firestore',
+      );
+
+      // Y un valor nuevo real sigue llegando a ambos con normalidad.
+      origen.add(2);
+      await Future<void>.delayed(Duration.zero);
+      expect(recibidosTemprano, [1, 2]);
+      expect(recibidosTardio, [1, 2]);
+
+      await subTemprano.cancel();
+      await subTardio.cancel();
+      await origen.close();
+    },
+  );
+
+  test('un oyente tardío tras un error recibe también el último error conocido', () async {
+    final origen = StreamController<int>.broadcast();
+    final compartido = origen.stream.compartido('error-tardio');
+
+    final subTemprano = compartido.listen((_) {}, onError: (_) {});
+    origen.addError('fallo previo');
+    await Future<void>.delayed(Duration.zero);
+
+    final erroresTardios = <Object>[];
+    final subTardio = compartido.listen((_) {}, onError: erroresTardios.add);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(erroresTardios, ['fallo previo']);
+
+    await subTemprano.cancel();
+    await subTardio.cancel();
+    await origen.close();
+  });
+
   test('un error del stream real llega a todos los oyentes compartidos', () async {
     final origen = StreamController<int>();
     final compartido1 = origen.stream.compartido('con-error');

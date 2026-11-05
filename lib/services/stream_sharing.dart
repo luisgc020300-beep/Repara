@@ -31,8 +31,23 @@
 // que (a) solo se abre un listener real de Firestore aunque varios widgets
 // pidan los mismos datos, y (b) un StreamBuilder cuyo `stream:` sigue
 // resolviendo a la misma instancia en cada rebuild nunca cancela ni
-// resuscribe -- `StreamBuilder.didUpdateWidget` compara por identidad
-// (`oldWidget.stream != widget.stream`) y aquí deja de cambiar.
+// resuscribe.
+//
+// CORRECCIÓN (misma auditoría, hallazgo en producción -- "al entrar a un
+// trabajo desde REPARA Pro se queda cargando para siempre"): la primera
+// versión de esto usaba un StreamController.broadcast() normal, que NO
+// repite el último valor a un oyente que se suscribe más tarde que otro.
+// trabajo_pro_agregado.dart mantiene suscripciones propias de larga
+// duración a estos mismos streamX() mientras la pestaña Trabajos/Dashboard
+// está montada; en cuanto el profesional entra al detalle de un trabajo
+// concreto, su StreamBuilder se suscribe DESPUÉS de esa suscripción ya
+// viva -- con un broadcast normal, nunca recibía el snapshot inicial (que
+// Firestore sí entrega siempre a cada listener nuevo) y se quedaba en
+// ConnectionState.waiting para siempre. Se arregla con Stream.multi: cada
+// llamada a listen() dispara su propio callback (aunque el stream sea
+// broadcast), así que aquí se le repite a CADA oyente nuevo el último
+// valor o error conocido antes de engancharlo a los eventos futuros --
+// igual que haría Firestore de verdad.
 //
 // Vive por referencia, no por tiempo: la entrada se borra en cuanto el
 // último suscriptor se cancela (p.ej. al cerrar la pantalla), momento en
@@ -42,8 +57,73 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+class _EntradaCompartida<T> {
+  _EntradaCompartida(String clave, Stream<T> Function() crear, void Function(String) onVacia) {
+    stream = Stream<T>.multi((controlador) {
+      // Repetir primero lo último conocido -- si todavía no ha llegado
+      // nada (primer oyente de todos), no hay nada que repetir y sigue
+      // exactamente igual que antes.
+      if (_tieneValor) {
+        controlador.addSync(_ultimoValor as T);
+      } else if (_tieneError) {
+        controlador.addErrorSync(_ultimoError!, _ultimoErrorStack);
+      }
+      _oyentes.add(controlador);
+      controlador.onCancel = () {
+        _oyentes.remove(controlador);
+        if (_oyentes.isEmpty) {
+          onVacia(clave);
+          _subReal?.cancel();
+          _subReal = null;
+        }
+      };
+      // La suscripción real a Firestore se abre UNA sola vez, en cuanto
+      // llega el primer oyente -- los siguientes se enganchan a la misma.
+      // Aquí (a diferencia de la repetición de arriba) se usan las
+      // variantes asíncronas normales: este callback corre en un turno
+      // posterior del event loop, no de forma síncrona dentro de
+      // onListen, que es el único caso que addSync/addErrorSync/closeSync
+      // admiten de verdad.
+      _subReal ??= crear().listen(
+        (valor) {
+          _tieneValor = true;
+          _tieneError = false;
+          _ultimoValor = valor;
+          for (final o in List.of(_oyentes)) {
+            o.add(valor);
+          }
+        },
+        onError: (Object error, StackTrace stack) {
+          _tieneError = true;
+          _ultimoError = error;
+          _ultimoErrorStack = stack;
+          for (final o in List.of(_oyentes)) {
+            o.addError(error, stack);
+          }
+        },
+        onDone: () {
+          onVacia(clave);
+          for (final o in List.of(_oyentes)) {
+            o.close();
+          }
+        },
+      );
+    }, isBroadcast: true);
+  }
+
+  late final Stream<T> stream;
+  final _oyentes = <MultiStreamController<T>>[];
+  StreamSubscription<T>? _subReal;
+
+  bool _tieneValor = false;
+  T? _ultimoValor;
+  bool _tieneError = false;
+  Object? _ultimoError;
+  StackTrace? _ultimoErrorStack;
+}
+
 class _CacheDeStreamsCompartidos {
-  final _entradas = <String, Stream<dynamic>>{};
+  final _entradas = <String, _EntradaCompartida<dynamic>>{};
 
   /// Seam de solo test -- nunca se llama en código de producción. La
   /// caché es un singleton de todo el proceso (en producción solo existe
@@ -59,36 +139,11 @@ class _CacheDeStreamsCompartidos {
 
   Stream<T> obtener<T>(String clave, Stream<T> Function() crear) {
     final existente = _entradas[clave];
-    if (existente != null) return existente as Stream<T>;
+    if (existente != null) return (existente as _EntradaCompartida<T>).stream;
 
-    late final StreamController<T> controller;
-    StreamSubscription<T>? sub;
-    controller = StreamController<T>.broadcast(
-      onListen: () {
-        sub ??= crear().listen(
-          controller.add,
-          onError: controller.addError,
-          onDone: () {
-            _entradas.remove(clave);
-            controller.close();
-          },
-        );
-      },
-      onCancel: () {
-        _entradas.remove(clave);
-        sub?.cancel();
-        sub = null;
-      },
-    );
-    // OJO: `controller.stream` de un StreamController.broadcast() NO es
-    // idempotente -- cada acceso al getter crea un wrapper _BroadcastStream
-    // nuevo (a diferencia de un controller normal, que sí cachea el suyo).
-    // Hay que leerlo UNA sola vez y guardar esa misma referencia, o dos
-    // llamadas con la misma clave dejarían de ser `identical` entre sí y
-    // todo este arreglo no serviría de nada.
-    final stream = controller.stream;
-    _entradas[clave] = stream;
-    return stream;
+    final entrada = _EntradaCompartida<T>(clave, crear, _entradas.remove);
+    _entradas[clave] = entrada;
+    return entrada.stream;
   }
 }
 
@@ -104,7 +159,9 @@ extension CompartirStream<T> on Stream<T> {
   /// Memoiza este stream por [clave]: llamadas repetidas con la misma
   /// clave (incluida la que se produce en cada rebuild de un
   /// StreamBuilder) devuelven la misma instancia en vez de abrir una
-  /// suscripción real nueva.
+  /// suscripción real nueva -- y cualquier oyente que llegue más tarde que
+  /// otro recibe de inmediato el último valor conocido, igual que haría
+  /// Firestore con un listener nuevo.
   Stream<T> compartido(String clave) {
     return _cacheStreamsCompartidos.obtener<T>(clave, () => this);
   }
