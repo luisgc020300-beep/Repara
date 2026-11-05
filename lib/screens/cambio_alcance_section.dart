@@ -24,12 +24,12 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:repara_core/analytics_service.dart';
 import 'package:repara_core/cambio_alcance.dart';
 import 'package:repara_core/cambio_alcance_service.dart';
 
 import '../core/idempotency.dart';
 import '../screens/presupuestos_section.dart' show RolEnTrabajo;
-import '../services/analytics_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_dialog.dart';
 import '../widgets/app_error.dart';

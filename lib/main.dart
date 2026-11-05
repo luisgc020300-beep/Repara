@@ -14,13 +14,13 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
+import 'package:repara_core/analytics_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/service_locator.dart';
 import 'firebase_options.dart';
 import 'screens/casa_gate_screen.dart';
 import 'screens/login_screen.dart';
-import 'services/analytics_service.dart';
 import 'services/casa_service.dart';
 import 'services/notificacion_router.dart';
 import 'theme/design_tokens.dart';

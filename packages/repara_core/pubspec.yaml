@@ -26,6 +26,9 @@ dependencies:
   cloud_functions: 6.0.7
   firebase_auth: ^6.1.4
   firebase_storage: ^13.0.5
+  # analytics_service.dart (Grupo 4 de la Fase 1) -- misma versión que la
+  # app principal.
+  firebase_analytics: ^12.1.0
 
 dev_dependencies:
   flutter_test:

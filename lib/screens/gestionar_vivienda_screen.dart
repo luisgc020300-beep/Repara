@@ -8,10 +8,10 @@ import 'dart:async';
 
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
+import 'package:repara_core/analytics_service.dart';
 import 'package:repara_core/invitacion_service.dart';
 
 import '../models/casa.dart';
-import '../services/analytics_service.dart';
 import '../services/casa_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_dialog.dart';

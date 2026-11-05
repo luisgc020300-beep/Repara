@@ -13,12 +13,12 @@ import 'dart:async';
 
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
+import 'package:repara_core/analytics_service.dart';
 
 import '../models/casa.dart';
 import '../models/contacto.dart';
 import '../models/elemento.dart';
 import '../models/habitacion.dart';
-import '../services/analytics_service.dart';
 import '../services/contacto_service.dart';
 import '../services/elemento_service.dart';
 import '../services/habitacion_service.dart';

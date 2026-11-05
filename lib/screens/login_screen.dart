@@ -4,8 +4,8 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:repara_core/analytics_service.dart';
 
-import '../services/analytics_service.dart';
 import '../theme/design_tokens.dart';
 
 class LoginScreen extends StatefulWidget {

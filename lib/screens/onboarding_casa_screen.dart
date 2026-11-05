@@ -9,8 +9,8 @@ import 'dart:async';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:repara_core/analytics_service.dart';
 
-import '../services/analytics_service.dart';
 import '../services/casa_service.dart';
 import '../services/fcm_service.dart';
 import '../theme/design_tokens.dart';
