@@ -11,6 +11,7 @@ import 'package:repara/screens/pro/clientes_pro_tab.dart';
 import 'package:repara/services/cambio_alcance_service.dart';
 import 'package:repara/services/pago_service.dart';
 import 'package:repara/services/presupuesto_service.dart';
+import 'package:repara/services/cliente_profesional_service.dart';
 import 'package:repara/services/profesional_service.dart';
 import 'package:repara/services/registro_service.dart';
 import 'package:repara/theme/design_tokens.dart';
@@ -24,6 +25,8 @@ void _limpiarOverrides() {
   PagoService.debugFirestoreOverride = null;
   PresupuestoService.debugFirestoreOverride = null;
   CambioAlcanceService.debugFirestoreOverride = null;
+  ClienteProfesionalService.debugFirestoreOverride = null;
+  ClienteProfesionalService.debugUidOverride = null;
 }
 
 void _aplicarOverrides(FakeFirebaseFirestore db) {
@@ -33,6 +36,8 @@ void _aplicarOverrides(FakeFirebaseFirestore db) {
   PagoService.debugFirestoreOverride = db;
   PresupuestoService.debugFirestoreOverride = db;
   CambioAlcanceService.debugFirestoreOverride = db;
+  ClienteProfesionalService.debugFirestoreOverride = db;
+  ClienteProfesionalService.debugUidOverride = _uid;
 }
 
 void main() {

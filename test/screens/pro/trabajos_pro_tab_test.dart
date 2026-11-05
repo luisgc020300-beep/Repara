@@ -8,12 +8,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:repara/models/registro.dart';
+import 'package:repara/models/trabajo_profesional.dart';
 import 'package:repara/screens/pro/trabajos_pro_tab.dart';
 import 'package:repara/services/cambio_alcance_service.dart';
 import 'package:repara/services/pago_service.dart';
 import 'package:repara/services/presupuesto_service.dart';
 import 'package:repara/services/profesional_service.dart';
 import 'package:repara/services/registro_service.dart';
+import 'package:repara/services/trabajo_profesional_service.dart';
 import 'package:repara/theme/design_tokens.dart';
 
 const _uid = 'pro-1';
@@ -99,6 +102,8 @@ void main() {
     PagoService.debugFirestoreOverride = null;
     PresupuestoService.debugFirestoreOverride = null;
     CambioAlcanceService.debugFirestoreOverride = null;
+    TrabajoProfesionalService.debugFirestoreOverride = null;
+    TrabajoProfesionalService.debugUidOverride = null;
   });
 
   testWidgets(
@@ -111,6 +116,8 @@ void main() {
       PagoService.debugFirestoreOverride = db;
       PresupuestoService.debugFirestoreOverride = db;
       CambioAlcanceService.debugFirestoreOverride = db;
+      TrabajoProfesionalService.debugFirestoreOverride = db;
+      TrabajoProfesionalService.debugUidOverride = _uid;
 
       await tester.pumpWidget(
         MaterialApp(
@@ -144,6 +151,8 @@ void main() {
       PagoService.debugFirestoreOverride = db;
       PresupuestoService.debugFirestoreOverride = db;
       CambioAlcanceService.debugFirestoreOverride = db;
+      TrabajoProfesionalService.debugFirestoreOverride = db;
+      TrabajoProfesionalService.debugUidOverride = _uid;
 
       await tester.pumpWidget(
         MaterialApp(
@@ -176,6 +185,48 @@ void main() {
       await tester.tap(find.widgetWithText(ChoiceChip, 'Terminado (1)'));
       await tester.pumpAndSettle();
       expect(find.text('Reparación de tejas'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'la vista Lista muestra una sección Privados con los trabajos propios del profesional',
+    (tester) async {
+      final db = await _seed();
+      ProfesionalService.debugFirestoreOverride = db;
+      ProfesionalService.debugUidOverride = _uid;
+      RegistroService.debugFirestoreOverride = db;
+      PagoService.debugFirestoreOverride = db;
+      PresupuestoService.debugFirestoreOverride = db;
+      CambioAlcanceService.debugFirestoreOverride = db;
+      TrabajoProfesionalService.debugFirestoreOverride = db;
+      TrabajoProfesionalService.debugUidOverride = _uid;
+
+      await TrabajoProfesionalService.crear(
+        const TrabajoProfesional(
+          id: '',
+          clienteId: 'cliente-1',
+          clienteNombre: 'Cliente privado',
+          titulo: 'Trabajo privado sin invitación',
+          tipo: TipoRegistro.reparacion,
+          estado: EstadoTrabajoProfesional.abierto,
+        ),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildReparaLightTheme(),
+          home: const TrabajosProTab(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Privados'), findsOneWidget);
+      expect(find.text('Trabajo privado sin invitación'), findsOneWidget);
+      // El Tablero (compartido) sigue mostrando solo trabajos compartidos --
+      // no se mezcla con los privados, que no tienen las mismas fases.
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Tablero'));
+      await tester.pumpAndSettle();
+      expect(find.text('Trabajo privado sin invitación'), findsNothing);
     },
   );
 }
