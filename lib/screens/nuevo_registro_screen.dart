@@ -35,7 +35,7 @@ import 'package:flutter/material.dart';
 import 'package:repara_core/analytics_service.dart';
 import 'package:repara_core/registro.dart';
 
-import '../services/registro_service.dart';
+import 'package:repara_core/registro_service.dart';
 import 'package:repara_core/design_tokens.dart';
 import '../widgets/app_error.dart';
 import '../widgets/seccion_formulario.dart';

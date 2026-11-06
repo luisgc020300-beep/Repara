@@ -34,7 +34,7 @@ import 'package:repara_core/profesional_service.dart';
 import 'package:repara_core/registro.dart';
 
 import 'package:repara_core/pago_service.dart';
-import '../../services/registro_service.dart';
+import 'package:repara_core/registro_service.dart';
 
 /// Agrupación visual del tablero de Trabajos sobre EstadoRegistro +
 /// EstadoPresupuesto -- nunca un estado nuevo en el modelo de datos (ver

@@ -11,7 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:repara/screens/pro/clientes_pro_tab.dart';
 import 'package:repara/services/cliente_profesional_service.dart';
 import 'package:repara_core/pago_service.dart';
-import 'package:repara/services/registro_service.dart';
+import 'package:repara_core/registro_service.dart';
 import 'package:repara/services/trabajo_profesional_service.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_core/cambio_alcance_service.dart';

@@ -9,7 +9,7 @@ import 'package:repara_core/stream_error_logging.dart';
 import 'package:repara_core/stream_sharing.dart';
 
 import '../models/elemento.dart';
-import 'registro_service.dart';
+import 'package:repara_core/registro_service.dart';
 
 class ElementoService {
   /// Seam de solo test -- nunca se asigna en código de producción. Ver

@@ -26,7 +26,7 @@ import '../models/elemento.dart';
 import '../services/elemento_service.dart';
 import '../services/habitacion_service.dart';
 import 'package:repara_core/pago_service.dart';
-import '../services/registro_service.dart';
+import 'package:repara_core/registro_service.dart';
 import 'package:repara_core/design_tokens.dart';
 import '../widgets/app_error.dart';
 import '../widgets/boton_ajustes.dart';

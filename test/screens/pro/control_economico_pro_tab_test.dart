@@ -11,7 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repara/screens/pro/control_economico_pro_tab.dart';
 import 'package:repara_core/pago_service.dart';
-import 'package:repara/services/registro_service.dart';
+import 'package:repara_core/registro_service.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_core/cambio_alcance_service.dart';
 import 'package:repara_core/presupuesto_service.dart';
