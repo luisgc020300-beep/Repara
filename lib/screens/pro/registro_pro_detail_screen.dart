@@ -12,17 +12,18 @@ import 'package:repara_core/documento.dart';
 import 'package:repara_core/documento_service.dart';
 import 'package:repara_core/registro.dart';
 
+import '../../services/security/documento_gate.dart';
 import 'package:repara_core/pago_service.dart';
 import 'package:repara_core/registro_service.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_ui/app_dialog.dart';
 import 'package:repara_ui/app_error.dart';
+import 'package:repara_ui/cambio_alcance_section.dart';
 import 'package:repara_ui/estado_registro_chip.dart';
 import 'package:repara_ui/ios_list.dart';
+import 'package:repara_ui/pagos_section.dart';
 import '../../widgets/progreso_pago.dart';
-import '../cambio_alcance_section.dart';
 import '../nuevo_documento_flow.dart';
-import '../pagos_section.dart';
 import '../presupuestos_section.dart';
 
 class RegistroProDetailScreen extends StatelessWidget {
@@ -342,6 +343,7 @@ class RegistroProDetailScreen extends StatelessWidget {
                 registroTitulo: registro.titulo,
                 presupuesto: registro.presupuesto,
                 rol: RolEnTrabajo.profesional,
+                verificarAcceso: verificarAccesoDocumentoHogar,
               ),
               const SizedBox(height: 20),
               Row(

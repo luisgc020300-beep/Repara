@@ -9,11 +9,12 @@ Depende de `repara_core` (modelos, servicios, tokens de diseño), nunca al
 revés. No importa nada de `lib/` ni de `apps/`: si un componente que parece
 compartido arrastra una dependencia exclusiva de Hogar o de Pro (una
 pantalla, un servicio de seguridad local, el *service locator* de una app
-concreta...), esa dependencia hay que resolverla primero, o el componente se
-queda donde está. Ver `miniatura_documento.dart` en `lib/widgets/`: bloqueado
-por el gate biométrico de `documento_abrir.dart` (Fase 2B.2, noviembre 2026).
+concreta...), esa dependencia se resuelve como una capacidad inyectada
+(ver `VerificarAccesoDocumento` en `abrir_protegido.dart`, `IniciarAnadirPago`
+en `pagos_section.dart`) o el componente se queda donde está -- nunca se
+importa directamente.
 
-## Contenido (Fase 2B.2)
+## Contenido
 
 - `app_error.dart` -- feedback de error/éxito compartido (`AppError`,
   `EmptyHint`).
@@ -25,3 +26,20 @@ por el gate biométrico de `documento_abrir.dart` (Fase 2B.2, noviembre 2026).
   `iconoTipoRegistro`).
 - `keyboard_dismiss_bar.dart` -- barra para ocultar el teclado
   (`KeyboardDismissBar`).
+- `abrir_protegido.dart` -- apertura de un archivo externo con gate
+  opcional inyectado (`abrirArchivoProtegido`, `VerificarAccesoDocumento`).
+- `foto_ampliada_screen.dart` -- foto a pantalla completa con zoom
+  (`FotoAmpliadaScreen`).
+- `miniatura_documento.dart` -- miniatura clicable de un documento/
+  comprobante (`MiniaturaDocumento`).
+- `pagos_section.dart` -- lista de pagos de un registro (`PagosSection`,
+  `mostrarAccionesPago`, `IniciarAnadirPago`).
+- `pago_detail_screen.dart` -- detalle/alta de un pago (`PagoDetailScreen`).
+- `cambio_alcance_section.dart` -- solicitudes de cambio de alcance
+  (`CambiosAlcanceSection`).
+
+## Qué sigue en `lib/` (Fase 2B.4)
+
+- `presupuestos_section.dart` y `widgets/presupuesto_pdf.dart` -- no se han
+  movido en esta fase (fuera de alcance explícito). `RolEnTrabajo` ya vive en
+  `repara_core/registro.dart`, así que ya no es lo que los bloquea.

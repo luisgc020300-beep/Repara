@@ -29,6 +29,7 @@ import 'package:share_plus/share_plus.dart';
 import '../models/casa.dart';
 import '../models/elemento.dart';
 import '../services/elemento_service.dart';
+import '../services/security/documento_gate.dart';
 import 'package:repara_core/pago_service.dart';
 import 'package:repara_core/registro_service.dart';
 import 'package:repara_core/design_tokens.dart';
@@ -36,15 +37,15 @@ import 'package:repara_ui/app_dialog.dart';
 import 'package:repara_ui/app_error.dart';
 import '../widgets/boton_ajustes.dart';
 import '../widgets/documento_abrir.dart';
+import 'package:repara_ui/cambio_alcance_section.dart';
 import 'package:repara_ui/estado_registro_chip.dart';
 import '../widgets/historial_timeline.dart';
 import 'package:repara_ui/ios_list.dart';
-import 'cambio_alcance_section.dart';
+import 'package:repara_ui/pagos_section.dart';
 import 'contacto_acciones.dart';
 import 'editar_registro_sheet.dart';
 import 'elemento_detail_screen.dart';
 import 'nuevo_documento_flow.dart';
-import 'pagos_section.dart';
 import 'presupuestos_section.dart';
 import 'registro_simple/registro_cabecera.dart';
 import 'registro_simple/registro_resumen_pdf.dart';
@@ -784,6 +785,8 @@ class _CuerpoConProfesionalState extends State<_CuerpoConProfesional> {
                             registroTitulo: registro.titulo,
                             presupuesto: registro.presupuesto,
                             rol: RolEnTrabajo.propietario,
+                            verificarAcceso: verificarAccesoDocumentoHogar,
+                            onAnadirPago: elegirFormaDeAnadirPago,
                           ),
                         ),
                         _DocumentosTab(
@@ -1679,6 +1682,8 @@ class _CuerpoSimple extends StatelessWidget {
                         registroTitulo: registro.titulo,
                         presupuesto: null,
                         rol: RolEnTrabajo.propietario,
+                        verificarAcceso: verificarAccesoDocumentoHogar,
+                        onAnadirPago: elegirFormaDeAnadirPago,
                       ),
                       if (registro.plazoFrecuenciaMeses != null) ...[
                         const SizedBox(height: 20),

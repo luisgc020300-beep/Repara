@@ -31,6 +31,7 @@ import '../models/elemento.dart';
 import '../models/habitacion.dart';
 import '../services/elemento_service.dart';
 import '../services/habitacion_service.dart';
+import '../services/security/documento_gate.dart';
 import 'package:repara_core/pago_service.dart';
 import 'package:repara_core/registro_service.dart';
 import 'package:repara_core/design_tokens.dart';
@@ -41,12 +42,12 @@ import '../widgets/documento_abrir.dart';
 import 'package:repara_ui/estado_registro_chip.dart' show nombreEstadoRegistro;
 import 'package:repara_ui/foto_ampliada_screen.dart';
 import 'package:repara_ui/ios_list.dart';
+import 'package:repara_ui/pagos_section.dart' show mostrarAccionesPago;
 import '../widgets/pdf_trabajo.dart';
 import 'elemento_resumen_pdf.dart';
 import 'nuevo_documento_flow.dart';
 import 'nuevo_elemento_screen.dart';
 import 'nuevo_registro_screen.dart';
-import 'pagos_section.dart' show mostrarAccionesPago;
 import 'registro_detail_screen.dart';
 
 class ElementoDetailScreen extends StatelessWidget {
@@ -1605,6 +1606,7 @@ class _PagoDocumentoTile extends StatelessWidget {
         presupuesto: registro.presupuesto,
         editable: true,
         pago: pago,
+        verificarAcceso: verificarAccesoDocumentoHogar,
       ),
     );
   }

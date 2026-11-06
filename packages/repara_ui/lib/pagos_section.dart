@@ -1,4 +1,4 @@
-// lib/screens/pagos_section.dart
+// packages/repara_ui/lib/pagos_section.dart
 //
 // Lista de pagos de un registro, con fecha e importe a simple vista --
 // tocar uno abre un menú (abrir comprobante, editar datos). Eliminar un
@@ -6,19 +6,40 @@
 // repite aquí, mismo criterio que registro_simple_acciones.dart ("se
 // quitaron de aquí porque duplicaban"). Apartado propio dentro del
 // registro, separado del resumen de progreso (ver widgets/progreso_pago.dart).
+//
+// [verificarAcceso]/[onAnadirPago] (Fase 2B.4, noviembre 2026): capacidades
+// inyectadas, mismo criterio que abrir_protegido.dart -- el gate biométrico
+// y el flujo de "Añadir pago" (que abre el escáner de documentos, exclusivo
+// de Hogar por ahora) nunca se importan directamente aquí. Sin
+// [onAnadirPago], el botón de añadir simplemente no se muestra -- hoy eso
+// nunca ocurre para Hogar (único rol que lo necesita, siempre lo pasa) y a
+// Pro (rol profesional) no le hace falta: ese botón ya estaba oculto para
+// él antes de esta separación.
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:repara_core/pago.dart';
-
 import 'package:repara_core/pago_service.dart';
+import 'package:repara_core/registro.dart' show RolEnTrabajo;
+
+import 'abrir_protegido.dart';
+import 'app_error.dart' show EmptyHint;
 import 'package:repara_core/design_tokens.dart';
-import '../services/security/documento_gate.dart';
-import 'package:repara_ui/abrir_protegido.dart';
-import 'package:repara_ui/app_error.dart' show EmptyHint;
-import 'package:repara_ui/ios_list.dart';
-import 'nuevo_documento_flow.dart' show elegirFormaDeAnadirPago;
+import 'ios_list.dart';
 import 'pago_detail_screen.dart';
-import 'presupuestos_section.dart' show RolEnTrabajo;
+
+/// Abre el flujo de "escanear un recibo o rellenarlo a mano" para un pago
+/// nuevo -- en la app, `elegirFormaDeAnadirPago` de nuevo_documento_flow.dart
+/// (exclusivo de Hogar hoy: usa el escáner de documentos con IA).
+typedef IniciarAnadirPago =
+    void Function(
+      BuildContext context, {
+      required String casaId,
+      required String elementoId,
+      required String registroId,
+      required String registroTitulo,
+      required double? presupuesto,
+      required String conceptoSugerido,
+    });
 
 class PagosSection extends StatelessWidget {
   const PagosSection({
@@ -28,6 +49,8 @@ class PagosSection extends StatelessWidget {
     required this.registroTitulo,
     required this.presupuesto,
     required this.rol,
+    this.verificarAcceso,
+    this.onAnadirPago,
     super.key,
   });
 
@@ -37,6 +60,8 @@ class PagosSection extends StatelessWidget {
   final String registroTitulo;
   final double? presupuesto;
   final RolEnTrabajo rol;
+  final VerificarAccesoDocumento? verificarAcceso;
+  final IniciarAnadirPago? onAnadirPago;
 
   @override
   Widget build(BuildContext context) {
@@ -69,9 +94,9 @@ class PagosSection extends StatelessWidget {
                     ],
                   ],
                 ),
-                if (editable)
+                if (editable && onAnadirPago != null)
                   TextButton.icon(
-                    onPressed: () => elegirFormaDeAnadirPago(
+                    onPressed: () => onAnadirPago!(
                       context,
                       casaId: casaId,
                       elementoId: elementoId,
@@ -117,6 +142,7 @@ class PagosSection extends StatelessWidget {
                           presupuesto: presupuesto,
                           editable: editable,
                           pago: p,
+                          verificarAcceso: verificarAcceso,
                         ),
                       ),
                     )
@@ -140,6 +166,7 @@ Future<void> mostrarAccionesPago(
   required double? presupuesto,
   required bool editable,
   required Pago pago,
+  VerificarAccesoDocumento? verificarAcceso,
 }) {
   final tieneComprobante = (pago.comprobante ?? '').isNotEmpty;
   return showModalBottomSheet<void>(
@@ -176,7 +203,7 @@ Future<void> mostrarAccionesPago(
                       abrirArchivoProtegido(
                         context,
                         pago.comprobante!,
-                        verificarAcceso: verificarAccesoDocumentoHogar,
+                        verificarAcceso: verificarAcceso,
                       );
                     },
                   ),
@@ -197,6 +224,7 @@ Future<void> mostrarAccionesPago(
                           presupuesto: presupuesto,
                           editable: editable,
                           pago: pago,
+                          verificarAcceso: verificarAcceso,
                         ),
                       ),
                     );

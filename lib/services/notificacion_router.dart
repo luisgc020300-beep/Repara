@@ -6,12 +6,13 @@
 import 'package:flutter/material.dart';
 import 'package:repara_core/notificacion.dart';
 
-import '../screens/pago_detail_screen.dart';
 import '../screens/pro/registro_pro_detail_screen.dart';
 import '../screens/registro_detail_screen.dart';
 import 'casa_service.dart';
+import 'security/documento_gate.dart';
 import 'package:repara_core/pago_service.dart';
 import 'package:repara_core/registro_service.dart';
+import 'package:repara_ui/pago_detail_screen.dart';
 
 Future<void> abrirDestinoNotificacion(
   BuildContext context, {
@@ -49,6 +50,7 @@ Future<void> abrirDestinoNotificacion(
           presupuesto: registro.presupuesto,
           editable: false,
           pago: pago,
+          verificarAcceso: verificarAccesoDocumentoHogar,
         ),
       ),
     );

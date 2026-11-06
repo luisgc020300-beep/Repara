@@ -43,6 +43,14 @@ String nombreTipoRegistro(TipoRegistro t) => switch (t) {
   TipoRegistro.nota => 'Nota',
 };
 
+/// El rol de quien mira un registro CON profesional -- decide qué puede
+/// editar y qué acciones ve (presupuestos_section.dart, cambio_alcance_
+/// section.dart, pagos_section.dart). Vivía dentro de presupuestos_section.
+/// dart hasta la Fase 2B.4 (noviembre 2026): al mover las otras dos
+/// secciones a repara_ui, un enum tan simple no podía seguir atado a una
+/// sola pantalla de Hogar.
+enum RolEnTrabajo { propietario, profesional }
+
 // pendienteConfirmacion: el profesional dice que ha terminado, pero el
 // propietario todavía no lo ha confirmado ni rechazado -- modelo de dos
 // pasos (auditoría de producto, octubre 2026) en vez de que cualquiera de

@@ -21,7 +21,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:repara/models/casa.dart';
-import 'package:repara/screens/pago_detail_screen.dart';
 import 'package:repara/screens/registro_detail_screen.dart';
 import 'package:repara/services/elemento_service.dart';
 import 'package:repara_core/pago_service.dart';
@@ -29,6 +28,7 @@ import 'package:repara_core/registro_service.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_core/documento_service.dart';
 import 'package:repara_core/historial_service.dart';
+import 'package:repara_ui/pago_detail_screen.dart';
 
 const _casa = Casa(
   id: 'c1',

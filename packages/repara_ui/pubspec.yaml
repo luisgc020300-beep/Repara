@@ -25,6 +25,11 @@ dependencies:
   cached_network_image: ^3.4.1
   # abrir_protegido.dart (Fase 2B.3) -- misma versión que la app principal.
   url_launcher: ^6.3.1
+  # pagos_section.dart, pago_detail_screen.dart, cambio_alcance_section.dart
+  # (Fase 2B.4) -- mismas versiones que la app principal.
+  intl: ^0.20.2
+  cloud_functions: 6.0.7
+  image_picker: ^1.1.2
 
 dev_dependencies:
   flutter_test:
@@ -34,6 +39,11 @@ dev_dependencies:
   # miniatura_documento.dart -- transitiva de url_launcher, declarada aquí
   # porque se importa directamente.
   url_launcher_platform_interface: ^2.3.2
+  # Firestore falso en los tests de pagos_section.dart/pago_detail_screen.
+  # dart/cambio_alcance_section.dart -- mismas versiones que la app
+  # principal; cloud_firestore se usa directamente para Timestamp.
+  fake_cloud_firestore: ^4.1.0
+  cloud_firestore: ^6.1.2
 
 flutter:
   # Paquete de widgets puros -- sin assets propios.

@@ -13,6 +13,7 @@ import 'package:repara/screens/presupuestos_section.dart';
 import 'package:repara_core/conceptos_frecuentes_service.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_core/presupuesto_service.dart';
+import 'package:repara_core/registro.dart' show RolEnTrabajo;
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {

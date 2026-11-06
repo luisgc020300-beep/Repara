@@ -25,6 +25,7 @@ import 'package:repara_core/analytics_service.dart';
 import 'package:repara_core/conceptos_frecuentes_service.dart';
 import 'package:repara_core/presupuesto.dart';
 import 'package:repara_core/presupuesto_service.dart';
+import 'package:repara_core/registro.dart' show RolEnTrabajo;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:repara_core/design_tokens.dart';
@@ -38,8 +39,6 @@ import '../widgets/presupuesto_pdf.dart';
 // parecido. Local, no por Firestore -- evita abrir una vía de lectura
 // entre casas distintas solo para esto.
 const _claveUltimaPlantilla = 'repara_ultima_plantilla_presupuesto';
-
-enum RolEnTrabajo { propietario, profesional }
 
 class PresupuestosSection extends StatelessWidget {
   const PresupuestosSection({

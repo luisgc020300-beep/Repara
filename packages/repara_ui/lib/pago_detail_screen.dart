@@ -1,25 +1,29 @@
-// lib/screens/pago_detail_screen.dart
+// packages/repara_ui/lib/pago_detail_screen.dart
 //
 // Detalle de un pago concreto de un registro, con aspecto de recibo formal
 // (número, fecha, filas con regla) -- editable para el propietario (quien
 // registra lo que ha pagado), solo lectura para el profesional asignado a
 // ese registro (se entera de todo el detalle sin poder tocarlo). Ver
-// screens/pagos_section.dart para el listado que abre esta pantalla.
+// pagos_section.dart para el listado que abre esta pantalla.
+//
+// [verificarAcceso] (Fase 2B.4, noviembre 2026): capacidad inyectada para
+// el comprobante adjunto, igual que en miniatura_documento.dart -- el gate
+// biométrico real de Hogar nunca se importa aquí directamente.
 import 'dart:async';
 
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:repara_core/analytics_service.dart';
+import 'package:repara_core/idempotency.dart';
 import 'package:repara_core/pago.dart';
-
-import '../core/idempotency.dart';
 import 'package:repara_core/pago_service.dart';
+
+import 'abrir_protegido.dart';
+import 'app_dialog.dart';
+import 'app_error.dart';
 import 'package:repara_core/design_tokens.dart';
-import '../services/security/documento_gate.dart';
-import 'package:repara_ui/app_dialog.dart';
-import 'package:repara_ui/app_error.dart';
-import 'package:repara_ui/miniatura_documento.dart';
+import 'miniatura_documento.dart';
 
 class PagoDetailScreen extends StatefulWidget {
   const PagoDetailScreen({
@@ -34,6 +38,7 @@ class PagoDetailScreen extends StatefulWidget {
     this.fechaSugerida,
     this.importeSugerido,
     this.comprobanteSugerido,
+    this.verificarAcceso,
     super.key,
   });
 
@@ -69,6 +74,10 @@ class PagoDetailScreen extends StatefulWidget {
   /// se usa al crear un pago nuevo; al editar manda el de widget.pago.
   final String? comprobanteSugerido;
 
+  /// Capacidad inyectada para abrir el comprobante adjunto (ver
+  /// MiniaturaDocumento) -- sin ella, se abre sin gate.
+  final VerificarAccesoDocumento? verificarAcceso;
+
   @override
   State<PagoDetailScreen> createState() => _PagoDetailScreenState();
 }
@@ -98,7 +107,7 @@ class _PagoDetailScreenState extends State<PagoDetailScreen> {
   /// de "Guardar") -- si el guardado falla y el usuario vuelve a intentar
   /// sobre esta misma pantalla, reutiliza el mismo valor para que un
   /// reintento de red no pueda duplicar el pago en servidor (ver
-  /// lib/core/idempotency.dart). Solo aplica a pagos nuevos: editar es
+  /// repara_core/idempotency.dart). Solo aplica a pagos nuevos: editar es
   /// idempotente por naturaleza (reaplicar el mismo importe no duplica
   /// nada).
   late final String _clientRequestId = generarIdempotencyKey();
@@ -528,7 +537,7 @@ class _PagoDetailScreenState extends State<PagoDetailScreen> {
               MiniaturaDocumento(
                 url: _comprobante,
                 nombreArchivo: 'comprobante',
-                verificarAcceso: verificarAccesoDocumentoHogar,
+                verificarAcceso: widget.verificarAcceso,
               ),
             ],
           ],

@@ -1,4 +1,4 @@
-// test/screens/cambio_alcance_cancelar_test.dart
+// packages/repara_ui/test/cambio_alcance_section_test.dart
 //
 // Cancelar un cambio de alcance pendiente (iteración R2, defecto 1): el
 // botón solo debe verse cuando el servidor lo permitiría (pendiente, rol
@@ -16,10 +16,10 @@
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:repara/screens/cambio_alcance_section.dart';
-import 'package:repara/screens/presupuestos_section.dart' show RolEnTrabajo;
-import 'package:repara_core/design_tokens.dart';
 import 'package:repara_core/cambio_alcance_service.dart';
+import 'package:repara_core/design_tokens.dart';
+import 'package:repara_core/registro.dart' show RolEnTrabajo;
+import 'package:repara_ui/cambio_alcance_section.dart';
 
 const _casaId = 'c1';
 const _elementoId = 'e1';

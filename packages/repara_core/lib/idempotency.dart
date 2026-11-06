@@ -1,4 +1,4 @@
-// lib/core/idempotency.dart
+// packages/repara_core/lib/idempotency.dart
 //
 // Clave de idempotencia estable por intento lógico de usuario (crear un
 // pago, crear un cambio de alcance), para que una Cloud Function pueda usar
