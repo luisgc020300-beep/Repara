@@ -19,10 +19,39 @@ dependencies:
 
   cupertino_icons: ^1.0.8
 
+  # Bootstrap de Firebase (mismo proyecto compartido repara-hogar-app, ver
+  # README.md) -- misma versión que la app principal.
+  firebase_core: ^4.4.0
+  firebase_auth: ^6.1.4
+  firebase_app_check: ^0.4.3
+  firebase_crashlytics: ^5.0.0
+  cloud_firestore: ^6.1.2
+  cloud_functions: 6.0.7
+  # main.dart apunta Storage al emulador en modo USE_EMULATOR (documentos
+  # subidos por el profesional, ver DocumentoService en repara_core) --
+  # misma versión que la app principal.
+  firebase_storage: ^13.0.5
+  intl: ^0.20.2
+  # trabajo_profesional_sheet.dart/inicio_pro_tab.dart (código de invitación
+  # a compartir) -- misma versión que la app principal.
+  share_plus: ^10.1.4
+  # control_economico_pro_tab.dart (gráfica de ingresos) -- misma versión
+  # que la app principal.
+  fl_chart: ^0.69.2
+
+# Mismo conflicto que packages/repara_ui/pubspec.yaml (ver su comentario):
+# dentro del grafo de dependencias más pequeño de esta app, pdf 3.12.0
+# resuelve a image 4.11.0, incompatible con archive 4.0.9
+# (ZLibDecoder.decodeLazy no existe ahí) -- se fija la misma versión que ya
+# usa el resto del monorepo.
+dependency_overrides:
+  image: 4.10.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  fake_cloud_firestore: ^4.1.0
 
 flutter:
   uses-material-design: true
