@@ -1,0 +1,28 @@
+name: repara_hogar
+description: "REPARA Hogar — la app del propietario, lado de la separación Hogar/Pro."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.8
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Paquetes compartidos con REPARA Pro -- nunca al revés.
+  repara_core:
+    path: ../../packages/repara_core
+  repara_ui:
+    path: ../../packages/repara_ui
+
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
