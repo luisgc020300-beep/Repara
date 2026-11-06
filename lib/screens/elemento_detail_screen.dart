@@ -39,7 +39,7 @@ import 'package:repara_ui/app_error.dart';
 import '../widgets/boton_ajustes.dart';
 import '../widgets/documento_abrir.dart';
 import 'package:repara_ui/estado_registro_chip.dart' show nombreEstadoRegistro;
-import '../widgets/foto_ampliada_screen.dart';
+import 'package:repara_ui/foto_ampliada_screen.dart';
 import 'package:repara_ui/ios_list.dart';
 import '../widgets/pdf_trabajo.dart';
 import 'elemento_resumen_pdf.dart';

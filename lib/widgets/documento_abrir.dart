@@ -18,13 +18,11 @@
 import 'package:flutter/material.dart';
 import 'package:repara_core/documento.dart';
 import 'package:repara_core/documento_service.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-import '../core/service_locator.dart';
 import '../screens/editar_documento_sheet.dart';
-import '../services/security/biometric_service.dart';
-import '../services/security/security_preferences_service.dart';
+import '../services/security/documento_gate.dart';
 import 'package:repara_core/design_tokens.dart';
+import 'package:repara_ui/abrir_protegido.dart';
 import 'package:repara_ui/app_dialog.dart';
 import 'package:repara_ui/app_error.dart';
 import 'package:repara_ui/ios_list.dart';
@@ -148,27 +146,9 @@ Future<void> abrirDocumento(BuildContext context, Documento documento) async {
     );
     return;
   }
-  await abrirArchivoProtegido(context, documento.url);
-}
-
-/// Mismo gate biométrico de arriba, pero recibiendo la url suelta en vez de
-/// un Documento entero -- lo reutiliza MiniaturaDocumento (CEO, noviembre
-/// 2026) para el comprobante de un Pago, que no es un Documento de la
-/// colección de siempre.
-Future<void> abrirArchivoProtegido(BuildContext context, String url) async {
-  if (await SecurityPreferencesService.instance.isDocumentProtectionEnabled()) {
-    final verificado =
-        await sl<BiometricService>().authenticate(
-          'Verifica tu identidad para abrir este documento',
-        ) ==
-        BiometricAuthResult.success;
-    if (!verificado) return;
-  }
-  if (!context.mounted) return;
-  final uri = Uri.tryParse(url);
-  if (uri == null ||
-      !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-    if (context.mounted)
-      AppError.show(context, 'No se pudo abrir el documento.');
-  }
+  await abrirArchivoProtegido(
+    context,
+    documento.url,
+    verificarAcceso: verificarAccesoDocumentoHogar,
+  );
 }

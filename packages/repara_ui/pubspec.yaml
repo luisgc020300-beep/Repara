@@ -20,13 +20,20 @@ dependencies:
 
   # app_error.dart (Fase 2B.2) -- misma versión que la app principal.
   firebase_crashlytics: ^5.0.0
-  # ios_list.dart (Fase 2B.2) -- misma versión que la app principal.
+  # ios_list.dart y miniatura_documento.dart (Fase 2B.2/2B.3) -- misma
+  # versión que la app principal.
   cached_network_image: ^3.4.1
+  # abrir_protegido.dart (Fase 2B.3) -- misma versión que la app principal.
+  url_launcher: ^6.3.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  # Fake de UrlLauncherPlatform en los tests de abrir_protegido.dart/
+  # miniatura_documento.dart -- transitiva de url_launcher, declarada aquí
+  # porque se importa directamente.
+  url_launcher_platform_interface: ^2.3.2
 
 flutter:
   # Paquete de widgets puros -- sin assets propios.

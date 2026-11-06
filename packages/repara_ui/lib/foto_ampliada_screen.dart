@@ -1,4 +1,4 @@
-// lib/widgets/foto_ampliada_screen.dart
+// packages/repara_ui/lib/foto_ampliada_screen.dart
 //
 // Foto a pantalla completa, con zoom (pellizcar para ampliar) --
 // InteractiveViewer basta, sin necesidad de ningún paquete nuevo. Movido

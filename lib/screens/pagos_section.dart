@@ -12,8 +12,9 @@ import 'package:repara_core/pago.dart';
 
 import 'package:repara_core/pago_service.dart';
 import 'package:repara_core/design_tokens.dart';
+import '../services/security/documento_gate.dart';
+import 'package:repara_ui/abrir_protegido.dart';
 import 'package:repara_ui/app_error.dart' show EmptyHint;
-import '../widgets/documento_abrir.dart' show abrirArchivoProtegido;
 import 'package:repara_ui/ios_list.dart';
 import 'nuevo_documento_flow.dart' show elegirFormaDeAnadirPago;
 import 'pago_detail_screen.dart';
@@ -172,7 +173,11 @@ Future<void> mostrarAccionesPago(
                     title: 'Abrir documento',
                     onTap: () {
                       Navigator.pop(ctx);
-                      abrirArchivoProtegido(context, pago.comprobante!);
+                      abrirArchivoProtegido(
+                        context,
+                        pago.comprobante!,
+                        verificarAcceso: verificarAccesoDocumentoHogar,
+                      );
                     },
                   ),
                 IosRow(

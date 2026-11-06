@@ -16,9 +16,10 @@ import 'package:repara_core/pago.dart';
 import '../core/idempotency.dart';
 import 'package:repara_core/pago_service.dart';
 import 'package:repara_core/design_tokens.dart';
+import '../services/security/documento_gate.dart';
 import 'package:repara_ui/app_dialog.dart';
 import 'package:repara_ui/app_error.dart';
-import '../widgets/miniatura_documento.dart';
+import 'package:repara_ui/miniatura_documento.dart';
 
 class PagoDetailScreen extends StatefulWidget {
   const PagoDetailScreen({
@@ -527,6 +528,7 @@ class _PagoDetailScreenState extends State<PagoDetailScreen> {
               MiniaturaDocumento(
                 url: _comprobante,
                 nombreArchivo: 'comprobante',
+                verificarAcceso: verificarAccesoDocumentoHogar,
               ),
             ],
           ],

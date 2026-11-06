@@ -1,29 +1,37 @@
-// lib/widgets/miniatura_documento.dart
+// packages/repara_ui/lib/miniatura_documento.dart
 //
 // Miniatura clicable de un documento/comprobante ya guardado (CEO,
 // noviembre 2026: "en editar documento, ya sea factura, presupuesto o
 // pagos, también quiero que aparezca una imagen del documento clicable y
 // se amplíe al clicarla"). Una imagen se amplía con FotoAmpliadaScreen --
 // igual que la foto de un elemento/registro, sin gate biométrico (ese gate
-// es solo para abrir el ARCHIVO en sí, ver documento_abrir.dart). Un PDF no
-// se puede previsualizar inline, así que se abre con el visor externo
-// protegido de siempre.
+// es solo para abrir el ARCHIVO en sí, vía [verificarAcceso]). Un PDF no se
+// puede previsualizar inline, así que se abre con el visor externo
+// protegido (ver abrir_protegido.dart).
+//
+// [verificarAcceso] (Fase 2B.3, noviembre 2026): capacidad inyectada, igual
+// que en abrir_protegido.dart -- Hogar pasa el gate biométrico real
+// (lib/services/security/documento_gate.dart en la app), Pro puede pasar
+// null (sin depender de servicios exclusivos de Hogar) o su propia
+// capacidad el día que la tenga.
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+import 'abrir_protegido.dart';
 import 'package:repara_core/design_tokens.dart';
-import 'documento_abrir.dart';
 import 'foto_ampliada_screen.dart';
 
 class MiniaturaDocumento extends StatelessWidget {
   const MiniaturaDocumento({
     required this.url,
     required this.nombreArchivo,
+    this.verificarAcceso,
     super.key,
   });
 
   final String url;
   final String nombreArchivo;
+  final VerificarAccesoDocumento? verificarAcceso;
 
   bool get _esPdf =>
       nombreArchivo.toLowerCase().endsWith('.pdf') ||
@@ -34,7 +42,7 @@ class MiniaturaDocumento extends StatelessWidget {
     return GestureDetector(
       onTap: () {
         if (_esPdf) {
-          abrirArchivoProtegido(context, url);
+          abrirArchivoProtegido(context, url, verificarAcceso: verificarAcceso);
         } else {
           Navigator.push(
             context,
