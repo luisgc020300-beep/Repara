@@ -25,6 +25,37 @@ jobs:
         run: flutter analyze --no-fatal-infos
       - name: Flutter test
         run: flutter test
+      # repara_core/repara_ui (paquetes compartidos) y repara_pro/repara_hogar
+      # (apps independientes, en construcción -- ver README.md de cada una)
+      # son paquetes Flutter aparte, cada uno con su propio pubspec.yaml --
+      # necesitan su propio `pub get` antes de que `flutter analyze` pueda
+      # resolver sus imports (si no, el analyze de la raíz, que SÍ recorre
+      # estos subdirectorios, falla con uri_does_not_exist aunque el código
+      # esté bien).
+      - name: Flutter pub get + analyze + test (packages/repara_core)
+        working-directory: packages/repara_core
+        run: |
+          flutter pub get
+          flutter analyze --no-fatal-infos
+          flutter test
+      - name: Flutter pub get + analyze + test (packages/repara_ui)
+        working-directory: packages/repara_ui
+        run: |
+          flutter pub get
+          flutter analyze --no-fatal-infos
+          flutter test
+      - name: Flutter pub get + analyze + test (apps/repara_pro)
+        working-directory: apps/repara_pro
+        run: |
+          flutter pub get
+          flutter analyze --no-fatal-infos
+          flutter test
+      - name: Flutter pub get + analyze + test (apps/repara_hogar)
+        working-directory: apps/repara_hogar
+        run: |
+          flutter pub get
+          flutter analyze --no-fatal-infos
+          flutter test
       - name: Setup Node
         uses: actions/setup-node@v4
         with:

@@ -29,3 +29,11 @@ linter:
 analyzer:
   exclude:
     - "**/node_modules/**"
+    # apps/* y packages/* son paquetes Flutter aparte (cada uno con su
+    # propio pubspec.yaml y analysis_options.yaml) -- sin esto, el
+    # `flutter analyze` de la raíz los recorre igualmente pero sin su
+    # propio `.dart_tool/package_config.json` resuelto, y falla con
+    # uri_does_not_exist aunque esos paquetes estén bien. Se analizan por
+    # separado (ver .github/workflows/main.yml).
+    - "apps/**"
+    - "packages/**"
