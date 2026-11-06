@@ -1,4 +1,4 @@
-// lib/services/conceptos_frecuentes_service.dart
+// packages/repara_core/lib/conceptos_frecuentes_service.dart
 //
 // Biblioteca de conceptos frecuentes de presupuesto (ampliación REPARA Pro,
 // Fase 3 -- CEO, noviembre 2026): "Desplazamiento", "Mano de obra",

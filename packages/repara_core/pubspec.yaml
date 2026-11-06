@@ -29,6 +29,9 @@ dependencies:
   # analytics_service.dart (Grupo 4 de la Fase 1) -- misma versión que la
   # app principal.
   firebase_analytics: ^12.1.0
+  # conceptos_frecuentes_service.dart (Fase 2, preparación repara_ui,
+  # noviembre 2026) -- misma versión que la app principal.
+  shared_preferences: ^2.3.0
 
 dev_dependencies:
   flutter_test:

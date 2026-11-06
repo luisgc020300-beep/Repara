@@ -5,7 +5,7 @@
 // duplicar, eliminar quita solo ese concepto, y un valor local corrupto
 // nunca debe hacer fallar la lectura.
 import 'package:flutter_test/flutter_test.dart';
-import 'package:repara/services/conceptos_frecuentes_service.dart';
+import 'package:repara_core/conceptos_frecuentes_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
