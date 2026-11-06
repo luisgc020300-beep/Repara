@@ -20,7 +20,7 @@ import 'package:repara_core/registro.dart';
 
 import '../../models/casa.dart';
 import 'package:repara_ui/estado_registro_chip.dart';
-import '../../widgets/pdf_fuente_unicode.dart';
+import 'package:repara_ui/pdf_fuente_unicode.dart';
 
 // Mismos tonos de marca que ReparaColors.light (theme/design_tokens.dart)
 // -- el paquete pdf no puede leer un ThemeExtension de Flutter, así que se

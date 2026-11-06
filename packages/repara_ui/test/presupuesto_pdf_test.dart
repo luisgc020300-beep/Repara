@@ -1,19 +1,22 @@
-// test/widgets/presupuesto_pdf_test.dart
+// packages/repara_ui/test/presupuesto_pdf_test.dart
 //
 // Documento de presupuesto en PDF (ampliación REPARA Pro, Fase 3, noviembre
 // 2026): prueba de humo -- construye bytes de verdad sin lanzar, con y sin
 // los campos opcionales (casaNombre no siempre está disponible del lado
-// profesional, ver presupuestos_section.dart).
+// profesional, ver presupuestos_section.dart). También es la prueba real de
+// que la fuente Unicode se carga bien como asset DEL PROPIO PAQUETE (ver
+// pdf_fuente_unicode.dart, Fase 2B.5) -- si la ruta 'packages/repara_ui/...'
+// estuviera mal, esto fallaría con un error de asset no encontrado.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:repara/widgets/presupuesto_pdf.dart';
 import 'package:repara_core/presupuesto.dart';
+import 'package:repara_ui/presupuesto_pdf.dart';
 
 void main() {
   // testWidgets, no test: cargarTemaPdfUnicode() carga la fuente como asset
   // (rootBundle), que exige un binding de Flutter inicializado -- testWidgets
   // lo hace por nosotros, igual que el resto de pruebas de PDF del repo
-  // (ver expediente_vivienda_pdf_test.dart).
+  // (ver expediente_vivienda_pdf_test.dart en la app).
   setUpAll(() => initializeDateFormatting('es_ES'));
 
   testWidgets('construirBytes() genera un PDF no vacío con todos los campos', (

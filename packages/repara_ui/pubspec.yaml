@@ -30,6 +30,24 @@ dependencies:
   intl: ^0.20.2
   cloud_functions: 6.0.7
   image_picker: ^1.1.2
+  # presupuestos_section.dart (plantilla local) y presupuesto_pdf.dart/
+  # pdf_fuente_unicode.dart (Fase 2B.5) -- mismas versiones que la app
+  # principal.
+  shared_preferences: ^2.3.0
+  pdf: ^3.12.0
+  printing: ^5.14.3
+
+# pdf 3.12.0 depende de archive 4.0.9 Y de image (sin fijar versión) --
+# dentro del grafo de dependencias más pequeño de este paquete (menos
+# paquetes que en la app principal, que fuerzan techos más bajos en otras
+# ramas), el resolutor elige image 4.11.0, que ya no es compatible con esa
+# versión de archive (ZLibDecoder.decodeLazy no existe ahí) y rompe la
+# carga de CUALQUIER test que toque el paquete pdf, incluido
+# presupuesto_pdf_test.dart. En la app principal el grafo completo resuelve
+# a image 4.10.1, que sí es compatible -- se fija aquí la misma versión
+# para no depender de qué otros paquetes haya alrededor.
+dependency_overrides:
+  image: 4.10.1
 
 dev_dependencies:
   flutter_test:
@@ -46,4 +64,8 @@ dev_dependencies:
   cloud_firestore: ^6.1.2
 
 flutter:
-  # Paquete de widgets puros -- sin assets propios.
+  # Fuente Unicode para los PDF con "€" (ver pdf_fuente_unicode.dart) --
+  # único asset propio del paquete.
+  assets:
+    - assets/fonts/NotoSans-Regular.ttf
+    - assets/fonts/NotoSans-Bold.ttf

@@ -1,4 +1,4 @@
-// lib/widgets/pdf_fuente_unicode.dart
+// packages/repara_ui/lib/pdf_fuente_unicode.dart
 //
 // Fuente Unicode compartida por todos los PDF de REPARA (CEO, octubre
 // 2026): la fuente base de cualquier PDF (Helvetica estándar) no tiene el
@@ -7,10 +7,16 @@
 // un fallo de descarga, el propio paquete cae en silencio a Helvetica sin
 // lanzar ninguna excepción detectable, así que no hay forma de saber desde
 // aquí si el símbolo se va a ver o no. La fuente se empaqueta ahora como
-// asset del propio proyecto (TTF de Noto Sans, licencia SIL Open Font
+// asset del propio paquete (TTF de Noto Sans, licencia SIL Open Font
 // License, libre de redistribuir) -- funciona siempre, sin red, sin
 // depender de que un CDN externo responda en el momento justo de generar
 // un documento.
+//
+// 'packages/repara_ui/assets/...', no 'assets/...' (Fase 2B.5, noviembre
+// 2026): un asset declarado en el pubspec.yaml de un paquete se expone en
+// el bundle final bajo esa clave con el prefijo del paquete -- rootBundle
+// la exige completa incluso desde el propio código del paquete que la
+// declaró, nunca solo la ruta relativa.
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/widgets.dart' as pw;
 
@@ -22,8 +28,12 @@ pw.ThemeData? _temaUnicodeCache;
 Future<pw.ThemeData> cargarTemaPdfUnicode() async {
   final cacheado = _temaUnicodeCache;
   if (cacheado != null) return cacheado;
-  final regularBytes = await rootBundle.load('assets/fonts/NotoSans-Regular.ttf');
-  final boldBytes = await rootBundle.load('assets/fonts/NotoSans-Bold.ttf');
+  final regularBytes = await rootBundle.load(
+    'packages/repara_ui/assets/fonts/NotoSans-Regular.ttf',
+  );
+  final boldBytes = await rootBundle.load(
+    'packages/repara_ui/assets/fonts/NotoSans-Bold.ttf',
+  );
   final tema = pw.ThemeData.withFont(
     base: pw.Font.ttf(regularBytes),
     bold: pw.Font.ttf(boldBytes),

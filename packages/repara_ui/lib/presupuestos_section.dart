@@ -1,4 +1,4 @@
-// lib/screens/presupuestos_section.dart
+// packages/repara_ui/lib/presupuestos_section.dart
 //
 // Sección de presupuestos formales (secciones 15-18 del spec), reutilizada
 // tanto en la ficha de registro de Hogar (rol propietario: aceptar/rechazar)
@@ -28,10 +28,10 @@ import 'package:repara_core/presupuesto_service.dart';
 import 'package:repara_core/registro.dart' show RolEnTrabajo;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'app_dialog.dart';
+import 'app_error.dart';
 import 'package:repara_core/design_tokens.dart';
-import 'package:repara_ui/app_dialog.dart';
-import 'package:repara_ui/app_error.dart';
-import '../widgets/presupuesto_pdf.dart';
+import 'presupuesto_pdf.dart';
 
 // Plantilla de presupuesto (auditoría de producto, octubre 2026): recuerda
 // en este dispositivo las líneas del último presupuesto creado desde cero

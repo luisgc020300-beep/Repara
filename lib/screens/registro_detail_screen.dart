@@ -46,7 +46,7 @@ import 'contacto_acciones.dart';
 import 'editar_registro_sheet.dart';
 import 'elemento_detail_screen.dart';
 import 'nuevo_documento_flow.dart';
-import 'presupuestos_section.dart';
+import 'package:repara_ui/presupuestos_section.dart';
 import 'registro_simple/registro_cabecera.dart';
 import 'registro_simple/registro_resumen_pdf.dart';
 import 'registro_simple/registro_simple_acciones.dart';

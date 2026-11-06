@@ -29,8 +29,8 @@ import 'package:repara_core/registro.dart';
 import '../models/casa.dart';
 import '../models/elemento.dart';
 import '../models/habitacion.dart';
-import '../widgets/pdf_estilo.dart';
-import '../widgets/pdf_fuente_unicode.dart';
+import 'package:repara_ui/pdf_estilo.dart';
+import 'package:repara_ui/pdf_fuente_unicode.dart';
 import '../widgets/pdf_imagenes.dart';
 import '../widgets/pdf_trabajo.dart';
 

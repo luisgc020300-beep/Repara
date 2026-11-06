@@ -24,7 +24,7 @@ import 'package:repara_ui/ios_list.dart';
 import 'package:repara_ui/pagos_section.dart';
 import '../../widgets/progreso_pago.dart';
 import '../nuevo_documento_flow.dart';
-import '../presupuestos_section.dart';
+import 'package:repara_ui/presupuestos_section.dart';
 
 class RegistroProDetailScreen extends StatelessWidget {
   const RegistroProDetailScreen({

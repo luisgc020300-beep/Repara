@@ -1,4 +1,4 @@
-// test/screens/presupuestos_section_test.dart
+// packages/repara_ui/test/presupuestos_section_test.dart
 //
 // Mejoras de presentación y conceptos reutilizables (ampliación REPARA Pro,
 // Fase 3, noviembre 2026): la fecha y las observaciones del presupuesto,
@@ -9,11 +9,11 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:repara/screens/presupuestos_section.dart';
 import 'package:repara_core/conceptos_frecuentes_service.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_core/presupuesto_service.dart';
 import 'package:repara_core/registro.dart' show RolEnTrabajo;
+import 'package:repara_ui/presupuestos_section.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {

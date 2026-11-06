@@ -16,7 +16,7 @@ import 'package:repara_core/pago.dart';
 import 'package:repara_core/registro.dart';
 
 import 'package:repara_ui/estado_registro_chip.dart' show nombreEstadoRegistro;
-import 'pdf_estilo.dart';
+import 'package:repara_ui/pdf_estilo.dart';
 
 String nombreMetodoPagoPdf(MetodoPago? m) => switch (m) {
   MetodoPago.bizum => 'Bizum',

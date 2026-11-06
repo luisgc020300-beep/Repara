@@ -1,4 +1,4 @@
-// lib/widgets/pdf_estilo.dart
+// packages/repara_ui/lib/pdf_estilo.dart
 //
 // Estilo visual compartido por todos los PDF de REPARA (CEO, octubre
 // 2026): antes cada generador de PDF (registro_resumen_pdf.dart,

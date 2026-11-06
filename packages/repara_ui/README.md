@@ -37,9 +37,23 @@ importa directamente.
 - `pago_detail_screen.dart` -- detalle/alta de un pago (`PagoDetailScreen`).
 - `cambio_alcance_section.dart` -- solicitudes de cambio de alcance
   (`CambiosAlcanceSection`).
+- `presupuestos_section.dart` -- presupuestos formales (`PresupuestosSection`).
+- `presupuesto_pdf.dart` -- documento PDF del presupuesto (`PresupuestoPdf`).
+- `pdf_estilo.dart` -- estilo visual compartido por todos los PDF de la app
+  (colores, `tituloSeccionPdf`, `etiquetaPdf`, `miniaturaPdf`,
+  `formatoImportePdf`) -- también lo usan `pdf_trabajo.dart`,
+  `elemento_resumen_pdf.dart`, `expediente_vivienda_pdf.dart` y
+  `registro_resumen_pdf.dart`, que se quedan en `lib/` (no generan el PDF de
+  un presupuesto) pero importan este archivo desde aquí para no duplicarlo.
+- `pdf_fuente_unicode.dart` -- fuente Unicode para el símbolo "€"
+  (`cargarTemaPdfUnicode`), con sus dos `.ttf` como asset propio del paquete
+  (ver `assets/fonts/` y `pubspec.yaml`) -- movida junto con la fuente desde
+  `assets/fonts/` de la app, que ya no la necesita.
 
-## Qué sigue en `lib/` (Fase 2B.4)
+## Qué sigue en `lib/`
 
-- `presupuestos_section.dart` y `widgets/presupuesto_pdf.dart` -- no se han
-  movido en esta fase (fuera de alcance explícito). `RolEnTrabajo` ya vive en
-  `repara_core/registro.dart`, así que ya no es lo que los bloquea.
+No queda ningún bloqueo identificado para `PresupuestosSection` ni para los
+cuatro consumidores de `pdf_estilo.dart`/`pdf_fuente_unicode.dart`
+mencionados arriba -- se quedan en `lib/` porque generan otros documentos
+(ficha de elemento, expediente de la vivienda, resumen de un registro
+simple), no porque dependan de algo exclusivo de Hogar o de Pro.

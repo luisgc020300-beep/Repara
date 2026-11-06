@@ -1,4 +1,4 @@
-// lib/widgets/presupuesto_pdf.dart
+// packages/repara_ui/lib/presupuesto_pdf.dart
 //
 // Documento de presupuesto en PDF (ampliación REPARA Pro, Fase 3 -- CEO,
 // noviembre 2026): "apariencia profesional, con identidad visual REPARA"
