@@ -58,7 +58,7 @@ packages:
     source: hosted
     version: "2.1.2"
   cached_network_image:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: cached_network_image
       sha256: "7c1183e361e5c8b0a0f21a28401eecdbde252441106a9816400dd4c2b2424916"
@@ -98,7 +98,7 @@ packages:
     source: hosted
     version: "1.1.2"
   cloud_firestore:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: cloud_firestore
       sha256: "3ac242332166ae5037bd87bc343744bb96d88d7b13f791492b00958ce5cc6c63"
@@ -122,7 +122,7 @@ packages:
     source: hosted
     version: "5.3.0"
   cloud_functions:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: cloud_functions
       sha256: "7b2e82cad51c198d2da8744da5c83550e8d00e4e1abcc0052057df86ff647b55"
@@ -273,8 +273,32 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.6.1+5"
-  firebase_auth:
+  firebase_app_check:
+    dependency: "direct main"
+    description:
+      name: firebase_app_check
+      sha256: "893cf0f921f76a3eeb288a6fb4ba821d1fdb08f8967d71a429648aea0c172570"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.4.3"
+  firebase_app_check_platform_interface:
     dependency: transitive
+    description:
+      name: firebase_app_check_platform_interface
+      sha256: d46dc041aca21e7659e928a03900e0e60f168349523a00d9773618a27d562bc4
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.3.0"
+  firebase_app_check_web:
+    dependency: transitive
+    description:
+      name: firebase_app_check_web
+      sha256: "2b5904c7dc72366306f69c0b31a7ebed4eb56b7c7170220cd18ba06628abad39"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.4"
+  firebase_auth:
+    dependency: "direct main"
     description:
       name: firebase_auth
       sha256: b12cb1e2e87797d27e0041100b73ebf890dbafcff2e7e991d4593f5e8e309808
@@ -298,7 +322,7 @@ packages:
     source: hosted
     version: "6.1.5"
   firebase_core:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: firebase_core
       sha256: d5a94b884dcb1e6d3430298e94bfe002238094cdfd5e29202d536ee2120f9158
@@ -322,7 +346,7 @@ packages:
     source: hosted
     version: "3.6.0"
   firebase_crashlytics:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: firebase_crashlytics
       sha256: "43a311b280d9391389a690d10e1ac0d458b965154a57de5be2f0857225aa2016"
@@ -337,8 +361,32 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.8.20"
-  firebase_storage:
+  firebase_messaging:
+    dependency: "direct main"
+    description:
+      name: firebase_messaging
+      sha256: e5c93e8e7a9b0513f94bb684d2cf100e32e7dcdf2949574386b1955fc9a9b96a
+      url: "https://pub.dev"
+    source: hosted
+    version: "16.2.0"
+  firebase_messaging_platform_interface:
     dependency: transitive
+    description:
+      name: firebase_messaging_platform_interface
+      sha256: "8cbb7d842e5071bba836452aff262f7db4b14bb3a0d00c1896cf176df886d65a"
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.7.9"
+  firebase_messaging_web:
+    dependency: transitive
+    description:
+      name: firebase_messaging_web
+      sha256: "8750bacf50573c0383535fc3f9c58c6a2f9dff5320a16a82c30631b9dad894f1"
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.1.5"
+  firebase_storage:
+    dependency: "direct main"
     description:
       name: firebase_storage
       sha256: "825a5a64addc66b57a2e793b5e40343d1364e8b5a2a0d7e6cfc116ae9c021fbd"
@@ -382,6 +430,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.5.0"
+  flutter_contacts:
+    dependency: "direct main"
+    description:
+      name: flutter_contacts
+      sha256: "388d32cd33f16640ee169570128c933b45f3259bddbfae7a100bb49e5ffea9ae"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.9+2"
   flutter_lints:
     dependency: "direct dev"
     description:
@@ -417,7 +473,7 @@ packages:
     source: hosted
     version: "2.0.2"
   http:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: http
       sha256: "87721a4a50b19c7f1d49001e51409bddc46303966ce89a65af4f4e6004896412"
@@ -433,15 +489,15 @@ packages:
     source: hosted
     version: "4.1.2"
   image:
-    dependency: transitive
+    dependency: "direct overridden"
     description:
       name: image
-      sha256: d701df3ef4761a22854c69b9661c9d8f25b264b3982985f25944247ce644761f
+      sha256: a1e7f4951e538a568e14b856702afc9ae1d2f4b202daced8d22c1b9cd211ce89
       url: "https://pub.dev"
     source: hosted
-    version: "4.11.0"
+    version: "4.10.1"
   image_picker:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: image_picker
       sha256: d8402284df184bc05f4a2210c6c23983b0720f4cd87cbd05c5390a78af602667
@@ -505,7 +561,7 @@ packages:
     source: hosted
     version: "0.2.2"
   intl:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: intl
       sha256: "1ca20c894b1717686a2319b8548763d812bc0aabdac580420a44c5178c57a867"
@@ -697,7 +753,7 @@ packages:
     source: hosted
     version: "2.3.0"
   pdf:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: pdf
       sha256: e47a275b267873d5944ad5f5ff0dcc7ac2e36c02b3046a0ffac9b72fd362c44b
@@ -745,7 +801,7 @@ packages:
     source: hosted
     version: "6.5.4"
   printing:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: printing
       sha256: "689170c9ddb1bda85826466ba80378aa8993486d3c959a71cd7d2d80cb606692"
@@ -798,6 +854,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.28.0"
+  share_plus:
+    dependency: "direct main"
+    description:
+      name: share_plus
+      sha256: fce43200aa03ea87b91ce4c3ac79f0cecd52e2a7a56c7a4185023c271fbfa6da
+      url: "https://pub.dev"
+    source: hosted
+    version: "10.1.4"
+  share_plus_platform_interface:
+    dependency: transitive
+    description:
+      name: share_plus_platform_interface
+      sha256: cc012a23fc2d479854e6c80150696c4a5f5bb62cb89af4de1c505cf78d0a5d0b
+      url: "https://pub.dev"
+    source: hosted
+    version: "5.0.2"
   shared_preferences:
     dependency: transitive
     description:
@@ -964,7 +1036,7 @@ packages:
     source: hosted
     version: "1.4.0"
   url_launcher:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: url_launcher
       sha256: f6a7e5c4835bb4e3026a04793a4199ca2d14c739ec378fdfe23fc8075d0439f8

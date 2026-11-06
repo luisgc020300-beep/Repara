@@ -1,30 +1,18 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
+// Smoke test minimo: comprueba que los temas de REPARA Hogar se
+// construyen sin errores (no hay Firebase de verdad en el test, asi que
+// ReparaHogarApp no se puede montar aqui sin mocks; mismo criterio que
+// test/widget_test.dart del monolito y de apps/repara_pro).
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:repara_hogar/main.dart';
+import 'package:repara_core/design_tokens.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('Los temas claro y oscuro de REPARA Hogar se construyen sin errores', (WidgetTester tester) async {
+    await tester.pumpWidget(MaterialApp(theme: buildReparaLightTheme(), home: const Scaffold()));
+    expect(find.byType(Scaffold), findsOneWidget);
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    await tester.pumpWidget(MaterialApp(theme: buildReparaDarkTheme(), home: const Scaffold()));
+    expect(find.byType(Scaffold), findsOneWidget);
   });
 }

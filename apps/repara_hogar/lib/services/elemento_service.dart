@@ -1,0 +1,367 @@
+// lib/services/elemento_service.dart
+import 'dart:io';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart';
+import 'package:repara_core/stream_error_logging.dart';
+import 'package:repara_core/stream_sharing.dart';
+
+import '../models/elemento.dart';
+import 'package:repara_core/registro_service.dart';
+
+class ElementoService {
+  /// Seam de solo test -- nunca se asigna en código de producción. Ver
+  /// casa_service.dart para el criterio general.
+  @visibleForTesting
+  static FirebaseFirestore? debugFirestoreOverride;
+
+  static FirebaseFirestore get _db =>
+      debugFirestoreOverride ?? FirebaseFirestore.instance;
+  static const _region = 'europe-west1';
+
+  static CollectionReference<Map<String, dynamic>> _col(String casaId) =>
+      _db.collection('casas').doc(casaId).collection('elementos');
+
+  // El más reciente primero (CEO, octubre 2026: sin orderBy, Firestore
+  // devuelve los documentos en un orden interno no garantizado -- no es el
+  // orden de creación -- así que un elemento recién añadido podía aparecer
+  // en cualquier sitio de la lista, no arriba).
+  //
+  // [incluirArchivados] false por defecto (auditoría R5, octubre 2026): el
+  // filtro se hace en el cliente, nunca con un .where('archivado', ...) de
+  // Firestore -- una query de igualdad de Firestore NO encuentra los
+  // documentos a los que les falta el campo, así que filtrar en servidor
+  // habría escondido de golpe TODOS los elementos antiguos (antes de esta
+  // iteración, ninguno tiene este campo). Filtrando aquí, con
+  // Elemento.archivado ya resuelto a false por fromDoc cuando el campo no
+  // existe, un elemento antiguo se sigue viendo como activo sin ninguna
+  // migración.
+  static Stream<List<Elemento>> streamElementos(
+    String casaId, {
+    String? habitacionId,
+    bool incluirArchivados = false,
+  }) {
+    Query<Map<String, dynamic>> q = _col(
+      casaId,
+    ).orderBy('createdAt', descending: true);
+    if (habitacionId != null) {
+      q = q.where('habitacionId', isEqualTo: habitacionId);
+    }
+    return q
+        .snapshots()
+        .map((s) => s.docs.map(Elemento.fromDoc).toList())
+        .map(
+          (lista) => incluirArchivados
+              ? lista
+              : lista.where((e) => !e.archivado).toList(),
+        )
+        .conRegistroDeErrores();
+  }
+
+  /// Solo los archivados -- para la pantalla dedicada a verlos (nunca
+  /// mezclados con los activos, ver streamElementos). Mismo motivo de filtro
+  /// en cliente que arriba.
+  static Stream<List<Elemento>> streamElementosArchivados(String casaId) {
+    return _col(casaId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map(
+          (s) =>
+              s.docs.map(Elemento.fromDoc).where((e) => e.archivado).toList(),
+        )
+        .conRegistroDeErrores();
+  }
+
+  /// Bloquea en servidor si tiene trabajo profesional activo o pendiente, o
+  /// si ya está archivado -- la UI puede (y debe) evitar ofrecer el botón en
+  /// esos casos, pero la decisión real es de archivarElemento (Cloud
+  /// Function), nunca de este método ni de ningún botón deshabilitado.
+  static Future<void> archivar(String casaId, String elementoId) async {
+    final callable = FirebaseFunctions.instanceFor(
+      region: _region,
+    ).httpsCallable('archivarElemento');
+    await callable.call<Map<String, dynamic>>({
+      'casaId': casaId,
+      'elementoId': elementoId,
+    });
+  }
+
+  static Future<void> restaurar(String casaId, String elementoId) async {
+    final callable = FirebaseFunctions.instanceFor(
+      region: _region,
+    ).httpsCallable('restaurarElemento');
+    await callable.call<Map<String, dynamic>>({
+      'casaId': casaId,
+      'elementoId': elementoId,
+    });
+  }
+
+  static Stream<Elemento?> streamElemento(String casaId, String elementoId) {
+    return _col(casaId)
+        .doc(elementoId)
+        .snapshots()
+        .map((d) => d.exists ? Elemento.fromDoc(d) : null)
+        .conRegistroDeErrores()
+        .compartido('elemento:$casaId:$elementoId');
+  }
+
+  static Future<String> crear(String casaId, Elemento elemento) async {
+    final ref = await _col(
+      casaId,
+    ).add({...elemento.toMap(), 'createdAt': FieldValue.serverTimestamp()});
+    return ref.id;
+  }
+
+  /// A diferencia de [crear] (que usa toMap(), omitiendo las claves nulas --
+  /// perfecto para un documento nuevo), aquí hay que escribir explícitamente
+  /// null en cada campo editable para que vaciar un campo en el formulario
+  /// (p.ej. borrar un typo en "Marca") de verdad lo borre en Firestore --
+  /// `.update()` nunca toca una clave que no se le pase (auditoría de
+  /// producto, octubre 2026). `fotoUrl` queda fuera a propósito: ningún
+  /// formulario lo edita todavía, así que nunca debe tocarse aquí.
+  static Future<void> actualizar(
+    String casaId,
+    String elementoId,
+    Elemento elemento,
+  ) async {
+    await _col(casaId).doc(elementoId).update({
+      'nombre': elemento.nombre,
+      'habitacionId': elemento.habitacionId,
+      'marca': elemento.marca,
+      'modelo': elemento.modelo,
+      'fechaInstalacion': elemento.fechaInstalacion != null
+          ? Timestamp.fromDate(elemento.fechaInstalacion!)
+          : null,
+      'coste': elemento.coste,
+      'profesionalNombre': elemento.profesionalNombre,
+      'garantiaHasta': elemento.garantiaHasta != null
+          ? Timestamp.fromDate(elemento.garantiaHasta!)
+          : null,
+      'intervaloMantenimientoMeses': elemento.intervaloMantenimientoMeses,
+      'proximoMantenimiento': elemento.proximoMantenimiento != null
+          ? Timestamp.fromDate(elemento.proximoMantenimiento!)
+          : null,
+    });
+  }
+
+  /// Borrado real (CEO, octubre 2026, cierre de R6): la Cloud Function hace
+  /// en servidor la limpieza completa -- subcolecciones (con
+  /// recursiveDelete), foto en Storage y los documentos (con sus archivos)
+  /// que referencian este elemento o cualquiera de sus registros. Rechaza
+  /// con `failed-precondition` un elemento con algún registro con
+  /// profesional -- ver la propia Cloud Function para el motivo.
+  /// firestore.rules sigue bloqueando el `delete` directo del cliente a
+  /// propósito: esta función es la única vía legítima.
+  static Future<void> eliminar(String casaId, String elementoId) async {
+    final callable = FirebaseFunctions.instanceFor(
+      region: _region,
+    ).httpsCallable('eliminarElemento');
+    await callable.call<Map<String, dynamic>>({
+      'casaId': casaId,
+      'elementoId': elementoId,
+    });
+  }
+
+  /// Foto del elemento -- la única forma de rellenar [Elemento.fotoUrl],
+  /// aparte del propio campo en Firestore (CEO, octubre 2026: se edita desde
+  /// la ficha, tocando el hueco de foto, no desde el formulario de
+  /// creación -- muchas veces la foto se hace después, no al crear el
+  /// elemento). Nombre de archivo fijo ("foto") en vez de con timestamp: una
+  /// foto nueva sustituye a la anterior, nunca se acumulan fotos sueltas.
+  static Future<String> subirFoto(
+    String casaId,
+    String elementoId,
+    File archivo,
+  ) async {
+    final ref = FirebaseStorage.instance.ref().child(
+      'casas/$casaId/elementos/$elementoId/foto',
+    );
+    await ref.putFile(archivo);
+    return ref.getDownloadURL();
+  }
+
+  /// [fotoUrl] null borra la foto (no el archivo en Storage, solo la
+  /// referencia -- mismo criterio de limpieza que el resto de la app, ver
+  /// nota en subirFoto: una foto nueva ya sustituye a la anterior en el
+  /// mismo nombre de archivo, así que no se acumula basura en Storage).
+  static Future<void> actualizarFoto(
+    String casaId,
+    String elementoId,
+    String? fotoUrl,
+  ) async {
+    await _col(casaId).doc(elementoId).update({'fotoUrl': fotoUrl});
+  }
+
+  /// Elementos con garantía a menos de 30 días -- usado en el dashboard de
+  /// Inicio (sección 25 del spec: avisar de garantías próximas a vencer).
+  static Future<List<Elemento>> conGarantiaProximaAVencer(String casaId) async {
+    final snap = await _col(casaId).get();
+    return snap.docs
+        .map(Elemento.fromDoc)
+        .where((e) => e.garantiaProximaAVencer)
+        .toList();
+  }
+
+  /// Elementos con revisión periódica próxima o ya atrasada -- calendario
+  /// de mantenimiento autogenerado, mismo dashboard de Inicio.
+  static Future<List<Elemento>> conRevisionPendiente(String casaId) async {
+    final snap = await _col(casaId).get();
+    return snap.docs
+        .map(Elemento.fromDoc)
+        .where((e) => e.revisionPendiente)
+        .toList();
+  }
+
+  /// TODOS los elementos con una fecha de garantía guardada, pendiente o no
+  /// -- el aviso de Inicio solo enseña lo urgente (<=30 días), pero "encontrar
+  /// una garantía" (auditoría de producto, octubre 2026) necesita poder
+  /// consultar también las que vencen más adelante, no solo las que aprietan.
+  static Future<List<Elemento>> conGarantia(String casaId) async {
+    final snap = await _col(casaId).get();
+    final elementos = snap.docs
+        .map(Elemento.fromDoc)
+        .where((e) => e.garantiaHasta != null)
+        .toList();
+    elementos.sort((a, b) => a.garantiaHasta!.compareTo(b.garantiaHasta!));
+    return elementos;
+  }
+
+  /// TODOS los elementos con un calendario de mantenimiento configurado,
+  /// pendiente o no -- mismo motivo que [conGarantia]: "ver qué mantenimiento
+  /// está pendiente" no debe depender de que ya esté a punto de vencer.
+  static Future<List<Elemento>> conMantenimientoConfigurado(
+    String casaId,
+  ) async {
+    final snap = await _col(casaId).get();
+    final elementos = snap.docs
+        .map(Elemento.fromDoc)
+        .where((e) => e.proximoMantenimiento != null)
+        .toList();
+    elementos.sort(
+      (a, b) => a.proximoMantenimiento!.compareTo(b.proximoMantenimiento!),
+    );
+    return elementos;
+  }
+
+  /// Avanza la próxima revisión [intervaloMeses] meses desde HOY (no desde
+  /// la fecha antigua) -- si estaba muy atrasada, no tiene sentido arrastrar
+  /// ese retraso para siempre.
+  static Future<void> marcarRevisionHecha(
+    String casaId,
+    String elementoId,
+    int intervaloMeses,
+  ) async {
+    final ahora = DateTime.now();
+    final proxima = DateTime(
+      ahora.year,
+      ahora.month + intervaloMeses,
+      ahora.day,
+    );
+    await _col(casaId).doc(elementoId).update({
+      'proximoMantenimiento': Timestamp.fromDate(proxima),
+    });
+  }
+
+  /// Edición manual del calendario de mantenimiento -- por si la sugerencia
+  /// de la IA no encajaba o el propietario quiere cambiarla más tarde.
+  /// Ambos valores pueden ser null para quitar el recordatorio por completo.
+  static Future<void> actualizarMantenimiento(
+    String casaId,
+    String elementoId, {
+    required int? intervaloMeses,
+    required DateTime? proximoMantenimiento,
+  }) async {
+    await _col(casaId).doc(elementoId).update({
+      'intervaloMantenimientoMeses': intervaloMeses,
+      'proximoMantenimiento': proximoMantenimiento != null
+          ? Timestamp.fromDate(proximoMantenimiento)
+          : null,
+    });
+  }
+
+  /// Pide a la IA un intervalo típico de revisión según el tipo de
+  /// elemento -- solo SUGIERE, nunca se guarda sin que el propietario lo
+  /// confirme (mismo principio que DocumentoService.clasificarConIA).
+  static Future<({int? intervaloMeses, String? motivo})>
+  sugerirIntervaloMantenimiento({
+    required String nombre,
+    String? marca,
+    String? modelo,
+  }) async {
+    final callable = FirebaseFunctions.instanceFor(
+      region: _region,
+    ).httpsCallable('sugerirIntervaloMantenimiento');
+    final result = await callable.call<Map<String, dynamic>>({
+      'nombre': nombre,
+      'marca': marca,
+      'modelo': modelo,
+    });
+    return (
+      intervaloMeses: (result.data['intervaloMeses'] as num?)?.toInt(),
+      motivo: result.data['motivo'] as String?,
+    );
+  }
+
+  /// Botón "Trabajos pendientes" de Inicio: una fila por cada REGISTRO
+  /// pendiente, no una por elemento (CEO, octubre 2026) -- antes, si un
+  /// mismo elemento tenía varios registros pendientes a la vez (p.ej. dos
+  /// instalaciones y una reforma, todas sobre "Pérgolas"), solo se
+  /// mostraba la más antigua y el resto desaparecía sin ningún aviso de
+  /// que había más. Lectura puntual (no stream) recorriendo la
+  /// subcolección de registros de cada elemento -- un registro nunca vive
+  /// en una colección a nivel de casa, así que no hay una única consulta
+  /// que lo traiga todo de golpe (mismo patrón que
+  /// ExpedienteViviendaScreen._todosLosRegistros). Ordenado por fecha
+  /// ascendente: el que lleva más tiempo esperando sale primero.
+  ///
+  /// Trasladado desde RegistroService (Fase 1, Grupo 6A, noviembre 2026):
+  /// es un cruce de Elemento + Registro, pero su única razón de ser es
+  /// exclusiva de Hogar (el banner de "Trabajos pendientes" de Inicio), así
+  /// que vive aquí para que RegistroService pueda extraerse a repara_core
+  /// sin arrastrar Elemento/ElementoService.
+  static Future<
+    List<
+      ({
+        Elemento elemento,
+        String registroId,
+        String registroTitulo,
+        DateTime fecha,
+        String? fotoUrl,
+      })
+    >
+  >
+  registrosConTrabajoPendiente(String casaId) async {
+    final elementos = await streamElementos(casaId).first;
+    final resultado =
+        <
+          ({
+            Elemento elemento,
+            String registroId,
+            String registroTitulo,
+            DateTime fecha,
+            String? fotoUrl,
+          })
+        >[];
+    for (final elemento in elementos) {
+      final registros = await RegistroService.streamRegistros(
+        casaId,
+        elemento.id,
+      ).first;
+      for (final r in registros.where(RegistroService.esTrabajoActivo)) {
+        resultado.add((
+          elemento: elemento,
+          registroId: r.id,
+          registroTitulo: r.titulo,
+          fecha: r.fecha,
+          // r.fotos cubre el evento con una sola foto (fotoUrl heredado) y
+          // con varias (fotoUrls) -- ver Registro.fotos.
+          fotoUrl: r.fotos.isNotEmpty ? r.fotos.first : null,
+        ));
+      }
+    }
+    resultado.sort((a, b) => a.fecha.compareTo(b.fecha));
+    return resultado;
+  }
+}
