@@ -10,6 +10,7 @@ import '../core/service_locator.dart';
 import '../services/security/biometric_service.dart';
 import '../services/security/security_preferences_service.dart';
 import 'package:repara_core/design_tokens.dart';
+import 'package:repara_ui/app_error.dart';
 import 'package:repara_ui/ios_list.dart';
 
 class SeguridadScreen extends StatelessWidget {
@@ -21,9 +22,7 @@ class SeguridadScreen extends StatelessWidget {
       appBar: AppBar(title: const Text('Seguridad')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-        children: const [
-          SeccionSeguridad(),
-        ],
+        children: const [SeccionSeguridad()],
       ),
     );
   }
@@ -56,8 +55,10 @@ class _SeccionSeguridadState extends State<SeccionSeguridad> {
   Future<void> _cargar() async {
     final biometria = sl<BiometricService>();
     final disponible = await biometria.isAvailable();
-    final documentosProtegidos = await SecurityPreferencesService.instance.isDocumentProtectionEnabled();
-    final proProtegido = await SecurityPreferencesService.instance.isProGateEnabled();
+    final documentosProtegidos = await SecurityPreferencesService.instance
+        .isDocumentProtectionEnabled();
+    final proProtegido = await SecurityPreferencesService.instance
+        .isProGateEnabled();
     if (!mounted) return;
     setState(() {
       _biometriaDisponible = disponible;
@@ -67,14 +68,48 @@ class _SeccionSeguridadState extends State<SeccionSeguridad> {
     });
   }
 
+  // Al ACTIVAR cualquiera de los dos gates se pide Face ID/huella ahora
+  // mismo (CEO, noviembre 2026: "pedir el Face ID cuando marques los
+  // permisos en ajustes") -- confirma que la biometría funciona de verdad
+  // en este dispositivo antes de depender de ella; si falla, se cancela o
+  // da error, el interruptor no llega a activarse. Al DESACTIVAR no hace
+  // falta -- quitar una protección no necesita la propia protección.
+  Future<bool> _confirmarConBiometria(String motivo) async {
+    final resultado = await sl<BiometricService>().authenticate(motivo);
+    if (resultado == BiometricAuthResult.success) return true;
+    if (mounted) {
+      AppError.show(
+        context,
+        resultado == BiometricAuthResult.cancelled
+            ? 'Verificación cancelada -- no se ha activado.'
+            : 'No se pudo verificar tu identidad. Inténtalo de nuevo.',
+      );
+    }
+    return false;
+  }
+
   Future<void> _cambiarProProtegido(bool valor) async {
+    if (valor &&
+        !await _confirmarConBiometria(
+          'Verifica tu identidad para proteger el acceso a Repara Pro',
+        )) {
+      return;
+    }
     setState(() => _proProtegido = valor);
     await SecurityPreferencesService.instance.setProGateEnabled(valor);
   }
 
   Future<void> _cambiarDocumentosProtegidos(bool valor) async {
+    if (valor &&
+        !await _confirmarConBiometria(
+          'Verifica tu identidad para proteger tus documentos',
+        )) {
+      return;
+    }
     setState(() => _documentosProtegidos = valor);
-    await SecurityPreferencesService.instance.setDocumentProtectionEnabled(valor);
+    await SecurityPreferencesService.instance.setDocumentProtectionEnabled(
+      valor,
+    );
   }
 
   @override
@@ -95,7 +130,9 @@ class _SeccionSeguridadState extends State<SeccionSeguridad> {
           showChevron: false,
           trailing: Switch(
             value: _documentosProtegidos && _biometriaDisponible,
-            onChanged: _biometriaDisponible ? _cambiarDocumentosProtegidos : null,
+            onChanged: _biometriaDisponible
+                ? _cambiarDocumentosProtegidos
+                : null,
           ),
         ),
         IosRow(

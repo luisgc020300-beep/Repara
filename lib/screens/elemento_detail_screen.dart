@@ -37,7 +37,6 @@ import 'package:repara_core/registro_service.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_ui/app_dialog.dart';
 import 'package:repara_ui/app_error.dart';
-import '../widgets/boton_ajustes.dart';
 import '../widgets/documento_abrir.dart';
 import 'package:repara_ui/estado_registro_chip.dart' show nombreEstadoRegistro;
 import 'package:repara_ui/foto_ampliada_screen.dart';
@@ -454,7 +453,6 @@ class ElementoDetailScreen extends StatelessWidget {
               ),
               _ArchivarElementoButton(casaId: casa.id, elemento: elemento),
               _EliminarElementoButton(casaId: casa.id, elemento: elemento),
-              BotonAjustes(casa: casa),
             ],
           ),
           // null cuando está archivado (auditoría R5, octubre 2026): la

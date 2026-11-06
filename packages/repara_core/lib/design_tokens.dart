@@ -101,12 +101,14 @@ class ReparaColors extends ThemeExtension<ReparaColors> {
     brandOn: Color(0xFFFFFFFF),
     brandTint: Color(0x334F85C4),
     sand: Color(0xFF6D93C2),
-    success: Color(0xFF4FB996),
-    successText: Color(0xFF7ED4B7),
+    // success/error mas oscuros (CEO, noviembre 2026: "demasiado claros en
+    // modo oscuro") -- mismo tono, menos luminosidad; warning sin tocar.
+    success: Color(0xFF3B9372),
+    successText: Color(0xFF63B897),
     warning: Color(0xFFF0B860),
     warningText: Color(0xFFF3C88A),
-    error: Color(0xFFE88888),
-    errorText: Color(0xFFF2A7A7),
+    error: Color(0xFFC96E6E),
+    errorText: Color(0xFFD98F8F),
     overlay: Color(0x59000000),
   );
 

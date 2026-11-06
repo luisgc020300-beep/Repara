@@ -72,7 +72,9 @@ class _CasaShellScreenState extends State<CasaShellScreen> {
       stream: CasaService.streamCasa(widget.casaId),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
         }
         final casa = snapshot.data!;
         final tabs = [
@@ -92,9 +94,24 @@ class _CasaShellScreenState extends State<CasaShellScreen> {
             currentIndex: _index,
             onTap: _cambiarPestana,
             items: const [
-              BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Inicio'),
-              BottomNavigationBarItem(icon: Icon(Icons.house_outlined), activeIcon: Icon(Icons.house), label: 'Casa'),
-              BottomNavigationBarItem(icon: Icon(Icons.contact_phone_outlined), activeIcon: Icon(Icons.contact_phone), label: 'Contactos'),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.home_outlined),
+                activeIcon: Icon(Icons.home),
+                label: 'Inicio',
+              ),
+              // door_front_door, no house_outlined (CEO, noviembre 2026:
+              // "el emoticono de Inicio y Casa son demasiado parecidos") --
+              // antes ambos eran siluetas de casa casi idénticas.
+              BottomNavigationBarItem(
+                icon: Icon(Icons.door_front_door_outlined),
+                activeIcon: Icon(Icons.door_front_door),
+                label: 'Casa',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.contact_phone_outlined),
+                activeIcon: Icon(Icons.contact_phone),
+                label: 'Contactos',
+              ),
             ],
           ),
         );
@@ -117,7 +134,8 @@ class _KeepAlivePage extends StatefulWidget {
   State<_KeepAlivePage> createState() => _KeepAlivePageState();
 }
 
-class _KeepAlivePageState extends State<_KeepAlivePage> with AutomaticKeepAliveClientMixin {
+class _KeepAlivePageState extends State<_KeepAlivePage>
+    with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
 

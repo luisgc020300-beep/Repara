@@ -35,7 +35,6 @@ import 'package:repara_core/registro_service.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_ui/app_dialog.dart';
 import 'package:repara_ui/app_error.dart';
-import '../widgets/boton_ajustes.dart';
 import '../widgets/documento_abrir.dart';
 import 'package:repara_ui/cambio_alcance_section.dart';
 import 'package:repara_ui/estado_registro_chip.dart';
@@ -377,7 +376,6 @@ class RegistroDetailScreen extends StatelessWidget {
                     ),
                 ],
               ),
-              BotonAjustes(casa: casa),
             ],
           ),
           body: registro.esConProfesional

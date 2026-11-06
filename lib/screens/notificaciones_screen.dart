@@ -15,7 +15,6 @@ import 'package:repara_core/notificacion_service.dart';
 
 import '../models/casa.dart';
 import '../services/notificacion_router.dart';
-import '../widgets/boton_ajustes.dart';
 import 'package:repara_ui/notificaciones_list.dart';
 
 class NotificacionesScreen extends StatelessWidget {
@@ -41,7 +40,6 @@ class NotificacionesScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text('Notificaciones', style: Theme.of(context).textTheme.displaySmall?.copyWith(color: Colors.white)),
-        actions: [BotonAjustes(casa: casa, modoPro: modoPro)],
       ),
       body: StreamBuilder<List<Notificacion>>(
         stream: NotificacionService.streamMisNotificaciones(),
