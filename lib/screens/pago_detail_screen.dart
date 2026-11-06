@@ -16,8 +16,8 @@ import 'package:repara_core/pago.dart';
 import '../core/idempotency.dart';
 import 'package:repara_core/pago_service.dart';
 import 'package:repara_core/design_tokens.dart';
-import '../widgets/app_dialog.dart';
-import '../widgets/app_error.dart';
+import 'package:repara_ui/app_dialog.dart';
+import 'package:repara_ui/app_error.dart';
 import '../widgets/miniatura_documento.dart';
 
 class PagoDetailScreen extends StatefulWidget {

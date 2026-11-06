@@ -1,4 +1,4 @@
-// lib/widgets/estado_registro_chip.dart
+// packages/repara_ui/lib/estado_registro_chip.dart
 //
 // Chrome visual compartido entre la ficha de registro de Hogar
 // (registro_detail_screen.dart) y la de Pro (registro_pro_detail_screen.dart)

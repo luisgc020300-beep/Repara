@@ -12,7 +12,7 @@ import 'package:intl/intl.dart';
 import '../models/casa.dart';
 import '../models/elemento.dart';
 import 'package:repara_core/design_tokens.dart';
-import '../widgets/ios_list.dart';
+import 'package:repara_ui/ios_list.dart';
 import 'registro_detail_screen.dart';
 
 class TrabajosPendientesScreen extends StatelessWidget {

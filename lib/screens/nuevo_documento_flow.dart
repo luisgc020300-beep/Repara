@@ -19,9 +19,9 @@ import 'package:repara_core/registro.dart';
 
 import 'package:repara_core/registro_service.dart';
 import 'package:repara_core/design_tokens.dart';
-import '../widgets/app_dialog.dart';
-import '../widgets/app_error.dart';
-import '../widgets/ios_list.dart';
+import 'package:repara_ui/app_dialog.dart';
+import 'package:repara_ui/app_error.dart';
+import 'package:repara_ui/ios_list.dart';
 import '../widgets/seccion_formulario.dart';
 import 'pago_detail_screen.dart';
 

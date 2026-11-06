@@ -11,7 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:repara_core/notificacion_service.dart';
 
 import 'package:repara_core/design_tokens.dart';
-import '../widgets/ios_list.dart';
+import 'package:repara_ui/ios_list.dart';
 
 const _categorias = [
   (clave: 'citas', titulo: 'Citas', subtitulo: 'Visitas programadas y sus recordatorios'),

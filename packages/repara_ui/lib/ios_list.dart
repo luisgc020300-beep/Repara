@@ -1,4 +1,4 @@
-// lib/widgets/ios_list.dart
+// packages/repara_ui/lib/ios_list.dart
 //
 // Lista agrupada estilo iOS (Ajustes, octubre 2026): cabecera opcional en
 // mayúsculas + una única tarjeta redondeada con las filas separadas por un

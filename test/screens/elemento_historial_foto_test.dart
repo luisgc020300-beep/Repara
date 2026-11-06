@@ -24,7 +24,7 @@ import 'package:repara/services/habitacion_service.dart';
 import 'package:repara_core/pago_service.dart';
 import 'package:repara_core/registro_service.dart';
 import 'package:repara_core/design_tokens.dart';
-import 'package:repara/widgets/ios_list.dart';
+import 'package:repara_ui/ios_list.dart';
 import 'package:repara_core/documento_service.dart';
 
 const _casa = Casa(

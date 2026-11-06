@@ -18,9 +18,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/contacto.dart';
 import '../services/contacto_service.dart';
 import 'package:repara_core/design_tokens.dart';
-import '../widgets/app_dialog.dart';
-import '../widgets/app_error.dart';
-import '../widgets/ios_list.dart';
+import 'package:repara_ui/app_dialog.dart';
+import 'package:repara_ui/app_error.dart';
+import 'package:repara_ui/ios_list.dart';
 import 'nuevo_contacto_sheet.dart';
 
 Future<void> mostrarAccionesContacto(BuildContext context, {required String casaId, required Contacto contacto}) {

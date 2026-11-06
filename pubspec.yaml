@@ -12,10 +12,12 @@ dependencies:
     sdk: flutter
 
   # Fase 1 de la separación Hogar/Pro (ver informe de arquitectura, sección
-  # 14): paquete compartido de modelos/servicios/utilidades, aún vacío salvo
-  # las utilidades de streams movidas en el Grupo 1.
+  # 14): paquete compartido de modelos/servicios/utilidades.
   repara_core:
     path: packages/repara_core
+  # Fase 2B.2: paquete compartido de widgets/componentes visuales.
+  repara_ui:
+    path: packages/repara_ui
 
   cupertino_icons: ^1.0.8
 

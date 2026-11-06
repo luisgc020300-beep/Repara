@@ -20,10 +20,10 @@ import 'package:repara_core/profesional.dart';
 import 'package:share_plus/share_plus.dart';
 
 import 'package:repara_core/design_tokens.dart';
-import '../../widgets/app_error.dart';
+import 'package:repara_ui/app_error.dart';
 import '../../widgets/boton_ajustes.dart';
 import '../../widgets/boton_notificaciones.dart';
-import '../../widgets/ios_list.dart';
+import 'package:repara_ui/ios_list.dart';
 import 'registro_pro_detail_screen.dart';
 import 'trabajo_pro_agregado.dart';
 

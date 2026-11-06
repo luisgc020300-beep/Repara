@@ -1,0 +1,32 @@
+name: repara_ui
+description: >
+  Widgets y componentes visuales compartidos entre REPARA (Hogar) y REPARA
+  Pro. Depende de repara_core para modelos y tokens de diseño -- nunca al
+  revés -- y no importa nada de lib/ ni de apps/: lo que arrastra esa
+  dependencia se queda en su app.
+publish_to: 'none'
+
+version: 0.1.0
+
+environment:
+  sdk: ^3.10.8
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  repara_core:
+    path: ../repara_core
+
+  # app_error.dart (Fase 2B.2) -- misma versión que la app principal.
+  firebase_crashlytics: ^5.0.0
+  # ios_list.dart (Fase 2B.2) -- misma versión que la app principal.
+  cached_network_image: ^3.4.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  # Paquete de widgets puros -- sin assets propios.

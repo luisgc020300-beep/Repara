@@ -12,9 +12,9 @@ import 'package:repara_core/pago.dart';
 
 import 'package:repara_core/pago_service.dart';
 import 'package:repara_core/design_tokens.dart';
-import '../widgets/app_error.dart' show EmptyHint;
+import 'package:repara_ui/app_error.dart' show EmptyHint;
 import '../widgets/documento_abrir.dart' show abrirArchivoProtegido;
-import '../widgets/ios_list.dart';
+import 'package:repara_ui/ios_list.dart';
 import 'nuevo_documento_flow.dart' show elegirFormaDeAnadirPago;
 import 'pago_detail_screen.dart';
 import 'presupuestos_section.dart' show RolEnTrabajo;

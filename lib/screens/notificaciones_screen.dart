@@ -18,7 +18,7 @@ import '../models/casa.dart';
 import '../services/notificacion_router.dart';
 import 'package:repara_core/design_tokens.dart';
 import '../widgets/boton_ajustes.dart';
-import '../widgets/ios_list.dart';
+import 'package:repara_ui/ios_list.dart';
 
 DateTime _soloFecha(DateTime d) => DateTime(d.year, d.month, d.day);
 

@@ -28,8 +28,8 @@ import 'package:repara_core/presupuesto_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:repara_core/design_tokens.dart';
-import '../widgets/app_dialog.dart';
-import '../widgets/app_error.dart';
+import 'package:repara_ui/app_dialog.dart';
+import 'package:repara_ui/app_error.dart';
 import '../widgets/presupuesto_pdf.dart';
 
 // Plantilla de presupuesto (auditoría de producto, octubre 2026): recuerda

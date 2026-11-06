@@ -14,7 +14,7 @@ import 'package:repara_core/documento.dart';
 import 'package:repara_core/documento_service.dart';
 
 import 'package:repara_core/design_tokens.dart';
-import '../widgets/app_error.dart';
+import 'package:repara_ui/app_error.dart';
 import '../widgets/miniatura_documento.dart';
 import '../widgets/seccion_formulario.dart';
 

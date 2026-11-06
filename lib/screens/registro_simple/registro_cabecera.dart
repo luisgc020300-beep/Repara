@@ -24,10 +24,10 @@ import '../../models/casa.dart';
 import '../../models/elemento.dart';
 import 'package:repara_core/registro_service.dart';
 import 'package:repara_core/design_tokens.dart';
-import '../../widgets/app_error.dart';
-import '../../widgets/estado_registro_chip.dart';
+import 'package:repara_ui/app_error.dart';
+import 'package:repara_ui/estado_registro_chip.dart';
 import '../../widgets/galeria_fotos_screen.dart';
-import '../../widgets/ios_list.dart';
+import 'package:repara_ui/ios_list.dart';
 
 class RegistroCabecera extends StatelessWidget {
   const RegistroCabecera({

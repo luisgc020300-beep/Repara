@@ -12,7 +12,7 @@ import 'package:repara_core/pago.dart';
 import 'package:repara_core/registro.dart';
 
 import '../../models/casa.dart';
-import '../../widgets/app_error.dart';
+import 'package:repara_ui/app_error.dart';
 import 'registro_resumen_pdf.dart';
 
 class RegistroSimpleAcciones extends StatefulWidget {

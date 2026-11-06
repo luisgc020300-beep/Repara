@@ -1,4 +1,4 @@
-// lib/widgets/keyboard_dismiss_bar.dart
+// packages/repara_ui/lib/keyboard_dismiss_bar.dart
 //
 // Envuelve toda la app (ver main.dart, `MaterialApp.builder`): mientras el
 // teclado está abierto, deja fija justo encima una barra con un botón para

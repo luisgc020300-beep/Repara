@@ -13,9 +13,9 @@ import '../../models/trabajo_profesional.dart';
 import '../../services/cliente_profesional_service.dart';
 import '../../services/trabajo_profesional_service.dart';
 import 'package:repara_core/design_tokens.dart';
-import '../../widgets/app_dialog.dart';
-import '../../widgets/app_error.dart';
-import '../../widgets/ios_list.dart';
+import 'package:repara_ui/app_dialog.dart';
+import 'package:repara_ui/app_error.dart';
+import 'package:repara_ui/ios_list.dart';
 import 'cliente_profesional_sheet.dart';
 import 'trabajo_profesional_sheet.dart';
 

@@ -1047,6 +1047,13 @@ packages:
       relative: true
     source: path
     version: "0.1.0"
+  repara_ui:
+    dependency: "direct main"
+    description:
+      path: "packages/repara_ui"
+      relative: true
+    source: path
+    version: "0.1.0"
   rx:
     dependency: transitive
     description:

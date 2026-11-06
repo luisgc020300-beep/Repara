@@ -10,7 +10,7 @@ import '../core/service_locator.dart';
 import '../services/security/biometric_service.dart';
 import '../services/security/security_preferences_service.dart';
 import 'package:repara_core/design_tokens.dart';
-import '../widgets/ios_list.dart';
+import 'package:repara_ui/ios_list.dart';
 
 class SeguridadScreen extends StatelessWidget {
   const SeguridadScreen({super.key});

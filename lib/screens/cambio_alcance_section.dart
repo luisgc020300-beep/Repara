@@ -31,9 +31,9 @@ import 'package:repara_core/cambio_alcance_service.dart';
 import '../core/idempotency.dart';
 import '../screens/presupuestos_section.dart' show RolEnTrabajo;
 import 'package:repara_core/design_tokens.dart';
-import '../widgets/app_dialog.dart';
-import '../widgets/app_error.dart';
-import '../widgets/ios_list.dart';
+import 'package:repara_ui/app_dialog.dart';
+import 'package:repara_ui/app_error.dart';
+import 'package:repara_ui/ios_list.dart';
 
 class CambiosAlcanceSection extends StatelessWidget {
   const CambiosAlcanceSection({

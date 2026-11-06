@@ -1,4 +1,4 @@
-// lib/widgets/app_dialog.dart
+// packages/repara_ui/lib/app_dialog.dart
 //
 // Diálogos de confirmación y de texto repetidos por toda la app (eliminar,
 // cerrar sesión, renombrar, canjear un código...) -- antes cada pantalla

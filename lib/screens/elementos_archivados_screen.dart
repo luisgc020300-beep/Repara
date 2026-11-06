@@ -14,7 +14,7 @@ import '../models/casa.dart';
 import '../models/elemento.dart';
 import '../services/elemento_service.dart';
 import 'package:repara_core/design_tokens.dart';
-import '../widgets/app_error.dart';
+import 'package:repara_ui/app_error.dart';
 import 'elemento_detail_screen.dart';
 
 class ElementosArchivadosScreen extends StatelessWidget {

@@ -24,8 +24,8 @@ import 'screens/login_screen.dart';
 import 'services/casa_service.dart';
 import 'services/notificacion_router.dart';
 import 'package:repara_core/design_tokens.dart';
-import 'theme/theme_controller.dart';
-import 'widgets/keyboard_dismiss_bar.dart';
+import 'package:repara_core/theme_controller.dart';
+import 'package:repara_ui/keyboard_dismiss_bar.dart';
 
 final navigatorKey = GlobalKey<NavigatorState>();
 

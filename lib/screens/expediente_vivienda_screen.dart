@@ -28,9 +28,9 @@ import '../services/habitacion_service.dart';
 import 'package:repara_core/pago_service.dart';
 import 'package:repara_core/registro_service.dart';
 import 'package:repara_core/design_tokens.dart';
-import '../widgets/app_error.dart';
+import 'package:repara_ui/app_error.dart';
 import '../widgets/boton_ajustes.dart';
-import '../widgets/ios_list.dart';
+import 'package:repara_ui/ios_list.dart';
 import '../widgets/pdf_trabajo.dart';
 import 'expediente_vivienda_pdf.dart';
 

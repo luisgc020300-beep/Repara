@@ -18,8 +18,8 @@ import 'package:flutter/material.dart';
 import 'package:repara_core/presupuesto.dart';
 
 import 'package:repara_core/design_tokens.dart';
-import '../../widgets/app_error.dart';
-import '../../widgets/ios_list.dart';
+import 'package:repara_ui/app_error.dart';
+import 'package:repara_ui/ios_list.dart';
 import 'registro_pro_detail_screen.dart';
 import 'trabajo_pro_agregado.dart';
 

@@ -8,8 +8,8 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:repara_core/design_tokens.dart';
-import '../widgets/app_error.dart';
-import '../widgets/ios_list.dart';
+import 'package:repara_ui/app_error.dart';
+import 'package:repara_ui/ios_list.dart';
 
 // URL única con dos secciones (#privacidad / #terminos) -- más fácil de
 // mantener que dos páginas separadas mientras la app es de un único

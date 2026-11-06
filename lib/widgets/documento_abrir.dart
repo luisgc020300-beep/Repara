@@ -25,9 +25,9 @@ import '../screens/editar_documento_sheet.dart';
 import '../services/security/biometric_service.dart';
 import '../services/security/security_preferences_service.dart';
 import 'package:repara_core/design_tokens.dart';
-import 'app_dialog.dart';
-import 'app_error.dart';
-import 'ios_list.dart';
+import 'package:repara_ui/app_dialog.dart';
+import 'package:repara_ui/app_error.dart';
+import 'package:repara_ui/ios_list.dart';
 
 Future<void> mostrarAccionesDocumento(
   BuildContext context, {

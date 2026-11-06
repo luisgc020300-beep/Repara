@@ -1,4 +1,4 @@
-// lib/widgets/app_error.dart
+// packages/repara_ui/lib/app_error.dart
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
 

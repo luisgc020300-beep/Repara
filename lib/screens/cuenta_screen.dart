@@ -12,9 +12,9 @@ import 'package:flutter/material.dart';
 import '../services/cuenta_service.dart';
 import '../services/fcm_service.dart';
 import 'package:repara_core/design_tokens.dart';
-import '../widgets/app_dialog.dart';
-import '../widgets/app_error.dart';
-import '../widgets/ios_list.dart';
+import 'package:repara_ui/app_dialog.dart';
+import 'package:repara_ui/app_error.dart';
+import 'package:repara_ui/ios_list.dart';
 
 class CuentaScreen extends StatefulWidget {
   const CuentaScreen({super.key});
