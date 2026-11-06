@@ -9,7 +9,9 @@ import 'package:repara_core/documento.dart';
 import 'package:repara_core/documento_service.dart';
 
 import '../models/casa.dart';
+import '../models/elemento.dart';
 import 'package:repara_core/design_tokens.dart';
+import '../services/elemento_service.dart';
 import '../widgets/documento_abrir.dart';
 import '../widgets/ios_list.dart';
 import 'nuevo_documento_flow.dart';
@@ -34,7 +36,12 @@ class DocumentosCasaScreen extends StatelessWidget {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => iniciarNuevoDocumento(context, casaId: casa.id),
+        onPressed: () => iniciarNuevoDocumento(
+          context,
+          casaId: casa.id,
+          cargarElementosDisponibles: _cargarElementosDisponibles,
+          crearElementoNuevo: _crearElementoNuevo,
+        ),
         icon: const Icon(Icons.document_scanner_outlined),
         label: const Text('Escanear documento'),
       ),
@@ -114,3 +121,28 @@ IconData _iconoTipo(TipoDocumento t) => switch (t) {
       TipoDocumento.contrato => Icons.description_outlined,
       TipoDocumento.otro => Icons.insert_drive_file_outlined,
     };
+
+Future<List<ElementoResumen>> _cargarElementosDisponibles(
+  String casaId,
+) async {
+  final elementos = await ElementoService.streamElementos(casaId).first;
+  return elementos.map((e) => (id: e.id, nombre: e.nombre)).toList();
+}
+
+Future<String> _crearElementoNuevo(
+  String casaId,
+  ElementoNuevoBorrador borrador,
+) {
+  return ElementoService.crear(
+    casaId,
+    Elemento(
+      id: '',
+      nombre: borrador.nombre,
+      habitacionId: borrador.habitacionId,
+      coste: borrador.coste,
+      fechaInstalacion: borrador.fechaInstalacion,
+      garantiaHasta: borrador.garantiaHasta,
+      profesionalNombre: borrador.profesionalNombre,
+    ),
+  );
+}

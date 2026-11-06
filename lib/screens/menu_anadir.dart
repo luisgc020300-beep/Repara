@@ -7,7 +7,9 @@
 import 'package:flutter/material.dart';
 
 import '../models/casa.dart';
+import '../models/elemento.dart';
 import 'package:repara_core/design_tokens.dart';
+import '../services/elemento_service.dart';
 import '../widgets/ios_list.dart';
 import 'nuevo_documento_flow.dart';
 import 'nuevo_elemento_screen.dart';
@@ -36,7 +38,12 @@ Future<void> mostrarMenuAnadir(BuildContext context, {required Casa casa}) {
                   subtitle: 'La IA rellena los datos por ti',
                   onTap: () {
                     Navigator.pop(ctx);
-                    iniciarNuevoDocumento(context, casaId: casa.id);
+                    iniciarNuevoDocumento(
+                      context,
+                      casaId: casa.id,
+                      cargarElementosDisponibles: _cargarElementosDisponibles,
+                      crearElementoNuevo: _crearElementoNuevo,
+                    );
                   },
                 ),
                 IosRow(
@@ -64,6 +71,31 @@ Future<void> mostrarMenuAnadir(BuildContext context, {required Casa casa}) {
           ],
         ),
       ),
+    ),
+  );
+}
+
+Future<List<ElementoResumen>> _cargarElementosDisponibles(
+  String casaId,
+) async {
+  final elementos = await ElementoService.streamElementos(casaId).first;
+  return elementos.map((e) => (id: e.id, nombre: e.nombre)).toList();
+}
+
+Future<String> _crearElementoNuevo(
+  String casaId,
+  ElementoNuevoBorrador borrador,
+) {
+  return ElementoService.crear(
+    casaId,
+    Elemento(
+      id: '',
+      nombre: borrador.nombre,
+      habitacionId: borrador.habitacionId,
+      coste: borrador.coste,
+      fechaInstalacion: borrador.fechaInstalacion,
+      garantiaHasta: borrador.garantiaHasta,
+      profesionalNombre: borrador.profesionalNombre,
     ),
   );
 }

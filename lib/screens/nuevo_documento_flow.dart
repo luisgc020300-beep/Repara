@@ -17,8 +17,6 @@ import 'package:repara_core/documento.dart';
 import 'package:repara_core/documento_service.dart';
 import 'package:repara_core/registro.dart';
 
-import '../models/elemento.dart';
-import '../services/elemento_service.dart';
 import 'package:repara_core/registro_service.dart';
 import 'package:repara_core/design_tokens.dart';
 import '../widgets/app_dialog.dart';
@@ -27,12 +25,36 @@ import '../widgets/ios_list.dart';
 import '../widgets/seccion_formulario.dart';
 import 'pago_detail_screen.dart';
 
+/// Datos mínimos de un elemento para las sugerencias de este flujo -- evita
+/// que este archivo compartido (Hogar + Pro) dependa del modelo `Elemento`
+/// ni de `ElementoService`, exclusivos de Hogar (Fase 2B.1, noviembre 2026).
+typedef ElementoResumen = ({String id, String nombre});
+
+/// Datos mínimos para crear un elemento nuevo desde este flujo, inyectados
+/// por el llamador vía [CrearElementoNuevo] -- mismo motivo que
+/// [ElementoResumen].
+typedef ElementoNuevoBorrador = ({
+  String nombre,
+  String? habitacionId,
+  double? coste,
+  DateTime? fechaInstalacion,
+  DateTime? garantiaHasta,
+  String? profesionalNombre,
+});
+
+typedef CargarElementosDisponibles =
+    Future<List<ElementoResumen>> Function(String casaId);
+typedef CrearElementoNuevo =
+    Future<String> Function(String casaId, ElementoNuevoBorrador borrador);
+
 Future<void> iniciarNuevoDocumento(
   BuildContext context, {
   required String casaId,
   String? elementoId,
   String? registroId,
   String? habitacionId,
+  CargarElementosDisponibles? cargarElementosDisponibles,
+  CrearElementoNuevo? crearElementoNuevo,
 }) async {
   final paginas = await _elegirPaginas(context);
   if (paginas == null || paginas.isEmpty || !context.mounted) return;
@@ -48,11 +70,15 @@ Future<void> iniciarNuevoDocumento(
   // Un profesional invitado a un registro concreto no tiene permiso para
   // listar TODOS los elementos de la casa (solo lee su propio registro) --
   // en ese caso se sigue sin lista de sugerencias en vez de reventar el flujo.
-  List<Elemento> elementos = const [];
-  try {
-    elementos = await ElementoService.streamElementos(casaId).first;
-  } catch (e) {
-    // sin acceso al listado completo -- se continúa sin sugerencias.
+  // Pro (y cualquier llamador sin capacidad de Hogar) no pasa
+  // cargarElementosDisponibles -- se sigue igual sin sugerencias.
+  List<ElementoResumen> elementos = const [];
+  if (cargarElementosDisponibles != null) {
+    try {
+      elementos = await cargarElementosDisponibles(casaId);
+    } catch (e) {
+      // sin acceso al listado completo -- se continúa sin sugerencias.
+    }
   }
   if (!context.mounted) return;
 
@@ -129,6 +155,7 @@ Future<void> iniciarNuevoDocumento(
         elementoIdInicial: elementoId,
         registroIdInicial: registroId,
         habitacionIdInicial: habitacionId,
+        crearElementoNuevo: crearElementoNuevo,
       ),
     ),
   );
@@ -147,13 +174,17 @@ Future<void> iniciarNuevoDocumentoManual(
   String? registroId,
   String? habitacionId,
   TipoDocumento? tipoInicial,
+  CargarElementosDisponibles? cargarElementosDisponibles,
+  CrearElementoNuevo? crearElementoNuevo,
 }) async {
-  List<Elemento> elementos = const [];
-  try {
-    elementos = await ElementoService.streamElementos(casaId).first;
-  } catch (e) {
-    // Mismo motivo que en iniciarNuevoDocumento: un profesional invitado no
-    // puede listar todos los elementos de la casa -- se sigue sin sugerencias.
+  List<ElementoResumen> elementos = const [];
+  if (cargarElementosDisponibles != null) {
+    try {
+      elementos = await cargarElementosDisponibles(casaId);
+    } catch (e) {
+      // Mismo motivo que en iniciarNuevoDocumento: un profesional invitado no
+      // puede listar todos los elementos de la casa -- se sigue sin sugerencias.
+    }
   }
   if (!context.mounted) return;
   await Navigator.push<void>(
@@ -168,6 +199,7 @@ Future<void> iniciarNuevoDocumentoManual(
         registroIdInicial: registroId,
         habitacionIdInicial: habitacionId,
         tipoInicial: tipoInicial,
+        crearElementoNuevo: crearElementoNuevo,
       ),
     ),
   );
@@ -185,6 +217,8 @@ Future<void> elegirFormaDeAnadirDocumento(
   String? registroId,
   String? habitacionId,
   TipoDocumento? tipoInicial,
+  CargarElementosDisponibles? cargarElementosDisponibles,
+  CrearElementoNuevo? crearElementoNuevo,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -211,6 +245,8 @@ Future<void> elegirFormaDeAnadirDocumento(
                   elementoId: elementoId,
                   registroId: registroId,
                   habitacionId: habitacionId,
+                  cargarElementosDisponibles: cargarElementosDisponibles,
+                  crearElementoNuevo: crearElementoNuevo,
                 );
               },
             ),
@@ -229,6 +265,8 @@ Future<void> elegirFormaDeAnadirDocumento(
                   registroId: registroId,
                   habitacionId: habitacionId,
                   tipoInicial: tipoInicial,
+                  cargarElementosDisponibles: cargarElementosDisponibles,
+                  crearElementoNuevo: crearElementoNuevo,
                 );
               },
             ),
@@ -702,15 +740,17 @@ class _RevisionDocumentoScreen extends StatefulWidget {
     this.registroIdInicial,
     this.habitacionIdInicial,
     this.tipoInicial,
+    this.crearElementoNuevo,
   });
 
   final String casaId;
   final List<PaginaDocumento> paginas;
   final SugerenciaIA? sugerencia;
-  final List<Elemento> elementos;
+  final List<ElementoResumen> elementos;
   final String? elementoIdInicial;
   final String? registroIdInicial;
   final String? habitacionIdInicial;
+  final CrearElementoNuevo? crearElementoNuevo;
   // Categoría ya elegida antes de llegar aquí (CEO, noviembre 2026: "Añadir"
   // desde Presupuestos/Facturas-Notas) -- gana sobre la sugerencia de la IA,
   // que aquí ni siquiera existe (solo se usa desde iniciarNuevoDocumentoManual).
@@ -777,7 +817,10 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
   static String _formatoImporte(double? v) =>
       v == null ? '' : v.toStringAsFixed(2);
 
-  static String? _buscarIdPorNombre(List<Elemento> lista, String? nombre) {
+  static String? _buscarIdPorNombre(
+    List<ElementoResumen> lista,
+    String? nombre,
+  ) {
     if (nombre == null) return null;
     for (final item in lista) {
       if (item.nombre.toLowerCase() == nombre.toLowerCase()) return item.id;
@@ -863,11 +906,11 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
       }
 
       if (_crearElementoNuevo &&
-          _nuevoElementoNombreCtrl.text.trim().isNotEmpty) {
-        _elementoId = await ElementoService.crear(
+          _nuevoElementoNombreCtrl.text.trim().isNotEmpty &&
+          widget.crearElementoNuevo != null) {
+        _elementoId = await widget.crearElementoNuevo!(
           widget.casaId,
-          Elemento(
-            id: '',
+          (
             nombre: _nuevoElementoNombreCtrl.text.trim(),
             habitacionId: widget.habitacionIdInicial,
             coste: _importe,
@@ -1433,7 +1476,7 @@ class _VinculoFijo extends StatelessWidget {
   }
 }
 
-String _tituloElemento(List<Elemento> elementos, String id) {
+String _tituloElemento(List<ElementoResumen> elementos, String id) {
   for (final e in elementos) {
     if (e.id == id) return e.nombre;
   }

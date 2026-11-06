@@ -106,6 +106,7 @@ class ElementoDetailScreen extends StatelessWidget {
                         context,
                         casaId: casa.id,
                         elementoId: elemento.id,
+                        cargarElementosDisponibles: _cargarElementosDisponibles,
                       );
                     },
                   ),
@@ -624,6 +625,7 @@ class ElementoDetailScreen extends StatelessWidget {
                       casaId: casa.id,
                       elementoId: elemento.id,
                       habitacionId: elemento.habitacionId,
+                      cargarElementosDisponibles: _cargarElementosDisponibles,
                     ),
                     icon: const Icon(Icons.document_scanner_outlined, size: 18),
                     label: const Text('Escanear documento'),
@@ -1606,4 +1608,11 @@ class _PagoDocumentoTile extends StatelessWidget {
       ),
     );
   }
+}
+
+Future<List<ElementoResumen>> _cargarElementosDisponibles(
+  String casaId,
+) async {
+  final elementos = await ElementoService.streamElementos(casaId).first;
+  return elementos.map((e) => (id: e.id, nombre: e.nombre)).toList();
 }

@@ -1429,6 +1429,7 @@ class _DocumentosTab extends StatelessWidget {
                 casaId: casa.id,
                 elementoId: elementoId,
                 registroId: registro.id,
+                cargarElementosDisponibles: _cargarElementosDisponibles,
               ),
               icon: const Icon(Icons.document_scanner_outlined, size: 18),
               label: const Text('Escanear documento'),
@@ -1633,6 +1634,8 @@ class _CuerpoSimple extends StatelessWidget {
                                   elementoId: elementoId,
                                   registroId: registro.id,
                                   tipoInicial: TipoDocumento.presupuesto,
+                                  cargarElementosDisponibles:
+                                      _cargarElementosDisponibles,
                                 ),
                               ),
                               const SizedBox(height: 20),
@@ -1647,6 +1650,8 @@ class _CuerpoSimple extends StatelessWidget {
                                   elementoId: elementoId,
                                   registroId: registro.id,
                                   tipoInicial: TipoDocumento.factura,
+                                  cargarElementosDisponibles:
+                                      _cargarElementosDisponibles,
                                 ),
                               ),
                             ],
@@ -2320,3 +2325,10 @@ const _estadosEditables = [
   EstadoRegistro.presupuestado,
   EstadoRegistro.enCurso,
 ];
+
+Future<List<ElementoResumen>> _cargarElementosDisponibles(
+  String casaId,
+) async {
+  final elementos = await ElementoService.streamElementos(casaId).first;
+  return elementos.map((e) => (id: e.id, nombre: e.nombre)).toList();
+}
