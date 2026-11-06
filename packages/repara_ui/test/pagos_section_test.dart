@@ -107,6 +107,7 @@ void main() {
               required registroTitulo,
               required presupuesto,
               required conceptoSugerido,
+              verificarAcceso,
             }) {
               casaRecibida = casaId;
               conceptoRecibido = conceptoSugerido;
@@ -144,6 +145,7 @@ void main() {
               required registroTitulo,
               required presupuesto,
               required conceptoSugerido,
+              verificarAcceso,
             }) {},
           ),
         ),

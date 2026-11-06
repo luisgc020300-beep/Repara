@@ -39,6 +39,7 @@ typedef IniciarAnadirPago =
       required String registroTitulo,
       required double? presupuesto,
       required String conceptoSugerido,
+      VerificarAccesoDocumento? verificarAcceso,
     });
 
 class PagosSection extends StatelessWidget {
@@ -104,6 +105,7 @@ class PagosSection extends StatelessWidget {
                       registroTitulo: registroTitulo,
                       presupuesto: presupuesto,
                       conceptoSugerido: 'Pago ${pagos.length + 1}',
+                      verificarAcceso: verificarAcceso,
                     ),
                     icon: const Icon(Icons.add, size: 18),
                     label: const Text('Añadir pago'),

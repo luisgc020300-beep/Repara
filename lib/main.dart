@@ -20,7 +20,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'core/service_locator.dart';
 import 'firebase_options.dart';
 import 'screens/casa_gate_screen.dart';
-import 'screens/login_screen.dart';
+import 'package:repara_ui/login_screen.dart';
 import 'services/casa_service.dart';
 import 'services/notificacion_router.dart';
 import 'package:repara_core/design_tokens.dart';

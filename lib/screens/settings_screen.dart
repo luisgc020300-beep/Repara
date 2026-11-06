@@ -39,7 +39,7 @@ import 'acerca_screen.dart';
 import 'cuenta_screen.dart';
 import 'expediente_vivienda_screen.dart';
 import 'gestionar_vivienda_screen.dart';
-import 'notificaciones_preferencias_screen.dart';
+import 'package:repara_ui/notificaciones_preferencias_screen.dart';
 import 'pro/repara_pro_shell_screen.dart';
 import 'seguridad_screen.dart';
 

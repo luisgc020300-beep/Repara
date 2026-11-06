@@ -45,7 +45,7 @@ import 'package:repara_ui/ios_list.dart';
 import 'package:repara_ui/pagos_section.dart' show mostrarAccionesPago;
 import '../widgets/pdf_trabajo.dart';
 import 'elemento_resumen_pdf.dart';
-import 'nuevo_documento_flow.dart';
+import 'package:repara_ui/nuevo_documento_flow.dart';
 import 'nuevo_elemento_screen.dart';
 import 'nuevo_registro_screen.dart';
 import 'registro_detail_screen.dart';

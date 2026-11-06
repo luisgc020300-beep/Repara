@@ -17,7 +17,7 @@ import 'package:repara_core/design_tokens.dart';
 import '../services/security/documento_gate.dart';
 import 'package:repara_ui/app_error.dart';
 import 'package:repara_ui/miniatura_documento.dart';
-import '../widgets/seccion_formulario.dart';
+import 'package:repara_ui/seccion_formulario.dart';
 
 Future<void> mostrarEditarDocumentoSheet(
   BuildContext context, {

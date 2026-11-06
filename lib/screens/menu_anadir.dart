@@ -11,7 +11,7 @@ import '../models/elemento.dart';
 import 'package:repara_core/design_tokens.dart';
 import '../services/elemento_service.dart';
 import 'package:repara_ui/ios_list.dart';
-import 'nuevo_documento_flow.dart';
+import 'package:repara_ui/nuevo_documento_flow.dart';
 import 'nuevo_elemento_screen.dart';
 
 Future<void> mostrarMenuAnadir(BuildContext context, {required Casa casa}) {

@@ -22,8 +22,8 @@ import 'package:repara_ui/cambio_alcance_section.dart';
 import 'package:repara_ui/estado_registro_chip.dart';
 import 'package:repara_ui/ios_list.dart';
 import 'package:repara_ui/pagos_section.dart';
-import '../../widgets/progreso_pago.dart';
-import '../nuevo_documento_flow.dart';
+import 'package:repara_ui/progreso_pago.dart';
+import 'package:repara_ui/nuevo_documento_flow.dart';
 import 'package:repara_ui/presupuestos_section.dart';
 
 class RegistroProDetailScreen extends StatelessWidget {

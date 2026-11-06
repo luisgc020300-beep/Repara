@@ -38,7 +38,7 @@ import 'package:repara_core/registro.dart';
 import 'package:repara_core/registro_service.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_ui/app_error.dart';
-import '../widgets/seccion_formulario.dart';
+import 'package:repara_ui/seccion_formulario.dart';
 import '../widgets/selector_profesional_field.dart';
 
 Future<void> abrirNuevoRegistroScreen(
