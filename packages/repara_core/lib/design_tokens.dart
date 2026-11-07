@@ -5,7 +5,8 @@
 // blancas con borde fino, editorial y de gestión -- reemplaza la paleta
 // "niebla azulada + lavanda" anterior. Sin degradados, sin sombras fuertes,
 // sin acentos decorativos: cada color tiene un rol semántico concreto.
-import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 
@@ -36,21 +37,32 @@ class ReparaColors extends ThemeExtension<ReparaColors> {
   final Color background; // fondo general -- cálido neutro
   final Color surface; // tarjetas -- blanco
   final Color surfaceMuted; // campos de entrada, filas alternas
-  final Color surfaceSunken; // pista vacía de una barra de progreso, separadores gruesos
-  final Color border; // borde fino de tarjetas/inputs/divisores -- NUNCA alpha sobre ink
+  final Color
+  surfaceSunken; // pista vacía de una barra de progreso, separadores gruesos
+  final Color
+  border; // borde fino de tarjetas/inputs/divisores -- NUNCA alpha sobre ink
   final Color ink; // texto principal -- azul marino oscuro
   final Color inkMuted; // texto secundario -- gris azulado
-  final Color inkFaint; // texto terciario, iconos en reposo -- NUNCA para texto que haya que leer
-  final Color brand; // azul de interacción -- botones secundarios, enlaces, iconos activos
-  final Color brandStrong; // azul marino profundo -- CTA principal, nav activa, pressed
+  final Color
+  inkFaint; // texto terciario, iconos en reposo -- NUNCA para texto que haya que leer
+  final Color
+  brand; // azul de interacción -- botones secundarios, enlaces, iconos activos
+  final Color
+  brandStrong; // azul marino profundo -- CTA principal, nav activa, pressed
   final Color brandOn; // texto/icono sobre un fondo de marca relleno
   final Color brandTint; // fondo tenue azul: icono circular, chip activo
-  final Color sand; // acento secundario neutro -- decorativo puntual, nunca semántico
-  final Color success; // SOLO icono, borde o fondo tenue -- como texto usa successText
-  final Color successText; // variante de success que sí cumple contraste de texto
-  final Color warning; // SOLO icono o fondo tenue -- como texto no llega a 4.5:1, usa warningText
-  final Color warningText; // variante oscurecida de warning para cumplir contraste de texto
-  final Color error; // SOLO icono, borde o fondo tenue -- como texto usa errorText
+  final Color
+  sand; // acento secundario neutro -- decorativo puntual, nunca semántico
+  final Color
+  success; // SOLO icono, borde o fondo tenue -- como texto usa successText
+  final Color
+  successText; // variante de success que sí cumple contraste de texto
+  final Color
+  warning; // SOLO icono o fondo tenue -- como texto no llega a 4.5:1, usa warningText
+  final Color
+  warningText; // variante oscurecida de warning para cumplir contraste de texto
+  final Color
+  error; // SOLO icono, borde o fondo tenue -- como texto usa errorText
   final Color errorText; // variante de error que sí cumple contraste de texto
   final Color overlay; // scrim bajo una hoja modal o diálogo
 
@@ -72,8 +84,11 @@ class ReparaColors extends ThemeExtension<ReparaColors> {
     successText: Color(0xFF1C6F59),
     warning: Color(0xFFE5A23B),
     warningText: Color(0xFF8A5A1F),
-    error: Color(0xFFE57373),
-    errorText: Color(0xFFC23B3B),
+    // Rojo iOS (CEO, noviembre 2026: "el rojo de la última captura" --
+    // referencia el rojo de "Eliminar app" del propio sistema) -- mismo
+    // valor en error/errorText y en claro/oscuro, a propósito.
+    error: Color(0xFFFF3B30),
+    errorText: Color(0xFFFF3B30),
     overlay: Color(0x26131A2B),
   );
 
@@ -101,24 +116,43 @@ class ReparaColors extends ThemeExtension<ReparaColors> {
     brandOn: Color(0xFFFFFFFF),
     brandTint: Color(0x334F85C4),
     sand: Color(0xFF6D93C2),
-    // success/error mas oscuros (CEO, noviembre 2026: "demasiado claros en
-    // modo oscuro") -- mismo tono, menos luminosidad; warning sin tocar.
-    success: Color(0xFF3B9372),
-    successText: Color(0xFF63B897),
+    // Verde mas intenso (CEO, noviembre 2026: "sigue siendo muy crema en
+    // el modo oscuro, quiero un verde mas intenso" -- el claro no cambia)
+    // -- mismo verde de sistema de iOS en modo oscuro para success y
+    // successText, suficiente contraste sobre el fondo casi negro.
+    success: Color(0xFF30D158),
+    successText: Color(0xFF32D74B),
     warning: Color(0xFFF0B860),
     warningText: Color(0xFFF3C88A),
-    error: Color(0xFFC96E6E),
-    errorText: Color(0xFFD98F8F),
+    // Mismo rojo, mismo valor exacto que en claro (ver comentario de
+    // `light`) -- pedido explícitamente para ambos modos, sin variante.
+    error: Color(0xFFFF3B30),
+    errorText: Color(0xFFFF3B30),
     overlay: Color(0x59000000),
   );
 
   @override
   ReparaColors copyWith({
-    Color? background, Color? surface, Color? surfaceMuted, Color? surfaceSunken, Color? border,
-    Color? ink, Color? inkMuted, Color? inkFaint,
-    Color? brand, Color? brandStrong, Color? brandOn, Color? brandTint,
-    Color? sand, Color? success, Color? successText, Color? warning, Color? warningText,
-    Color? error, Color? errorText, Color? overlay,
+    Color? background,
+    Color? surface,
+    Color? surfaceMuted,
+    Color? surfaceSunken,
+    Color? border,
+    Color? ink,
+    Color? inkMuted,
+    Color? inkFaint,
+    Color? brand,
+    Color? brandStrong,
+    Color? brandOn,
+    Color? brandTint,
+    Color? sand,
+    Color? success,
+    Color? successText,
+    Color? warning,
+    Color? warningText,
+    Color? error,
+    Color? errorText,
+    Color? overlay,
   }) {
     return ReparaColors(
       background: background ?? this.background,
@@ -188,33 +222,58 @@ extension ReparaThemeContextX on BuildContext {
 class ReparaText {
   ReparaText._();
 
-  static String get fontFamily => defaultTargetPlatform == TargetPlatform.iOS ? '.SF Pro Text' : 'Roboto';
+  static String get fontFamily =>
+      defaultTargetPlatform == TargetPlatform.iOS ? '.SF Pro Text' : 'Roboto';
 
   static TextTheme uiTextTheme(Brightness brightness) {
-    final base = brightness == Brightness.dark ? ThemeData.dark().textTheme : ThemeData.light().textTheme;
-    final palette = brightness == Brightness.dark ? ReparaColors.dark : ReparaColors.light;
+    final base = brightness == Brightness.dark
+        ? ThemeData.dark().textTheme
+        : ThemeData.light().textTheme;
+    final palette = brightness == Brightness.dark
+        ? ReparaColors.dark
+        : ReparaColors.light;
     final sistema = base.apply(
       fontFamily: fontFamily,
       bodyColor: palette.ink,
       displayColor: palette.ink,
     );
     TextStyle display(double size, double height) => TextStyle(
-          fontFamily: fontFamily,
-          color: palette.ink,
-          fontSize: size,
-          height: height / size,
-          fontWeight: FontWeight.w700,
-          letterSpacing: -0.2,
-        );
+      fontFamily: fontFamily,
+      color: palette.ink,
+      fontSize: size,
+      height: height / size,
+      fontWeight: FontWeight.w700,
+      letterSpacing: -0.2,
+    );
     return sistema.copyWith(
       displayMedium: display(28, 34), // display-lg: recibo, estado vacío
       displaySmall: display(22, 28), // display-md: "Nuevo elemento", "RECIBO"
       headlineSmall: display(18, 24), // heading: título de sección
-      labelSmall: sistema.labelSmall?.copyWith(fontWeight: FontWeight.w700, letterSpacing: 0.6), // label: eyebrow en mayúsculas
-      bodyLarge: sistema.bodyLarge?.copyWith(fontSize: 15, height: 22 / 15, fontWeight: FontWeight.w400), // body
-      titleMedium: sistema.titleMedium?.copyWith(fontSize: 15, height: 22 / 15, fontWeight: FontWeight.w600), // body-strong: título de fila
-      bodySmall: sistema.bodySmall?.copyWith(fontSize: 12.5, height: 17 / 12.5, fontWeight: FontWeight.w500, color: palette.inkMuted), // caption
-      labelLarge: sistema.labelLarge?.copyWith(fontSize: 15, fontWeight: FontWeight.w600, letterSpacing: 0.2), // button
+      labelSmall: sistema.labelSmall?.copyWith(
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.6,
+      ), // label: eyebrow en mayúsculas
+      bodyLarge: sistema.bodyLarge?.copyWith(
+        fontSize: 15,
+        height: 22 / 15,
+        fontWeight: FontWeight.w400,
+      ), // body
+      titleMedium: sistema.titleMedium?.copyWith(
+        fontSize: 15,
+        height: 22 / 15,
+        fontWeight: FontWeight.w600,
+      ), // body-strong: título de fila
+      bodySmall: sistema.bodySmall?.copyWith(
+        fontSize: 12.5,
+        height: 17 / 12.5,
+        fontWeight: FontWeight.w500,
+        color: palette.inkMuted,
+      ), // caption
+      labelLarge: sistema.labelLarge?.copyWith(
+        fontSize: 15,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.2,
+      ), // button
     );
   }
 
@@ -232,7 +291,9 @@ class ReparaText {
 }
 
 ThemeData _buildReparaTheme(Brightness brightness) {
-  final palette = brightness == Brightness.dark ? ReparaColors.dark : ReparaColors.light;
+  final palette = brightness == Brightness.dark
+      ? ReparaColors.dark
+      : ReparaColors.light;
   final textTheme = ReparaText.uiTextTheme(brightness);
   return ThemeData(
     brightness: brightness,
@@ -305,7 +366,9 @@ ThemeData _buildReparaTheme(Brightness brightness) {
       style: FilledButton.styleFrom(
         backgroundColor: palette.brandStrong,
         foregroundColor: palette.brandOn,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(ReparaRadius.sm)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(ReparaRadius.sm),
+        ),
         padding: const EdgeInsets.symmetric(vertical: 14),
       ),
     ),
@@ -313,7 +376,9 @@ ThemeData _buildReparaTheme(Brightness brightness) {
       style: OutlinedButton.styleFrom(
         foregroundColor: palette.brandStrong,
         side: BorderSide(color: palette.border),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(ReparaRadius.sm)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(ReparaRadius.sm),
+        ),
       ),
     ),
     // Chip sin seleccionar como contorno, no bloque sólido -- más ligero,
@@ -323,8 +388,16 @@ ThemeData _buildReparaTheme(Brightness brightness) {
       selectedColor: palette.brandStrong,
       side: BorderSide(color: palette.border),
       shape: const StadiumBorder(),
-      labelStyle: TextStyle(color: palette.ink, fontSize: 13, fontWeight: FontWeight.w500),
-      secondaryLabelStyle: TextStyle(color: palette.brandOn, fontSize: 13, fontWeight: FontWeight.w600),
+      labelStyle: TextStyle(
+        color: palette.ink,
+        fontSize: 13,
+        fontWeight: FontWeight.w500,
+      ),
+      secondaryLabelStyle: TextStyle(
+        color: palette.brandOn,
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+      ),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
     ),
     bottomNavigationBarTheme: BottomNavigationBarThemeData(
@@ -341,7 +414,9 @@ ThemeData _buildReparaTheme(Brightness brightness) {
     ),
     dialogTheme: DialogThemeData(
       backgroundColor: palette.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(ReparaRadius.md)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(ReparaRadius.md),
+      ),
     ),
     // Sin el divider gris por defecto de Material -- el indicador ya marca
     // la pestaña activa, un divider encima solo añadía una línea gris que
@@ -371,7 +446,9 @@ ThemeData _buildReparaTheme(Brightness brightness) {
     // Spinners de "generando PDF"/"cargando" tomaban colorScheme.primary por
     // defecto -- mismo azul marino profundo que el resto de CTAs, no el azul
     // de interacción más claro.
-    progressIndicatorTheme: ProgressIndicatorThemeData(color: palette.brandStrong),
+    progressIndicatorTheme: ProgressIndicatorThemeData(
+      color: palette.brandStrong,
+    ),
   );
 }
 

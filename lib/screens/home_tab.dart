@@ -10,7 +10,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 import 'package:intl/intl.dart';
 
 import '../models/casa.dart';
@@ -89,189 +88,185 @@ class _HomeTabState extends State<HomeTab> {
 
   @override
   Widget build(BuildContext context) {
-    // Sin Scaffold.appBar (CEO, noviembre 2026: "⌂ REPARA" debe vivir sobre
-    // el mismo bloque navy que el saludo, pegado a la barra de estado, no en
-    // una barra separada encima) -- AnnotatedRegion fuerza los iconos de la
-    // barra de estado (hora, batería, señal) a blanco, ya que se pintan
-    // sobre el degradado oscuro de _CabeceraNavy en vez de sobre el fondo
-    // claro/oscuro normal del tema.
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light,
-      child: Scaffold(
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: () => mostrarMenuAnadir(context, casa: widget.casa),
-          icon: const Icon(Icons.add),
-          label: const Text('Añadir elemento'),
-        ),
-        // Un único ListView, no un Column con el encabezado fijo arriba y el
-        // listado aparte en un Expanded -- antes el resumen, la búsqueda y los
-        // filtros nunca se iban de la pantalla por mucho que hubiera scroll,
-        // quitándole sitio permanente a los elementos (CEO, octubre 2026: con
-        // muchos elementos, la parte de arriba debe desaparecer progresivamente
-        // al hacer scroll). Ahora todo vive en el mismo scroll: cabecera y
-        // elementos suben juntos, igual que el resto de listas de la app.
-        body: Stack(
+    // AppBar real (CEO, noviembre 2026: "mismo azul y mismo scroll que Casa
+    // y Contactos") -- antes "REPARA" y el saludo vivían dentro del propio
+    // ListView como su primer item (_CabeceraNavy), así que al tirar del
+    // scroll hacia abajo (rebote) se veía el fondo del Scaffold por encima;
+    // con un AppBar de verdad, fuera de la zona de scroll, eso ya no puede
+    // pasar -- es exactamente el mismo mecanismo que usan Casa/Contactos.
+    // Sin backgroundColor/foregroundColor explícitos: los toma del tema
+    // (appBarTheme: brandStrong + blanco), igual que el AppBar de esas dos.
+    return Scaffold(
+      appBar: AppBar(
+        title: const Row(
           children: [
-            // Mismo azul que _CabeceraNavy, pintado detrás del ListView --
-            // sin esto, el rebote del scroll al tirar hacia abajo dejaba ver
-            // el fondo plano del Scaffold por encima de la cabecera un
-            // instante (CEO, noviembre 2026: "aparece ese hueco blanco").
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              height: 260,
-              child: Container(color: context.colors.brand),
-            ),
-            StreamBuilder<List<Habitacion>>(
-              stream: HabitacionService.streamHabitaciones(widget.casa.id),
-              builder: (context, habSnapshot) {
-                final habitaciones = habSnapshot.data ?? const <Habitacion>[];
-                final nombrePorHabitacion = {
-                  for (final h in habitaciones) h.id: h.nombre,
-                };
-                return StreamBuilder<List<Elemento>>(
-                  stream: ElementoService.streamElementos(
-                    widget.casa.id,
-                    habitacionId: _habitacionFiltro,
-                  ),
-                  builder: (context, snapshot) {
-                    var elementos = snapshot.data ?? [];
-                    if (_busqueda.isNotEmpty) {
-                      elementos = elementos
-                          .where(
-                            (e) => e.nombre.toLowerCase().contains(_busqueda),
-                          )
-                          .toList();
-                    }
-                    return ListView(
-                      padding: EdgeInsets.zero,
-                      children: [
-                        _CabeceraNavy(casa: widget.casa),
-                        _SolicitudesProfesionales(casa: widget.casa),
-                        _ResumenCasa(
-                          casa: widget.casa,
-                          refreshTick: widget.refreshTick,
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                          child: TextField(
-                            controller: _busquedaCtrl,
-                            decoration: InputDecoration(
-                              hintText: 'Buscar elemento',
-                              prefixIcon: const Icon(Icons.search, size: 20),
-                              isDense: true,
-                            ),
-                            onChanged: (v) => setState(
-                              () => _busqueda = v.trim().toLowerCase(),
-                            ),
-                          ),
-                        ),
-                        if (habitaciones.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: Row(
-                                children: [
-                                  ChoiceChip(
-                                    label: const Text('Todo'),
-                                    selected: _habitacionFiltro == null,
-                                    onSelected: (_) => setState(
-                                      () => _habitacionFiltro = null,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  ...habitaciones.map(
-                                    (h) => Padding(
-                                      padding: const EdgeInsets.only(right: 8),
-                                      child: ChoiceChip(
-                                        label: Text(h.nombre),
-                                        selected: _habitacionFiltro == h.id,
-                                        onSelected: (_) => setState(
-                                          () => _habitacionFiltro = h.id,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        if (elementos.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.all(24),
-                            child: Column(
-                              children: [
-                                Container(
-                                  width: 72,
-                                  height: 72,
-                                  decoration: BoxDecoration(
-                                    color: context.colors.brandTint,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    Icons.inventory_2_outlined,
-                                    size: 32,
-                                    color: context.colors.brand,
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'Todavía no hay ningún elemento aquí.\nToca "Añadir" para crear el primero.',
-                                  textAlign: TextAlign.center,
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                              ],
-                            ),
-                          )
-                        else
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: ReparaSpace.s2,
-                                  ),
-                                  child: Text(
-                                    'Tus elementos',
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.headlineSmall,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                // Un único contenedor con filas internas, no una
-                                // Card por elemento (CEO: "evita acumular
-                                // tarjetas") -- mismo patrón que Historial/
-                                // Documentos en registro_detail_screen.dart y
-                                // elemento_detail_screen.dart.
-                                IosSection(
-                                  rows: elementos
-                                      .map(
-                                        (e) => _ElementoRow(
-                                          casa: widget.casa,
-                                          elemento: e,
-                                          ubicacion:
-                                              nombrePorHabitacion[e
-                                                  .habitacionId],
-                                        ),
-                                      )
-                                      .toList(),
-                                ),
-                              ],
-                            ),
-                          ),
-                      ],
-                    );
-                  },
-                );
-              },
+            Icon(Icons.home_rounded, size: 20),
+            SizedBox(width: 8),
+            Text(
+              'REPARA',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+              ),
             ),
           ],
         ),
+        actions: [
+          BotonNotificaciones(modoPro: false, casa: widget.casa),
+          BotonAjustes(casa: widget.casa),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => mostrarMenuAnadir(context, casa: widget.casa),
+        icon: const Icon(Icons.add),
+        label: const Text('Añadir elemento'),
+      ),
+      // Un único ListView, no un Column con el encabezado fijo arriba y el
+      // listado aparte en un Expanded -- antes el resumen, la búsqueda y los
+      // filtros nunca se iban de la pantalla por mucho que hubiera scroll,
+      // quitándole sitio permanente a los elementos (CEO, octubre 2026: con
+      // muchos elementos, la parte de arriba debe desaparecer progresivamente
+      // al hacer scroll). Ahora todo vive en el mismo scroll: saludo y
+      // elementos suben juntos, igual que el resto de listas de la app.
+      body: StreamBuilder<List<Habitacion>>(
+        stream: HabitacionService.streamHabitaciones(widget.casa.id),
+        builder: (context, habSnapshot) {
+          final habitaciones = habSnapshot.data ?? const <Habitacion>[];
+          final nombrePorHabitacion = {
+            for (final h in habitaciones) h.id: h.nombre,
+          };
+          return StreamBuilder<List<Elemento>>(
+            stream: ElementoService.streamElementos(
+              widget.casa.id,
+              habitacionId: _habitacionFiltro,
+            ),
+            builder: (context, snapshot) {
+              var elementos = snapshot.data ?? [];
+              if (_busqueda.isNotEmpty) {
+                elementos = elementos
+                    .where((e) => e.nombre.toLowerCase().contains(_busqueda))
+                    .toList();
+              }
+              return ListView(
+                padding: EdgeInsets.zero,
+                children: [
+                  _CabeceraNavy(casa: widget.casa),
+                  _SolicitudesProfesionales(casa: widget.casa),
+                  _ResumenCasa(
+                    casa: widget.casa,
+                    refreshTick: widget.refreshTick,
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                    child: TextField(
+                      controller: _busquedaCtrl,
+                      decoration: InputDecoration(
+                        hintText: 'Buscar elemento',
+                        prefixIcon: const Icon(Icons.search, size: 20),
+                        isDense: true,
+                      ),
+                      onChanged: (v) =>
+                          setState(() => _busqueda = v.trim().toLowerCase()),
+                    ),
+                  ),
+                  if (habitaciones.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            ChoiceChip(
+                              label: const Text('Todo'),
+                              selected: _habitacionFiltro == null,
+                              onSelected: (_) =>
+                                  setState(() => _habitacionFiltro = null),
+                            ),
+                            const SizedBox(width: 8),
+                            ...habitaciones.map(
+                              (h) => Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: ChoiceChip(
+                                  label: Text(h.nombre),
+                                  selected: _habitacionFiltro == h.id,
+                                  onSelected: (_) =>
+                                      setState(() => _habitacionFiltro = h.id),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  if (elementos.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 72,
+                            height: 72,
+                            decoration: BoxDecoration(
+                              color: context.colors.brandTint,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.inventory_2_outlined,
+                              size: 32,
+                              color: context.colors.brand,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Todavía no hay ningún elemento aquí.\nToca "Añadir" para crear el primero.',
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: ReparaSpace.s2,
+                            ),
+                            child: Text(
+                              'Tus elementos',
+                              style: Theme.of(context).textTheme.headlineSmall,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          // Un único contenedor con filas internas, no una
+                          // Card por elemento (CEO: "evita acumular
+                          // tarjetas") -- mismo patrón que Historial/
+                          // Documentos en registro_detail_screen.dart y
+                          // elemento_detail_screen.dart.
+                          IosSection(
+                            rows: elementos
+                                .map(
+                                  (e) => _ElementoRow(
+                                    casa: widget.casa,
+                                    elemento: e,
+                                    ubicacion:
+                                        nombrePorHabitacion[e.habitacionId],
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              );
+            },
+          );
+        },
       ),
     );
   }
@@ -693,71 +688,25 @@ class _CabeceraNavy extends StatelessWidget {
   Widget build(BuildContext context) {
     final saludo = _saludo();
     final nombreUsuario = _nombreUsuarioActual(casa);
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        // Mismo azul plano que el AppBar de Casa/Contactos (CEO, noviembre
-        // 2026: "quiero que las 3 pantallas principales tengan el mismo
-        // azul") -- antes era un degradado brandStrong->brand, más oscuro.
-        color: context.colors.brand,
-        borderRadius: const BorderRadius.vertical(
-          bottom: Radius.circular(ReparaRadius.lg),
-        ),
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 12, 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.home_rounded, color: Colors.white, size: 20),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'REPARA',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const Spacer(),
-                  IconTheme.merge(
-                    data: const IconThemeData(color: Colors.white),
-                    child: BotonNotificaciones(modoPro: false, casa: casa),
-                  ),
-                  IconTheme.merge(
-                    data: const IconThemeData(color: Colors.white),
-                    child: BotonAjustes(casa: casa),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              Text(
-                nombreUsuario != null && nombreUsuario.isNotEmpty
-                    ? '$saludo, $nombreUsuario'
-                    : saludo,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                casa.nombre,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.85),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
+    // "REPARA" + notificaciones/ajustes viven ahora en el AppBar de verdad
+    // (ver HomeTab.build) -- este widget ya solo es el saludo, como
+    // cualquier otro contenido normal del ListView, sobre el fondo de la
+    // página (no navy) -- igual que Casa/Contactos no tienen ningún banner
+    // de color debajo de su AppBar.
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            nombreUsuario != null && nombreUsuario.isNotEmpty
+                ? '$saludo, $nombreUsuario'
+                : saludo,
+            style: Theme.of(context).textTheme.displaySmall,
           ),
-        ),
+          const SizedBox(height: 4),
+          Text(casa.nombre, style: Theme.of(context).textTheme.bodySmall),
+        ],
       ),
     );
   }
