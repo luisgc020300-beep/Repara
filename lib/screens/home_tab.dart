@@ -739,8 +739,10 @@ class _CabeceraNavy extends StatelessWidget {
   final double alturaExpandida;
   final double alturaCompacta;
 
-  // 8 de padding superior + 48 de los IconButton de notificaciones/ajustes.
-  static const double _alturaFilaIconos = 56;
+  // Mismo alto que el AppBar de Casa (toolbarHeight: 68 en casa_tab.dart),
+  // para que la barra compacta de Inicio y la de Casa coincidan al cambiar
+  // de pestaña.
+  static const double _alturaFilaIconos = 68;
 
   static double calcularAlturaCompacta(double topPadding) =>
       topPadding + _alturaFilaIconos;
@@ -749,7 +751,7 @@ class _CabeceraNavy extends StatelessWidget {
   /// los tamaños de letra (y la escala de texto del sistema). Si se queda
   /// algo corta, el bloque se recorta abajo en vez de desbordar.
   static double _alturaBloqueSaludo(TextScaler textScaler, bool conNombre) =>
-      18 + // separación con la fila de iconos
+      6 + // separación con la fila de iconos (ya más alta, 68)
       textScaler.scale(15) * 1.4 + // "Buenas tardes,"
       (conNombre ? textScaler.scale(22) * 1.3 : 0) + // nombre del usuario
       10 +
@@ -783,6 +785,15 @@ class _CabeceraNavy extends StatelessWidget {
         // El texto se va antes de que la cabecera acabe de encogerse, para
         // que nunca se vea aplastado.
         final opacidadSaludo = (1 - t * 1.8).clamp(0.0, 1.0);
+        // "Inicio" aparece al final de la transición, cuando el saludo ya
+        // se ha ido.
+        final opacidadTitulo = ((t - 0.6) / 0.4).clamp(0.0, 1.0);
+        // Compacta, el degradado se convierte en el mismo azul liso del
+        // AppBar de Casa (mismo origen: el tema de AppBar), para que las
+        // dos pestañas tengan exactamente el mismo color de barra.
+        final colorBarra =
+            Theme.of(context).appBarTheme.backgroundColor ??
+            context.colors.brandStrong;
 
         return Container(
           width: double.infinity,
@@ -792,7 +803,10 @@ class _CabeceraNavy extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [context.colors.brandStrong, context.colors.brand],
+              colors: [
+                Color.lerp(context.colors.brandStrong, colorBarra, t)!,
+                Color.lerp(context.colors.brand, colorBarra, t)!,
+              ],
             ),
             borderRadius: BorderRadius.vertical(
               bottom: Radius.circular(28 * (1 - t)),
@@ -808,34 +822,57 @@ class _CabeceraNavy extends StatelessWidget {
           ),
           child: Column(
             children: [
-              // Fila de iconos: siempre visible.
+              // Fila de iconos: siempre visible, con "Inicio" centrado
+              // cuando está compacta.
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 12, 0),
+                padding: const EdgeInsets.fromLTRB(16, 0, 12, 0),
                 child: SizedBox(
-                  height: _alturaFilaIconos - 8,
-                  child: Row(
+                  height: _alturaFilaIconos,
+                  child: Stack(
+                    alignment: Alignment.center,
                     children: [
-                      Container(
-                        width: 34,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.16),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(
-                          Icons.home_rounded,
-                          color: Colors.white,
-                          size: 18,
+                      ExcludeSemantics(
+                        excluding: opacidadTitulo == 0,
+                        child: Opacity(
+                          opacity: opacidadTitulo,
+                          child: Text(
+                            'Inicio',
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                          ),
                         ),
                       ),
-                      const Spacer(),
-                      IconTheme.merge(
-                        data: const IconThemeData(color: Colors.white),
-                        child: BotonNotificaciones(modoPro: false, casa: casa),
-                      ),
-                      IconTheme.merge(
-                        data: const IconThemeData(color: Colors.white),
-                        child: BotonAjustes(casa: casa),
+                      Row(
+                        children: [
+                          Container(
+                            width: 34,
+                            height: 34,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.16),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.home_rounded,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                          ),
+                          const Spacer(),
+                          IconTheme.merge(
+                            data: const IconThemeData(color: Colors.white),
+                            child: BotonNotificaciones(
+                              modoPro: false,
+                              casa: casa,
+                            ),
+                          ),
+                          IconTheme.merge(
+                            data: const IconThemeData(color: Colors.white),
+                            child: BotonAjustes(casa: casa),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -855,7 +892,7 @@ class _CabeceraNavy extends StatelessWidget {
                         child: Transform.translate(
                           offset: Offset(0, -16 * t),
                           child: Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 18, 12, 20),
+                            padding: const EdgeInsets.fromLTRB(16, 6, 12, 20),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
