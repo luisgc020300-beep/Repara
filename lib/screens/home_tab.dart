@@ -86,24 +86,40 @@ class _HomeTabState extends State<HomeTab> {
   String? _habitacionFiltro;
   final _busquedaCtrl = TextEditingController();
   String _busqueda = '';
+  // Lo escucha _CabeceraNavy para compactarse según el scroll del listado.
+  final _scrollCtrl = ScrollController();
 
   @override
   void dispose() {
     _busquedaCtrl.dispose();
+    _scrollCtrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // Cabecera propia fuera de la zona de scroll (CEO, noviembre 2026:
-    // rediseño visual sobre una referencia concreta) -- no es un
-    // Scaffold.appBar porque la cabecera necesita más alto y una forma
-    // propia (degradado + esquina inferior muy redondeada) de lo que
-    // permite un AppBar normal; en vez de eso, un Column con la cabecera
-    // fija arriba y el listado en un Expanded debajo. Mismo principio que
-    // ya resolvió el rebote del scroll con el AppBar real: la cabecera
-    // vive FUERA del ListView, así que nunca puede quedar detrás de él ni
-    // dejar ver un hueco al tirar del scroll -- igual que Casa/Contactos.
+    // Cabecera propia fuera del ListView (CEO, noviembre 2026: rediseño
+    // visual sobre una referencia concreta) -- no es un Scaffold.appBar
+    // porque necesita más alto y una forma propia (degradado + esquina
+    // inferior muy redondeada). Se superpone al listado en un Stack: el
+    // ListView ocupa toda la pantalla con un padding superior igual a la
+    // altura expandida de la cabecera, y la cabecera se compacta según el
+    // scroll (CEO, noviembre 2026: al bajar, el saludo debe irse poco a
+    // poco y quedar solo una barra con casa + notificaciones + ajustes,
+    // sin tapar el listado). La cabecera sigue sin estar DENTRO del scroll,
+    // así que el rebote al tirar hacia abajo nunca la despega de arriba ni
+    // deja ver un hueco encima -- igual que Casa/Contactos. Y como no cambia
+    // el tamaño del ListView al encogerse, no hay saltos en el scroll.
+    final topPadding = MediaQuery.paddingOf(context).top;
+    final nombreUsuario = _nombreUsuarioActual(widget.casa);
+    final conNombre = nombreUsuario != null && nombreUsuario.isNotEmpty;
+    final alturaCompacta = _CabeceraNavy.calcularAlturaCompacta(topPadding);
+    final alturaExpandida = _CabeceraNavy.calcularAlturaExpandida(
+      topPadding: topPadding,
+      textScaler: MediaQuery.textScalerOf(context),
+      conNombre: conNombre,
+    );
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
@@ -112,10 +128,9 @@ class _HomeTabState extends State<HomeTab> {
           icon: const Icon(Icons.add),
           label: const Text('Añadir elemento'),
         ),
-        body: Column(
+        body: Stack(
           children: [
-            _CabeceraNavy(casa: widget.casa),
-            Expanded(
+            Positioned.fill(
               child: StreamBuilder<List<Habitacion>>(
                 stream: HabitacionService.streamHabitaciones(widget.casa.id),
                 builder: (context, habSnapshot) {
@@ -138,7 +153,14 @@ class _HomeTabState extends State<HomeTab> {
                             .toList();
                       }
                       return ListView(
-                        padding: EdgeInsets.zero,
+                        controller: _scrollCtrl,
+                        // Arriba, el hueco de la cabecera expandida; abajo,
+                        // sitio para que "Añadir elemento" no tape el
+                        // último elemento.
+                        padding: EdgeInsets.only(
+                          top: alturaExpandida,
+                          bottom: 88,
+                        ),
                         children: [
                           _SolicitudesProfesionales(casa: widget.casa),
                           _ResumenCasa(
@@ -268,6 +290,20 @@ class _HomeTabState extends State<HomeTab> {
                     },
                   );
                 },
+              ),
+            ),
+            // Encima del listado: se dibuja por delante y recibe los toques
+            // de sus botones.
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: _CabeceraNavy(
+                casa: widget.casa,
+                scroll: _scrollCtrl,
+                topPadding: topPadding,
+                alturaExpandida: alturaExpandida,
+                alturaCompacta: alturaCompacta,
               ),
             ),
           ],
@@ -672,113 +708,216 @@ class _ResumenCasa extends StatelessWidget {
   }
 }
 
-/// Cabecera fija de Inicio (rediseño visual, noviembre 2026, sobre una
-/// referencia concreta) -- vive fuera del ListView (ver HomeTab.build), así
-/// que nunca puede quedar detrás del contenido al hacer scroll. Degradado
-/// navy (incluye brandStrong, el mismo azul de Casa/Contactos, para que se
-/// reconozca como la misma familia de color) con la esquina inferior muy
-/// redondeada; marca + notificaciones + ajustes arriba, saludo por hora del
-/// día (_saludo()) más el nombre real del usuario (de memberProfiles, que
-/// el servidor ya rellena al crear/unirse a la casa -- nunca un nombre
-/// inventado) debajo, y un mensaje de confianza fijo (sin dato propio
-/// detrás -- no hay ningún indicador de seguridad por cuenta en el código,
-/// así que no se simula uno; es solo texto de marca, igual que cualquier
-/// otra app muestra un sello de confianza genérico).
+/// Cabecera de Inicio (rediseño visual, noviembre 2026, sobre una
+/// referencia concreta) -- se superpone al ListView (ver HomeTab.build) y
+/// se compacta con su scroll: expandida muestra marca + notificaciones +
+/// ajustes, el saludo y el mensaje de confianza; al bajar, el bloque del
+/// saludo sube y se desvanece mientras la cabecera se encoge hasta quedar
+/// solo la fila de iconos (CEO, noviembre 2026: "que no tape información al
+/// hacer scroll"). Degradado navy (incluye brandStrong, el mismo azul de
+/// Casa/Contactos, para que se reconozca como la misma familia de color)
+/// con la esquina inferior muy redondeada solo expandida -- compacta queda
+/// recta, como la cabecera de Casa. Saludo por hora del día (_saludo())
+/// más el nombre real del usuario (de memberProfiles, que el servidor ya
+/// rellena al crear/unirse a la casa -- nunca un nombre inventado), y un
+/// mensaje de confianza fijo (sin dato propio detrás -- no hay ningún
+/// indicador de seguridad por cuenta en el código, así que no se simula
+/// uno; es solo texto de marca, igual que cualquier otra app muestra un
+/// sello de confianza genérico).
 class _CabeceraNavy extends StatelessWidget {
-  const _CabeceraNavy({required this.casa});
+  const _CabeceraNavy({
+    required this.casa,
+    required this.scroll,
+    required this.topPadding,
+    required this.alturaExpandida,
+    required this.alturaCompacta,
+  });
 
   final Casa casa;
+  final ScrollController scroll;
+  final double topPadding;
+  final double alturaExpandida;
+  final double alturaCompacta;
+
+  // 8 de padding superior + 48 de los IconButton de notificaciones/ajustes.
+  static const double _alturaFilaIconos = 56;
+
+  static double calcularAlturaCompacta(double topPadding) =>
+      topPadding + _alturaFilaIconos;
+
+  /// Altura del bloque saludo + mensaje de confianza, estimada a partir de
+  /// los tamaños de letra (y la escala de texto del sistema). Si se queda
+  /// algo corta, el bloque se recorta abajo en vez de desbordar.
+  static double _alturaBloqueSaludo(TextScaler textScaler, bool conNombre) =>
+      18 + // separación con la fila de iconos
+      textScaler.scale(15) * 1.4 + // "Buenas tardes,"
+      (conNombre ? textScaler.scale(22) * 1.3 : 0) + // nombre del usuario
+      10 +
+      textScaler.scale(12.5) * 1.45 + // "Tu cuenta está segura"
+      20; // padding inferior
+
+  static double calcularAlturaExpandida({
+    required double topPadding,
+    required TextScaler textScaler,
+    required bool conNombre,
+  }) =>
+      calcularAlturaCompacta(topPadding) +
+      _alturaBloqueSaludo(textScaler, conNombre);
 
   @override
   Widget build(BuildContext context) {
     final saludo = _saludo();
     final nombreUsuario = _nombreUsuarioActual(casa);
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [context.colors.brandStrong, context.colors.brand],
-        ),
-        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(28)),
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 12, 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.16),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.home_rounded,
-                      color: Colors.white,
-                      size: 18,
-                    ),
-                  ),
-                  const Spacer(),
-                  IconTheme.merge(
-                    data: const IconThemeData(color: Colors.white),
-                    child: BotonNotificaciones(modoPro: false, casa: casa),
-                  ),
-                  IconTheme.merge(
-                    data: const IconThemeData(color: Colors.white),
-                    child: BotonAjustes(casa: casa),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              Text(
-                nombreUsuario != null && nombreUsuario.isNotEmpty
-                    ? '$saludo,'
-                    : saludo,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              if (nombreUsuario != null && nombreUsuario.isNotEmpty)
-                Text(
-                  nombreUsuario,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Icon(
-                    Icons.shield_outlined,
-                    size: 15,
-                    color: Colors.white.withValues(alpha: 0.85),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Tu cuenta está segura',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.85),
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
+    final recorrido = alturaExpandida - alturaCompacta;
+    final alturaBloque = recorrido;
+
+    return AnimatedBuilder(
+      animation: scroll,
+      builder: (context, _) {
+        final offset = scroll.hasClients ? scroll.offset : 0.0;
+        // t = 0 → expandida, t = 1 → compacta. El rebote hacia abajo
+        // (offset negativo) la deja expandida, sin estirarla.
+        final t = recorrido <= 0
+            ? 1.0
+            : (offset / recorrido).clamp(0.0, 1.0);
+        // El texto se va antes de que la cabecera acabe de encogerse, para
+        // que nunca se vea aplastado.
+        final opacidadSaludo = (1 - t * 1.8).clamp(0.0, 1.0);
+
+        return Container(
+          width: double.infinity,
+          height: alturaExpandida - recorrido * t,
+          padding: EdgeInsets.only(top: topPadding),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [context.colors.brandStrong, context.colors.brand],
+            ),
+            borderRadius: BorderRadius.vertical(
+              bottom: Radius.circular(28 * (1 - t)),
+            ),
+            // Sombra suave solo cuando el listado ya pasa por debajo.
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.15 * t),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
-        ),
-      ),
+          child: Column(
+            children: [
+              // Fila de iconos: siempre visible.
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 12, 0),
+                child: SizedBox(
+                  height: _alturaFilaIconos - 8,
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.16),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.home_rounded,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                      ),
+                      const Spacer(),
+                      IconTheme.merge(
+                        data: const IconThemeData(color: Colors.white),
+                        child: BotonNotificaciones(modoPro: false, casa: casa),
+                      ),
+                      IconTheme.merge(
+                        data: const IconThemeData(color: Colors.white),
+                        child: BotonAjustes(casa: casa),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Saludo + confianza: se encoge, sube y se desvanece.
+              Expanded(
+                child: ClipRect(
+                  child: OverflowBox(
+                    alignment: Alignment.topLeft,
+                    minHeight: alturaBloque,
+                    maxHeight: alturaBloque,
+                    child: ExcludeSemantics(
+                      excluding: opacidadSaludo == 0,
+                      child: Opacity(
+                        opacity: opacidadSaludo,
+                        child: Transform.translate(
+                          offset: Offset(0, -16 * t),
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 18, 12, 20),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  nombreUsuario != null &&
+                                          nombreUsuario.isNotEmpty
+                                      ? '$saludo,'
+                                      : saludo,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                if (nombreUsuario != null &&
+                                    nombreUsuario.isNotEmpty)
+                                  Text(
+                                    nombreUsuario,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                const SizedBox(height: 10),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.shield_outlined,
+                                      size: 15,
+                                      color: Colors.white.withValues(
+                                        alpha: 0.85,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Tu cuenta está segura',
+                                      style: TextStyle(
+                                        color: Colors.white.withValues(
+                                          alpha: 0.85,
+                                        ),
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
