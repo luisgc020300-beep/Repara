@@ -468,7 +468,16 @@ class ElementoDetailScreen extends StatelessWidget {
                   label: const Text('Añadir evento'),
                 ),
           body: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+            // Abajo, hueco extra para que "Añadir evento" no tape
+            // "Compartir resumen" ni "Generar ficha PDF" al llegar al final
+            // (CEO, noviembre 2026). Sin botón (elemento archivado), el
+            // margen normal.
+            padding: EdgeInsets.fromLTRB(
+              20,
+              14,
+              20,
+              elemento.archivado ? 24 : 104,
+            ),
             children: [
               // Archivado (auditoría R5, octubre 2026): nunca oculta nada de
               // lo que ya se ve más abajo (foto, mantenimiento, registros,
@@ -611,25 +620,13 @@ class ElementoDetailScreen extends StatelessWidget {
                 },
               ),
               const SizedBox(height: 22),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Documentos',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  TextButton.icon(
-                    onPressed: () => iniciarNuevoDocumento(
-                      context,
-                      casaId: casa.id,
-                      elementoId: elemento.id,
-                      habitacionId: elemento.habitacionId,
-                      cargarElementosDisponibles: _cargarElementosDisponibles,
-                    ),
-                    icon: const Icon(Icons.document_scanner_outlined, size: 18),
-                    label: const Text('Escanear documento'),
-                  ),
-                ],
+              // Solo consulta (CEO, noviembre 2026): los documentos se
+              // escanean dentro de cada evento (como factura, presupuesto o
+              // pago) y aparecen aquí con el nombre del evento de origen --
+              // un botón de escanear en esta sección no tenía sentido.
+              Text(
+                'Documentos',
+                style: Theme.of(context).textTheme.headlineSmall,
               ),
               const SizedBox(height: 8),
               StreamBuilder<List<Documento>>(

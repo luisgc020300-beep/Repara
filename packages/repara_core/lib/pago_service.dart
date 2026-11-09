@@ -110,6 +110,35 @@ class PagoService {
     });
   }
 
+  /// Adjuntar o sustituir el comprobante de un pago ya existente (CEO,
+  /// noviembre 2026: un pago apuntado a mano puede recibir su PDF/foto
+  /// después). Usa la misma Cloud Function que actualizar() -- así sigue
+  /// pasando por la validación de servidor -- reenviando el resto de campos
+  /// del pago exactamente como estaban: solo cambia el comprobante.
+  static Future<void> actualizarComprobante(
+    String casaId,
+    String elementoId,
+    String registroId,
+    Pago pago,
+    String comprobanteUrl,
+  ) async {
+    final callable = FirebaseFunctions.instanceFor(
+      region: _region,
+    ).httpsCallable('actualizarPago');
+    await callable.call<Map<String, dynamic>>({
+      'casaId': casaId,
+      'elementoId': elementoId,
+      'registroId': registroId,
+      'pagoId': pago.id,
+      'importe': pago.importe,
+      'fecha': pago.fecha.millisecondsSinceEpoch,
+      'concepto': pago.concepto,
+      'descripcion': pago.descripcion,
+      'metodo': pago.metodo?.name,
+      'comprobante': comprobanteUrl,
+    });
+  }
+
   static Future<void> eliminar(
     String casaId,
     String elementoId,

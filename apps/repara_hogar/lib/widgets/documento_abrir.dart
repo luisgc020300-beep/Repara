@@ -15,6 +15,11 @@
 // mostrarAccionesContacto() en contacto_acciones.dart. Antes, borrar un
 // documento solo existía (sin ningún indicio visual) como gesto de mantener
 // pulsado en el listado de la casa; editar no existía en ningún sitio.
+//
+// "Adjuntar PDF o foto" / "Sustituir archivo" (CEO, noviembre 2026): un
+// presupuesto o factura rellenado a mano puede recibir su archivo después,
+// en el mismo documento -- antes, subir el PDF creaba un documento nuevo
+// duplicado en vez de completar el que ya existía.
 import 'package:flutter/material.dart';
 import 'package:repara_core/documento.dart';
 import 'package:repara_core/documento_service.dart';
@@ -25,12 +30,15 @@ import 'package:repara_ui/abrir_protegido.dart';
 import 'package:repara_ui/app_dialog.dart';
 import 'package:repara_ui/app_error.dart';
 import 'package:repara_ui/ios_list.dart';
+import 'package:repara_ui/nuevo_documento_flow.dart'
+    show elegirYSubirArchivosAdjuntos;
 
 Future<void> mostrarAccionesDocumento(
   BuildContext context, {
   required String casaId,
   required Documento documento,
 }) {
+  final tieneArchivo = documento.url.isNotEmpty;
   return showModalBottomSheet<void>(
     context: context,
     builder: (ctx) => SafeArea(
@@ -55,7 +63,7 @@ Future<void> mostrarAccionesDocumento(
             ),
             IosSection(
               rows: [
-                if (documento.url.isNotEmpty)
+                if (tieneArchivo)
                   IosRow(
                     icon: Icons.open_in_new,
                     iconColor: ctx.colors.brand,
@@ -65,6 +73,24 @@ Future<void> mostrarAccionesDocumento(
                       abrirDocumento(context, documento);
                     },
                   ),
+                IosRow(
+                  icon: tieneArchivo ? Icons.sync_outlined : Icons.attach_file,
+                  iconColor: ctx.colors.brand,
+                  title: tieneArchivo
+                      ? 'Sustituir archivo'
+                      : 'Adjuntar PDF o foto',
+                  subtitle: tieneArchivo
+                      ? null
+                      : 'Los datos que ya rellenaste no cambian',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _adjuntarArchivo(
+                      context,
+                      casaId: casaId,
+                      documento: documento,
+                    );
+                  },
+                ),
                 IosRow(
                   icon: Icons.edit_outlined,
                   iconColor: ctx.colors.inkMuted,
@@ -104,6 +130,55 @@ Future<void> mostrarAccionesDocumento(
       ),
     ),
   );
+}
+
+/// Sube un PDF/foto y lo enlaza a ESTE documento -- nunca crea uno nuevo.
+/// Solo cambia el archivo (url y páginas adicionales); importe, proveedor,
+/// fecha y el resto de datos rellenados a mano se quedan como estaban.
+Future<void> _adjuntarArchivo(
+  BuildContext context, {
+  required String casaId,
+  required Documento documento,
+}) async {
+  if (documento.url.isNotEmpty) {
+    final seguir = await AppDialog.confirmText(
+      context,
+      title: '¿Sustituir el archivo?',
+      message:
+          'El archivo actual se cambiará por el nuevo. Los datos del '
+          'documento (importe, fecha, proveedor…) no cambian.',
+      confirmLabel: 'Sustituir',
+    );
+    if (!seguir || !context.mounted) return;
+  }
+  final urls = await elegirYSubirArchivosAdjuntos(
+    context,
+    casaId: casaId,
+    elementoId: documento.elementoId,
+    registroId: documento.registroId,
+  );
+  if (urls == null || urls.isEmpty || !context.mounted) return;
+  try {
+    await DocumentoService.actualizar(casaId, documento.id, {
+      'url': urls.first,
+      'archivosAdicionales': urls.skip(1).toList(),
+    });
+    if (context.mounted) {
+      AppError.showSuccess(
+        context,
+        documento.url.isEmpty ? 'Archivo adjuntado.' : 'Archivo sustituido.',
+      );
+    }
+  } catch (e, st) {
+    if (context.mounted) {
+      AppError.show(
+        context,
+        'No se pudo adjuntar el archivo al documento.',
+        error: e,
+        stackTrace: st,
+      );
+    }
+  }
 }
 
 Future<void> _eliminarDocumento(

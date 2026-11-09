@@ -1488,3 +1488,80 @@ String _tituloElemento(List<ElementoResumen> elementos, String id) {
   }
   return 'Elemento de esta ficha';
 }
+
+// =============================================================================
+// ADJUNTAR ARCHIVO A ALGO YA GUARDADO (presupuesto, factura/nota o pago)
+// =============================================================================
+
+/// Adjuntar un PDF o foto a un presupuesto, factura/nota o pago que ya
+/// existe (CEO, noviembre 2026: "si lo relleno a mano y después consigo el
+/// PDF, quiero añadírselo a ese mismo, no que se cree otro"). Mismo selector
+/// de origen que el escáner (cámara, galería o archivo), pero sin IA ni
+/// pantalla de revisión: los datos que se rellenaron a mano no se tocan,
+/// solo se sube el archivo. Devuelve las URLs subidas (la primera es el
+/// archivo principal, el resto páginas adicionales), o null si se cancela o
+/// falla la subida -- en ese caso ya se ha mostrado el error.
+Future<List<String>?> elegirYSubirArchivosAdjuntos(
+  BuildContext context, {
+  required String casaId,
+  String? elementoId,
+  String? registroId,
+}) async {
+  final paginas = await _elegirPaginas(context);
+  if (paginas == null || paginas.isEmpty || !context.mounted) return null;
+
+  // Mismo indicador de carga que "Analizando documento…": sin await, se
+  // cierra a mano en el finally.
+  showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) => AlertDialog(
+      shape: AppDialog.shape(),
+      content: const Row(
+        children: [
+          SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          SizedBox(width: 16),
+          Expanded(child: Text('Subiendo archivo…')),
+        ],
+      ),
+    ),
+  );
+
+  List<String>? urls;
+  Object? error;
+  StackTrace? stackTrace;
+  try {
+    final subidas = <String>[];
+    for (final p in paginas) {
+      subidas.add(
+        await DocumentoService.subirArchivo(
+          casaId,
+          p.archivo,
+          p.nombre,
+          elementoId: elementoId,
+          registroId: registroId,
+        ),
+      );
+    }
+    urls = subidas;
+  } catch (e, st) {
+    error = e;
+    stackTrace = st;
+  } finally {
+    if (context.mounted) Navigator.pop(context);
+  }
+
+  if (error != null && context.mounted) {
+    AppError.show(
+      context,
+      'No se pudo subir el archivo. Inténtalo de nuevo.',
+      error: error,
+      stackTrace: stackTrace,
+    );
+  }
+  return urls;
+}
