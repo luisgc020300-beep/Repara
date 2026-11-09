@@ -32,6 +32,12 @@ import 'registro_detail_screen.dart' show RegistroDetailScreen;
 import 'revisiones_pendientes_screen.dart';
 import 'trabajos_pendientes_screen.dart';
 
+// Acento morado solo para la tarjeta "En curso" (rediseño visual, noviembre
+// 2026, sobre una referencia concreta con 3 colores distintos por tarjeta)
+// -- no es un token de ReparaColors porque no tiene ningún significado
+// semántico propio (ni éxito, ni aviso, ni error), es puramente decorativo.
+const _colorEnCurso = Color(0xFF8B7FD1);
+
 // Saludo según la hora del dispositivo -- sin dato nuevo, nada que no supiera
 // ya el propio teléfono; da a Inicio el tono de "bienvenida" que no tiene
 // sentido repetir en el resto de fichas (CEO, octubre 2026: "personalidad
@@ -80,177 +86,227 @@ class _HomeTabState extends State<HomeTab> {
   String? _habitacionFiltro;
   final _busquedaCtrl = TextEditingController();
   String _busqueda = '';
+  // Lo escucha _CabeceraNavy para compactarse según el scroll del listado.
+  final _scrollCtrl = ScrollController();
 
   @override
   void dispose() {
     _busquedaCtrl.dispose();
+    _scrollCtrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // Sin Scaffold.appBar (CEO, noviembre 2026: "⌂ REPARA" debe vivir sobre
-    // el mismo bloque navy que el saludo, pegado a la barra de estado, no en
-    // una barra separada encima) -- AnnotatedRegion fuerza los iconos de la
-    // barra de estado (hora, batería, señal) a blanco, ya que se pintan
-    // sobre el degradado oscuro de _CabeceraNavy en vez de sobre el fondo
-    // claro/oscuro normal del tema.
+    // Cabecera propia fuera del ListView (CEO, noviembre 2026: rediseño
+    // visual sobre una referencia concreta) -- no es un Scaffold.appBar
+    // porque necesita más alto y una forma propia (degradado + esquina
+    // inferior muy redondeada). Se superpone al listado en un Stack: el
+    // ListView ocupa toda la pantalla con un padding superior igual a la
+    // altura expandida de la cabecera, y la cabecera se compacta según el
+    // scroll (CEO, noviembre 2026: al bajar, el saludo debe irse poco a
+    // poco y quedar solo una barra con casa + notificaciones + ajustes,
+    // sin tapar el listado). La cabecera sigue sin estar DENTRO del scroll,
+    // así que el rebote al tirar hacia abajo nunca la despega de arriba ni
+    // deja ver un hueco encima -- igual que Casa/Contactos. Y como no cambia
+    // el tamaño del ListView al encogerse, no hay saltos en el scroll.
+    final topPadding = MediaQuery.paddingOf(context).top;
+    final nombreUsuario = _nombreUsuarioActual(widget.casa);
+    final conNombre = nombreUsuario != null && nombreUsuario.isNotEmpty;
+    final alturaCompacta = _CabeceraNavy.calcularAlturaCompacta(topPadding);
+    final alturaExpandida = _CabeceraNavy.calcularAlturaExpandida(
+      topPadding: topPadding,
+      textScaler: MediaQuery.textScalerOf(context),
+      conNombre: conNombre,
+    );
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
         floatingActionButton: FloatingActionButton.extended(
           onPressed: () => mostrarMenuAnadir(context, casa: widget.casa),
           icon: const Icon(Icons.add),
-          label: const Text('Añadir'),
+          label: const Text('Añadir elemento'),
         ),
-        // Un único ListView, no un Column con el encabezado fijo arriba y el
-        // listado aparte en un Expanded -- antes el resumen, la búsqueda y los
-        // filtros nunca se iban de la pantalla por mucho que hubiera scroll,
-        // quitándole sitio permanente a los elementos (CEO, octubre 2026: con
-        // muchos elementos, la parte de arriba debe desaparecer progresivamente
-        // al hacer scroll). Ahora todo vive en el mismo scroll: cabecera y
-        // elementos suben juntos, igual que el resto de listas de la app.
-        body: StreamBuilder<List<Habitacion>>(
-          stream: HabitacionService.streamHabitaciones(widget.casa.id),
-          builder: (context, habSnapshot) {
-            final habitaciones = habSnapshot.data ?? const <Habitacion>[];
-            final nombrePorHabitacion = {
-              for (final h in habitaciones) h.id: h.nombre,
-            };
-            return StreamBuilder<List<Elemento>>(
-              stream: ElementoService.streamElementos(
-                widget.casa.id,
-                habitacionId: _habitacionFiltro,
-              ),
-              builder: (context, snapshot) {
-                var elementos = snapshot.data ?? [];
-                if (_busqueda.isNotEmpty) {
-                  elementos = elementos
-                      .where((e) => e.nombre.toLowerCase().contains(_busqueda))
-                      .toList();
-                }
-                return ListView(
-                  padding: EdgeInsets.zero,
-                  children: [
-                    _CabeceraNavy(casa: widget.casa),
-                    _SolicitudesProfesionales(casa: widget.casa),
-                    _ResumenCasa(
-                      casa: widget.casa,
-                      refreshTick: widget.refreshTick,
+        body: Stack(
+          children: [
+            Positioned.fill(
+              child: StreamBuilder<List<Habitacion>>(
+                stream: HabitacionService.streamHabitaciones(widget.casa.id),
+                builder: (context, habSnapshot) {
+                  final habitaciones = habSnapshot.data ?? const <Habitacion>[];
+                  final nombrePorHabitacion = {
+                    for (final h in habitaciones) h.id: h.nombre,
+                  };
+                  return StreamBuilder<List<Elemento>>(
+                    stream: ElementoService.streamElementos(
+                      widget.casa.id,
+                      habitacionId: _habitacionFiltro,
                     ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                      child: TextField(
-                        controller: _busquedaCtrl,
-                        decoration: InputDecoration(
-                          hintText: 'Buscar elemento',
-                          prefixIcon: const Icon(Icons.search, size: 20),
-                          isDense: true,
+                    builder: (context, snapshot) {
+                      var elementos = snapshot.data ?? [];
+                      if (_busqueda.isNotEmpty) {
+                        elementos = elementos
+                            .where(
+                              (e) => e.nombre.toLowerCase().contains(_busqueda),
+                            )
+                            .toList();
+                      }
+                      return ListView(
+                        controller: _scrollCtrl,
+                        // Arriba, el hueco de la cabecera expandida; abajo,
+                        // sitio para que "Añadir elemento" no tape el
+                        // último elemento.
+                        padding: EdgeInsets.only(
+                          top: alturaExpandida,
+                          bottom: 88,
                         ),
-                        onChanged: (v) =>
-                            setState(() => _busqueda = v.trim().toLowerCase()),
-                      ),
-                    ),
-                    if (habitaciones.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: [
-                              ChoiceChip(
-                                label: const Text('Todo'),
-                                selected: _habitacionFiltro == null,
-                                onSelected: (_) =>
-                                    setState(() => _habitacionFiltro = null),
-                              ),
-                              const SizedBox(width: 8),
-                              ...habitaciones.map(
-                                (h) => Padding(
-                                  padding: const EdgeInsets.only(right: 8),
-                                  child: ChoiceChip(
-                                    label: Text(h.nombre),
-                                    selected: _habitacionFiltro == h.id,
-                                    onSelected: (_) => setState(
-                                      () => _habitacionFiltro = h.id,
-                                    ),
-                                  ),
+                        children: [
+                          _SolicitudesProfesionales(casa: widget.casa),
+                          _ResumenCasa(
+                            casa: widget.casa,
+                            refreshTick: widget.refreshTick,
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                            child: TextField(
+                              controller: _busquedaCtrl,
+                              decoration: InputDecoration(
+                                hintText: 'Buscar elemento...',
+                                prefixIcon: const Icon(Icons.search, size: 20),
+                                isDense: true,
+                                filled: true,
+                                fillColor: context.colors.surfaceMuted,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(24),
+                                  borderSide: BorderSide.none,
                                 ),
                               ),
-                            ],
+                              onChanged: (v) => setState(
+                                () => _busqueda = v.trim().toLowerCase(),
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                    if (elementos.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          children: [
-                            Container(
-                              width: 72,
-                              height: 72,
-                              decoration: BoxDecoration(
-                                color: context.colors.brandTint,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                Icons.inventory_2_outlined,
-                                size: 32,
-                                color: context.colors.brand,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Todavía no hay ningún elemento aquí.\nToca "Añadir" para crear el primero.',
-                              textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          ],
-                        ),
-                      )
-                    else
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
+                          if (habitaciones.isNotEmpty)
                             Padding(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: ReparaSpace.s2,
-                              ),
-                              child: Text(
-                                'Tus elementos',
-                                style: Theme.of(
-                                  context,
-                                ).textTheme.headlineSmall,
+                              padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: [
+                                    ChoiceChip(
+                                      label: const Text('Todo'),
+                                      selected: _habitacionFiltro == null,
+                                      onSelected: (_) => setState(
+                                        () => _habitacionFiltro = null,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    ...habitaciones.map(
+                                      (h) => Padding(
+                                        padding: const EdgeInsets.only(
+                                          right: 8,
+                                        ),
+                                        child: ChoiceChip(
+                                          label: Text(h.nombre),
+                                          selected: _habitacionFiltro == h.id,
+                                          onSelected: (_) => setState(
+                                            () => _habitacionFiltro = h.id,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            // Un único contenedor con filas internas, no una
-                            // Card por elemento (CEO: "evita acumular
-                            // tarjetas") -- mismo patrón que Historial/
-                            // Documentos en registro_detail_screen.dart y
-                            // elemento_detail_screen.dart.
-                            IosSection(
-                              rows: elementos
-                                  .map(
+                          if (elementos.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Column(
+                                children: [
+                                  Container(
+                                    width: 72,
+                                    height: 72,
+                                    decoration: BoxDecoration(
+                                      color: context.colors.brandTint,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      Icons.inventory_2_outlined,
+                                      size: 32,
+                                      color: context.colors.brand,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'Todavía no hay ningún elemento aquí.\nToca "Añadir" para crear el primero.',
+                                    textAlign: TextAlign.center,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall,
+                                  ),
+                                ],
+                              ),
+                            )
+                          else
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: ReparaSpace.s2,
+                                    ),
+                                    child: Text(
+                                      'Tus elementos',
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.headlineSmall,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  // Tarjeta propia por elemento, no un único
+                                  // contenedor con filas internas (CEO,
+                                  // noviembre 2026: rediseño visual sobre
+                                  // referencia) -- Historial/Documentos de
+                                  // registro_detail_screen.dart y
+                                  // elemento_detail_screen.dart siguen con
+                                  // IosSection, esto es solo para Inicio.
+                                  ...elementos.map(
                                     (e) => _ElementoRow(
                                       casa: widget.casa,
                                       elemento: e,
                                       ubicacion:
                                           nombrePorHabitacion[e.habitacionId],
                                     ),
-                                  )
-                                  .toList(),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ],
-                        ),
-                      ),
-                  ],
-                );
-              },
-            );
-          },
+                        ],
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+            // Encima del listado: se dibuja por delante y recibe los toques
+            // de sus botones.
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: _CabeceraNavy(
+                casa: widget.casa,
+                scroll: _scrollCtrl,
+                topPadding: topPadding,
+                alturaExpandida: alturaExpandida,
+                alturaCompacta: alturaCompacta,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -299,7 +355,10 @@ class _SolicitudesProfesionales extends StatelessWidget {
 }
 
 class _SolicitudProfesionalCard extends StatefulWidget {
-  const _SolicitudProfesionalCard({required this.solicitud, required this.casa});
+  const _SolicitudProfesionalCard({
+    required this.solicitud,
+    required this.casa,
+  });
 
   final InvitacionHogar solicitud;
   final Casa casa;
@@ -309,8 +368,7 @@ class _SolicitudProfesionalCard extends StatefulWidget {
       _SolicitudProfesionalCardState();
 }
 
-class _SolicitudProfesionalCardState
-    extends State<_SolicitudProfesionalCard> {
+class _SolicitudProfesionalCardState extends State<_SolicitudProfesionalCard> {
   bool _respondiendo = false;
 
   /// Antes de aceptar, el propietario elige a qué Elemento pertenece este
@@ -320,7 +378,9 @@ class _SolicitudProfesionalCardState
   /// duplicando Elementos que ya existían (hallazgo de uso real, noviembre
   /// 2026).
   Future<void> _elegirElementoYAceptar() async {
-    final elementos = await ElementoService.streamElementos(widget.casa.id).first;
+    final elementos = await ElementoService.streamElementos(
+      widget.casa.id,
+    ).first;
     if (!mounted) return;
     // "null" explícito = crear uno nuevo; el modal se cierra sin elegir
     // (pop sin valor) = cancelar, no se acepta nada todavía.
@@ -565,7 +625,7 @@ class _ResumenCasa extends StatelessWidget {
                 Expanded(
                   child: _StatCard(
                     icon: Icons.shield_outlined,
-                    iconColor: context.colors.warning,
+                    iconColor: context.colors.brand,
                     numero: garantias.length,
                     etiqueta: 'Garantías',
                     destacado: garantias.isNotEmpty,
@@ -592,7 +652,7 @@ class _ResumenCasa extends StatelessWidget {
                 Expanded(
                   child: _StatCard(
                     icon: Icons.build_circle_outlined,
-                    iconColor: context.colors.brand,
+                    iconColor: context.colors.warning,
                     numero: revisiones.length,
                     etiqueta: 'Revisión',
                     destacado: revisiones.isNotEmpty,
@@ -620,7 +680,7 @@ class _ResumenCasa extends StatelessWidget {
                 Expanded(
                   child: _StatCard(
                     icon: Icons.hourglass_top_outlined,
-                    iconColor: context.colors.brand,
+                    iconColor: _colorEnCurso,
                     numero: pendientes.length,
                     etiqueta: 'En curso',
                     destacado: pendientes.isNotEmpty,
@@ -648,94 +708,260 @@ class _ResumenCasa extends StatelessWidget {
   }
 }
 
-/// Banner de bienvenida (rediseño visual, noviembre 2026) -- sustituye a la
-/// tarjeta "Todo en orden"/"Hay cosas que revisar": un solo bloque navy desde
-/// la barra de estado (CEO, noviembre 2026: "el icono y REPARA deben vivir
-/// sobre el mismo fondo azul marino que el saludo, no en una barra blanca
-/// aparte") -- SafeArea solo inset-ea el contenido, el Container de fondo
-/// sigue pintando detrás de la barra de estado. Marca + notificaciones +
-/// ajustes arriba, saludo por hora del día (_saludo(), antes en el AppBar)
+/// Cabecera de Inicio (rediseño visual, noviembre 2026, sobre una
+/// referencia concreta) -- se superpone al ListView (ver HomeTab.build) y
+/// se compacta con su scroll: expandida muestra marca + notificaciones +
+/// ajustes, el saludo y el mensaje de confianza; al bajar, el bloque del
+/// saludo sube y se desvanece mientras la cabecera se encoge hasta quedar
+/// solo la fila de iconos (CEO, noviembre 2026: "que no tape información al
+/// hacer scroll"). Degradado navy (incluye brandStrong, el mismo azul de
+/// Casa/Contactos, para que se reconozca como la misma familia de color)
+/// con la esquina inferior muy redondeada solo expandida -- compacta queda
+/// recta, como la cabecera de Casa. Saludo por hora del día (_saludo())
 /// más el nombre real del usuario (de memberProfiles, que el servidor ya
-/// rellena al crear/unirse a la casa -- nunca un nombre inventado) y el
-/// nombre real de la casa debajo. Sin foto de fondo: Casa no tiene ningún
-/// campo de foto de vivienda, así que en vez de simular una se usa el mismo
-/// degradado de marca que antes solo llevaba la tarjeta de saludo.
+/// rellena al crear/unirse a la casa -- nunca un nombre inventado), y un
+/// mensaje de confianza fijo (sin dato propio detrás -- no hay ningún
+/// indicador de seguridad por cuenta en el código, así que no se simula
+/// uno; es solo texto de marca, igual que cualquier otra app muestra un
+/// sello de confianza genérico).
 class _CabeceraNavy extends StatelessWidget {
-  const _CabeceraNavy({required this.casa});
+  const _CabeceraNavy({
+    required this.casa,
+    required this.scroll,
+    required this.topPadding,
+    required this.alturaExpandida,
+    required this.alturaCompacta,
+  });
 
   final Casa casa;
+  final ScrollController scroll;
+  final double topPadding;
+  final double alturaExpandida;
+  final double alturaCompacta;
+
+  // Mismo alto que el AppBar de Casa (toolbarHeight: 68 en casa_tab.dart),
+  // para que la barra compacta de Inicio y la de Casa coincidan al cambiar
+  // de pestaña.
+  static const double _alturaFilaIconos = 68;
+
+  static double calcularAlturaCompacta(double topPadding) =>
+      topPadding + _alturaFilaIconos;
+
+  /// Altura del bloque saludo + mensaje de confianza, estimada a partir de
+  /// los tamaños de letra (y la escala de texto del sistema). Si se queda
+  /// algo corta, el bloque se recorta abajo en vez de desbordar.
+  static double _alturaBloqueSaludo(TextScaler textScaler, bool conNombre) =>
+      6 + // separación con la fila de iconos (ya más alta, 68)
+      textScaler.scale(15) * 1.4 + // "Buenas tardes,"
+      (conNombre ? textScaler.scale(22) * 1.3 : 0) + // nombre del usuario
+      10 +
+      textScaler.scale(12.5) * 1.45 + // "Tu cuenta está segura"
+      20; // padding inferior
+
+  static double calcularAlturaExpandida({
+    required double topPadding,
+    required TextScaler textScaler,
+    required bool conNombre,
+  }) =>
+      calcularAlturaCompacta(topPadding) +
+      _alturaBloqueSaludo(textScaler, conNombre);
 
   @override
   Widget build(BuildContext context) {
     final saludo = _saludo();
     final nombreUsuario = _nombreUsuarioActual(casa);
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [context.colors.brandStrong, context.colors.brand],
-        ),
-        borderRadius: const BorderRadius.vertical(
-          bottom: Radius.circular(ReparaRadius.lg),
-        ),
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 12, 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.home_rounded, color: Colors.white, size: 20),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'REPARA',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const Spacer(),
-                  IconTheme.merge(
-                    data: const IconThemeData(color: Colors.white),
-                    child: BotonNotificaciones(modoPro: false, casa: casa),
-                  ),
-                  IconTheme.merge(
-                    data: const IconThemeData(color: Colors.white),
-                    child: BotonAjustes(casa: casa),
-                  ),
-                ],
+    final recorrido = alturaExpandida - alturaCompacta;
+    final alturaBloque = recorrido;
+
+    return AnimatedBuilder(
+      animation: scroll,
+      builder: (context, _) {
+        final offset = scroll.hasClients ? scroll.offset : 0.0;
+        // t = 0 → expandida, t = 1 → compacta. El rebote hacia abajo
+        // (offset negativo) la deja expandida, sin estirarla.
+        final t = recorrido <= 0
+            ? 1.0
+            : (offset / recorrido).clamp(0.0, 1.0);
+        // El texto se va antes de que la cabecera acabe de encogerse, para
+        // que nunca se vea aplastado.
+        final opacidadSaludo = (1 - t * 1.8).clamp(0.0, 1.0);
+        // "Inicio" aparece al final de la transición, cuando el saludo ya
+        // se ha ido.
+        final opacidadTitulo = ((t - 0.6) / 0.4).clamp(0.0, 1.0);
+        // Compacta, el degradado se convierte en el mismo azul liso del
+        // AppBar de Casa (mismo origen: el tema de AppBar), para que las
+        // dos pestañas tengan exactamente el mismo color de barra.
+        final colorBarra =
+            Theme.of(context).appBarTheme.backgroundColor ??
+            context.colors.brandStrong;
+        // En modo oscuro, `brand` es el azul claro de iconos y enlaces --
+        // como final del degradado quedaba demasiado claro (CEO, noviembre
+        // 2026: "azules más oscuros, navy corporativo"); se usa un navy
+        // intermedio entre brandStrong y brand. El claro no cambia.
+        final finDegradado = Theme.of(context).brightness == Brightness.dark
+            ? Color.lerp(context.colors.brandStrong, context.colors.brand, 0.3)!
+            : context.colors.brand;
+
+        return Container(
+          width: double.infinity,
+          height: alturaExpandida - recorrido * t,
+          padding: EdgeInsets.only(top: topPadding),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color.lerp(context.colors.brandStrong, colorBarra, t)!,
+                Color.lerp(finDegradado, colorBarra, t)!,
+              ],
+            ),
+            borderRadius: BorderRadius.vertical(
+              bottom: Radius.circular(28 * (1 - t)),
+            ),
+            // Sombra suave solo cuando el listado ya pasa por debajo.
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.15 * t),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
               ),
-              const SizedBox(height: 18),
-              Text(
-                nombreUsuario != null && nombreUsuario.isNotEmpty
-                    ? '$saludo, $nombreUsuario'
-                    : saludo,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
+            ],
+          ),
+          child: Column(
+            children: [
+              // Fila de iconos: siempre visible, con "Inicio" centrado
+              // cuando está compacta.
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 12, 0),
+                child: SizedBox(
+                  height: _alturaFilaIconos,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      ExcludeSemantics(
+                        excluding: opacidadTitulo == 0,
+                        child: Opacity(
+                          opacity: opacidadTitulo,
+                          child: Text(
+                            'Inicio',
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                          ),
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          Container(
+                            width: 34,
+                            height: 34,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.16),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.home_rounded,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                          ),
+                          const Spacer(),
+                          IconTheme.merge(
+                            data: const IconThemeData(color: Colors.white),
+                            child: BotonNotificaciones(
+                              modoPro: false,
+                              casa: casa,
+                            ),
+                          ),
+                          IconTheme.merge(
+                            data: const IconThemeData(color: Colors.white),
+                            child: BotonAjustes(casa: casa),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                casa.nombre,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.85),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
+              // Saludo + confianza: se encoge, sube y se desvanece.
+              Expanded(
+                child: ClipRect(
+                  child: OverflowBox(
+                    alignment: Alignment.topLeft,
+                    minHeight: alturaBloque,
+                    maxHeight: alturaBloque,
+                    child: ExcludeSemantics(
+                      excluding: opacidadSaludo == 0,
+                      child: Opacity(
+                        opacity: opacidadSaludo,
+                        child: Transform.translate(
+                          offset: Offset(0, -16 * t),
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 6, 12, 20),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  nombreUsuario != null &&
+                                          nombreUsuario.isNotEmpty
+                                      ? '$saludo,'
+                                      : saludo,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                if (nombreUsuario != null &&
+                                    nombreUsuario.isNotEmpty)
+                                  Text(
+                                    nombreUsuario,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                const SizedBox(height: 10),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.shield_outlined,
+                                      size: 15,
+                                      color: Colors.white.withValues(
+                                        alpha: 0.85,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Tu cuenta está segura',
+                                      style: TextStyle(
+                                        color: Colors.white.withValues(
+                                          alpha: 0.85,
+                                        ),
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ],
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -811,10 +1037,13 @@ class _BannerAviso extends StatelessWidget {
 
 /// Tarjeta propia por métrica (rediseño visual, noviembre 2026) -- antes las
 /// tres vivían como tercios de una única Card con divisores internos; ahora
-/// cada una es su propia tarjeta redondeada, con fondo tenue cuando
-/// [destacado] (hay algo real que mirar) para que destaque sin inventar un
-/// color nuevo -- reutiliza el mismo [iconColor] semántico que ya tenía cada
-/// métrica, solo como fondo en vez de solo como icono.
+/// cada una es su propia tarjeta redondeada, con fondo tenue siempre (CEO:
+/// "rediseño sobre una referencia con las 3 tarjetas siempre coloreadas",
+/// antes solo se teñía con [destacado]) -- reutiliza el mismo [iconColor]
+/// semántico que ya tenía cada métrica, solo como fondo en vez de solo como
+/// icono. [destacado] (hay algo real que mirar) ahora solo pone el número
+/// en negrita extra/con el color de la métrica, en vez de decidir si hay
+/// fondo o no.
 class _StatCard extends StatelessWidget {
   const _StatCard({
     required this.icon,
@@ -837,7 +1066,7 @@ class _StatCard extends StatelessWidget {
     return Card(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
-      color: destacado ? iconColor.withValues(alpha: 0.08) : null,
+      color: iconColor.withValues(alpha: 0.1),
       child: InkWell(
         onTap: onTap,
         child: Semantics(
@@ -860,9 +1089,11 @@ class _StatCard extends StatelessWidget {
                 const SizedBox(height: 8),
                 Text(
                   '$numero',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.headlineSmall?.copyWith(fontSize: 22, height: 1),
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontSize: 22,
+                    height: 1,
+                    color: destacado ? iconColor : null,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -883,11 +1114,13 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-/// Fila de un elemento dentro del listado agrupado -- sin Card ni borde
-/// propios (antes cada elemento era su propia tarjeta suelta); vive dentro
-/// de un IosSection, que ya pone el contenedor único y los divisores. El
+/// Tarjeta propia por elemento (rediseño visual, noviembre 2026, sobre una
+/// referencia concreta) -- antes vivía como fila dentro de un IosSection
+/// (un único contenedor con divisores); mismos datos y mismo onTap de
+/// siempre, solo el envoltorio cambia a una Card suelta con badge circular
+/// y chevron, para que cada elemento se lea como su propia tarjeta. El
 /// aviso (ámbar) cubre tanto garantía como revisión próximas, igual que el
-/// banner de arriba -- antes solo se destacaba la garantía.
+/// banner de arriba.
 class _ElementoRow extends StatelessWidget {
   const _ElementoRow({
     required this.casa,
@@ -914,8 +1147,9 @@ class _ElementoRow extends StatelessWidget {
       if (elemento.fechaInstalacion != null)
         DateFormat('d MMM yyyy', 'es_ES').format(elemento.fechaInstalacion!),
     ].join(' · ');
-    return Material(
-      color: Colors.transparent,
+    return Card(
+      margin: const EdgeInsets.only(bottom: ReparaSpace.s2),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => Navigator.push(
           context,
@@ -936,7 +1170,7 @@ class _ElementoRow extends StatelessWidget {
                   color: avisado
                       ? context.colors.warning.withValues(alpha: 0.12)
                       : context.colors.brandTint,
-                  borderRadius: BorderRadius.circular(ReparaRadius.sm),
+                  shape: BoxShape.circle,
                 ),
                 child: elemento.fotoUrl != null
                     ? CachedNetworkImage(
@@ -1005,6 +1239,12 @@ class _ElementoRow extends StatelessWidget {
                   style: ReparaText.amount(context),
                 ),
               ],
+              const SizedBox(width: 4),
+              Icon(
+                Icons.chevron_right,
+                size: 20,
+                color: context.colors.inkFaint,
+              ),
             ],
           ),
         ),

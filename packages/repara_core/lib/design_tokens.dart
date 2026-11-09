@@ -102,6 +102,20 @@ class ReparaColors extends ThemeExtension<ReparaColors> {
   // el azul queda SOLO en brand/brandStrong, como acento de marca sobre un
   // negro de verdad, igual que el claro reserva el azul para ink/marca y
   // deja el fondo en un neutro aparte.
+  //
+  // Navy corporativo (CEO, noviembre 2026: "en modo oscuro, todos los azules
+  // más oscuros, rollo navy corporativo profesional, que se distinga el
+  // texto"). Antes brandStrong era un azul medio-claro (4F85C4) que se veía
+  // chillón como fondo de barras, botones y FAB. Ahora:
+  //  - brandStrong (fondos: AppBar, FAB, botones, chip activo) es un navy
+  //    profundo -- texto blanco encima a ~10:1, muy por encima de 4.5:1.
+  //  - brand (iconos y enlaces sobre fondo oscuro) baja de tono y
+  //    saturación, pero se mantiene por encima de 4.5:1 sobre `surface`
+  //    para que siga leyéndose.
+  //  - brandTint se calcula sobre `brand`, no sobre brandStrong: un tinte
+  //    del navy profundo sería invisible sobre el negro.
+  // En oscuro, brandStrong ya NO sirve como color de texto/icono (se
+  // perdería sobre el fondo) -- ver `acento` en _buildReparaTheme.
   static const dark = ReparaColors(
     background: Color(0xFF0A0A0C),
     surface: Color(0xFF161617),
@@ -111,11 +125,11 @@ class ReparaColors extends ThemeExtension<ReparaColors> {
     ink: Color(0xFFF2F2F4),
     inkMuted: Color(0xFF9C9CA3),
     inkFaint: Color(0xFF6C6C73),
-    brand: Color(0xFF6D93C2),
-    brandStrong: Color(0xFF4F85C4),
+    brand: Color(0xFF6489B8),
+    brandStrong: Color(0xFF22426A),
     brandOn: Color(0xFFFFFFFF),
-    brandTint: Color(0x334F85C4),
-    sand: Color(0xFF6D93C2),
+    brandTint: Color(0x2E6489B8),
+    sand: Color(0xFF6489B8),
     // Verde mas intenso (CEO, noviembre 2026: "sigue siendo muy crema en
     // el modo oscuro, quiero un verde mas intenso" -- el claro no cambia)
     // -- mismo verde de sistema de iOS en modo oscuro para success y
@@ -294,6 +308,14 @@ ThemeData _buildReparaTheme(Brightness brightness) {
   final palette = brightness == Brightness.dark
       ? ReparaColors.dark
       : ReparaColors.light;
+  // Azul para texto/iconos sobre el fondo de la pantalla (no sobre un
+  // relleno de marca). En claro es brandStrong, como siempre. En oscuro,
+  // brandStrong es un navy profundo pensado para FONDOS (barras, botones,
+  // FAB) -- como color de texto o icono se perdería sobre el negro, así que
+  // se usa brand, el azul legible del modo oscuro (CEO, noviembre 2026).
+  final acento = brightness == Brightness.dark
+      ? palette.brand
+      : palette.brandStrong;
   final textTheme = ReparaText.uiTextTheme(brightness);
   return ThemeData(
     brightness: brightness,
@@ -372,9 +394,10 @@ ThemeData _buildReparaTheme(Brightness brightness) {
         padding: const EdgeInsets.symmetric(vertical: 14),
       ),
     ),
+    // Texto del botón secundario sobre el fondo de la pantalla -> `acento`.
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        foregroundColor: palette.brandStrong,
+        foregroundColor: acento,
         side: BorderSide(color: palette.border),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(ReparaRadius.sm),
@@ -386,6 +409,7 @@ ThemeData _buildReparaTheme(Brightness brightness) {
     chipTheme: ChipThemeData(
       backgroundColor: Colors.transparent,
       selectedColor: palette.brandStrong,
+      checkmarkColor: palette.brandOn,
       side: BorderSide(color: palette.border),
       shape: const StadiumBorder(),
       labelStyle: TextStyle(
@@ -400,9 +424,10 @@ ThemeData _buildReparaTheme(Brightness brightness) {
       ),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
     ),
+    // Icono y texto de la pestaña activa sobre la barra inferior -> `acento`.
     bottomNavigationBarTheme: BottomNavigationBarThemeData(
       backgroundColor: palette.surface,
-      selectedItemColor: palette.brandStrong,
+      selectedItemColor: acento,
       unselectedItemColor: palette.inkFaint,
       type: BottomNavigationBarType.fixed,
     ),
@@ -420,9 +445,10 @@ ThemeData _buildReparaTheme(Brightness brightness) {
     ),
     // Sin el divider gris por defecto de Material -- el indicador ya marca
     // la pestaña activa, un divider encima solo añadía una línea gris que
-    // competía con el borde fino del resto del sistema.
+    // competía con el borde fino del resto del sistema. Indicador como
+    // línea fina sobre el fondo -> `acento`.
     tabBarTheme: TabBarThemeData(
-      indicatorColor: palette.brandStrong,
+      indicatorColor: acento,
       labelColor: palette.ink,
       unselectedLabelColor: palette.inkMuted,
       dividerColor: Colors.transparent,
@@ -443,12 +469,9 @@ ThemeData _buildReparaTheme(Brightness brightness) {
       textColor: palette.ink,
       tileColor: Colors.transparent,
     ),
-    // Spinners de "generando PDF"/"cargando" tomaban colorScheme.primary por
-    // defecto -- mismo azul marino profundo que el resto de CTAs, no el azul
-    // de interacción más claro.
-    progressIndicatorTheme: ProgressIndicatorThemeData(
-      color: palette.brandStrong,
-    ),
+    // Spinners de "generando PDF"/"cargando" sobre el fondo de la pantalla
+    // -> `acento` (en oscuro, un spinner navy profundo apenas se vería).
+    progressIndicatorTheme: ProgressIndicatorThemeData(color: acento),
   );
 }
 
