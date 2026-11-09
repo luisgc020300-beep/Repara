@@ -27,6 +27,11 @@ Future<void> mostrarEditarDocumentoSheet(
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
+    // Con el formulario largo, la hoja crece hasta arriba del todo -- sin
+    // esto, el título "Editar documento" quedaba debajo de la hora y la
+    // batería (CEO, noviembre 2026). useSafeArea hace que la hoja se pare
+    // justo debajo de la barra de estado.
+    useSafeArea: true,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(
         top: Radius.circular(ReparaRadius.lg),
@@ -82,6 +87,8 @@ class _EditarDocumentoFormState extends State<_EditarDocumentoForm> {
 
   static String _formatoImporte(double? v) =>
       v == null ? '' : v.toStringAsFixed(2).replaceAll('.', ',');
+
+  static String _formatoFecha(DateTime f) => '${f.day}/${f.month}/${f.year}';
 
   @override
   void dispose() {
@@ -168,7 +175,12 @@ class _EditarDocumentoFormState extends State<_EditarDocumentoForm> {
         left: ReparaSpace.s5,
         right: ReparaSpace.s5,
         top: ReparaSpace.s5,
-        bottom: ReparaSpace.s5 + MediaQuery.of(context).viewInsets.bottom,
+        // Teclado abierto (viewInsets) o, si no, la barra de inicio del
+        // iPhone (padding) -- para que "Guardar cambios" nunca quede debajo.
+        bottom:
+            ReparaSpace.s5 +
+            MediaQuery.of(context).viewInsets.bottom +
+            MediaQuery.of(context).padding.bottom,
       ),
       child: SingleChildScrollView(
         child: Column(
@@ -215,29 +227,22 @@ class _EditarDocumentoFormState extends State<_EditarDocumentoForm> {
                 Row(
                   children: [
                     Expanded(
-                      child: OutlinedButton.icon(
+                      child: _BotonFecha(
+                        icono: Icons.calendar_today_outlined,
+                        texto: _fecha == null
+                            ? 'Fecha'
+                            : _formatoFecha(_fecha!),
                         onPressed: () => _elegirFecha(vencimiento: false),
-                        icon: const Icon(
-                          Icons.calendar_today_outlined,
-                          size: 16,
-                        ),
-                        label: Text(
-                          _fecha == null
-                              ? 'Fecha'
-                              : '${_fecha!.day}/${_fecha!.month}/${_fecha!.year}',
-                        ),
                       ),
                     ),
                     const SizedBox(width: ReparaSpace.s3),
                     Expanded(
-                      child: OutlinedButton.icon(
+                      child: _BotonFecha(
+                        icono: Icons.event_outlined,
+                        texto: _fechaVencimiento == null
+                            ? 'Vencimiento'
+                            : _formatoFecha(_fechaVencimiento!),
                         onPressed: () => _elegirFecha(vencimiento: true),
-                        icon: const Icon(Icons.event_outlined, size: 16),
-                        label: Text(
-                          _fechaVencimiento == null
-                              ? 'Vencimiento'
-                              : '${_fechaVencimiento!.day}/${_fechaVencimiento!.month}/${_fechaVencimiento!.year}',
-                        ),
                       ),
                     ),
                   ],
@@ -346,6 +351,38 @@ class _EditarDocumentoFormState extends State<_EditarDocumentoForm> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Botón de fecha de media anchura (Fecha / Vencimiento). El texto va
+/// siempre en una sola línea y, si no cabe entero, se reduce un poco en vez
+/// de partirse -- antes "Vencimiento" se cortaba en "Vencimient-o" en
+/// pantallas estrechas (CEO, noviembre 2026). Padding horizontal más
+/// ajustado que el de un OutlinedButton normal para dejarle más sitio.
+class _BotonFecha extends StatelessWidget {
+  const _BotonFecha({
+    required this.icono,
+    required this.texto,
+    required this.onPressed,
+  });
+
+  final IconData icono;
+  final String texto;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      ),
+      icon: Icon(icono, size: 16),
+      label: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(texto, maxLines: 1, softWrap: false),
       ),
     );
   }
