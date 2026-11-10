@@ -91,7 +91,7 @@ class PagosSection extends StatelessWidget {
                     if (total > 0) ...[
                       const SizedBox(width: 12),
                       Text(
-                        '(${total.toStringAsFixed(0)} €)',
+                        '(${total.euros} €)',
                         style: ReparaText.amount(
                           context,
                         ).copyWith(fontSize: 15),
@@ -135,7 +135,7 @@ class PagosSection extends StatelessWidget {
                             ? DateFormat('d MMM yyyy', 'es_ES').format(p.fecha)
                             : null,
                         trailing: Text(
-                          '${p.importe.toStringAsFixed(2)} €',
+                          '${p.importe.euros} €',
                           style: ReparaText.amount(context),
                         ),
                         showChevron: false,

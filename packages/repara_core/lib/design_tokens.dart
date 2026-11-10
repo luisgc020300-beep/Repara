@@ -227,6 +227,29 @@ extension ReparaThemeContextX on BuildContext {
   ReparaColors get colors => Theme.of(this).extension<ReparaColors>()!;
 }
 
+/// Importes en euros con formato español y SIEMPRE dos decimales -- "859,10",
+/// "1.038,00", "20,00" (CEO, noviembre 2026: los pagos salían con dos
+/// decimales y presupuestos/facturas sin ninguno, redondeando incluso
+/// importes que sí tenían céntimos). Un único formato para toda la app:
+/// `'${importe.euros} €'`. Sin el símbolo, para que cada sitio decida si lo
+/// pone con espacio, entre paréntesis, etc. Sin depender de intl: coma
+/// decimal y punto de miles, a mano.
+extension ReparaImporteX on num {
+  String get euros {
+    final centimos = (this * 100).round();
+    final negativo = centimos < 0;
+    final absoluto = centimos.abs();
+    final entero = (absoluto ~/ 100).toString();
+    final decimales = (absoluto % 100).toString().padLeft(2, '0');
+    final conMiles = StringBuffer();
+    for (var i = 0; i < entero.length; i++) {
+      if (i > 0 && (entero.length - i) % 3 == 0) conMiles.write('.');
+      conMiles.write(entero[i]);
+    }
+    return '${negativo ? '-' : ''}$conMiles,$decimales';
+  }
+}
+
 /// Fuente nativa del sistema -- SF Pro en iPhone, Roboto en Android, nunca una
 /// fuente descargada -- exactamente lo que hace que WhatsApp o Instagram se
 /// sientan "de app" y no de página web. Sustituye a Newsreader+Inter (CEO,

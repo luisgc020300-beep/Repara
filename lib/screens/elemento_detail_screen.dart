@@ -469,14 +469,15 @@ class ElementoDetailScreen extends StatelessWidget {
                 ),
           body: ListView(
             // Abajo, hueco extra para que "Añadir evento" no tape
-            // "Compartir resumen" ni "Generar ficha PDF" al llegar al final
+            // "Compartir resumen" ni "Generar ficha PDF" al llegar al final,
+            // con aire de separación entre el último botón y el flotante
             // (CEO, noviembre 2026). Sin botón (elemento archivado), el
             // margen normal.
             padding: EdgeInsets.fromLTRB(
               20,
               14,
               20,
-              elemento.archivado ? 24 : 104,
+              elemento.archivado ? 24 : 136,
             ),
             children: [
               // Archivado (auditoría R5, octubre 2026): nunca oculta nada de
@@ -598,7 +599,7 @@ class ElementoDetailScreen extends StatelessWidget {
                             ).format(r.fecha),
                             trailing: r.coste != null
                                 ? Text(
-                                    '${r.coste!.toStringAsFixed(0)} €',
+                                    '${r.coste!.euros} €',
                                     style: ReparaText.amount(context),
                                   )
                                 : null,
@@ -743,7 +744,7 @@ class _AccionesElementoState extends State<_AccionesElemento> {
         '${elemento.marca}${elemento.modelo != null ? ' ${elemento.modelo}' : ''}',
       if (elemento.fechaInstalacion != null)
         'instalado ${DateFormat('MM/yyyy').format(elemento.fechaInstalacion!)}',
-      if (elemento.coste != null) '${elemento.coste!.toStringAsFixed(0)} €',
+      if (elemento.coste != null) '${elemento.coste!.euros} €',
       if (elemento.profesionalNombre != null) elemento.profesionalNombre!,
     ];
     if (detalle.isNotEmpty) buffer.writeln(detalle.join(' · '));
@@ -759,7 +760,7 @@ class _AccionesElementoState extends State<_AccionesElemento> {
         final coste = montoDebidoRegistro(r);
         final detalleR = [
           nombreEstadoRegistro(r.estado),
-          if (coste != null) '${coste.toStringAsFixed(0)} €',
+          if (coste != null) '${coste.euros} €',
         ].join(' · ');
         buffer.writeln(
           '- ${r.titulo} ($detalleR) -- ${DateFormat('d MMM yyyy', 'es_ES').format(r.fecha)}',
@@ -1286,7 +1287,7 @@ class _TarjetaInformacion extends StatelessWidget {
         if (elemento.coste != null)
           IosValueRow(
             label: 'Coste',
-            value: '${elemento.coste!.toStringAsFixed(0)} €',
+            value: '${elemento.coste!.euros} €',
           ),
         if (elemento.profesionalNombre != null)
           IosValueRow(label: 'Profesional', value: elemento.profesionalNombre!),
@@ -1438,7 +1439,7 @@ class _DocumentoTile extends StatelessWidget {
       subtitle: subtitulo.isEmpty ? null : subtitulo,
       trailing: documento.importe != null
           ? Text(
-              '${documento.importe!.toStringAsFixed(0)} €',
+              '${documento.importe!.euros} €',
               style: ReparaText.amount(context),
             )
           : null,
@@ -1588,7 +1589,7 @@ class _PagoDocumentoTile extends StatelessWidget {
           ? '$concepto · $fecha'
           : fecha,
       trailing: Text(
-        '${pago.importe.toStringAsFixed(0)} €',
+        '${pago.importe.euros} €',
         style: ReparaText.amount(context),
       ),
       showChevron: false,

@@ -794,6 +794,13 @@ class _CabeceraNavy extends StatelessWidget {
         final colorBarra =
             Theme.of(context).appBarTheme.backgroundColor ??
             context.colors.brandStrong;
+        // En modo oscuro, `brand` es el azul claro de iconos y enlaces --
+        // como final del degradado quedaba demasiado claro (CEO, noviembre
+        // 2026: "azules más oscuros, navy corporativo"); se usa un navy
+        // intermedio entre brandStrong y brand. El claro no cambia.
+        final finDegradado = Theme.of(context).brightness == Brightness.dark
+            ? Color.lerp(context.colors.brandStrong, context.colors.brand, 0.3)!
+            : context.colors.brand;
 
         return Container(
           width: double.infinity,
@@ -805,7 +812,7 @@ class _CabeceraNavy extends StatelessWidget {
               end: Alignment.bottomRight,
               colors: [
                 Color.lerp(context.colors.brandStrong, colorBarra, t)!,
-                Color.lerp(context.colors.brand, colorBarra, t)!,
+                Color.lerp(finDegradado, colorBarra, t)!,
               ],
             ),
             borderRadius: BorderRadius.vertical(
@@ -1228,7 +1235,7 @@ class _ElementoRow extends StatelessWidget {
               if (elemento.coste != null) ...[
                 const SizedBox(width: 8),
                 Text(
-                  '${elemento.coste!.toStringAsFixed(0)} €',
+                  '${elemento.coste!.euros} €',
                   style: ReparaText.amount(context),
                 ),
               ],
