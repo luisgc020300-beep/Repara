@@ -15,6 +15,13 @@
 // sin red: que la sección aparece, que un pago ya existente se lista, y que
 // "Añadir pago" navega al formulario correcto sin tope de presupuesto.
 // Usa FakeFirebaseFirestore, nada de Firebase real.
+//
+// Importes con el formato único de la app (noviembre 2026, ver `euros` en
+// design_tokens.dart): siempre dos decimales, coma decimal y punto de
+// miles -- "2.000,00 €", "800,00 €". Como ahora la tarjeta económica y la
+// lista de Pagos usan el MISMO formato, un mismo importe puede aparecer
+// varias veces en pantalla (antes "800 €" en la tarjeta y "800.00 €" en la
+// lista eran textos distintos).
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -121,7 +128,12 @@ void main() {
 
       expect(find.text('Sin pagos registrados todavía.'), findsNothing);
       expect(find.text('Pago 1'), findsOneWidget);
-      expect(find.text('2000.00 €'), findsOneWidget);
+      // El pago (2000) aparece en su fila de la lista -- y, con el mismo
+      // formato, también en la tarjeta económica (Coste y Pagado son
+      // 2000 aquí), así que hay al menos uno.
+      expect(find.text('2.000,00 €'), findsWidgets);
+      // Total de la cabecera de "Pagos", entre paréntesis.
+      expect(find.text('(2.000,00 €)'), findsOneWidget);
     },
   );
 
@@ -129,7 +141,7 @@ void main() {
   // Pagado/Saldo) que ya tenía un registro con profesional (presupuesto),
   // también para uno simple -- _TarjetaEconomica ya existía, solo faltaba
   // reutilizarla aquí con "Coste" en vez de "Presupuesto".
-    testWidgets(
+  testWidgets(
     'un registro simple con coste y un pago parcial muestra la barra de progreso Coste/Pagado/Saldo',
     (tester) async {
       final db = await _prepararConRegistroSimple();
@@ -159,12 +171,15 @@ void main() {
       expect(find.text('COSTE'), findsOneWidget);
       expect(find.text('PAGADO'), findsOneWidget);
       expect(find.text('SALDO'), findsOneWidget);
-      expect(find.text('2000 €'), findsOneWidget);
-      // "800 €" en la barra Coste/Pagado/Saldo y "(800 €)" en el total
-      // que lleva la cabecera de "Pagos" (entre paréntesis).
-      expect(find.text('800 €'), findsOneWidget);
-      expect(find.text('(800 €)'), findsOneWidget);
-      expect(find.text('1200 €'), findsOneWidget);
+      // Coste en la tarjeta.
+      expect(find.text('2.000,00 €'), findsOneWidget);
+      // "800,00 €" dos veces: en "Pagado" de la tarjeta y en la fila del
+      // pago dentro de la lista -- y "(800,00 €)" en el total de la
+      // cabecera de "Pagos".
+      expect(find.text('800,00 €'), findsNWidgets(2));
+      expect(find.text('(800,00 €)'), findsOneWidget);
+      // Saldo pendiente.
+      expect(find.text('1.200,00 €'), findsOneWidget);
       expect(find.byType(LinearProgressIndicator), findsOneWidget);
     },
   );
