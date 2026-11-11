@@ -29,7 +29,6 @@ import 'package:repara_core/pago_service.dart';
 import 'package:repara_core/registro_service.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_ui/app_error.dart';
-import '../widgets/boton_ajustes.dart';
 import 'package:repara_ui/ios_list.dart';
 import '../widgets/pdf_trabajo.dart';
 import 'expediente_vivienda_pdf.dart';
@@ -290,7 +289,6 @@ class _ExpedienteViviendaScreenState extends State<ExpedienteViviendaScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Expediente de la vivienda'),
-        actions: [BotonAjustes(casa: casa)],
       ),
       body: FutureBuilder<List<Elemento>>(
         // incluirArchivados: true (auditoría R5, octubre 2026) -- este

@@ -1235,7 +1235,7 @@ class _ElementoRow extends StatelessWidget {
               if (elemento.coste != null) ...[
                 const SizedBox(width: 8),
                 Text(
-                  '${elemento.coste!.toStringAsFixed(0)} €',
+                  '${elemento.coste!.euros} €',
                   style: ReparaText.amount(context),
                 ),
               ],

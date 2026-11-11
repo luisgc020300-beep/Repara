@@ -36,7 +36,6 @@ import 'package:repara_core/registro_service.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_ui/app_dialog.dart';
 import 'package:repara_ui/app_error.dart';
-import '../widgets/boton_ajustes.dart';
 import '../widgets/documento_abrir.dart';
 import 'package:repara_ui/estado_registro_chip.dart' show nombreEstadoRegistro;
 import 'package:repara_ui/foto_ampliada_screen.dart';
@@ -453,7 +452,6 @@ class ElementoDetailScreen extends StatelessWidget {
               ),
               _ArchivarElementoButton(casaId: casa.id, elemento: elemento),
               _EliminarElementoButton(casaId: casa.id, elemento: elemento),
-              BotonAjustes(casa: casa),
             ],
           ),
           // null cuando está archivado (auditoría R5, octubre 2026): la
@@ -469,7 +467,17 @@ class ElementoDetailScreen extends StatelessWidget {
                   label: const Text('Añadir evento'),
                 ),
           body: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+            // Abajo, hueco extra para que "Añadir evento" no tape
+            // "Compartir resumen" ni "Generar ficha PDF" al llegar al final,
+            // con aire de separación entre el último botón y el flotante
+            // (CEO, noviembre 2026). Sin botón (elemento archivado), el
+            // margen normal.
+            padding: EdgeInsets.fromLTRB(
+              20,
+              14,
+              20,
+              elemento.archivado ? 24 : 136,
+            ),
             children: [
               // Archivado (auditoría R5, octubre 2026): nunca oculta nada de
               // lo que ya se ve más abajo (foto, mantenimiento, registros,
@@ -590,7 +598,7 @@ class ElementoDetailScreen extends StatelessWidget {
                             ).format(r.fecha),
                             trailing: r.coste != null
                                 ? Text(
-                                    '${r.coste!.toStringAsFixed(0)} €',
+                                    '${r.coste!.euros} €',
                                     style: ReparaText.amount(context),
                                   )
                                 : null,
@@ -612,25 +620,13 @@ class ElementoDetailScreen extends StatelessWidget {
                 },
               ),
               const SizedBox(height: 22),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Documentos',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  TextButton.icon(
-                    onPressed: () => iniciarNuevoDocumento(
-                      context,
-                      casaId: casa.id,
-                      elementoId: elemento.id,
-                      habitacionId: elemento.habitacionId,
-                      cargarElementosDisponibles: _cargarElementosDisponibles,
-                    ),
-                    icon: const Icon(Icons.document_scanner_outlined, size: 18),
-                    label: const Text('Escanear documento'),
-                  ),
-                ],
+              // Solo consulta (CEO, noviembre 2026): los documentos se
+              // escanean dentro de cada evento (como factura, presupuesto o
+              // pago) y aparecen aquí con el nombre del evento de origen --
+              // un botón de escanear en esta sección no tenía sentido.
+              Text(
+                'Documentos',
+                style: Theme.of(context).textTheme.headlineSmall,
               ),
               const SizedBox(height: 8),
               StreamBuilder<List<Documento>>(
@@ -747,7 +743,7 @@ class _AccionesElementoState extends State<_AccionesElemento> {
         '${elemento.marca}${elemento.modelo != null ? ' ${elemento.modelo}' : ''}',
       if (elemento.fechaInstalacion != null)
         'instalado ${DateFormat('MM/yyyy').format(elemento.fechaInstalacion!)}',
-      if (elemento.coste != null) '${elemento.coste!.toStringAsFixed(0)} €',
+      if (elemento.coste != null) '${elemento.coste!.euros} €',
       if (elemento.profesionalNombre != null) elemento.profesionalNombre!,
     ];
     if (detalle.isNotEmpty) buffer.writeln(detalle.join(' · '));
@@ -763,7 +759,7 @@ class _AccionesElementoState extends State<_AccionesElemento> {
         final coste = montoDebidoRegistro(r);
         final detalleR = [
           nombreEstadoRegistro(r.estado),
-          if (coste != null) '${coste.toStringAsFixed(0)} €',
+          if (coste != null) '${coste.euros} €',
         ].join(' · ');
         buffer.writeln(
           '- ${r.titulo} ($detalleR) -- ${DateFormat('d MMM yyyy', 'es_ES').format(r.fecha)}',
@@ -1290,7 +1286,7 @@ class _TarjetaInformacion extends StatelessWidget {
         if (elemento.coste != null)
           IosValueRow(
             label: 'Coste',
-            value: '${elemento.coste!.toStringAsFixed(0)} €',
+            value: '${elemento.coste!.euros} €',
           ),
         if (elemento.profesionalNombre != null)
           IosValueRow(label: 'Profesional', value: elemento.profesionalNombre!),
@@ -1442,7 +1438,7 @@ class _DocumentoTile extends StatelessWidget {
       subtitle: subtitulo.isEmpty ? null : subtitulo,
       trailing: documento.importe != null
           ? Text(
-              '${documento.importe!.toStringAsFixed(0)} €',
+              '${documento.importe!.euros} €',
               style: ReparaText.amount(context),
             )
           : null,
@@ -1592,7 +1588,7 @@ class _PagoDocumentoTile extends StatelessWidget {
           ? '$concepto · $fecha'
           : fecha,
       trailing: Text(
-        '${pago.importe.toStringAsFixed(0)} €',
+        '${pago.importe.euros} €',
         style: ReparaText.amount(context),
       ),
       showChevron: false,

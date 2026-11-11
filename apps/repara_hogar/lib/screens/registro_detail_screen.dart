@@ -34,7 +34,6 @@ import 'package:repara_core/registro_service.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_ui/app_dialog.dart';
 import 'package:repara_ui/app_error.dart';
-import '../widgets/boton_ajustes.dart';
 import '../widgets/documento_abrir.dart';
 import 'package:repara_ui/cambio_alcance_section.dart';
 import 'package:repara_ui/estado_registro_chip.dart';
@@ -51,8 +50,7 @@ import 'registro_simple/registro_resumen_pdf.dart';
 import 'registro_simple/registro_simple_acciones.dart';
 import 'registro_simple/registro_simple_progreso.dart';
 
-String _formatoImporte(double v) =>
-    v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(2);
+String _formatoImporte(double v) => v.euros;
 
 class RegistroDetailScreen extends StatelessWidget {
   const RegistroDetailScreen({
@@ -103,7 +101,7 @@ class RegistroDetailScreen extends StatelessWidget {
           context,
           title: 'Todavía no está pagado del todo',
           message:
-              'Llevas pagado ${pagado.toStringAsFixed(2)} € de ${registro.presupuesto!.toStringAsFixed(2)} €. '
+              'Llevas pagado ${pagado.euros} € de ${registro.presupuesto!.euros} €. '
               '¿Quieres finalizar igualmente?',
           confirmLabel: 'Finalizar igualmente',
         );
@@ -376,7 +374,6 @@ class RegistroDetailScreen extends StatelessWidget {
                     ),
                 ],
               ),
-              BotonAjustes(casa: casa),
             ],
           ),
           body: registro.esConProfesional
@@ -1459,7 +1456,7 @@ class _DocumentosTab extends StatelessWidget {
                       title: d.proveedor ?? d.nombreArchivo,
                       trailing: d.importe != null
                           ? Text(
-                              '${d.importe!.toStringAsFixed(0)} €',
+                              '${d.importe!.euros} €',
                               style: ReparaText.amount(context),
                             )
                           : null,
@@ -1786,7 +1783,7 @@ class _SeccionCategoriaDocumentos extends StatelessWidget {
                 if (total > 0) ...[
                   const SizedBox(width: 12),
                   Text(
-                    '(${total.toStringAsFixed(0)} €)',
+                    '(${total.euros} €)',
                     style: ReparaText.amount(context).copyWith(fontSize: 15),
                   ),
                 ],
@@ -1814,7 +1811,7 @@ class _SeccionCategoriaDocumentos extends StatelessWidget {
                         : null,
                     trailing: d.importe != null
                         ? Text(
-                            '${d.importe!.toStringAsFixed(0)} €',
+                            '${d.importe!.euros} €',
                             style: ReparaText.amount(context),
                           )
                         : null,
@@ -2010,7 +2007,7 @@ class _PlanDePagos extends StatelessWidget {
                 Text(
                   'Pago a plazos · cada ${registro.plazoFrecuenciaMeses} '
                   '${registro.plazoFrecuenciaMeses == 1 ? 'mes' : 'meses'} · '
-                  '${registro.plazoImporte!.toStringAsFixed(2)} €',
+                  '${registro.plazoImporte!.euros} €',
                   style: Theme.of(
                     context,
                   ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
