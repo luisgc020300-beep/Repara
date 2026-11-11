@@ -2,9 +2,18 @@
 //
 // Importar contactos del teléfono a la libreta de Contactos de la casa (CEO,
 // noviembre 2026) -- solo lectura del directorio del teléfono
-// (FlutterContacts.requestPermission(readonly: true)), nunca escritura ahí.
-// Un contacto del teléfono sin ningún número no sirve (Contacto.telefono es
-// obligatorio en el modelo), así que se descarta directamente de la lista.
+// (FlutterContacts.permissions.request(PermissionType.read)), nunca escritura
+// ahí. Un contacto del teléfono sin ningún número no sirve (Contacto.telefono
+// es obligatorio en el modelo), así que se descarta directamente de la lista.
+//
+// Migrado a flutter_contacts 2.x (nov 2026): la 1.1.9+2 hacía
+// `UIApplication.shared.delegate!.window!!.rootViewController!` en su
+// register(with:) nativo de iOS -- force-unwrap que crasheaba la app al
+// arrancar en iOS 26. La reescritura 2.x ya no toca rootViewController ahí.
+// Fijado a 2.0.x/2.1.x en pubspec.yaml (2.2.0+ exige Flutter 3.44, aquí hay
+// 3.38.9). API nueva: permissions.request() devuelve PermissionStatus (no
+// bool), getAll(properties: {...}) en vez de getContacts(withProperties:),
+// y Contact.id/displayName pasan a ser nullable.
 import 'package:flutter/material.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 
@@ -17,7 +26,11 @@ Future<void> abrirImportarContactos(
   BuildContext context, {
   required String casaId,
 }) async {
-  final permitido = await FlutterContacts.requestPermission(readonly: true);
+  final estado = await FlutterContacts.permissions.request(
+    PermissionType.read,
+  );
+  final permitido =
+      estado == PermissionStatus.granted || estado == PermissionStatus.limited;
   if (!permitido) {
     if (context.mounted) {
       AppError.show(
@@ -83,11 +96,16 @@ class _ImportarContactosScreenState extends State<ImportarContactosScreen> {
           .map((c) => _normalizar(c.telefono))
           .where((t) => t.isNotEmpty)
           .toSet();
-      final dispositivo = await FlutterContacts.getContacts(
-        withProperties: true,
+      final dispositivo = await FlutterContacts.getAll(
+        properties: {ContactProperty.phone},
       );
       final conTelefono = dispositivo
-          .where((c) => c.phones.isNotEmpty && c.displayName.trim().isNotEmpty)
+          .where(
+            (c) =>
+                c.id != null &&
+                c.phones.isNotEmpty &&
+                (c.displayName ?? '').trim().isNotEmpty,
+          )
           .toList();
       if (!mounted) return;
       setState(() {
@@ -121,7 +139,7 @@ class _ImportarContactosScreenState extends State<ImportarContactosScreen> {
           widget.casaId,
           Contacto(
             id: '',
-            nombre: c.displayName.trim(),
+            nombre: c.displayName!.trim(),
             telefono: c.phones.first.number.trim(),
             tipo: TipoContacto.particular,
           ),
@@ -161,7 +179,10 @@ class _ImportarContactosScreenState extends State<ImportarContactosScreen> {
         : (_busqueda.isEmpty
               ? contactos
               : contactos
-                    .where((c) => c.displayName.toLowerCase().contains(_busqueda))
+                    .where(
+                      (c) =>
+                          (c.displayName ?? '').toLowerCase().contains(_busqueda),
+                    )
                     .toList());
     return Scaffold(
       appBar: AppBar(
@@ -223,21 +244,22 @@ class _ImportarContactosScreenState extends State<ImportarContactosScreen> {
                     itemCount: filtrados!.length,
                     itemBuilder: (context, i) {
                       final c = filtrados[i];
+                      final id = c.id!;
                       final yaGuardado = _yaGuardado(c);
-                      final seleccionado = _seleccionados.contains(c.id);
+                      final seleccionado = _seleccionados.contains(id);
                       return CheckboxListTile(
                         value: yaGuardado ? true : seleccionado,
                         onChanged: yaGuardado
                             ? null
                             : (v) => setState(() {
                                 if (v ?? false) {
-                                  _seleccionados.add(c.id);
+                                  _seleccionados.add(id);
                                 } else {
-                                  _seleccionados.remove(c.id);
+                                  _seleccionados.remove(id);
                                 }
                               }),
                         controlAffinity: ListTileControlAffinity.leading,
-                        title: Text(c.displayName),
+                        title: Text(c.displayName ?? ''),
                         subtitle: Text(
                           yaGuardado
                               ? 'Ya está en tus contactos'
