@@ -1056,6 +1056,27 @@ async function marcarCasaParaEliminarSiEsSeguro(casaRef, uid) {
   });
 }
 
+// Borra TODOS los documentos que cumplan [query] en páginas de como mucho
+// [pageSize] (por defecto 400, margen de seguridad bajo el límite real de
+// 500 operaciones por batch de Firestore) -- a diferencia del batch plano
+// de un solo lote que usa el borrado de `notificaciones` más abajo (seguro
+// ahí porque nadie acumula cientos de notificaciones sin leerlas, pero no
+// un patrón a repetir para colecciones que sí pueden crecer sin límite
+// práctico, como las invitaciones de vinculación de un profesional con
+// años de actividad). Usada por eliminarCuenta (noviembre 2026, corrección
+// de la auditoría de comunicación cruzada) para las invitaciones Hogar que
+// deja pendientes un profesional al borrar su cuenta.
+async function borrarEnLotesPorQuery(query, pageSize = 400) {
+  while (true) {
+    const snap = await query.limit(pageSize).get();
+    if (snap.empty) return;
+    const batch = db.batch();
+    snap.docs.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+    if (snap.size < pageSize) return;
+  }
+}
+
 exports.eliminarCuenta = onCall({ region: REGION }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
   const uid = request.auth.uid;
@@ -1143,7 +1164,33 @@ exports.eliminarCuenta = onCall({ region: REGION }, async (request) => {
     );
   }
 
-  await db.collection('profesionales').doc(uid).delete();
+  // recursiveDelete (mismo mecanismo ya usado arriba para `casaRef`) borra
+  // el documento profesionales/{uid} Y TODAS sus subcolecciones
+  // (trabajosPro, clientesPro, y cualquier otra que se añada en el futuro)
+  // en las páginas/lotes que haga falta -- sin este cambio (noviembre
+  // 2026, corrección de la auditoría de comunicación cruzada), un .delete()
+  // plano del documento dejaba esas subcolecciones huérfanas para siempre,
+  // ya inaccesibles para el dueño pero nunca borradas de verdad. Es
+  // idempotente igual que el resto de la función: si ya no queda nada que
+  // borrar (reintento, o un uid que nunca tuvo perfil profesional), no
+  // lanza ningún error.
+  await db.recursiveDelete(db.collection('profesionales').doc(uid));
+
+  // Invitaciones de vinculación (sección 4 de este archivo) que este
+  // profesional dejó pendientes -- sin esto, un propietario podría aceptar
+  // una más tarde y responderInvitacionHogar crearía un Registro real con
+  // profesionalUid apuntando a una cuenta que ya no existe (el
+  // TrabajoProfesional original tampoco existe ya, por el recursiveDelete
+  // de arriba). Solo se tocan las que de verdad siguen vivas/accionables
+  // -- las ya resueltas (aceptada/rechazada/cancelada) son historial inerte
+  // y se dejan tal cual, igual que el resto de datos de la casa receptora,
+  // que nunca se toca aquí.
+  await borrarEnLotesPorQuery(
+    db.collection('invitacionesHogar').where('profesionalUid', '==', uid).where('estado', '==', 'pendiente'),
+  );
+  await borrarEnLotesPorQuery(
+    db.collection('invitacionesHogarAbiertas').where('profesionalUid', '==', uid).where('estado', '==', 'pendiente_registro'),
+  );
 
   const notifsSnap = await db.collection('notificaciones').where('uid', '==', uid).get();
   if (!notifsSnap.empty) {
