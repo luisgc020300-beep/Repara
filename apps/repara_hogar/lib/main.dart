@@ -4,13 +4,6 @@
 // monolito.
 //
 // Pendiente de conexion real (ver README.md e informe de esta integracion):
-// - `firebase_options.dart` es un placeholder deliberado, solo valido
-//   contra el emulador local (USE_EMULATOR=true) -- falta `flutterfire
-//   configure` para registrar esta app de verdad en el proyecto Firebase
-//   compartido (repara-hogar-app).
-// - El gate biometrico de documentos (verificarAccesoDocumentoHogar,
-//   BiometricService/SecurityPreferencesService) no esta conectado
-//   todavia -- los documentos se abren sin ese gate en esta app.
 // - Notificaciones push (FCM): el permiso y el guardado de token si
 //   ocurren (FcmService.inicializar(), llamado desde CasaShellScreen),
 //   pero el enrutamiento al tocar una notificacion push (app en frio/
@@ -29,6 +22,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'package:repara_core/analytics_service.dart';
+import 'package:repara_core/claims_sync.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_core/theme_controller.dart';
 import 'package:repara_ui/keyboard_dismiss_bar.dart';
@@ -36,6 +30,7 @@ import 'package:repara_ui/login_screen.dart';
 
 import 'firebase_options.dart';
 import 'screens/casa_gate_screen.dart';
+import 'services/casa_service.dart';
 
 const bool _usarEmulador = bool.fromEnvironment('USE_EMULATOR');
 
@@ -83,6 +78,15 @@ void main() async {
   }
 
   final themeController = await ThemeController.load();
+
+  // Backfill de custom claims (casaIds/registrosProId) para cuentas que ya
+  // existían antes de que Storage las necesitara (ver storage.rules) --
+  // mismo criterio que lib/main.dart del monolito, usando el mecanismo
+  // compartido de repara_core (ver claims_sync.dart).
+  registrarSincronizacionDeClaims(
+    FirebaseAuth.instance.authStateChanges(),
+    CasaService.sincronizarClaims,
+  );
 
   runApp(ReparaHogarApp(themeController: themeController));
 }

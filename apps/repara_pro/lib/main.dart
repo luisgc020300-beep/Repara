@@ -6,10 +6,6 @@
 // biométrico (no hay "casa" que proteger aquí).
 //
 // Pendiente de conexión real (ver README.md e informe de esta integración):
-// - `firebase_options.dart` es un placeholder deliberado, solo válido
-//   contra el emulador local (USE_EMULATOR=true) -- falta `flutterfire
-//   configure` para registrar esta app de verdad en el proyecto Firebase
-//   compartido (repara-hogar-app).
 // - Notificaciones push (FCM) no están conectadas todavía -- las
 //   notificaciones internas (NotificacionesProScreen) sí funcionan en
 //   cuanto hay backend real, son independientes de FCM.
@@ -27,13 +23,15 @@ import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'package:repara_core/analytics_service.dart';
+import 'package:repara_core/claims_sync.dart';
 import 'package:repara_core/design_tokens.dart';
+import 'package:repara_core/profesional_service.dart';
 import 'package:repara_core/theme_controller.dart';
 import 'package:repara_ui/keyboard_dismiss_bar.dart';
 import 'package:repara_ui/login_screen.dart';
 
 import 'firebase_options.dart';
-import 'screens/repara_pro_shell_screen.dart';
+import 'screens/activar_profesional_gate_screen.dart';
 
 // Mismo criterio que lib/main.dart del monolito: SOLO cuando se compila con
 // `--dart-define=USE_EMULATOR=true`. En cualquier build normal este bloque
@@ -81,6 +79,15 @@ void main() async {
 
   final themeController = await ThemeController.load();
 
+  // Backfill de custom claims (casaIds/registrosProId) para cuentas que ya
+  // existían antes de que Storage las necesitara (ver storage.rules) --
+  // mismo criterio que lib/main.dart del monolito y de Hogar, usando el
+  // mecanismo compartido de repara_core (ver claims_sync.dart).
+  registrarSincronizacionDeClaims(
+    FirebaseAuth.instance.authStateChanges(),
+    ProfesionalService.sincronizarClaims,
+  );
+
   runApp(ReparaProApp(themeController: themeController));
 }
 
@@ -107,7 +114,7 @@ class ReparaProApp extends StatelessWidget {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Scaffold(body: Center(child: CircularProgressIndicator()));
             }
-            if (snapshot.hasData) return const ReparaProShellScreen();
+            if (snapshot.hasData) return const ActivarProfesionalGateScreen();
             return const LoginScreen();
           },
         ),

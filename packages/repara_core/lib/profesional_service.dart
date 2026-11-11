@@ -25,6 +25,20 @@ class ProfesionalService {
     await callable.call<Map<String, dynamic>>();
   }
 
+  /// Backfill de custom claims (casaIds/registrosProId) para cuentas que ya
+  /// existían antes de que Storage las necesitara (ver storage.rules) --
+  /// mismo criterio y misma Cloud Function genérica que
+  /// CasaService.sincronizarClaims() (Hogar/monolito), aquí sin duplicar la
+  /// lógica: la función del servidor no depende de casaIds, también
+  /// recalcula registrosProId a partir de users/{uid}.registrosProRefs, que
+  /// es justo lo que Pro necesita. Se llama una vez por evento de inicio de
+  /// sesión (ver main.dart).
+  static Future<void> sincronizarClaims() async {
+    final callable = FirebaseFunctions.instanceFor(region: _region).httpsCallable('sincronizarClaims');
+    await callable.call<Map<String, dynamic>>();
+    await FirebaseAuth.instance.currentUser?.getIdToken(true);
+  }
+
   /// null mientras carga, false/true una vez se conoce el estado real.
   static Stream<bool> streamEsProfesional() {
     final uid = _uid;
