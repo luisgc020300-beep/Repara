@@ -32,6 +32,15 @@ dependencies:
   # conceptos_frecuentes_service.dart (Fase 2, preparación repara_ui,
   # noviembre 2026) -- misma versión que la app principal.
   shared_preferences: ^2.3.0
+  # biometric_service.dart / documento_gate.dart (gate de documentos
+  # sensibles, extraído del monolito a este paquete en noviembre 2026 para
+  # que Hogar y Pro lo reutilicen sin duplicarlo) -- mismas versiones que la
+  # app principal.
+  local_auth: ^2.3.0
+  # paquete de tipos compartido de local_auth, no una dependencia transitiva
+  # -- LocalAuthException/LocalAuthExceptionCode se importan directamente.
+  local_auth_platform_interface: ^1.1.0
+  flutter_secure_storage: ^9.2.2
 
 dev_dependencies:
   flutter_test:

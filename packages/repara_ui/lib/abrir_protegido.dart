@@ -1,13 +1,13 @@
 // packages/repara_ui/lib/abrir_protegido.dart
 //
 // Apertura de un archivo externo (documento, comprobante) con una
-// verificación de acceso opcional e inyectada (Fase 2B.3, noviembre 2026):
-// el gate biométrico real es exclusivo de Hogar (SecurityPreferencesService
-// + BiometricService, ver lib/services/security/documento_gate.dart en la
-// app) -- este paquete compartido nunca los importa, solo declara el
-// contrato ([VerificarAccesoDocumento]) y lo ejecuta si alguien lo inyecta.
-// Sin capacidad inyectada, se abre directamente sin gate -- así es como Pro
-// puede abrir documentos sin depender de servicios exclusivos de Hogar.
+// verificación de acceso opcional e inyectada (Fase 2B.3, noviembre 2026).
+// El gate biométrico real (BiometricService/SecurityPreferencesService)
+// vive en repara_core/documento_gate.dart (movido ahí en noviembre 2026
+// para que el monolito, Hogar y Pro lo reutilicen sin duplicarlo) -- este
+// paquete solo declara el contrato ([VerificarAccesoDocumento]) y lo
+// ejecuta si alguien lo inyecta, sin importar repara_core para nada de
+// esto. Sin capacidad inyectada, se abre directamente sin gate.
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 

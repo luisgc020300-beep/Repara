@@ -19,17 +19,22 @@ import 'inicio_pro_tab.dart';
 import 'trabajos_pro_tab.dart';
 
 class ReparaProShellScreen extends StatefulWidget {
-  const ReparaProShellScreen({super.key});
+  const ReparaProShellScreen({this.initialIndex = 0, super.key});
+
+  /// Pestaña con la que arranca (0 = Inicio) -- usado al llegar desde una
+  /// notificación que debe abrir directamente Trabajos/Clientes (ver
+  /// notificacion_router_pro.dart).
+  final int initialIndex;
 
   @override
   State<ReparaProShellScreen> createState() => _ReparaProShellScreenState();
 }
 
 class _ReparaProShellScreenState extends State<ReparaProShellScreen> {
-  int _index = 0;
+  late int _index = widget.initialIndex;
   // Mismo patrón que CasaShellScreen (Hogar) y Convive: deslizar con el
   // dedo entre pestañas, no solo tocar la barra de abajo.
-  final _pageController = PageController();
+  late final _pageController = PageController(initialPage: widget.initialIndex);
 
   @override
   void dispose() {

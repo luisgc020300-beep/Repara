@@ -1,18 +1,18 @@
-// test/security/documento_gate_test.dart
+// test/documento_gate_test.dart
 //
-// verificarAccesoDocumentoHogar() -- el VerificarAccesoDocumento real de
-// Hogar (Fase 2B.3, noviembre 2026): mismo comportamiento que tenía
-// abrirArchivoProtegido() antes de separarse en documento_gate.dart + el
-// contrato inyectable de repara_ui/abrir_protegido.dart. FakeBiometricService
-// nunca toca hardware real (ver la nota en biometric_service.dart).
+// verificarAccesoDocumento() -- el VerificarAccesoDocumento real, movido
+// del monolito (verificarAccesoDocumentoHogar) a repara_core en noviembre
+// 2026 para que Hogar y Pro lo reutilicen sin duplicarlo. Mismo
+// comportamiento exacto de siempre: solo pide biometría si la protección
+// de documentos está activada. BiometricAuth.debugServiceOverride nunca
+// toca hardware real (ver la nota en biometric_service.dart).
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:repara/core/service_locator.dart';
-import 'package:repara/services/security/biometric_service.dart';
-import 'package:repara/services/security/documento_gate.dart';
-import 'package:repara/services/security/security_preferences_service.dart';
+import 'package:repara_core/biometric_service.dart';
+import 'package:repara_core/documento_gate.dart';
+import 'package:repara_core/security_preferences_service.dart';
 
-import '../fakes/fake_secure_storage_channel.dart';
+import 'fakes/fake_secure_storage_channel.dart';
 
 class _FakeBiometricService implements BiometricService {
   BiometricAuthResult resultado = BiometricAuthResult.success;
@@ -34,11 +34,11 @@ void main() {
   setUp(() {
     instalarSecureStorageFalso();
     fakeBiometric = _FakeBiometricService();
-    sl.registerSingleton<BiometricService>(fakeBiometric);
+    BiometricAuth.debugServiceOverride = fakeBiometric;
   });
 
-  tearDown(() async {
-    await sl.reset();
+  tearDown(() {
+    BiometricAuth.debugServiceOverride = null;
   });
 
   Widget envolver(Widget Function(BuildContext) builder) =>
@@ -55,7 +55,7 @@ void main() {
         envolver(
           (context) => ElevatedButton(
             onPressed: () async {
-              autorizado = await verificarAccesoDocumentoHogar(context);
+              autorizado = await verificarAccesoDocumento(context);
             },
             child: const Text('comprobar'),
           ),
@@ -81,7 +81,7 @@ void main() {
         envolver(
           (context) => ElevatedButton(
             onPressed: () async {
-              autorizado = await verificarAccesoDocumentoHogar(context);
+              autorizado = await verificarAccesoDocumento(context);
             },
             child: const Text('comprobar'),
           ),
@@ -107,7 +107,7 @@ void main() {
         envolver(
           (context) => ElevatedButton(
             onPressed: () async {
-              autorizado = await verificarAccesoDocumentoHogar(context);
+              autorizado = await verificarAccesoDocumento(context);
             },
             child: const Text('comprobar'),
           ),

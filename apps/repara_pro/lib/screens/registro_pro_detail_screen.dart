@@ -12,6 +12,7 @@ import 'package:repara_core/documento.dart';
 import 'package:repara_core/documento_service.dart';
 import 'package:repara_core/registro.dart';
 
+import 'package:repara_core/documento_gate.dart';
 import 'package:repara_core/pago_service.dart';
 import 'package:repara_core/registro_service.dart';
 import 'package:repara_core/design_tokens.dart';
@@ -342,6 +343,7 @@ class RegistroProDetailScreen extends StatelessWidget {
                 registroTitulo: registro.titulo,
                 presupuesto: registro.presupuesto,
                 rol: RolEnTrabajo.profesional,
+                verificarAcceso: verificarAccesoDocumento,
               ),
               const SizedBox(height: 20),
               Row(

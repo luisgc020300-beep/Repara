@@ -26,6 +26,7 @@ import 'package:repara_core/documento_service.dart';
 
 import '../screens/editar_documento_sheet.dart';
 import 'package:repara_core/design_tokens.dart';
+import 'package:repara_core/documento_gate.dart';
 import 'package:repara_ui/abrir_protegido.dart';
 import 'package:repara_ui/app_dialog.dart';
 import 'package:repara_ui/app_error.dart';
@@ -223,5 +224,6 @@ Future<void> abrirDocumento(BuildContext context, Documento documento) async {
   await abrirArchivoProtegido(
     context,
     documento.url,
+    verificarAcceso: verificarAccesoDocumento,
   );
 }

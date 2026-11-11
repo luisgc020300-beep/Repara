@@ -26,17 +26,17 @@ import 'package:repara_core/profesional_service.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../core/service_locator.dart';
 import '../models/casa.dart';
-import '../services/security/biometric_service.dart';
-import '../services/security/security_preferences_service.dart';
+import '../services/fcm_service.dart';
+import 'package:repara_core/biometric_service.dart';
 import 'package:repara_core/design_tokens.dart';
+import 'package:repara_core/security_preferences_service.dart';
 import 'package:repara_core/theme_controller.dart';
 import 'package:repara_ui/app_dialog.dart';
 import 'package:repara_ui/app_error.dart';
+import 'package:repara_ui/cuenta_screen.dart';
 import 'package:repara_ui/ios_list.dart';
 import 'acerca_screen.dart';
-import 'cuenta_screen.dart';
 import 'expediente_vivienda_screen.dart';
 import 'gestionar_vivienda_screen.dart';
 import 'package:repara_ui/notificaciones_preferencias_screen.dart';
@@ -334,7 +334,18 @@ class _CuentaCard extends StatelessWidget {
         margin: EdgeInsets.zero,
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CuentaScreen())),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => CuentaScreen(
+                eliminarCuentaMensaje:
+                    'Se borra tu perfil y, si eres el único miembro de tu vivienda, también la vivienda entera con su '
+                    'historial, documentos y fotos. Si la compartes con alguien más, solo se elimina tu vinculación a ella. '
+                    'Esta acción no se puede deshacer.',
+                antesDeCerrarSesion: FcmService.olvidarEsteDispositivo,
+              ),
+            ),
+          ),
           child: Padding(
             padding: const EdgeInsets.all(ReparaSpace.s4),
             child: Row(
@@ -462,7 +473,7 @@ class _ModoAppToggleState extends State<_ModoAppToggle> {
       }
       if (await SecurityPreferencesService.instance.isProGateEnabled()) {
         final verificado =
-            await sl<BiometricService>().authenticate('Verifica tu identidad para entrar en Repara Pro') ==
+            await BiometricAuth.instance.authenticate('Verifica tu identidad para entrar en Repara Pro') ==
             BiometricAuthResult.success;
         if (!verificado) return;
       }

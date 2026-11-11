@@ -2,11 +2,11 @@
 //
 // Versión Pro, mínima pero funcional, de lib/screens/settings_screen.dart
 // (monolito). No incluye: el selector Hogar/Pro (aquí no existe "volver a
-// modo propietario" -- esta app ya es solo Pro), la sección "Tu vivienda"
-// (exclusiva de Hogar) ni la fila de Seguridad/biométrico (pendiente,
-// documentado en el informe de esta integración). Sí incluye: perfil
-// profesional editable, tema, preferencias de notificaciones y cerrar
-// sesión -- lo imprescindible para que la app sea usable de verdad.
+// modo propietario" -- esta app ya es solo Pro) ni la sección "Tu vivienda"
+// (exclusiva de Hogar). Sí incluye: cuenta (eliminar/cerrar en todos los
+// dispositivos, via el CuentaScreen compartido), perfil profesional
+// editable, tema, preferencias de notificaciones y protección biométrica
+// de documentos.
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
@@ -16,8 +16,10 @@ import 'package:repara_core/design_tokens.dart';
 import 'package:repara_core/theme_controller.dart';
 import 'package:repara_ui/app_dialog.dart';
 import 'package:repara_ui/app_error.dart';
+import 'package:repara_ui/cuenta_screen.dart';
 import 'package:repara_ui/ios_list.dart';
 import 'package:repara_ui/notificaciones_preferencias_screen.dart';
+import 'package:repara_ui/seccion_seguridad_documentos.dart';
 
 class AjustesProScreen extends StatefulWidget {
   const AjustesProScreen({super.key});
@@ -38,16 +40,17 @@ class _AjustesProScreenState extends State<AjustesProScreen> {
     }
   }
 
-  Future<void> _cerrarSesion(BuildContext context) async {
-    final confirmar = await AppDialog.confirm(
-      context,
-      title: 'Cerrar sesión',
-      message: '¿Seguro que quieres cerrar sesión?',
-      confirmLabel: 'Cerrar sesión',
-    );
-    if (!confirmar) return;
-    await FirebaseAuth.instance.signOut();
-  }
+  void _abrirCuenta(BuildContext context) => Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => const CuentaScreen(
+        eliminarCuentaMensaje:
+            'Se borra tu perfil profesional y todos tus clientes y trabajos privados guardados en REPARA Pro. '
+            'Si tienes una vivienda en REPARA Hogar con otros miembros, deberás salir de ella antes. '
+            'Esta acción no se puede deshacer.',
+      ),
+    ),
+  );
 
   String _temaLabel() => switch (ThemeController.instance.mode) {
     ThemeMode.light => 'Claro',
@@ -129,7 +132,8 @@ class _AjustesProScreenState extends State<AjustesProScreen> {
                   icon: Icons.person_outline,
                   iconColor: context.colors.brand,
                   title: user?.email ?? 'Tu cuenta',
-                  showChevron: false,
+                  subtitle: 'Gestiona tu cuenta',
+                  onTap: () => _abrirCuenta(context),
                 ),
               ],
             ),
@@ -200,18 +204,7 @@ class _AjustesProScreenState extends State<AjustesProScreen> {
               ],
             ),
             const SizedBox(height: ReparaSpace.s4),
-            IosSection(
-              rows: [
-                IosRow(
-                  icon: Icons.logout,
-                  iconColor: context.colors.error,
-                  title: 'Cerrar sesión',
-                  titleColor: context.colors.errorText,
-                  showChevron: false,
-                  onTap: () => _cerrarSesion(context),
-                ),
-              ],
-            ),
+            const SeccionSeguridadDocumentos(),
           ],
         ),
       ),

@@ -1,10 +1,12 @@
-// lib/services/security/biometric_service.dart
+// lib/biometric_service.dart
 //
 // Abstracción de autenticación biométrica (misión de seguridad local,
-// octubre 2026) -- ninguna pantalla habla directamente con `local_auth`,
-// todas pasan por esta interfaz. Dos motivos:
-//   1. Testeable sin depender de hardware real (ver FakeBiometricService
-//      en test/fakes/, usado por los 6 casos de la sección 32 de la misión).
+// octubre 2026 -- extraído a repara_core en noviembre 2026 para que Hogar y
+// Pro puedan proteger documentos sensibles sin duplicar esta lógica).
+// Ninguna pantalla habla directamente con `local_auth`, todas pasan por
+// esta interfaz. Dos motivos:
+//   1. Testeable sin depender de hardware real (sustituir
+//      BiometricAuth.debugServiceOverride por un fake en tests).
 //   2. La biometría NUNCA sustituye a Firebase Auth ni a las reglas de
 //      servidor -- es solo una cerradura local sobre un dispositivo que ya
 //      tiene sesión iniciada. Si un día cambia el paquete nativo usado,
@@ -13,6 +15,7 @@
 // Importante: REPARA nunca almacena huellas, rostros ni plantillas
 // biométricas -- eso lo gestiona el sistema operativo. Aquí solo se recibe
 // un resultado (éxito/fallo/cancelado/no disponible/error).
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:local_auth/local_auth.dart';
 import 'package:local_auth_platform_interface/local_auth_platform_interface.dart';
 
@@ -54,8 +57,8 @@ class LocalAuthBiometricService implements BiometricService {
         // dentro del mismo diálogo, que es justo lo que no se quería aquí
         // (CEO, octubre 2026: "pide el código del móvil, Face ID sería más
         // rápido"). Si la biometría falla/no está disponible, el fallback ya
-        // es la pantalla de bloqueo ofreciendo cerrar sesión (ver Caso 4),
-        // no el PIN del sistema.
+        // es la pantalla de bloqueo ofreciendo cerrar sesión, no el PIN del
+        // sistema.
         options: const AuthenticationOptions(biometricOnly: true, stickyAuth: true),
       );
       // Según la documentación del propio paquete: `false` es un reto
@@ -85,4 +88,22 @@ class LocalAuthBiometricService implements BiometricService {
       return BiometricAuthResult.error;
     }
   }
+}
+
+/// Punto único de acceso a [BiometricService] -- nunca instanciar
+/// [LocalAuthBiometricService] directamente en una pantalla. Sustituye al
+/// registro vía GetIt que tenía el monolito: mismo patrón de
+/// `debugXxxOverride` que ya usan el resto de servicios de este paquete
+/// (ver p.ej. ProfesionalService), para no arrastrar get_it como dependencia
+/// nueva de Hogar/Pro solo por esto.
+class BiometricAuth {
+  BiometricAuth._();
+
+  @visibleForTesting
+  static BiometricService? debugServiceOverride;
+
+  static BiometricService? _instance;
+
+  static BiometricService get instance =>
+      debugServiceOverride ?? (_instance ??= LocalAuthBiometricService());
 }

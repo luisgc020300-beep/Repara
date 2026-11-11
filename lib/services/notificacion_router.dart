@@ -7,9 +7,10 @@ import 'package:flutter/material.dart';
 import 'package:repara_core/notificacion.dart';
 
 import '../screens/pro/registro_pro_detail_screen.dart';
+import '../screens/pro/repara_pro_shell_screen.dart';
 import '../screens/registro_detail_screen.dart';
 import 'casa_service.dart';
-import 'security/documento_gate.dart';
+import 'package:repara_core/documento_gate.dart';
 import 'package:repara_core/pago_service.dart';
 import 'package:repara_core/registro_service.dart';
 import 'package:repara_ui/pago_detail_screen.dart';
@@ -28,6 +29,19 @@ Future<void> abrirDestinoNotificacion(
   // "Solicitudes de profesionales" de Inicio. Basta con volver ahí.
   if (tipo == 'invitacion_hogar_recibida') {
     Navigator.popUntil(context, (route) => route.isFirst);
+    return;
+  }
+  // El propietario ha rechazado la vinculación -- no hay ningún registro
+  // real al que ir (el vínculo nunca llegó a crearse), así que se lleva al
+  // profesional a la pestaña Trabajos, donde sigue viendo su trabajo
+  // privado (ahora ya no pendiente de vincular).
+  if (tipo == 'invitacion_hogar_rechazada') {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const ReparaProShellScreen(initialIndex: 1),
+      ),
+    );
     return;
   }
   if (casaId == null || elementoId == null || registroId == null) return;
@@ -50,7 +64,7 @@ Future<void> abrirDestinoNotificacion(
           presupuesto: registro.presupuesto,
           editable: false,
           pago: pago,
-          verificarAcceso: verificarAccesoDocumentoHogar,
+          verificarAcceso: verificarAccesoDocumento,
         ),
       ),
     );

@@ -1,9 +1,12 @@
-// lib/services/security/security_preferences_service.dart
+// lib/security_preferences_service.dart
 //
-// Ajustes de seguridad local (misión de seguridad local, octubre 2026):
-// protección de documentos sensibles y verificación al entrar en REPARA Pro.
-// El bloqueo general de la app al abrirla (con su propio timeout) se quitó
-// -- el launcher del móvil ya ofrece "requerir Face ID" por app, así que
+// Ajustes de seguridad local (misión de seguridad local, octubre 2026 --
+// extraído a repara_core en noviembre 2026 para que Hogar y Pro compartan
+// esta lógica con el monolito, sin duplicarla): protección de documentos
+// sensibles, y -- solo relevante para el monolito, que todavía tiene un
+// selector Hogar/Pro dentro de la misma app -- verificación al entrar en
+// modo profesional. El bloqueo general de la app al abrirla se quitó -- el
+// launcher del móvil ya ofrece "requerir Face ID" por app, así que
 // duplicarlo dentro de Repara no aportaba nada.
 //
 // Se guardan con flutter_secure_storage (Keychain en iOS, Keystore/
@@ -34,6 +37,8 @@ class SecurityPreferencesService {
   Future<void> setDocumentProtectionEnabled(bool valor) =>
       _storage.write(key: _kDocumentProtectionEnabled, value: valor.toString());
 
+  /// Exclusivo del monolito -- Hogar y Pro son ya apps separadas, no existe
+  /// en ellas un "entrar en modo profesional" al que proteger.
   Future<bool> isProGateEnabled() async => (await _storage.read(key: _kProGateEnabled)) == 'true';
 
   Future<void> setProGateEnabled(bool valor) => _storage.write(key: _kProGateEnabled, value: valor.toString());

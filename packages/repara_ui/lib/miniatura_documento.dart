@@ -10,10 +10,9 @@
 // protegido (ver abrir_protegido.dart).
 //
 // [verificarAcceso] (Fase 2B.3, noviembre 2026): capacidad inyectada, igual
-// que en abrir_protegido.dart -- Hogar pasa el gate biométrico real
-// (lib/services/security/documento_gate.dart en la app), Pro puede pasar
-// null (sin depender de servicios exclusivos de Hogar) o su propia
-// capacidad el día que la tenga.
+// que en abrir_protegido.dart -- el monolito, Hogar y Pro pasan el mismo
+// gate biométrico real (repara_core/documento_gate.dart, compartido desde
+// noviembre 2026).
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 

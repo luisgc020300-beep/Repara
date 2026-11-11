@@ -2,18 +2,20 @@
 //
 // Version Hogar, minima pero funcional, de lib/screens/settings_screen.dart
 // (monolito). No incluye el selector Hogar/Pro (esta app ya es solo
-// Hogar) ni la fila de Seguridad/biometrico (pendiente, ver informe de
-// esta integracion). Si incluye: cuenta, tu vivienda, tema, preferencias
-// de notificaciones y cerrar sesion.
+// Hogar). Si incluye: cuenta (eliminar/cerrar en todos los dispositivos,
+// via el CuentaScreen compartido), tu vivienda, tema, preferencias de
+// notificaciones y proteccion biometrica de documentos.
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_core/theme_controller.dart';
-import 'package:repara_ui/app_dialog.dart';
+import 'package:repara_ui/cuenta_screen.dart';
 import 'package:repara_ui/ios_list.dart';
 import 'package:repara_ui/notificaciones_preferencias_screen.dart';
+import 'package:repara_ui/seccion_seguridad_documentos.dart';
 
 import '../models/casa.dart';
+import '../services/fcm_service.dart';
 import 'gestionar_vivienda_screen.dart';
 
 class AjustesHogarScreen extends StatefulWidget {
@@ -26,16 +28,18 @@ class AjustesHogarScreen extends StatefulWidget {
 }
 
 class _AjustesHogarScreenState extends State<AjustesHogarScreen> {
-  Future<void> _cerrarSesion(BuildContext context) async {
-    final confirmar = await AppDialog.confirm(
-      context,
-      title: 'Cerrar sesión',
-      message: '¿Seguro que quieres cerrar sesión?',
-      confirmLabel: 'Cerrar sesión',
-    );
-    if (!confirmar) return;
-    await FirebaseAuth.instance.signOut();
-  }
+  void _abrirCuenta(BuildContext context) => Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => CuentaScreen(
+        eliminarCuentaMensaje:
+            'Se borra tu perfil y, si eres el único miembro de tu vivienda, también la vivienda entera con su '
+            'historial, documentos y fotos. Si la compartes con alguien más, solo se elimina tu vinculación a ella. '
+            'Esta acción no se puede deshacer.',
+        antesDeCerrarSesion: FcmService.olvidarEsteDispositivo,
+      ),
+    ),
+  );
 
   String _temaLabel() => switch (ThemeController.instance.mode) {
     ThemeMode.light => 'Claro',
@@ -118,7 +122,8 @@ class _AjustesHogarScreenState extends State<AjustesHogarScreen> {
                   icon: Icons.person_outline,
                   iconColor: context.colors.brand,
                   title: user?.email ?? 'Tu cuenta',
-                  showChevron: false,
+                  subtitle: 'Gestiona tu cuenta',
+                  onTap: () => _abrirCuenta(context),
                 ),
               ],
             ),
@@ -162,18 +167,7 @@ class _AjustesHogarScreenState extends State<AjustesHogarScreen> {
               ],
             ),
             const SizedBox(height: ReparaSpace.s4),
-            IosSection(
-              rows: [
-                IosRow(
-                  icon: Icons.logout,
-                  iconColor: context.colors.error,
-                  title: 'Cerrar sesión',
-                  titleColor: context.colors.errorText,
-                  showChevron: false,
-                  onTap: () => _cerrarSesion(context),
-                ),
-              ],
-            ),
+            const SeccionSeguridadDocumentos(),
           ],
         ),
       ),

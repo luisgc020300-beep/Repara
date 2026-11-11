@@ -4,11 +4,8 @@
 // se puede compartir entre apps porque cada una importa pantallas
 // exclusivas de su lado (alli RegistroProDetailScreen de Pro, aqui
 // RegistroDetailScreen de Hogar). Solo cubre los destinos de REPARA Hogar.
-//
-// Pendiente (ver informe de esta integracion): el gate biometrico de
-// documentos (verificarAccesoDocumentoHogar) no esta conectado todavia en
-// esta app -- PagoDetailScreen se abre sin el.
 import 'package:flutter/material.dart';
+import 'package:repara_core/documento_gate.dart';
 import 'package:repara_core/pago_service.dart';
 import 'package:repara_core/registro_service.dart';
 import 'package:repara_ui/pago_detail_screen.dart';
@@ -48,6 +45,7 @@ Future<void> abrirDestinoNotificacionHogar(
           presupuesto: registro.presupuesto,
           editable: false,
           pago: pago,
+          verificarAcceso: verificarAccesoDocumento,
         ),
       ),
     );

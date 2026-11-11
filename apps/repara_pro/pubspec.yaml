@@ -38,6 +38,12 @@ dependencies:
   # control_economico_pro_tab.dart (gráfica de ingresos) -- misma versión
   # que la app principal.
   fl_chart: ^0.69.2
+  # Gate biométrico de documentos sensibles (repara_core/biometric_service.dart,
+  # documento_gate.dart -- noviembre 2026) -- mismas versiones que la app
+  # principal.
+  local_auth: ^2.3.0
+  local_auth_platform_interface: ^1.1.0
+  flutter_secure_storage: ^9.2.2
 
 # Mismo conflicto que packages/repara_ui/pubspec.yaml (ver su comentario):
 # dentro del grafo de dependencias más pequeño de esta app, pdf 3.12.0
@@ -52,6 +58,22 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^6.0.0
   fake_cloud_firestore: ^4.1.0
+  flutter_launcher_icons: ^0.14.4
+
+# Icono propio de Pro (CEO, noviembre 2026): llave inglesa geométrica de
+# doble boca, mismo lenguaje de trazos rectilíneos que el icono de
+# Hogar/monolito, en el navy actual de marca (ReparaColors.light.brandStrong,
+# ver design_tokens.dart) sobre el mismo crema cálido de fondo.
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/app_icon.png"
+  adaptive_icon_background: "#F7F3EC"
+  adaptive_icon_foreground: "assets/icon/app_icon.png"
+  remove_alpha_ios: true
 
 flutter:
   uses-material-design: true
+
+  assets:
+    - assets/icon/app_icon.png

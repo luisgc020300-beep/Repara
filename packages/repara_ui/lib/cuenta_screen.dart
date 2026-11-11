@@ -1,23 +1,41 @@
-// lib/screens/cuenta_screen.dart
+// lib/cuenta_screen.dart
 //
-// "Tu cuenta" (rediseño Ajustes, noviembre 2026): identidad + las tres
-// acciones de sesión/cuenta que antes vivían sueltas al final de Ajustes
-// (Cerrar sesión, Cerrar en todos los dispositivos, Eliminar cuenta).
-// Lógica movida tal cual desde settings_screen.dart -- solo cambia dónde vive.
+// "Tu cuenta": identidad + las tres acciones de sesión/cuenta (Cerrar
+// sesión, Cerrar en todos los dispositivos, Eliminar cuenta). Movido del
+// monolito a repara_ui en noviembre 2026 para que Hogar y Pro lo reutilicen
+// sin duplicar la lógica -- solo dos cosas varían por app, inyectadas por
+// quien instancia la pantalla:
+//  - [eliminarCuentaMensaje]: qué se pierde exactamente al eliminar la
+//    cuenta (en Hogar menciona la vivienda; en Pro, el perfil profesional).
+//  - [antesDeCerrarSesion]: limpieza previa a signOut() exclusiva de cada
+//    app (p.ej. FcmService.olvidarEsteDispositivo() en Hogar) -- opcional,
+//    Pro no tiene hoy nada que limpiar aquí (sin FCM conectado todavía).
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
+import 'package:repara_core/cuenta_service.dart';
 
-import '../services/cuenta_service.dart';
-import '../services/fcm_service.dart';
 import 'package:repara_core/design_tokens.dart';
-import 'package:repara_ui/app_dialog.dart';
-import 'package:repara_ui/app_error.dart';
-import 'package:repara_ui/ios_list.dart';
+import 'app_dialog.dart';
+import 'app_error.dart';
+import 'ios_list.dart';
 
 class CuentaScreen extends StatefulWidget {
-  const CuentaScreen({super.key});
+  const CuentaScreen({
+    required this.eliminarCuentaMensaje,
+    this.antesDeCerrarSesion,
+    super.key,
+  });
+
+  /// Texto de advertencia mostrado en el diálogo de confirmación al
+  /// eliminar la cuenta -- qué se borra exactamente, específico de la app.
+  final String eliminarCuentaMensaje;
+
+  /// Limpieza previa a FirebaseAuth.instance.signOut() -- p.ej. olvidar el
+  /// token FCM de este dispositivo. Opcional: null si la app no tiene nada
+  /// que limpiar.
+  final Future<void> Function()? antesDeCerrarSesion;
 
   @override
   State<CuentaScreen> createState() => _CuentaScreenState();
@@ -34,7 +52,7 @@ class _CuentaScreenState extends State<CuentaScreen> {
       confirmLabel: 'Cerrar sesión',
     );
     if (!confirmar) return;
-    await FcmService.olvidarEsteDispositivo();
+    await widget.antesDeCerrarSesion?.call();
     await FirebaseAuth.instance.signOut();
     if (!mounted) return;
     Navigator.of(context).popUntil((route) => route.isFirst);
@@ -53,7 +71,7 @@ class _CuentaScreenState extends State<CuentaScreen> {
     setState(() => _cerrandoTodo = true);
     try {
       await CuentaService.cerrarSesionesEnTodosLosDispositivos();
-      await FcmService.olvidarEsteDispositivo();
+      await widget.antesDeCerrarSesion?.call();
       await FirebaseAuth.instance.signOut();
       if (!mounted) return;
       Navigator.of(context).popUntil((route) => route.isFirst);
@@ -71,10 +89,7 @@ class _CuentaScreenState extends State<CuentaScreen> {
     final confirmar = await AppDialog.confirm(
       context,
       title: '¿Eliminar tu cuenta?',
-      message:
-          'Se borra tu perfil y, si eres el único miembro de tu vivienda, también la vivienda entera con su '
-          'historial, documentos y fotos. Si la compartes con alguien más, solo se elimina tu vinculación a ella. '
-          'Esta acción no se puede deshacer.',
+      message: widget.eliminarCuentaMensaje,
       confirmLabel: 'Eliminar cuenta',
       destructive: true,
     );

@@ -29,7 +29,7 @@ import 'package:share_plus/share_plus.dart';
 import '../models/casa.dart';
 import '../models/elemento.dart';
 import '../services/elemento_service.dart';
-import '../services/security/documento_gate.dart';
+import 'package:repara_core/documento_gate.dart';
 import 'package:repara_core/pago_service.dart';
 import 'package:repara_core/registro_service.dart';
 import 'package:repara_core/design_tokens.dart';
@@ -782,7 +782,7 @@ class _CuerpoConProfesionalState extends State<_CuerpoConProfesional> {
                             registroTitulo: registro.titulo,
                             presupuesto: registro.presupuesto,
                             rol: RolEnTrabajo.propietario,
-                            verificarAcceso: verificarAccesoDocumentoHogar,
+                            verificarAcceso: verificarAccesoDocumento,
                             onAnadirPago: elegirFormaDeAnadirPago,
                           ),
                         ),
@@ -1679,7 +1679,7 @@ class _CuerpoSimple extends StatelessWidget {
                         registroTitulo: registro.titulo,
                         presupuesto: null,
                         rol: RolEnTrabajo.propietario,
-                        verificarAcceso: verificarAccesoDocumentoHogar,
+                        verificarAcceso: verificarAccesoDocumento,
                         onAnadirPago: elegirFormaDeAnadirPago,
                       ),
                       if (registro.plazoFrecuenciaMeses != null) ...[

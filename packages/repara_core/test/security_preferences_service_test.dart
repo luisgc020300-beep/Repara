@@ -1,15 +1,15 @@
-// test/security/security_preferences_service_test.dart
+// test/security_preferences_service_test.dart
 //
-// Cobertura de SecurityPreferencesService: solo quedan los dos gates
-// puntuales (documentos sensibles, acceso a Repara Pro) -- el bloqueo
-// general de la app al abrirla se quitó (octubre 2026, el launcher del
-// móvil ya ofrece "requerir Face ID" por app). Cubre en particular el valor
-// por defecto cuando no hay nada guardado (debe ser "todo desactivado",
-// nunca lo contrario).
+// Cobertura de SecurityPreferencesService (movido del monolito a
+// repara_core en noviembre 2026 para que Hogar y Pro lo reutilicen): solo
+// quedan los dos gates puntuales (documentos sensibles, acceso a Repara
+// Pro -- este último solo lo usa hoy el monolito). Cubre en particular el
+// valor por defecto cuando no hay nada guardado (debe ser "todo
+// desactivado", nunca lo contrario).
 import 'package:flutter_test/flutter_test.dart';
-import 'package:repara/services/security/security_preferences_service.dart';
+import 'package:repara_core/security_preferences_service.dart';
 
-import '../fakes/fake_secure_storage_channel.dart';
+import 'fakes/fake_secure_storage_channel.dart';
 
 void main() {
   setUp(() {

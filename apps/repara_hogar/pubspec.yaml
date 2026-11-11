@@ -43,6 +43,12 @@ dependencies:
   # reescritura que arregla el crash de arranque en iOS (ver informe nov 2026:
   # register(with:) de la 1.1.9+2 hacía force-unwrap de rootViewController).
   flutter_contacts: ">=2.0.0 <2.2.0"
+  # Gate biométrico de documentos sensibles (repara_core/biometric_service.dart,
+  # documento_gate.dart -- noviembre 2026) -- mismas versiones que la app
+  # principal.
+  local_auth: ^2.3.0
+  local_auth_platform_interface: ^1.1.0
+  flutter_secure_storage: ^9.2.2
 
 # Mismo conflicto que packages/repara_ui/pubspec.yaml y apps/repara_pro
 # (ver sus comentarios): pdf 3.12.0 resuelve a image 4.11.0 dentro de un
@@ -54,6 +60,19 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+
+# Mismo icono que el monolito, reutilizado tal cual (CEO, noviembre 2026).
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/app_icon.png"
+  adaptive_icon_background: "#F7F3EC"
+  adaptive_icon_foreground: "assets/icon/app_icon.png"
+  remove_alpha_ios: true
 
 flutter:
   uses-material-design: true
+
+  assets:
+    - assets/icon/app_icon.png

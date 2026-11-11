@@ -31,7 +31,7 @@ import '../models/elemento.dart';
 import '../models/habitacion.dart';
 import '../services/elemento_service.dart';
 import '../services/habitacion_service.dart';
-import '../services/security/documento_gate.dart';
+import 'package:repara_core/documento_gate.dart';
 import 'package:repara_core/pago_service.dart';
 import 'package:repara_core/registro_service.dart';
 import 'package:repara_core/design_tokens.dart';
@@ -1602,7 +1602,7 @@ class _PagoDocumentoTile extends StatelessWidget {
         presupuesto: registro.presupuesto,
         editable: true,
         pago: pago,
-        verificarAcceso: verificarAccesoDocumentoHogar,
+        verificarAcceso: verificarAccesoDocumento,
       ),
     );
   }

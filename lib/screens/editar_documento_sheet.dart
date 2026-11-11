@@ -14,7 +14,7 @@ import 'package:repara_core/documento.dart';
 import 'package:repara_core/documento_service.dart';
 
 import 'package:repara_core/design_tokens.dart';
-import '../services/security/documento_gate.dart';
+import 'package:repara_core/documento_gate.dart';
 import 'package:repara_ui/app_error.dart';
 import 'package:repara_ui/miniatura_documento.dart';
 import 'package:repara_ui/seccion_formulario.dart';
@@ -196,7 +196,7 @@ class _EditarDocumentoFormState extends State<_EditarDocumentoForm> {
               MiniaturaDocumento(
                 url: widget.documento.url,
                 nombreArchivo: widget.documento.nombreArchivo,
-                verificarAcceso: verificarAccesoDocumentoHogar,
+                verificarAcceso: verificarAccesoDocumento,
               ),
               const SizedBox(height: ReparaSpace.s4),
             ],
