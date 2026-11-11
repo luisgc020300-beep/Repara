@@ -54,14 +54,18 @@ void main() async {
   Intl.defaultLocale = 'es_ES';
 
   if (!kIsWeb) {
-    await FirebaseAppCheck.instance.activate(
-      providerAndroid: kDebugMode
-          ? const AndroidDebugProvider()
-          : const AndroidPlayIntegrityProvider(),
-      providerApple: kDebugMode
-          ? const AppleDebugProvider()
-          : const AppleAppAttestProvider(),
-    );
+    try {
+      await FirebaseAppCheck.instance.activate(
+        providerAndroid: kDebugMode
+            ? const AndroidDebugProvider()
+            : const AndroidPlayIntegrityProvider(),
+        providerApple: kDebugMode
+            ? const AppleDebugProvider()
+            : const AppleAppAttestProvider(),
+      );
+    } catch (e) {
+      debugPrint('App Check no se pudo activar: $e');
+    }
   }
 
   FirebaseFirestore.instance.settings = const Settings(
