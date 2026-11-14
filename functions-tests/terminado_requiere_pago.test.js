@@ -17,7 +17,7 @@
 // Contra el Emulator Suite real -- ver helpers.js.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { crearUsuario, llamar, sembrarRegistro, leerRegistro } = require('./helpers');
+const { db, crearUsuario, llamar, sembrarRegistro, leerRegistro, leerNotificaciones } = require('./helpers');
 
 test('finalizarTrabajoPropietario: sin nada que cobrar (sin presupuesto), cierra directo a terminado', async () => {
   const owner = await crearUsuario();
@@ -151,4 +151,82 @@ test('responderCambioAlcance: se rechaza sobre un registro en pendientePago, igu
     casaId, elementoId, registroId, cambioAlcanceId: ref.id, aprobar: true,
   });
   assert.equal(error?.status, 'FAILED_PRECONDITION');
+});
+
+// =============================================================================
+// NOTIFICAR EL CAMBIO DE SALDO (sistema de notificaciones activas, noviembre
+// 2026) -- hasta ahora, cerrar o reabrir un trabajo por un pago no avisaba a
+// nadie. Solo debe avisar cuando estadoTrasCambioDePago devuelve un estado
+// de verdad distinto (nunca por el simple hecho de seguir con saldo
+// pendiente), a los demás miembros de la casa y al profesional, nunca a
+// quien acaba de hacer el pago.
+// =============================================================================
+
+test('registrarPago: completar el saldo notifica al profesional y a otro miembro de la casa, no a quien pagó', async () => {
+  const owner = await crearUsuario();
+  const profesional = await crearUsuario();
+  const otroMiembro = await crearUsuario();
+  const { casaId, elementoId, registroId } = await sembrarRegistro({
+    ownerUid: owner.uid, estado: 'pendientePago', presupuesto: 100, profesionalUid: profesional.uid,
+  });
+  await db.collection('casas').doc(casaId).update({ members: [owner.uid, otroMiembro.uid] });
+
+  const { error } = await llamar('registrarPago', owner.idToken, { casaId, elementoId, registroId, importe: 100, fecha: Date.now() });
+  assert.equal(error, undefined);
+
+  const notisPro = await leerNotificaciones(profesional.uid);
+  assert.ok(notisPro.some((n) => n.tipo === 'trabajo_saldo_actualizado_profesional'));
+  const notisOtro = await leerNotificaciones(otroMiembro.uid);
+  assert.ok(notisOtro.some((n) => n.tipo === 'trabajo_saldo_actualizado'));
+  const notisPropio = await leerNotificaciones(owner.uid);
+  assert.equal(notisPropio.some((n) => n.tipo === 'trabajo_saldo_actualizado'), false, 'quien registró el pago no debe autonotificarse');
+});
+
+test('registrarPago: un pago parcial que no cambia el estado no genera ninguna notificación de saldo', async () => {
+  const owner = await crearUsuario();
+  const profesional = await crearUsuario();
+  const { casaId, elementoId, registroId } = await sembrarRegistro({
+    ownerUid: owner.uid, estado: 'pendientePago', presupuesto: 100, profesionalUid: profesional.uid,
+  });
+
+  const { error } = await llamar('registrarPago', owner.idToken, { casaId, elementoId, registroId, importe: 60, fecha: Date.now() });
+  assert.equal(error, undefined);
+
+  const notis = await leerNotificaciones(profesional.uid);
+  assert.equal(notis.some((n) => n.tipo === 'trabajo_saldo_actualizado_profesional'), false);
+});
+
+test('registrarPago: un reintento idempotente (mismo clientRequestId) no duplica la notificación de saldo', async () => {
+  const owner = await crearUsuario();
+  const profesional = await crearUsuario();
+  const { casaId, elementoId, registroId } = await sembrarRegistro({
+    ownerUid: owner.uid, estado: 'pendientePago', presupuesto: 100, profesionalUid: profesional.uid,
+  });
+
+  const payload = { casaId, elementoId, registroId, importe: 100, fecha: Date.now(), clientRequestId: 'pago-fijo-1' };
+  await llamar('registrarPago', owner.idToken, payload);
+  await llamar('registrarPago', owner.idToken, payload);
+
+  const notis = await leerNotificaciones(profesional.uid);
+  const avisos = notis.filter((n) => n.tipo === 'trabajo_saldo_actualizado_profesional');
+  assert.equal(avisos.length, 1, 'el reintento idempotente no debe generar un segundo aviso');
+});
+
+test('actualizarPago: reabrir un terminado a pendientePago también notifica el cambio de saldo', async () => {
+  const owner = await crearUsuario();
+  const profesional = await crearUsuario();
+  const { casaId, elementoId, registroId } = await sembrarRegistro({
+    ownerUid: owner.uid, estado: 'pendientePago', presupuesto: 100, profesionalUid: profesional.uid,
+  });
+  const { result } = await llamar('registrarPago', owner.idToken, { casaId, elementoId, registroId, importe: 100, fecha: Date.now() });
+  assert.equal((await leerRegistro(casaId, elementoId, registroId)).estado, 'terminado');
+
+  const { error } = await llamar('actualizarPago', owner.idToken, { casaId, elementoId, registroId, pagoId: result.pagoId, importe: 50, fecha: Date.now() });
+  assert.equal(error, undefined);
+
+  const notis = await leerNotificaciones(profesional.uid);
+  const avisos = notis.filter((n) => n.tipo === 'trabajo_saldo_actualizado_profesional');
+  // Dos transiciones reales en este test: el registrarPago inicial (pendientePago -> terminado)
+  // y la edición que lo reabre (terminado -> pendientePago).
+  assert.equal(avisos.length, 2);
 });

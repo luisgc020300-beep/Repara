@@ -3,11 +3,14 @@
 // Entrada propia de REPARA Hogar -- NO depende de lib/main.dart del
 // monolito.
 //
-// Pendiente de conexion real (ver README.md e informe de esta integracion):
-// - Notificaciones push (FCM): el permiso y el guardado de token si
-//   ocurren (FcmService.inicializar(), llamado desde CasaShellScreen),
-//   pero el enrutamiento al tocar una notificacion push (app en frio/
-//   segundo plano) no esta cableado en este main.dart todavia.
+// Notificaciones push (FCM): el permiso y el guardado de token ocurren en
+// FcmService.inicializar() (llamado desde CasaShellScreen); el enrutamiento
+// al tocar una notificacion push con la app en frio/segundo plano (sistema
+// de notificaciones activas, noviembre 2026) se cablea aqui, trasplantado
+// del mismo patron ya validado en lib/main.dart del monolito -- navigatorKey
+// porque no hay BuildContext propio cuando la app se abre directamente
+// desde una notificacion (proceso frio).
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -16,6 +19,7 @@ import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 import 'package:flutter/material.dart';
@@ -31,6 +35,27 @@ import 'package:repara_ui/login_screen.dart';
 import 'firebase_options.dart';
 import 'screens/casa_gate_screen.dart';
 import 'services/casa_service.dart';
+import 'services/notificacion_router_hogar.dart';
+
+final navigatorKey = GlobalKey<NavigatorState>();
+
+// Push tocada con la app en segundo plano, o que abre la app desde frio --
+// misma ruta que la lista interna (notificacion_router_hogar.dart), para no
+// duplicar la logica de navegacion.
+Future<void> _abrirDestinoPush(RemoteMessage message) async {
+  final context = navigatorKey.currentContext;
+  final data = message.data;
+  final tipo = data['tipo'] as String?;
+  if (context == null || tipo == null) return;
+  await abrirDestinoNotificacionHogar(
+    context,
+    tipo: tipo,
+    casaId: data['casaId'] as String?,
+    elementoId: data['elementoId'] as String?,
+    registroId: data['registroId'] as String?,
+    pagoId: data['pagoId'] as String?,
+  );
+}
 
 const bool _usarEmulador = bool.fromEnvironment('USE_EMULATOR');
 
@@ -88,6 +113,11 @@ void main() async {
     CasaService.sincronizarClaims,
   );
 
+  // Push tocada con la app en segundo plano, o que abre la app desde frio.
+  FirebaseMessaging.onMessageOpenedApp.listen(_abrirDestinoPush);
+  final mensajeInicial = await FirebaseMessaging.instance.getInitialMessage();
+  if (mensajeInicial != null) unawaited(_abrirDestinoPush(mensajeInicial));
+
   runApp(ReparaHogarApp(themeController: themeController));
 }
 
@@ -101,6 +131,7 @@ class ReparaHogarApp extends StatelessWidget {
     return AnimatedBuilder(
       animation: themeController,
       builder: (context, _) => MaterialApp(
+        navigatorKey: navigatorKey,
         debugShowCheckedModeBanner: false,
         title: 'REPARA',
         themeMode: themeController.mode,

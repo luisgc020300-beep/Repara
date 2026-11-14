@@ -19,6 +19,11 @@ const _categorias = [
   (clave: 'pagos', titulo: 'Pagos', subtitulo: 'Pagos registrados y saldo pendiente'),
   (clave: 'cambios', titulo: 'Cambios de estado', subtitulo: 'Cambios de alcance, finalización, archivado'),
   (clave: 'documentos', titulo: 'Documentos', subtitulo: 'Facturas, fotos y garantías añadidas'),
+  // Sistema de notificaciones activas (noviembre 2026): avisos proactivos
+  // por el paso del tiempo, no por una acción de alguien -- categorías
+  // propias, separadas de "documentos" (que es solo al añadir).
+  (clave: 'garantias', titulo: 'Garantías', subtitulo: 'Garantías próximas a caducar'),
+  (clave: 'mantenimiento', titulo: 'Mantenimiento', subtitulo: 'Revisiones próximas o atrasadas'),
 ];
 
 class NotificacionesPreferenciasScreen extends StatelessWidget {
@@ -88,5 +93,7 @@ IconData _iconoCategoria(String clave) => switch (clave) {
       'pagos' => Icons.payments_outlined,
       'cambios' => Icons.rule_outlined,
       'documentos' => Icons.description_outlined,
+      'garantias' => Icons.verified_outlined,
+      'mantenimiento' => Icons.build_outlined,
       _ => Icons.notifications_outlined,
     };

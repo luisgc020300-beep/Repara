@@ -41,6 +41,13 @@ const _tiposParaProfesional = {
   // aquí.
   'invitacion_hogar_aceptada',
   'invitacion_hogar_rechazada',
+  // Sistema de notificaciones activas (noviembre 2026): un pago que cierra o
+  // reabre un trabajo avisa tanto a la casa como al profesional, pero con
+  // "tipo" distinto para cada lado (mismo criterio que
+  // recordatorio_cita_profesional/documento_anadido_profesional arriba) --
+  // sin esto, la notificación al profesional no aparecería en su propia
+  // lista en modo Pro.
+  'trabajo_saldo_actualizado_profesional',
 };
 
 bool tipoEsParaProfesional(String tipo) => _tiposParaProfesional.contains(tipo);

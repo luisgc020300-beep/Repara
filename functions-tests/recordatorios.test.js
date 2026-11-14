@@ -18,6 +18,10 @@ function citaRef(profesionalUid, citaId) {
   return db.collection('profesionales').doc(profesionalUid).collection('citas').doc(citaId);
 }
 
+function elementoRef(casaId, elementoId) {
+  return db.collection('casas').doc(casaId).collection('elementos').doc(elementoId);
+}
+
 test('1. una cita compartida dentro de la ventana de antelación avisa a cliente y profesional', async () => {
   const owner = await crearUsuario();
   const pro = await crearUsuario();
@@ -174,4 +178,188 @@ test('9. repetir enviarRecordatorios no duplica el aviso de presupuesto sin resp
   const notis = await leerNotificaciones(owner.uid);
   const avisos = notis.filter((n) => n.tipo === 'presupuesto_sin_respuesta');
   assert.equal(avisos.length, 1);
+});
+
+// =============================================================================
+// GARANTÍAS Y MANTENIMIENTO (sistema de notificaciones activas, noviembre
+// 2026) -- mismo patrón de deduplicación por marcador en el propio
+// documento que citas/presupuestos arriba, aplicado a elementos.
+// =============================================================================
+
+test('10. una garantía que caduca en 5 días avisa con el umbral de 7 días', async () => {
+  const owner = await crearUsuario();
+  const { casaId, elementoId } = await sembrarRegistro({ ownerUid: owner.uid });
+  const ahoraMs = Date.now();
+  await elementoRef(casaId, elementoId).update({
+    nombre: 'Caldera', garantiaHasta: new Date(ahoraMs + 5 * 24 * 60 * 60 * 1000),
+  });
+
+  await _enviarRecordatoriosParaTests(ahoraMs);
+
+  const notis = await leerNotificaciones(owner.uid);
+  const aviso = notis.find((n) => n.tipo === 'garantia_proxima_vencer');
+  assert.ok(aviso, 'debe avisar de la garantía próxima');
+  assert.match(aviso.cuerpo, /7 días/);
+});
+
+test('11. una garantía que caduca hoy avisa con el umbral 0', async () => {
+  const owner = await crearUsuario();
+  const { casaId, elementoId } = await sembrarRegistro({ ownerUid: owner.uid });
+  const ahoraMs = Date.now();
+  await elementoRef(casaId, elementoId).update({
+    nombre: 'Caldera', garantiaHasta: new Date(ahoraMs),
+  });
+
+  await _enviarRecordatoriosParaTests(ahoraMs);
+
+  const notis = await leerNotificaciones(owner.uid);
+  const aviso = notis.find((n) => n.tipo === 'garantia_proxima_vencer');
+  assert.ok(aviso);
+  assert.match(aviso.cuerpo, /caduca hoy/);
+});
+
+test('12. repetir enviarRecordatorios para la misma garantía no duplica el aviso', async () => {
+  const owner = await crearUsuario();
+  const { casaId, elementoId } = await sembrarRegistro({ ownerUid: owner.uid });
+  const ahoraMs = Date.now();
+  await elementoRef(casaId, elementoId).update({
+    nombre: 'Caldera', garantiaHasta: new Date(ahoraMs + 5 * 24 * 60 * 60 * 1000),
+  });
+
+  await _enviarRecordatoriosParaTests(ahoraMs);
+  await _enviarRecordatoriosParaTests(ahoraMs + 60_000);
+
+  const notis = await leerNotificaciones(owner.uid);
+  const avisos = notis.filter((n) => n.tipo === 'garantia_proxima_vencer');
+  assert.equal(avisos.length, 1);
+});
+
+test('13. tras avisar del umbral de 7 días, entrar en el umbral de 0 días genera un segundo aviso', async () => {
+  const owner = await crearUsuario();
+  const { casaId, elementoId } = await sembrarRegistro({ ownerUid: owner.uid });
+  const ahoraMs = Date.now();
+  await elementoRef(casaId, elementoId).update({
+    nombre: 'Caldera', garantiaHasta: new Date(ahoraMs + 5 * 24 * 60 * 60 * 1000),
+  });
+  await _enviarRecordatoriosParaTests(ahoraMs);
+
+  // Pasan los días -- misma fecha de garantía, ahora el umbral es 0.
+  const cincoDiasDespues = ahoraMs + 5 * 24 * 60 * 60 * 1000;
+  await _enviarRecordatoriosParaTests(cincoDiasDespues);
+
+  const notis = await leerNotificaciones(owner.uid);
+  const avisos = notis.filter((n) => n.tipo === 'garantia_proxima_vencer');
+  assert.equal(avisos.length, 2, 'un umbral más cercano al vencimiento debe generar un aviso nuevo');
+});
+
+test('14. cambiar la fecha de garantía después de avisar permite un nuevo aviso con el mismo umbral', async () => {
+  const owner = await crearUsuario();
+  const { casaId, elementoId } = await sembrarRegistro({ ownerUid: owner.uid });
+  const ahoraMs = Date.now();
+  await elementoRef(casaId, elementoId).update({
+    nombre: 'Caldera', garantiaHasta: new Date(ahoraMs + 5 * 24 * 60 * 60 * 1000),
+  });
+  await _enviarRecordatoriosParaTests(ahoraMs);
+
+  // Se edita el elemento con una garantía nueva, de otro producto -- vuelve
+  // a caer en el mismo umbral de 7, pero es un dato distinto.
+  await elementoRef(casaId, elementoId).update({ garantiaHasta: new Date(ahoraMs + 6 * 24 * 60 * 60 * 1000) });
+  await _enviarRecordatoriosParaTests(ahoraMs + 60_000);
+
+  const notis = await leerNotificaciones(owner.uid);
+  const avisos = notis.filter((n) => n.tipo === 'garantia_proxima_vencer');
+  assert.equal(avisos.length, 2, 'una fecha de garantía distinta debe reabrir el aviso');
+});
+
+test('15. un elemento archivado con garantía próxima nunca avisa', async () => {
+  const owner = await crearUsuario();
+  const { casaId, elementoId } = await sembrarRegistro({ ownerUid: owner.uid });
+  const ahoraMs = Date.now();
+  await elementoRef(casaId, elementoId).update({
+    nombre: 'Caldera', garantiaHasta: new Date(ahoraMs + 5 * 24 * 60 * 60 * 1000), archivado: true,
+  });
+
+  await _enviarRecordatoriosParaTests(ahoraMs);
+
+  const notis = await leerNotificaciones(owner.uid);
+  assert.equal(notis.some((n) => n.tipo === 'garantia_proxima_vencer'), false);
+});
+
+test('16. una garantía caducada desde hace meses (ya así antes del despliegue) no avisa retroactivamente', async () => {
+  const owner = await crearUsuario();
+  const { casaId, elementoId } = await sembrarRegistro({ ownerUid: owner.uid });
+  const ahoraMs = Date.now();
+  await elementoRef(casaId, elementoId).update({
+    nombre: 'Caldera vieja', garantiaHasta: new Date(ahoraMs - 90 * 24 * 60 * 60 * 1000),
+  });
+
+  await _enviarRecordatoriosParaTests(ahoraMs);
+
+  const notis = await leerNotificaciones(owner.uid);
+  assert.equal(notis.some((n) => n.tipo === 'garantia_proxima_vencer'), false);
+});
+
+test('17. un mantenimiento próximo en 3 días avisa con el umbral de 7 días', async () => {
+  const owner = await crearUsuario();
+  const { casaId, elementoId } = await sembrarRegistro({ ownerUid: owner.uid });
+  const ahoraMs = Date.now();
+  await elementoRef(casaId, elementoId).update({
+    nombre: 'Caldera', proximoMantenimiento: new Date(ahoraMs + 3 * 24 * 60 * 60 * 1000),
+  });
+
+  await _enviarRecordatoriosParaTests(ahoraMs);
+
+  const notis = await leerNotificaciones(owner.uid);
+  const aviso = notis.find((n) => n.tipo === 'mantenimiento_pendiente');
+  assert.ok(aviso);
+  assert.match(aviso.cuerpo, /próximo/);
+});
+
+test('18. un mantenimiento vencido desde hace 2 días avisa como pendiente atrasado', async () => {
+  const owner = await crearUsuario();
+  const { casaId, elementoId } = await sembrarRegistro({ ownerUid: owner.uid });
+  const ahoraMs = Date.now();
+  await elementoRef(casaId, elementoId).update({
+    nombre: 'Caldera', proximoMantenimiento: new Date(ahoraMs - 2 * 24 * 60 * 60 * 1000),
+  });
+
+  await _enviarRecordatoriosParaTests(ahoraMs);
+
+  const notis = await leerNotificaciones(owner.uid);
+  const aviso = notis.find((n) => n.tipo === 'mantenimiento_pendiente');
+  assert.ok(aviso);
+  assert.match(aviso.cuerpo, /pendiente desde hace días/);
+});
+
+test('19. marcar la revisión como hecha (nueva fecha) reabre el aviso de mantenimiento', async () => {
+  const owner = await crearUsuario();
+  const { casaId, elementoId } = await sembrarRegistro({ ownerUid: owner.uid });
+  const ahoraMs = Date.now();
+  await elementoRef(casaId, elementoId).update({
+    nombre: 'Caldera', proximoMantenimiento: new Date(ahoraMs),
+  });
+  await _enviarRecordatoriosParaTests(ahoraMs);
+
+  // Equivalente a ElementoService.marcarRevisionHecha: avanza la próxima
+  // revisión -- mismo campo que ya escribe el cliente directamente.
+  await elementoRef(casaId, elementoId).update({ proximoMantenimiento: new Date(ahoraMs + 3 * 24 * 60 * 60 * 1000) });
+  await _enviarRecordatoriosParaTests(ahoraMs + 60_000);
+
+  const notis = await leerNotificaciones(owner.uid);
+  const avisos = notis.filter((n) => n.tipo === 'mantenimiento_pendiente');
+  assert.equal(avisos.length, 2, 'la nueva fecha de revisión debe generar un aviso propio');
+});
+
+test('20. un elemento archivado con mantenimiento vencido nunca avisa', async () => {
+  const owner = await crearUsuario();
+  const { casaId, elementoId } = await sembrarRegistro({ ownerUid: owner.uid });
+  const ahoraMs = Date.now();
+  await elementoRef(casaId, elementoId).update({
+    nombre: 'Caldera', proximoMantenimiento: new Date(ahoraMs - 2 * 24 * 60 * 60 * 1000), archivado: true,
+  });
+
+  await _enviarRecordatoriosParaTests(ahoraMs);
+
+  const notis = await leerNotificaciones(owner.uid);
+  assert.equal(notis.some((n) => n.tipo === 'mantenimiento_pendiente'), false);
 });

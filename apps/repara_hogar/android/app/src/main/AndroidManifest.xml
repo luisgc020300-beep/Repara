@@ -2,6 +2,12 @@
     <!-- Bloqueo biométrico (local_auth) — obligatorio en Android, sin esto
          authenticate() falla antes incluso de llegar al diálogo nativo. -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
+    <!-- Notificaciones push (sistema de notificaciones activas, noviembre
+         2026) — obligatorio desde Android 13 (API 33): sin este permiso
+         declarado, FirebaseMessaging.requestPermission() no puede mostrar
+         el diálogo nativo ni el sistema puede llegar a mostrar la
+         notificación aunque el envío desde el servidor sea correcto. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="repara_hogar"
         android:name="${applicationName}"

@@ -8,6 +8,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { db, crearUsuario, llamar, sembrarRegistro, leerNotificaciones } = require('./helpers');
+const { _enviarRecordatoriosParaTests } = require('../functions/index.js');
 
 async function marcarComoProfesional(uid) {
   await db.collection('users').doc(uid).set({ esProfesional: true }, { merge: true });
@@ -77,4 +78,34 @@ test('4. un tipo obligatorio (invitación aceptada) se crea aunque su categoría
 
   const notis = await leerNotificaciones(owner.uid);
   assert.ok(notis.some((n) => n.tipo === 'invitacion_aceptada'));
+});
+
+test('5. con la categoría "garantias" desactivada, el recordatorio de garantía no se crea', async () => {
+  const owner = await crearUsuario();
+  await db.collection('users').doc(owner.uid).set({ notifPrefs: { garantias: false } }, { merge: true });
+  const { casaId, elementoId } = await sembrarRegistro({ ownerUid: owner.uid });
+  const ahoraMs = Date.now();
+  await db.collection('casas').doc(casaId).collection('elementos').doc(elementoId).update({
+    nombre: 'Caldera', garantiaHasta: new Date(ahoraMs + 5 * 24 * 60 * 60 * 1000),
+  });
+
+  await _enviarRecordatoriosParaTests(ahoraMs);
+
+  const notis = await leerNotificaciones(owner.uid);
+  assert.equal(notis.some((n) => n.tipo === 'garantia_proxima_vencer'), false);
+});
+
+test('6. con la categoría "mantenimiento" desactivada, el recordatorio de mantenimiento no se crea', async () => {
+  const owner = await crearUsuario();
+  await db.collection('users').doc(owner.uid).set({ notifPrefs: { mantenimiento: false } }, { merge: true });
+  const { casaId, elementoId } = await sembrarRegistro({ ownerUid: owner.uid });
+  const ahoraMs = Date.now();
+  await db.collection('casas').doc(casaId).collection('elementos').doc(elementoId).update({
+    nombre: 'Caldera', proximoMantenimiento: new Date(ahoraMs),
+  });
+
+  await _enviarRecordatoriosParaTests(ahoraMs);
+
+  const notis = await leerNotificaciones(owner.uid);
+  assert.equal(notis.some((n) => n.tipo === 'mantenimiento_pendiente'), false);
 });

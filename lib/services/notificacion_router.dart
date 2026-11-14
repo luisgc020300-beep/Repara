@@ -6,6 +6,7 @@
 import 'package:flutter/material.dart';
 import 'package:repara_core/notificacion.dart';
 
+import '../screens/elemento_detail_screen.dart';
 import '../screens/pro/registro_pro_detail_screen.dart';
 import '../screens/pro/repara_pro_shell_screen.dart';
 import '../screens/registro_detail_screen.dart';
@@ -44,7 +45,22 @@ Future<void> abrirDestinoNotificacion(
     );
     return;
   }
-  if (casaId == null || elementoId == null || registroId == null) return;
+  if (casaId == null || elementoId == null) return;
+
+  // Avisos a nivel de elemento, sin un trabajo concreto detrás (garantía,
+  // mantenimiento, elemento archivado/restaurado, sistema de
+  // notificaciones activas de noviembre 2026) -- siempre del lado
+  // propietario (ninguno de estos tipos es "para profesional"), así que va
+  // directo a la ficha del elemento sin mirar modoPro.
+  if (registroId == null) {
+    final casa = await CasaService.streamCasa(casaId).first;
+    if (!context.mounted) return;
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(builder: (_) => ElementoDetailScreen(casa: casa, elementoId: elementoId)),
+    );
+    return;
+  }
   final modoPro = tipoEsParaProfesional(tipo);
 
   // "Te han registrado un pago" lleva directo al detalle de ESE pago, no

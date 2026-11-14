@@ -1260,6 +1260,15 @@ const CATEGORIA_POR_TIPO = {
   cita_cancelada: 'citas',
   recordatorio_cita_cliente: 'citas',
   recordatorio_cita_profesional: 'citas',
+  // Respuesta del propietario a una cita (noviembre 2026) -- faltaban en
+  // este mapa (hallazgo de esta auditoría de notificaciones): sin entrada
+  // aquí, `categoria` salía `undefined` y el chequeo de preferencias de
+  // crearNotificacion se saltaba entero, así que apagar "Citas" nunca
+  // silenciaba estos cuatro tipos.
+  cita_confirmada: 'citas',
+  cita_rechazada: 'citas',
+  cita_contrapropuesta: 'citas',
+  cita_contrapropuesta_rechazada: 'citas',
   documento_anadido_cliente: 'documentos',
   documento_anadido_profesional: 'documentos',
   invitacion_aceptada: 'seguridad',
@@ -1267,6 +1276,14 @@ const CATEGORIA_POR_TIPO = {
   invitacion_hogar_recibida: 'seguridad',
   invitacion_hogar_aceptada: 'seguridad',
   invitacion_hogar_rechazada: 'seguridad',
+  // Avisos inteligentes (sistema de notificaciones activas, noviembre
+  // 2026): garantías/mantenimiento son categorías nuevas y propias;
+  // "trabajo_saldo_actualizado" cae en "pagos" -- es un cambio económico
+  // del trabajo, no un cambio de alcance.
+  garantia_proxima_vencer: 'garantias',
+  mantenimiento_pendiente: 'mantenimiento',
+  trabajo_saldo_actualizado: 'pagos',
+  trabajo_saldo_actualizado_profesional: 'pagos',
 };
 
 // Seguridad/permisos -- la sección 6 del encargo pide explícitamente que
@@ -1879,6 +1896,35 @@ function estadoTrasCambioDePago(estadoActual, deuda, totalPagado) {
   return nuevoEstado === estadoActual ? null : nuevoEstado;
 }
 
+// Avisa de un cambio de saldo real en el trabajo (sistema de notificaciones
+// activas, noviembre 2026) -- solo se llama cuando estadoTrasCambioDePago ya
+// devolvió un nuevo estado de verdad, nunca por el simple hecho de que siga
+// existiendo un saldo pendiente (eso lo pide explícitamente el encargo).
+// Avisa a los demás miembros de la casa (nunca a quien acaba de pagar) y al
+// profesional del registro, si lo hay -- dos tipos distintos
+// (trabajo_saldo_actualizado/_profesional), igual que ya hace este archivo
+// con recordatorio_cita_cliente/profesional y documento_anadido_cliente/
+// profesional: un mismo "tipo" para las dos audiencias haría que
+// tipoEsParaProfesional (repara_core/notificacion.dart) clasificase mal la
+// mitad de los avisos en la pantalla de notificaciones de uno de los dos
+// lados.
+async function notificarCambioDeSaldo({ casaId, elementoId, registroId, actorUid, regData, nuevoEstado }) {
+  const titulo = regData.titulo || 'un trabajo';
+  const cuerpo = nuevoEstado === 'terminado'
+    ? `El pago completa el presupuesto de "${titulo}"; el trabajo queda terminado.`
+    : `Una edición del pago deja saldo pendiente en "${titulo}".`;
+  const casaSnap = await db.collection('casas').doc(casaId).get();
+  for (const memberUid of casaSnap.data()?.members || []) {
+    if (memberUid === actorUid) continue;
+    await crearNotificacion(memberUid, 'trabajo_saldo_actualizado', 'Saldo del trabajo actualizado', cuerpo,
+      { casaId, elementoId, registroId });
+  }
+  if (regData.profesionalUid && regData.profesionalUid !== actorUid) {
+    await crearNotificacion(regData.profesionalUid, 'trabajo_saldo_actualizado_profesional', 'Saldo del trabajo actualizado', cuerpo,
+      { casaId, elementoId, registroId });
+  }
+}
+
 function validarDatosPago(data) {
   const importe = redondear2(Number(data?.importe));
   if (!Number.isFinite(importe) || importe <= 0 || importe > 1000000) {
@@ -1943,10 +1989,16 @@ exports.registrarPago = onCall({ region: REGION }, async (request) => {
     // ver estadoTrasCambioDePago.
     const nuevoEstado = estadoTrasCambioDePago(regData.estado, montoDebido(regData), redondear2(totalActual + importe));
     if (nuevoEstado) tx.update(regRef, { estado: nuevoEstado });
-    return { ok: true, pagoId: pagoRef.id, yaExistia: false };
+    return { ok: true, pagoId: pagoRef.id, yaExistia: false, nuevoEstado, regData };
   });
 
-  return resultado;
+  // Avisa solo si de verdad hubo una transición de estado por este pago
+  // (nunca en un reintento idempotente ni si el trabajo seguía igual) --
+  // ver notificarCambioDeSaldo, mismo criterio que actualizarPago.
+  if (resultado.nuevoEstado) {
+    await notificarCambioDeSaldo({ casaId, elementoId, registroId, actorUid: uid, regData: resultado.regData, nuevoEstado: resultado.nuevoEstado });
+  }
+  return { ok: resultado.ok, pagoId: resultado.pagoId, yaExistia: resultado.yaExistia };
 });
 
 exports.actualizarPago = onCall({ region: REGION }, async (request) => {
@@ -1962,7 +2014,7 @@ exports.actualizarPago = onCall({ region: REGION }, async (request) => {
   const pagoRef = pagosCol.doc(pagoId);
   const elRef = elementoRef(casaId, elementoId);
 
-  await db.runTransaction(async (tx) => {
+  const resultado = await db.runTransaction(async (tx) => {
     const [registroSnap, pagoSnap, existentesSnap, elSnap] = await Promise.all([
       tx.get(regRef), tx.get(pagoRef), tx.get(pagosCol), tx.get(elRef),
     ]);
@@ -1998,8 +2050,12 @@ exports.actualizarPago = onCall({ region: REGION }, async (request) => {
     // las dos, el trabajo no está terminado" -- ver estadoTrasCambioDePago).
     const nuevoEstado = estadoTrasCambioDePago(regData.estado, montoDebido(regData), nuevoTotal);
     if (nuevoEstado) tx.update(regRef, { estado: nuevoEstado });
+    return { nuevoEstado, regData };
   });
 
+  if (resultado.nuevoEstado) {
+    await notificarCambioDeSaldo({ casaId, elementoId, registroId, actorUid: uid, regData: resultado.regData, nuevoEstado: resultado.nuevoEstado });
+  }
   return { ok: true };
 });
 
@@ -2936,11 +2992,85 @@ async function recordarPresupuestosSinRespuesta(ahoraMs) {
   }
 }
 
+const MS_DIA = 24 * 60 * 60 * 1000;
+
+// Ventana de la consulta acotada a propósito, igual en garantías y
+// mantenimiento (sistema de notificaciones activas, noviembre 2026): una
+// garantía o revisión que ya estaba muy atrasada ANTES de desplegar esto no
+// debe generar de golpe un aviso retroactivo de "ha caducado hace meses" --
+// solo se avisa de lo que entra en la ventana a partir de ahora.
+async function recordarGarantiasProximas(ahoraMs) {
+  const snap = await db.collectionGroup('elementos')
+    .where('garantiaHasta', '>=', Timestamp.fromMillis(ahoraMs - MS_DIA))
+    .where('garantiaHasta', '<=', Timestamp.fromMillis(ahoraMs + 31 * MS_DIA))
+    .get();
+  for (const d of snap.docs) {
+    const el = d.data();
+    if (el.archivado === true) continue; // conserva su historial, pero ya no es "activo"
+    const diasRestantes = Math.floor((el.garantiaHasta.toMillis() - ahoraMs) / MS_DIA);
+    const umbral = diasRestantes <= 0 ? 0 : diasRestantes <= 7 ? 7 : 30;
+
+    // Dedupe por el propio documento: si la fecha no coincide con la del
+    // último aviso, se trata como si nunca se hubiera avisado (la garantía
+    // cambió -- se autoinvalida solo, sin ningún paso manual). Si coincide,
+    // solo se avisa de un umbral MÁS cercano al vencimiento que el último.
+    const fechaMarcada = el.avisoGarantiaFecha?.isEqual?.(el.garantiaHasta);
+    if (fechaMarcada && el.avisoGarantiaUmbral <= umbral) continue;
+    await d.ref.update({ avisoGarantiaFecha: el.garantiaHasta, avisoGarantiaUmbral: umbral });
+
+    const casaId = d.ref.parent.parent.id;
+    const elementoId = d.id;
+    const nombre = el.nombre || 'Un elemento';
+    const cuerpo = umbral === 0
+      ? `La garantía de "${nombre}" caduca hoy.`
+      : `La garantía de "${nombre}" caduca en ${umbral} días.`;
+    const casaSnap = await db.collection('casas').doc(casaId).get();
+    for (const memberUid of casaSnap.data()?.members || []) {
+      await crearNotificacion(memberUid, 'garantia_proxima_vencer', 'Garantía próxima a caducar', cuerpo,
+        { casaId, elementoId });
+    }
+  }
+}
+
+async function recordarMantenimientoPendiente(ahoraMs) {
+  const snap = await db.collectionGroup('elementos')
+    .where('proximoMantenimiento', '>=', Timestamp.fromMillis(ahoraMs - 14 * MS_DIA))
+    .where('proximoMantenimiento', '<=', Timestamp.fromMillis(ahoraMs + 8 * MS_DIA))
+    .get();
+  for (const d of snap.docs) {
+    const el = d.data();
+    if (el.archivado === true) continue;
+    const diasRestantes = Math.floor((el.proximoMantenimiento.toMillis() - ahoraMs) / MS_DIA);
+    // -1 = vencida y sigue pendiente, 0 = hoy, 7 = próxima.
+    const umbral = diasRestantes <= -1 ? -1 : diasRestantes <= 0 ? 0 : 7;
+
+    const fechaMarcada = el.avisoMantenimientoFecha?.isEqual?.(el.proximoMantenimiento);
+    if (fechaMarcada && el.avisoMantenimientoUmbral <= umbral) continue;
+    await d.ref.update({ avisoMantenimientoFecha: el.proximoMantenimiento, avisoMantenimientoUmbral: umbral });
+
+    const casaId = d.ref.parent.parent.id;
+    const elementoId = d.id;
+    const nombre = el.nombre || 'Un elemento';
+    const cuerpo = umbral === -1
+      ? `La revisión de "${nombre}" está pendiente desde hace días.`
+      : umbral === 0
+        ? `Toca revisar el mantenimiento de "${nombre}".`
+        : `El mantenimiento de "${nombre}" está próximo.`;
+    const casaSnap = await db.collection('casas').doc(casaId).get();
+    for (const memberUid of casaSnap.data()?.members || []) {
+      await crearNotificacion(memberUid, 'mantenimiento_pendiente', 'Mantenimiento pendiente', cuerpo,
+        { casaId, elementoId });
+    }
+  }
+}
+
 exports.enviarRecordatorios = onSchedule({ region: REGION, schedule: 'every 30 minutes' }, async () => {
   const ahoraMs = Date.now();
   await Promise.all([
     recordarCitasProximas(ahoraMs),
     recordarPresupuestosSinRespuesta(ahoraMs),
+    recordarGarantiasProximas(ahoraMs),
+    recordarMantenimientoPendiente(ahoraMs),
   ]);
 });
 
@@ -2952,6 +3082,8 @@ exports._enviarRecordatoriosParaTests = async (ahoraMs) => {
   await Promise.all([
     recordarCitasProximas(ahoraMs),
     recordarPresupuestosSinRespuesta(ahoraMs),
+    recordarGarantiasProximas(ahoraMs),
+    recordarMantenimientoPendiente(ahoraMs),
   ]);
 };
 

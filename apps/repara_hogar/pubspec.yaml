@@ -61,6 +61,10 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.4
+  # Mismo paquete y versión que el monolito y repara_pro -- primer test de
+  # este app real que necesita un Firestore falso (sistema de
+  # notificaciones activas, noviembre 2026).
+  fake_cloud_firestore: ^4.1.0
 
 # Mismo icono que el monolito, reutilizado tal cual (CEO, noviembre 2026).
 flutter_launcher_icons:
