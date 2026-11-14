@@ -1120,6 +1120,10 @@ class _EditorCitaSheetState extends State<_EditorCitaSheet> {
           )
         : null;
     final vinculo = _trabajoVinculado;
+    // compartida solo tiene sentido si enlaza un trabajo -- si se quita el
+    // vínculo, se desactiva sola en vez de dejar un permiso de lectura
+    // "huérfano" que apuntaría a nada.
+    final compartidaFinal = vinculo != null && _compartida;
     final cita = Cita(
       id: widget.cita?.id ?? '',
       titulo: titulo,
@@ -1135,10 +1139,13 @@ class _EditorCitaSheetState extends State<_EditorCitaSheet> {
       registroTitulo: vinculo?.registroTitulo,
       casaNombre: vinculo?.casaNombre,
       completada: widget.cita?.completada ?? false,
-      // compartida solo tiene sentido si enlaza un trabajo -- si se quita
-      // el vínculo, se desactiva sola en vez de dejar un permiso de
-      // lectura "huérfano" que apuntaría a nada.
-      compartida: vinculo != null && _compartida,
+      compartida: compartidaFinal,
+      // CEO, noviembre 2026: toda cita compartida y vinculada a un trabajo
+      // arranca pendiente de que el propietario la confirme, rechace o
+      // proponga otra fecha -- tanto al crearla como en cualquier edición
+      // posterior (el propietario vuelve a tener que responder a la fecha
+      // nueva, no se da por aceptada en silencio).
+      estado: compartidaFinal ? EstadoCita.pendienteConfirmacion : EstadoCita.confirmada,
     );
     try {
       if (_esEdicion) {

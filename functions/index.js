@@ -2675,7 +2675,106 @@ exports.onDocumentoCreado = onDocumentCreated(
 // compartida=true en algún momento de la transición -- una cita puramente
 // privada nunca pasa por aquí de forma visible (before/after con
 // compartida=false en los dos lados no genera nada).
+//
+// RESPUESTA DEL PROPIETARIO (CEO, noviembre 2026: "que pueda responder de
+// verdad, no solo aceptar la fecha que ponga el profesional") -- esto SÍ
+// deja de ser "nunca afecta a otro usuario": el propietario confirma,
+// rechaza o propone otra fecha sobre un documento que no es suyo, así que
+// esas tres acciones son Cloud Functions con Admin SDK
+// (`responderCitaPropietario`, `proponerOtraFechaCita`), nunca una
+// escritura directa -- mismo principio que `responderCambioAlcance`. No
+// hace falta ninguna regla nueva en firestore.rules: el propietario sigue
+// sin tener ningún `allow write` sobre `citas`, las Cloud Functions ya la
+// saltan con Admin SDK. Cuando el profesional acepta la contrapropuesta
+// del propietario, sigue siendo su propio documento -- eso es
+// `CitaService.responderContrapropuesta`, escritura directa, sin Cloud
+// Function (ver cita_service.dart). `onCitaEscrita`, más abajo, reacciona
+// a los cambios de `estado` que produce cualquiera de los dos caminos,
+// igual que ya reaccionaba a `compartida`/`fecha`/`horaFin`/`titulo`.
 // =============================================================================
+exports.responderCitaPropietario = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+  const uid = request.auth.uid;
+  const { profesionalUid, citaId, respuesta } = request.data || {};
+  if (!profesionalUid || !citaId || !['confirmar', 'rechazar'].includes(respuesta)) {
+    throw new HttpsError('invalid-argument', 'Faltan datos.');
+  }
+
+  const ref = db.collection('profesionales').doc(profesionalUid).collection('citas').doc(citaId);
+  const cita = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) throw new HttpsError('not-found', 'La cita no existe.');
+    const c = snap.data();
+    if (!c.compartida || !c.casaId || !c.elementoId || !c.registroId) {
+      throw new HttpsError('permission-denied', 'Esta cita no está compartida contigo.');
+    }
+    if (!(await esMiembroCasa(c.casaId, uid))) throw new HttpsError('permission-denied', 'No perteneces a esa casa.');
+    const estadoActual = c.estado || 'confirmada';
+    if (estadoActual !== 'pendienteConfirmacion') throw new HttpsError('failed-precondition', 'Esta cita ya se respondió.');
+    const nuevoEstado = respuesta === 'confirmar' ? 'confirmada' : 'rechazada';
+    tx.update(ref, { estado: nuevoEstado });
+    // Historial/notificación se registran aquí mismo, con el uid real de
+    // quien responde -- el trigger onCitaEscrita (más abajo) no sabría
+    // atribuir esta escritura al propietario (solo conoce profesionalUid,
+    // el dueño de la ruta), así que atribuiría mal el evento si se dejara
+    // en sus manos.
+    registrarHistorial(registroRef(c.casaId, c.elementoId, c.registroId), {
+      tx, actorUid: uid, entidad: 'cita', entidadId: citaId, accion: nuevoEstado,
+    });
+    return c;
+  });
+
+  await crearNotificacion(profesionalUid,
+    respuesta === 'confirmar' ? 'cita_confirmada' : 'cita_rechazada',
+    respuesta === 'confirmar' ? 'Cita confirmada' : 'Cita rechazada',
+    `El propietario ha ${respuesta === 'confirmar' ? 'confirmado' : 'rechazado'} la visita para "${cita.registroTitulo || ''}".`,
+    { casaId: cita.casaId, elementoId: cita.elementoId, registroId: cita.registroId });
+
+  return { ok: true };
+});
+
+exports.proponerOtraFechaCita = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+  const uid = request.auth.uid;
+  const { profesionalUid, citaId, fecha, horaFin } = request.data || {};
+  if (!profesionalUid || !citaId || !fecha) throw new HttpsError('invalid-argument', 'Faltan datos.');
+  const fechaDate = new Date(fecha);
+  if (Number.isNaN(fechaDate.getTime())) throw new HttpsError('invalid-argument', 'Fecha inválida.');
+  let horaFinDate = null;
+  if (horaFin) {
+    horaFinDate = new Date(horaFin);
+    if (Number.isNaN(horaFinDate.getTime())) throw new HttpsError('invalid-argument', 'Hora de fin inválida.');
+  }
+
+  const ref = db.collection('profesionales').doc(profesionalUid).collection('citas').doc(citaId);
+  const cita = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) throw new HttpsError('not-found', 'La cita no existe.');
+    const c = snap.data();
+    if (!c.compartida || !c.casaId || !c.elementoId || !c.registroId) {
+      throw new HttpsError('permission-denied', 'Esta cita no está compartida contigo.');
+    }
+    if (!(await esMiembroCasa(c.casaId, uid))) throw new HttpsError('permission-denied', 'No perteneces a esa casa.');
+    const estadoActual = c.estado || 'confirmada';
+    if (estadoActual !== 'pendienteConfirmacion') throw new HttpsError('failed-precondition', 'Esta cita ya se respondió, o ya hay una contrapropuesta esperando respuesta.');
+    tx.update(ref, {
+      estado: 'contrapropuestaPropietario',
+      fechaPropuesta: Timestamp.fromDate(fechaDate),
+      horaFinPropuesta: horaFinDate ? Timestamp.fromDate(horaFinDate) : FieldValue.delete(),
+    });
+    registrarHistorial(registroRef(c.casaId, c.elementoId, c.registroId), {
+      tx, actorUid: uid, entidad: 'cita', entidadId: citaId, accion: 'contrapropuesta',
+    });
+    return c;
+  });
+
+  await crearNotificacion(profesionalUid, 'cita_contrapropuesta', 'Propuesta de nueva fecha',
+    `El propietario ha propuesto otra fecha para la visita de "${cita.registroTitulo || ''}".`,
+    { casaId: cita.casaId, elementoId: cita.elementoId, registroId: cita.registroId });
+
+  return { ok: true };
+});
+
 exports.onCitaEscrita = onDocumentWritten(
   { region: REGION, document: 'profesionales/{profesionalUid}/citas/{citaId}' },
   async (event) => {
@@ -2688,8 +2787,26 @@ exports.onCitaEscrita = onDocumentWritten(
     const compartidaAhora = after?.compartida === true && enlazaTrabajo(after);
     if (!compartidaAntes && !compartidaAhora) return; // nunca fue visible para el propietario
 
+    // Prioridad sobre el resto de comprobaciones de más abajo: el
+    // profesional respondiendo a la contrapropuesta del propietario
+    // (CitaService.responderContrapropuesta, escritura directa) también
+    // cambia fecha/horaFin si acepta -- sin esta comprobación primero, se
+    // etiquetaría igual que un simple 'modificada' en vez de reflejar que
+    // fue una respuesta a la contrapropuesta. Las transiciones que SÍ
+    // arrancan en pendienteConfirmacion (el propietario confirma/rechaza/
+    // contrapropone) no se detectan aquí -- esas las registra cada Cloud
+    // Function (responderCitaPropietario/proponerOtraFechaCita) ella
+    // misma, porque solo ellas conocen el uid real de quien actuó; este
+    // trigger solo conoce profesionalUid (el dueño de la ruta), así que
+    // atribuiría mal el evento si intentara reportarlas también.
     let accion;
-    if (!compartidaAntes && compartidaAhora) accion = 'creada';
+    const estadoAntes = before?.estado || 'confirmada';
+    const estadoAhora = after?.estado || 'confirmada';
+    if (compartidaAntes && compartidaAhora && estadoAntes === 'contrapropuestaPropietario' && estadoAhora === 'confirmada') {
+      accion = 'confirmada';
+    } else if (compartidaAntes && compartidaAhora && estadoAntes === 'contrapropuestaPropietario' && estadoAhora === 'pendienteConfirmacion') {
+      accion = 'contrapropuestaRechazada';
+    } else if (!compartidaAntes && compartidaAhora) accion = 'creada';
     else if (compartidaAntes && !compartidaAhora) accion = 'cancelada';
     else {
       // Las dos versiones estaban compartidas -- solo es un evento nuevo si
@@ -2717,10 +2834,15 @@ exports.onCitaEscrita = onDocumentWritten(
       ? after.fecha.toDate().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })
       : null;
     const mensaje = mensajeCitaCompartida(accion, datos.registroTitulo, fechaTexto);
+    const tipoNotificacion = {
+      creada: 'cita_creada',
+      modificada: 'cita_modificada',
+      cancelada: 'cita_cancelada',
+      confirmada: 'cita_confirmada',
+      contrapropuestaRechazada: 'cita_contrapropuesta_rechazada',
+    }[accion];
     for (const memberUid of casaSnap.data()?.members || []) {
-      await crearNotificacion(memberUid,
-        accion === 'creada' ? 'cita_creada' : accion === 'modificada' ? 'cita_modificada' : 'cita_cancelada',
-        'Visita programada', mensaje,
+      await crearNotificacion(memberUid, tipoNotificacion, 'Visita programada', mensaje,
         { casaId: datos.casaId, elementoId: datos.elementoId, registroId: datos.registroId });
     }
   }
@@ -2729,6 +2851,8 @@ exports.onCitaEscrita = onDocumentWritten(
 function mensajeCitaCompartida(accion, registroTitulo, fechaTexto) {
   if (accion === 'cancelada') return `Se ha cancelado la visita programada para "${registroTitulo}".`;
   if (accion === 'modificada') return `La visita para "${registroTitulo}" ahora es el ${fechaTexto}.`;
+  if (accion === 'confirmada') return `El profesional ha aceptado tu propuesta -- la visita para "${registroTitulo}" es el ${fechaTexto}.`;
+  if (accion === 'contrapropuestaRechazada') return `El profesional no ha aceptado tu propuesta de fecha para "${registroTitulo}". Revisa la pestaña Cita.`;
   return `Visita programada para "${registroTitulo}" el ${fechaTexto}.`;
 }
 

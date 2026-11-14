@@ -300,4 +300,48 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  // CEO, noviembre 2026: "que el propietario pueda responder de verdad, y
+  // que tenga más protagonismo que una línea del historial" -- la pestaña
+  // "Cita" (nueva) y el aviso en la propia tarjeta de "Próxima visita".
+  testWidgets(
+    'una cita pendiente de confirmar avisa en "Próxima visita" y la pestaña "Cita" ofrece responder',
+    (tester) async {
+      final db = await _sembrar();
+      await db
+          .collection('profesionales')
+          .doc(_profesionalUid)
+          .collection('citas')
+          .doc('cita-1')
+          .update({'estado': 'pendienteConfirmacion'});
+      _conectarServicios(db);
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildReparaDarkTheme(),
+          home: const RegistroDetailScreen(
+            casa: _casa,
+            elementoId: _elementoId,
+            registroId: _registroId,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Resumen: el aviso en la tarjeta de "Próxima visita".
+      expect(find.textContaining('Pendiente de confirmar'), findsOneWidget);
+
+      // Cambia a la pestaña "Cita" -- es la segunda, justo tras "Resumen".
+      await tester.tap(find.text('Cita'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Confirmar'), findsOneWidget);
+      expect(find.text('Rechazar'), findsOneWidget);
+      expect(find.text('Proponer otra fecha'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

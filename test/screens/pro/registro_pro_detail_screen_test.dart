@@ -18,6 +18,7 @@ import 'package:repara_core/pago_service.dart';
 import 'package:repara_core/registro_service.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_core/cambio_alcance_service.dart';
+import 'package:repara_core/cita_service.dart';
 import 'package:repara_core/documento_service.dart';
 import 'package:repara_core/presupuesto_service.dart';
 import 'package:repara_core/stream_sharing.dart';
@@ -71,6 +72,7 @@ void _conectarServicios(FakeFirebaseFirestore db) {
   CambioAlcanceService.debugFirestoreOverride = db;
   PagoService.debugFirestoreOverride = db;
   DocumentoService.debugFirestoreOverride = db;
+  CitaService.debugFirestoreOverride = db;
 }
 
 void _desconectarServicios() {
@@ -79,6 +81,7 @@ void _desconectarServicios() {
   CambioAlcanceService.debugFirestoreOverride = null;
   PagoService.debugFirestoreOverride = null;
   DocumentoService.debugFirestoreOverride = null;
+  CitaService.debugFirestoreOverride = null;
 }
 
 void main() {

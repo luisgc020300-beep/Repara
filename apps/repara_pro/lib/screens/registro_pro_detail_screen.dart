@@ -19,6 +19,7 @@ import 'package:repara_core/design_tokens.dart';
 import 'package:repara_ui/app_dialog.dart';
 import 'package:repara_ui/app_error.dart';
 import 'package:repara_ui/cambio_alcance_section.dart';
+import 'package:repara_ui/cita_section.dart';
 import 'package:repara_ui/estado_registro_chip.dart';
 import 'package:repara_ui/ios_list.dart';
 import 'package:repara_ui/pagos_section.dart';
@@ -322,6 +323,28 @@ class RegistroProDetailScreen extends StatelessWidget {
                           .join(', ')
                     : null,
               ),
+              const SizedBox(height: 20),
+              // Cita vive bajo profesionales/{uid}/citas -- un único uid,
+              // nunca una lista. Con varios profesionales en el mismo
+              // trabajo (listaProfesionales), profesionalUid queda null --
+              // mismo criterio que la Próxima visita del lado Hogar.
+              if (registro.profesionalUid == null)
+                EmptyHint(
+                  key: const ValueKey('pro-cita'),
+                  message: 'La agenda de citas no está disponible cuando el trabajo lo hacen varios profesionales a la vez.',
+                  icon: Icons.event_outlined,
+                )
+              else
+                CitaSeccion(
+                  key: const ValueKey('pro-cita'),
+                  profesionalUid: registro.profesionalUid!,
+                  registroId: registroId,
+                  rol: RolEnTrabajo.profesional,
+                  registroCerrado:
+                      registro.estado == EstadoRegistro.terminado ||
+                      registro.estado == EstadoRegistro.archivado ||
+                      registro.estado == EstadoRegistro.pendientePago,
+                ),
               const SizedBox(height: 20),
               CambiosAlcanceSection(
                 key: const ValueKey('pro-cambios'),

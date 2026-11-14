@@ -13,6 +13,27 @@
 // el día.
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+// [estado] (CEO, noviembre 2026: "que el propietario pueda responder de
+// verdad, no solo aceptar la fecha que ponga el profesional") -- solo
+// tiene sentido cuando la cita está compartida y enlaza un trabajo; el
+// profesional sigue escribiendo su propia cita directamente (crear,
+// editar, completar, eliminar), pero la respuesta del propietario
+// (confirmar/rechazar/proponer otra fecha) pasa SIEMPRE por una Cloud
+// Function con Admin SDK -- nunca una escritura directa cruzando de la
+// cuenta del propietario a un documento del profesional (mismo principio
+// que CambioAlcance). Por eso no hace falta ninguna regla nueva en
+// firestore.rules: el propietario sigue sin tener ningún `allow write`
+// sobre `citas`, las Cloud Functions ya saltan las reglas con Admin SDK.
+enum EstadoCita { pendienteConfirmacion, confirmada, rechazada, contrapropuestaPropietario }
+
+EstadoCita estadoCitaFromString(String? s) => EstadoCita.values.firstWhere(
+      (e) => e.name == s,
+      // Default a "confirmada", nunca a "pendienteConfirmacion": así
+      // ninguna cita creada antes de este campo existir aparece de
+      // pronto como si necesitara una respuesta que nadie le pidió.
+      orElse: () => EstadoCita.confirmada,
+    );
+
 class Cita {
   const Cita({
     required this.id,
@@ -28,6 +49,9 @@ class Cita {
     this.casaNombre,
     this.completada = false,
     this.compartida = false,
+    this.estado = EstadoCita.confirmada,
+    this.fechaPropuestaPropietario,
+    this.horaFinPropuestaPropietario,
     this.createdAt,
   });
 
@@ -65,6 +89,19 @@ class Cita {
   /// asociar el permiso de lectura (ver firestore.rules). El profesional
   /// sigue siendo el único que la crea/edita/cancela.
   final bool compartida;
+
+  /// Estado de la respuesta del propietario -- ver comentario de
+  /// [EstadoCita] arriba. Solo relevante cuando [compartida] y
+  /// [enlazaTrabajo] son true; en cualquier otro caso se ignora en la UI.
+  final EstadoCita estado;
+
+  /// Contrapropuesta del propietario (solo con sentido cuando [estado] es
+  /// [EstadoCita.contrapropuestaPropietario]) -- nunca sobrescribe [fecha]/
+  /// [horaFin] directamente, para no perder la propuesta original del
+  /// profesional mientras este no responda.
+  final DateTime? fechaPropuestaPropietario;
+  final DateTime? horaFinPropuestaPropietario;
+
   final DateTime? createdAt;
 
   bool get enlazaTrabajo =>
@@ -86,6 +123,9 @@ class Cita {
       casaNombre: data['casaNombre'] as String?,
       completada: data['completada'] as bool? ?? false,
       compartida: data['compartida'] as bool? ?? false,
+      estado: estadoCitaFromString(data['estado'] as String?),
+      fechaPropuestaPropietario: (data['fechaPropuesta'] as Timestamp?)?.toDate(),
+      horaFinPropuestaPropietario: (data['horaFinPropuesta'] as Timestamp?)?.toDate(),
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
     );
   }
@@ -104,5 +144,10 @@ class Cita {
     if (casaNombre != null) 'casaNombre': casaNombre,
     'completada': completada,
     'compartida': compartida,
+    'estado': estado.name,
+    if (fechaPropuestaPropietario != null)
+      'fechaPropuesta': Timestamp.fromDate(fechaPropuestaPropietario!),
+    if (horaFinPropuestaPropietario != null)
+      'horaFinPropuesta': Timestamp.fromDate(horaFinPropuestaPropietario!),
   };
 }

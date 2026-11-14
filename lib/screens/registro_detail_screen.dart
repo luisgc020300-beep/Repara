@@ -37,6 +37,7 @@ import 'package:repara_ui/app_dialog.dart';
 import 'package:repara_ui/app_error.dart';
 import '../widgets/documento_abrir.dart';
 import 'package:repara_ui/cambio_alcance_section.dart';
+import 'package:repara_ui/cita_section.dart';
 import 'package:repara_ui/estado_registro_chip.dart';
 import '../widgets/historial_timeline.dart';
 import 'package:repara_ui/ios_list.dart';
@@ -550,9 +551,10 @@ class _TarjetaEconomica extends StatelessWidget {
 /// Fila de pestañas tipo "pill" (indicador relleno, no subrayado) -- mismo
 /// TabBar/TabBarView de Material, solo con un indicador personalizado; evita
 /// construir un control a medida para algo que el framework ya resuelve.
-const _tabs = ['Resumen', 'Cambios', 'Pagos', 'Documentos'];
+const _tabs = ['Resumen', 'Cita', 'Cambios', 'Pagos', 'Documentos'];
 const _tabIcons = [
   Icons.summarize_outlined,
+  Icons.event_outlined,
   Icons.swap_horiz,
   Icons.payments_outlined,
   Icons.description_outlined,
@@ -757,6 +759,32 @@ class _CuerpoConProfesionalState extends State<_CuerpoConProfesional> {
                           elementoId: elementoId,
                           registro: registro,
                           elemento: elemento,
+                        ),
+                        SingleChildScrollView(
+                          key: const ValueKey('tab-cita'),
+                          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                          // Cita vive bajo profesionales/{uid}/citas -- un
+                          // único uid, nunca una lista. Con varios
+                          // profesionales en el mismo trabajo (
+                          // listaProfesionales, profesionalUid queda null --
+                          // mismo criterio que _SeccionProximaVisita más
+                          // abajo) no hay un único profesional cuya agenda
+                          // consultar, así que la pestaña lo dice en vez de
+                          // forzar uno cualquiera.
+                          child: registro.profesionalUid == null
+                              ? EmptyHint(
+                                  message: 'La agenda de citas no está disponible cuando el trabajo lo hacen varios profesionales a la vez.',
+                                  icon: Icons.event_outlined,
+                                )
+                              : CitaSeccion(
+                                  profesionalUid: registro.profesionalUid!,
+                                  registroId: registro.id,
+                                  rol: RolEnTrabajo.propietario,
+                                  registroCerrado:
+                                      registro.estado == EstadoRegistro.terminado ||
+                                      registro.estado == EstadoRegistro.archivado ||
+                                      registro.estado == EstadoRegistro.pendientePago,
+                                ),
                         ),
                         SingleChildScrollView(
                           key: const ValueKey('tab-cambios'),
@@ -1373,7 +1401,16 @@ class _SeccionHistorialState extends State<_SeccionHistorial> {
         final titulo = switch (e.accion) {
           'modificada' => 'Cita modificada',
           'cancelada' => 'Cita cancelada',
+          'confirmada' => 'Cita confirmada',
+          'rechazada' => 'Cita rechazada',
+          'contrapropuesta' => 'Propuesta de nueva fecha',
+          'contrapropuestaRechazada' => 'Nueva fecha no aceptada',
           _ => 'Cita programada',
+        };
+        final color = switch (e.accion) {
+          'cancelada' || 'rechazada' || 'contrapropuestaRechazada' => context.colors.errorText,
+          'contrapropuesta' => context.colors.warningText,
+          _ => context.colors.success,
         };
         return TimelineItem(
           titulo: titulo,
@@ -1381,9 +1418,7 @@ class _SeccionHistorialState extends State<_SeccionHistorial> {
           fecha: e.timestamp,
           autor: e.actorNombre,
           icono: Icons.event_outlined,
-          color: e.accion == 'cancelada'
-              ? context.colors.errorText
-              : context.colors.success,
+          color: color,
           categoria: 'citas',
         );
       case EntidadHistorial.desconocida:
@@ -1874,6 +1909,11 @@ class _SeccionProximaVisita extends StatelessWidget {
         final fechaTexto = cita.todoElDia
             ? DateFormat('d MMM yyyy', 'es_ES').format(cita.fecha)
             : DateFormat('d MMM yyyy · HH:mm', 'es_ES').format(cita.fecha);
+        // CEO, noviembre 2026: "más protagonismo" -- antes esta tarjeta era
+        // puramente informativa; ahora, si hace falta una respuesta, lo
+        // dice aquí mismo y señala la pestaña "Cita" en vez de dejar que
+        // se entere solo mirando el historial.
+        final pendiente = cita.estado == EstadoCita.pendienteConfirmacion;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1881,11 +1921,12 @@ class _SeccionProximaVisita extends StatelessWidget {
             const SizedBox(height: 8),
             Card(
               margin: EdgeInsets.zero,
+              color: pendiente ? context.colors.warning.withValues(alpha: 0.12) : null,
               child: Padding(
                 padding: const EdgeInsets.all(14),
                 child: Row(
                   children: [
-                    Icon(Icons.event_outlined, color: context.colors.brand),
+                    Icon(Icons.event_outlined, color: pendiente ? context.colors.warningText : context.colors.brand),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -1896,6 +1937,13 @@ class _SeccionProximaVisita extends StatelessWidget {
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
                           Text(fechaTexto, style: Theme.of(context).textTheme.bodySmall),
+                          if (pendiente) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              'Pendiente de confirmar -- ve a la pestaña "Cita" para responder.',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.colors.warningText),
+                            ),
+                          ],
                         ],
                       ),
                     ),
