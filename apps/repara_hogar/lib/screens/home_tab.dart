@@ -711,19 +711,19 @@ class _ResumenCasa extends StatelessWidget {
 /// Cabecera de Inicio (rediseño visual, noviembre 2026, sobre una
 /// referencia concreta) -- se superpone al ListView (ver HomeTab.build) y
 /// se compacta con su scroll: expandida muestra marca + notificaciones +
-/// ajustes, el saludo y el mensaje de confianza; al bajar, el bloque del
-/// saludo sube y se desvanece mientras la cabecera se encoge hasta quedar
-/// solo la fila de iconos (CEO, noviembre 2026: "que no tape información al
-/// hacer scroll"). Degradado navy (incluye brandStrong, el mismo azul de
-/// Casa/Contactos, para que se reconozca como la misma familia de color)
-/// con la esquina inferior muy redondeada solo expandida -- compacta queda
-/// recta, como la cabecera de Casa. Saludo por hora del día (_saludo())
-/// más el nombre real del usuario (de memberProfiles, que el servidor ya
-/// rellena al crear/unirse a la casa -- nunca un nombre inventado), y un
-/// mensaje de confianza fijo (sin dato propio detrás -- no hay ningún
-/// indicador de seguridad por cuenta en el código, así que no se simula
-/// uno; es solo texto de marca, igual que cualquier otra app muestra un
-/// sello de confianza genérico).
+/// ajustes, el saludo y el nombre de la casa actual; al bajar, el bloque
+/// del saludo sube y se desvanece mientras la cabecera se encoge hasta
+/// quedar solo la fila de iconos (CEO, noviembre 2026: "que no tape
+/// información al hacer scroll"). Degradado navy (incluye brandStrong, el
+/// mismo azul de Casa/Contactos, para que se reconozca como la misma
+/// familia de color) con la esquina inferior muy redondeada solo
+/// expandida -- compacta queda recta, como la cabecera de Casa. Saludo
+/// por hora del día (_saludo()) más el nombre real del usuario (de
+/// memberProfiles, que el servidor ya rellena al crear/unirse a la casa
+/// -- nunca un nombre inventado), y el nombre de la casa actual (CEO,
+/// noviembre 2026: quien tiene varias casas debe saber en cuál está nada
+/// más entrar a la app, sin tener que ir a la pestaña Casa a comprobarlo
+/// -- antes había aquí un mensaje de confianza fijo sin dato real detrás).
 class _CabeceraNavy extends StatelessWidget {
   const _CabeceraNavy({
     required this.casa,
@@ -747,15 +747,15 @@ class _CabeceraNavy extends StatelessWidget {
   static double calcularAlturaCompacta(double topPadding) =>
       topPadding + _alturaFilaIconos;
 
-  /// Altura del bloque saludo + mensaje de confianza, estimada a partir de
-  /// los tamaños de letra (y la escala de texto del sistema). Si se queda
-  /// algo corta, el bloque se recorta abajo en vez de desbordar.
+  /// Altura del bloque saludo + nombre de la casa actual, estimada a
+  /// partir de los tamaños de letra (y la escala de texto del sistema). Si
+  /// se queda algo corta, el bloque se recorta abajo en vez de desbordar.
   static double _alturaBloqueSaludo(TextScaler textScaler, bool conNombre) =>
       6 + // separación con la fila de iconos (ya más alta, 68)
       textScaler.scale(15) * 1.4 + // "Buenas tardes,"
       (conNombre ? textScaler.scale(22) * 1.3 : 0) + // nombre del usuario
       10 +
-      textScaler.scale(12.5) * 1.45 + // "Tu cuenta está segura"
+      textScaler.scale(12.5) * 1.45 + // nombre de la casa actual
       20; // padding inferior
 
   static double calcularAlturaExpandida({
@@ -930,21 +930,25 @@ class _CabeceraNavy extends StatelessWidget {
                                 Row(
                                   children: [
                                     Icon(
-                                      Icons.shield_outlined,
+                                      Icons.home_outlined,
                                       size: 15,
                                       color: Colors.white.withValues(
                                         alpha: 0.85,
                                       ),
                                     ),
                                     const SizedBox(width: 6),
-                                    Text(
-                                      'Tu cuenta está segura',
-                                      style: TextStyle(
-                                        color: Colors.white.withValues(
-                                          alpha: 0.85,
+                                    Flexible(
+                                      child: Text(
+                                        casa.nombre,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: Colors.white.withValues(
+                                            alpha: 0.85,
+                                          ),
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w500,
                                         ),
-                                        fontSize: 12.5,
-                                        fontWeight: FontWeight.w500,
                                       ),
                                     ),
                                   ],
