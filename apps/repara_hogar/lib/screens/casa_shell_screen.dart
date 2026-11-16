@@ -11,9 +11,20 @@ import 'casa_tab.dart';
 import 'home_tab.dart';
 
 class CasaShellScreen extends StatefulWidget {
-  const CasaShellScreen({required this.casaId, super.key});
+  const CasaShellScreen({
+    required this.casaId,
+    this.pedirNotificacionesAlMontar = true,
+    super.key,
+  });
 
   final String casaId;
+
+  /// `false` solo desde _TransicionFotoCabecera (casa_gate_screen.dart):
+  /// allí el shell se monta DEBAJO de la animación de la foto, y el aviso
+  /// de permiso de notificaciones saldría encima a mitad de transición --
+  /// la propia transición llama a FcmService.inicializar() cuando termina.
+  /// El resto de sitios que montan el shell siguen como siempre.
+  final bool pedirNotificacionesAlMontar;
 
   @override
   State<CasaShellScreen> createState() => _CasaShellScreenState();
@@ -51,7 +62,9 @@ class _CasaShellScreenState extends State<CasaShellScreen> {
     // usuario ya ha nombrado/unido su casa y está viendo la app de verdad --
     // mejor momento para pedir el permiso de notificaciones que nada más
     // iniciar sesión, antes de que haya visto nada.
-    unawaited(FcmService.inicializar());
+    if (widget.pedirNotificacionesAlMontar) {
+      unawaited(FcmService.inicializar());
+    }
   }
 
   void _onPageChanged(int i) {

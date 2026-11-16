@@ -57,7 +57,10 @@ String _saludo() {
 // FirebaseAuth.instance sin una app de Firebase inicializada (los widget
 // tests no la inicializan, solo FakeFirebaseFirestore) lanza -- mismo límite
 // de sistema que ya protegen con debugUidOverride los servicios con sesión.
-String? _nombreUsuarioActual(Casa casa) {
+// Nivel superior (no privada) para que _TransicionFotoCabecera
+// (casa_gate_screen.dart) calcule el mismo `conNombre` que esta pantalla,
+// sin duplicar la lógica.
+String? nombreUsuarioActualEnCasa(Casa casa) {
   try {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     return uid != null ? casa.memberProfiles[uid]?.displayName : null;
@@ -111,10 +114,10 @@ class _HomeTabState extends State<HomeTab> {
     // deja ver un hueco encima -- igual que Casa/Contactos. Y como no cambia
     // el tamaño del ListView al encogerse, no hay saltos en el scroll.
     final topPadding = MediaQuery.paddingOf(context).top;
-    final nombreUsuario = _nombreUsuarioActual(widget.casa);
+    final nombreUsuario = nombreUsuarioActualEnCasa(widget.casa);
     final conNombre = nombreUsuario != null && nombreUsuario.isNotEmpty;
-    final alturaCompacta = _CabeceraNavy.calcularAlturaCompacta(topPadding);
-    final alturaExpandida = _CabeceraNavy.calcularAlturaExpandida(
+    final alturaCompacta = alturaCabeceraCompacta(topPadding);
+    final alturaExpandida = alturaCabeceraExpandida(
       topPadding: topPadding,
       textScaler: MediaQuery.textScalerOf(context),
       conNombre: conNombre,
@@ -708,6 +711,44 @@ class _ResumenCasa extends StatelessWidget {
   }
 }
 
+// Mismo alto que el AppBar de Casa (toolbarHeight: 68 en casa_tab.dart),
+// para que la barra compacta de Inicio y la de Casa coincidan al cambiar
+// de pestaña. Nivel superior (no dentro de _CabeceraNavy, que es privada)
+// para que _TransicionFotoCabecera (casa_gate_screen.dart, "la foto del
+// login vuela hasta la cabecera", noviembre 2026) calcule exactamente el
+// mismo tamaño de destino sin repetir ningún número a mano.
+const double alturaFilaIconosCabecera = 68;
+
+double alturaCabeceraCompacta(double topPadding) =>
+    topPadding + alturaFilaIconosCabecera;
+
+/// Altura del bloque saludo + nombre de la casa actual, estimada a partir
+/// de los tamaños de letra (y la escala de texto del sistema). Si se queda
+/// algo corta, el bloque se recorta abajo en vez de desbordar.
+double _alturaBloqueSaludoCabecera(TextScaler textScaler, bool conNombre) =>
+    6 + // separación con la fila de iconos (ya más alta, 68)
+    textScaler.scale(15) * 1.4 + // "Buenas tardes,"
+    (conNombre ? textScaler.scale(22) * 1.3 : 0) + // nombre del usuario
+    10 +
+    textScaler.scale(12.5) * 1.45 + // nombre de la casa actual
+    20; // padding inferior
+
+double alturaCabeceraExpandida({
+  required double topPadding,
+  required TextScaler textScaler,
+  required bool conNombre,
+}) =>
+    alturaCabeceraCompacta(topPadding) +
+    _alturaBloqueSaludoCabecera(textScaler, conNombre);
+
+// Fondo fotográfico de la cabecera -- la misma foto del login
+// (login_screen.dart, LoginScreen.backgroundImageAsset), reutilizada tal
+// cual para que la transición entre una pantalla y otra no se note
+// (_TransicionFotoCabecera en casa_gate_screen.dart). El monolito no
+// empaqueta este archivo en sus propios assets -- usará el errorBuilder
+// de respaldo, sin romper nada (no es la app real que se publica).
+const String fondoCabeceraInicio = 'assets/images/login_background.jpg';
+
 /// Cabecera de Inicio (rediseño visual, noviembre 2026, sobre una
 /// referencia concreta) -- se superpone al ListView (ver HomeTab.build) y
 /// se compacta con su scroll: expandida muestra marca + notificaciones +
@@ -724,6 +765,13 @@ class _ResumenCasa extends StatelessWidget {
 /// noviembre 2026: quien tiene varias casas debe saber en cuál está nada
 /// más entrar a la app, sin tener que ir a la pestaña Casa a comprobarlo
 /// -- antes había aquí un mensaje de confianza fijo sin dato real detrás).
+///
+/// Fondo fotográfico (noviembre 2026, "la foto del login vuela hasta la
+/// cabecera"): la foto se ve con el degradado de arriba como un velo
+/// TRANSLÚCIDO mientras está expandida, y ese velo se vuelve opaco a
+/// medida que se compacta -- así el estado compacto sigue siendo el mismo
+/// azul liso de siempre, idéntico al AppBar de Casa (el requisito que ya
+/// exigía el comentario de arriba), y la foto solo asoma arriba del todo.
 class _CabeceraNavy extends StatelessWidget {
   const _CabeceraNavy({
     required this.casa,
@@ -739,37 +787,10 @@ class _CabeceraNavy extends StatelessWidget {
   final double alturaExpandida;
   final double alturaCompacta;
 
-  // Mismo alto que el AppBar de Casa (toolbarHeight: 68 en casa_tab.dart),
-  // para que la barra compacta de Inicio y la de Casa coincidan al cambiar
-  // de pestaña.
-  static const double _alturaFilaIconos = 68;
-
-  static double calcularAlturaCompacta(double topPadding) =>
-      topPadding + _alturaFilaIconos;
-
-  /// Altura del bloque saludo + nombre de la casa actual, estimada a
-  /// partir de los tamaños de letra (y la escala de texto del sistema). Si
-  /// se queda algo corta, el bloque se recorta abajo en vez de desbordar.
-  static double _alturaBloqueSaludo(TextScaler textScaler, bool conNombre) =>
-      6 + // separación con la fila de iconos (ya más alta, 68)
-      textScaler.scale(15) * 1.4 + // "Buenas tardes,"
-      (conNombre ? textScaler.scale(22) * 1.3 : 0) + // nombre del usuario
-      10 +
-      textScaler.scale(12.5) * 1.45 + // nombre de la casa actual
-      20; // padding inferior
-
-  static double calcularAlturaExpandida({
-    required double topPadding,
-    required TextScaler textScaler,
-    required bool conNombre,
-  }) =>
-      calcularAlturaCompacta(topPadding) +
-      _alturaBloqueSaludo(textScaler, conNombre);
-
   @override
   Widget build(BuildContext context) {
     final saludo = _saludo();
-    final nombreUsuario = _nombreUsuarioActual(casa);
+    final nombreUsuario = nombreUsuarioActualEnCasa(casa);
     final recorrido = alturaExpandida - alturaCompacta;
     final alturaBloque = recorrido;
 
@@ -779,9 +800,7 @@ class _CabeceraNavy extends StatelessWidget {
         final offset = scroll.hasClients ? scroll.offset : 0.0;
         // t = 0 → expandida, t = 1 → compacta. El rebote hacia abajo
         // (offset negativo) la deja expandida, sin estirarla.
-        final t = recorrido <= 0
-            ? 1.0
-            : (offset / recorrido).clamp(0.0, 1.0);
+        final t = recorrido <= 0 ? 1.0 : (offset / recorrido).clamp(0.0, 1.0);
         // El texto se va antes de que la cabecera acabe de encogerse, para
         // que nunca se vea aplastado.
         final opacidadSaludo = (1 - t * 1.8).clamp(0.0, 1.0);
@@ -802,23 +821,22 @@ class _CabeceraNavy extends StatelessWidget {
             ? Color.lerp(context.colors.brandStrong, context.colors.brand, 0.3)!
             : context.colors.brand;
 
+        // El velo pasa de translúcido (foto visible) a opaco (azul liso,
+        // igual que antes de añadir la foto) a medida que se compacta.
+        final alphaVeloArriba = 0.35 + 0.65 * t;
+        final alphaVeloAbajo = 0.75 + 0.25 * t;
+        final radioInferior = Radius.circular(28 * (1 - t));
+
         return Container(
           width: double.infinity,
           height: alturaExpandida - recorrido * t,
-          padding: EdgeInsets.only(top: topPadding),
+          // La sombra vive en este Container exterior, sin recortar -- un
+          // ClipRRect puesto encima la recortaría por completo. El
+          // redondeado de abajo se repite aquí (mismo valor) solo para que
+          // la sombra se vea con la misma forma que el contenido recortado
+          // de dentro.
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Color.lerp(context.colors.brandStrong, colorBarra, t)!,
-                Color.lerp(finDegradado, colorBarra, t)!,
-              ],
-            ),
-            borderRadius: BorderRadius.vertical(
-              bottom: Radius.circular(28 * (1 - t)),
-            ),
-            // Sombra suave solo cuando el listado ya pasa por debajo.
+            borderRadius: BorderRadius.vertical(bottom: radioInferior),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.15 * t),
@@ -827,142 +845,209 @@ class _CabeceraNavy extends StatelessWidget {
               ),
             ],
           ),
-          child: Column(
-            children: [
-              // Fila de iconos: siempre visible, con "Inicio" centrado
-              // cuando está compacta.
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 12, 0),
-                child: SizedBox(
-                  height: _alturaFilaIconos,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      ExcludeSemantics(
-                        excluding: opacidadTitulo == 0,
-                        child: Opacity(
-                          opacity: opacidadTitulo,
-                          child: Text(
-                            'Inicio',
-                            style: Theme.of(context).textTheme.titleLarge
-                                ?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                          ),
-                        ),
-                      ),
-                      Row(
-                        children: [
-                          Container(
-                            width: 34,
-                            height: 34,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.16),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(
-                              Icons.home_rounded,
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                          ),
-                          const Spacer(),
-                          IconTheme.merge(
-                            data: const IconThemeData(color: Colors.white),
-                            child: BotonNotificaciones(
-                              modoPro: false,
-                              casa: casa,
-                            ),
-                          ),
-                          IconTheme.merge(
-                            data: const IconThemeData(color: Colors.white),
-                            child: BotonAjustes(casa: casa),
-                          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.vertical(bottom: radioInferior),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Image.asset(
+                  fondoCabeceraInicio,
+                  fit: BoxFit.cover,
+                  // Degradado de marca de toda la vida si el recurso no está
+                  // disponible (p.ej. el monolito de desarrollo, que no
+                  // empaqueta esta foto) -- nunca una pantalla rota.
+                  errorBuilder: (context, error, stackTrace) => DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Color.lerp(
+                            context.colors.brandStrong,
+                            colorBarra,
+                            t,
+                          )!,
+                          Color.lerp(finDegradado, colorBarra, t)!,
                         ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              // Saludo + confianza: se encoge, sube y se desvanece.
-              Expanded(
-                child: ClipRect(
-                  child: OverflowBox(
-                    alignment: Alignment.topLeft,
-                    minHeight: alturaBloque,
-                    maxHeight: alturaBloque,
-                    child: ExcludeSemantics(
-                      excluding: opacidadSaludo == 0,
-                      child: Opacity(
-                        opacity: opacidadSaludo,
-                        child: Transform.translate(
-                          offset: Offset(0, -16 * t),
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 6, 12, 20),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  nombreUsuario != null &&
-                                          nombreUsuario.isNotEmpty
-                                      ? '$saludo,'
-                                      : saludo,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                if (nombreUsuario != null &&
-                                    nombreUsuario.isNotEmpty)
-                                  Text(
-                                    nombreUsuario,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                const SizedBox(height: 10),
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Icons.home_outlined,
-                                      size: 15,
-                                      color: Colors.white.withValues(
-                                        alpha: 0.85,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Flexible(
-                                      child: Text(
-                                        casa.nombre,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: Colors.white.withValues(
-                                            alpha: 0.85,
-                                          ),
-                                          fontSize: 12.5,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color.lerp(
+                          context.colors.brandStrong,
+                          colorBarra,
+                          t,
+                        )!.withValues(alpha: alphaVeloArriba),
+                        Color.lerp(
+                          finDegradado,
+                          colorBarra,
+                          t,
+                        )!.withValues(alpha: alphaVeloAbajo),
+                      ],
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: EdgeInsets.only(top: topPadding),
+                  child: Column(
+                    children: [
+                      // Fila de iconos: siempre visible, con "Inicio" centrado
+                      // cuando está compacta.
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 12, 0),
+                        child: SizedBox(
+                          height: alturaFilaIconosCabecera,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              ExcludeSemantics(
+                                excluding: opacidadTitulo == 0,
+                                child: Opacity(
+                                  opacity: opacidadTitulo,
+                                  child: Text(
+                                    'Inicio',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.copyWith(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                  ),
+                                ),
+                              ),
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 34,
+                                    height: 34,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.16,
+                                      ),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Icon(
+                                      Icons.home_rounded,
+                                      color: Colors.white,
+                                      size: 18,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  IconTheme.merge(
+                                    data: const IconThemeData(
+                                      color: Colors.white,
+                                    ),
+                                    child: BotonNotificaciones(
+                                      modoPro: false,
+                                      casa: casa,
+                                    ),
+                                  ),
+                                  IconTheme.merge(
+                                    data: const IconThemeData(
+                                      color: Colors.white,
+                                    ),
+                                    child: BotonAjustes(casa: casa),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      // Saludo + confianza: se encoge, sube y se desvanece.
+                      Expanded(
+                        child: ClipRect(
+                          child: OverflowBox(
+                            alignment: Alignment.topLeft,
+                            minHeight: alturaBloque,
+                            maxHeight: alturaBloque,
+                            child: ExcludeSemantics(
+                              excluding: opacidadSaludo == 0,
+                              child: Opacity(
+                                opacity: opacidadSaludo,
+                                child: Transform.translate(
+                                  offset: Offset(0, -16 * t),
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      16,
+                                      6,
+                                      12,
+                                      20,
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          nombreUsuario != null &&
+                                                  nombreUsuario.isNotEmpty
+                                              ? '$saludo,'
+                                              : saludo,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        if (nombreUsuario != null &&
+                                            nombreUsuario.isNotEmpty)
+                                          Text(
+                                            nombreUsuario,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 22,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        const SizedBox(height: 10),
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              Icons.home_outlined,
+                                              size: 15,
+                                              color: Colors.white.withValues(
+                                                alpha: 0.85,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Flexible(
+                                              child: Text(
+                                                casa.nombre,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  color: Colors.white
+                                                      .withValues(alpha: 0.85),
+                                                  fontSize: 12.5,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
