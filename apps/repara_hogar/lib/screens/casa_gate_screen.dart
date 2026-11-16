@@ -92,7 +92,7 @@ class _TransicionFotoCabeceraState extends State<_TransicionFotoCabecera>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 1100),
       vsync: this,
     );
     // ~580 ms encogiendo, ~220 ms de fundido final.
