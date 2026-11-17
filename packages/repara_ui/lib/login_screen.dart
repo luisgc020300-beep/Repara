@@ -9,7 +9,11 @@ import 'package:repara_core/analytics_service.dart';
 import 'package:repara_core/design_tokens.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({this.backgroundImageAsset, this.backgroundImageAssetDark, super.key});
+  const LoginScreen({
+    this.backgroundImageAsset,
+    this.backgroundImageAssetDark,
+    super.key,
+  });
 
   /// Fondo fotográfico a pantalla completa (pedido solo para REPARA Hogar,
   /// noviembre 2026) -- opcional y `null` por defecto para no tocar el
@@ -78,56 +82,76 @@ class _LoginScreenState extends State<LoginScreen> {
     final fondo = esOscuro
         ? (widget.backgroundImageAssetDark ?? widget.backgroundImageAsset)
         : widget.backgroundImageAsset;
-    return fondo == null ? _buildSinFondo(context) : _buildConFondo(context, fondo);
+    return fondo == null
+        ? _buildSinFondo(context)
+        : _buildConFondo(context, fondo);
   }
 
   // Lista de campos del formulario, compartida tal cual por los dos diseños
   // -- misma lógica de autenticación, mismos controllers/validators, solo
   // cambia cómo se pintan alrededor.
   List<Widget> _camposFormulario() => [
-        AutofillGroup(
-          child: Column(
-            children: [
-              TextFormField(
-                controller: _emailCtrl,
-                keyboardType: TextInputType.emailAddress,
-                autofillHints: const [AutofillHints.email],
-                decoration: const InputDecoration(labelText: 'Correo', prefixIcon: Icon(Icons.mail_outline)),
-                validator: (v) => (v == null || !v.contains('@')) ? 'Correo no válido' : null,
-              ),
-              const SizedBox(height: ReparaSpace.s3),
-              TextFormField(
-                controller: _passCtrl,
-                obscureText: true,
-                autofillHints: [_esRegistro ? AutofillHints.newPassword : AutofillHints.password],
-                decoration: const InputDecoration(labelText: 'Contraseña', prefixIcon: Icon(Icons.lock_outline)),
-                validator: (v) => (v == null || v.length < 6) ? 'Mínimo 6 caracteres' : null,
-              ),
-            ],
+    AutofillGroup(
+      child: Column(
+        children: [
+          TextFormField(
+            controller: _emailCtrl,
+            keyboardType: TextInputType.emailAddress,
+            autofillHints: const [AutofillHints.email],
+            decoration: const InputDecoration(
+              labelText: 'Correo',
+              prefixIcon: Icon(Icons.mail_outline),
+            ),
+            validator: (v) =>
+                (v == null || !v.contains('@')) ? 'Correo no válido' : null,
           ),
-        ),
-        if (_error != null) ...[
           const SizedBox(height: ReparaSpace.s3),
-          Row(
-            children: [
-              Icon(Icons.error_outline, size: 18, color: context.colors.error),
-              const SizedBox(width: ReparaSpace.s2),
-              Expanded(child: Text(_error!, style: TextStyle(color: context.colors.errorText))),
+          TextFormField(
+            controller: _passCtrl,
+            obscureText: true,
+            autofillHints: [
+              _esRegistro ? AutofillHints.newPassword : AutofillHints.password,
             ],
+            decoration: const InputDecoration(
+              labelText: 'Contraseña',
+              prefixIcon: Icon(Icons.lock_outline),
+            ),
+            validator: (v) =>
+                (v == null || v.length < 6) ? 'Mínimo 6 caracteres' : null,
           ),
         ],
-        const SizedBox(height: ReparaSpace.s5),
-        FilledButton(
-          onPressed: _cargando ? null : _enviar,
-          child: _cargando
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                )
-              : Text(_esRegistro ? 'Crear cuenta' : 'Entrar'),
-        ),
-      ];
+      ),
+    ),
+    if (_error != null) ...[
+      const SizedBox(height: ReparaSpace.s3),
+      Row(
+        children: [
+          Icon(Icons.error_outline, size: 18, color: context.colors.error),
+          const SizedBox(width: ReparaSpace.s2),
+          Expanded(
+            child: Text(
+              _error!,
+              style: TextStyle(color: context.colors.errorText),
+            ),
+          ),
+        ],
+      ),
+    ],
+    const SizedBox(height: ReparaSpace.s5),
+    FilledButton(
+      onPressed: _cargando ? null : _enviar,
+      child: _cargando
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Colors.white,
+              ),
+            )
+          : Text(_esRegistro ? 'Crear cuenta' : 'Entrar'),
+    ),
+  ];
 
   // Diseño original, sin fondo fotográfico -- intacto, es lo que siguen
   // viendo REPARA Pro y el monolito (llaman a LoginScreen() sin parámetro).
@@ -146,7 +170,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   Center(
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(ReparaRadius.md),
-                      child: Image.asset('assets/icon/app_icon.png', width: 88, height: 88),
+                      child: Image.asset(
+                        'assets/icon/app_icon.png',
+                        width: 88,
+                        height: 88,
+                      ),
                     ),
                   ),
                   const SizedBox(height: ReparaSpace.s5),
@@ -165,8 +193,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   ..._camposFormulario(),
                   const SizedBox(height: ReparaSpace.s2),
                   TextButton(
-                    onPressed: _cargando ? null : () => setState(() => _esRegistro = !_esRegistro),
-                    child: Text(_esRegistro ? '¿Ya tienes cuenta? Entra' : '¿No tienes cuenta? Regístrate'),
+                    onPressed: _cargando
+                        ? null
+                        : () => setState(() => _esRegistro = !_esRegistro),
+                    child: Text(
+                      _esRegistro
+                          ? '¿Ya tienes cuenta? Entra'
+                          : '¿No tienes cuenta? Regístrate',
+                    ),
                   ),
                 ],
               ),
@@ -203,19 +237,32 @@ class _LoginScreenState extends State<LoginScreen> {
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [context.colors.brand, context.colors.ink],
+                  colors: [context.colors.brand, context.colors.brandStrong],
                 ),
               ),
             ),
           ),
+          // Velo azul (pulido visual, noviembre 2026) -- siempre
+          // `brandStrong`, nunca `ink`: `ink` es el color de TEXTO (en modo
+          // oscuro es casi blanco, pensado para leerse sobre fondos oscuros,
+          // no para pintar un velo), mientras que `brandStrong` es azul de
+          // marca en los dos temas (más oscuro en claro, algo más claro en
+          // oscuro) -- el tono "coherente con la paleta de cada tema" que
+          // pide el encargo. La foto de día (clara, cielo despejado) necesita
+          // más velo para que el texto blanco siga siendo legible; la de
+          // noche ya es oscura de por sí, así que lleva menos.
           DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  context.colors.ink.withValues(alpha: esOscuro ? 0.55 : 0.35),
-                  context.colors.ink.withValues(alpha: 0.9),
+                  context.colors.brandStrong.withValues(
+                    alpha: esOscuro ? 0.12 : 0.22,
+                  ),
+                  context.colors.brandStrong.withValues(
+                    alpha: esOscuro ? 0.62 : 0.82,
+                  ),
                 ],
                 stops: const [0.0, 1.0],
               ),
@@ -234,28 +281,44 @@ class _LoginScreenState extends State<LoginScreen> {
                       Center(
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(ReparaRadius.md),
-                          child: Image.asset('assets/icon/app_icon.png', width: 88, height: 88),
+                          child: Image.asset(
+                            'assets/icon/app_icon.png',
+                            width: 88,
+                            height: 88,
+                          ),
                         ),
                       ),
                       const SizedBox(height: ReparaSpace.s5),
                       Text(
                         'Repara Hogar',
                         textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.displaySmall?.copyWith(color: Colors.white),
+                        style: Theme.of(
+                          context,
+                        ).textTheme.displaySmall?.copyWith(color: Colors.white),
                       ),
                       const SizedBox(height: ReparaSpace.s2),
                       Text(
                         'Tu hogar, siempre bajo control.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.85)),
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.85),
+                        ),
                       ),
                       const SizedBox(height: ReparaSpace.s8),
                       ..._camposFormulario(),
                       const SizedBox(height: ReparaSpace.s2),
                       TextButton(
-                        onPressed: _cargando ? null : () => setState(() => _esRegistro = !_esRegistro),
-                        style: TextButton.styleFrom(foregroundColor: Colors.white),
-                        child: Text(_esRegistro ? '¿Ya tienes cuenta? Entra' : '¿No tienes cuenta? Regístrate'),
+                        onPressed: _cargando
+                            ? null
+                            : () => setState(() => _esRegistro = !_esRegistro),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.white,
+                        ),
+                        child: Text(
+                          _esRegistro
+                              ? '¿Ya tienes cuenta? Entra'
+                              : '¿No tienes cuenta? Regístrate',
+                        ),
                       ),
                     ],
                   ),
