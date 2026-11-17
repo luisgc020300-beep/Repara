@@ -747,6 +747,18 @@ double alturaCabeceraExpandida({
 // (_TransicionFotoCabecera en casa_gate_screen.dart).
 const String fondoCabeceraInicio = 'assets/images/login_background.jpg';
 
+// Versión nocturna de la misma foto para modo oscuro (noviembre 2026) --
+// también es la que usa el login en oscuro (main.dart).
+const String fondoCabeceraInicioOscuro = 'assets/images/login_background_dark.png';
+
+/// Foto de la cabecera según el tema -- la misma regla que el login, así la
+/// transición de casa_gate_screen.dart sigue arrancando con la foto exacta
+/// que se veía en el login, tanto en claro como en oscuro.
+String fondoCabeceraSegunTema(BuildContext context) =>
+    Theme.of(context).brightness == Brightness.dark
+        ? fondoCabeceraInicioOscuro
+        : fondoCabeceraInicio;
+
 /// Cabecera de Inicio (rediseño visual, noviembre 2026, sobre una
 /// referencia concreta) -- se superpone al ListView (ver HomeTab.build) y
 /// se compacta con su scroll: expandida muestra marca + notificaciones +
@@ -850,8 +862,9 @@ class _CabeceraNavy extends StatelessWidget {
               fit: StackFit.expand,
               children: [
                 Image.asset(
-                  fondoCabeceraInicio,
+                  fondoCabeceraSegunTema(context),
                   fit: BoxFit.cover,
+                  gaplessPlayback: true,
                   // Degradado de marca de toda la vida si el recurso no está
                   // disponible (p.ej. el monolito de desarrollo, que no
                   // empaqueta esta foto) -- nunca una pantalla rota.

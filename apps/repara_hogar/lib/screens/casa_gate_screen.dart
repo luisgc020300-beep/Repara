@@ -16,7 +16,7 @@ import 'casa_shell_screen.dart';
 import 'home_tab.dart'
     show
         alturaCabeceraExpandida,
-        fondoCabeceraInicio,
+        fondoCabeceraSegunTema,
         nombreUsuarioActualEnCasa;
 import 'onboarding_casa_screen.dart';
 
@@ -92,7 +92,7 @@ class _TransicionFotoCabeceraState extends State<_TransicionFotoCabecera>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 1100),
+      duration: const Duration(milliseconds: 800),
       vsync: this,
     );
     // ~580 ms encogiendo, ~220 ms de fundido final.
@@ -202,8 +202,9 @@ class _TransicionFotoCabeceraState extends State<_TransicionFotoCabecera>
                   fit: StackFit.expand,
                   children: [
                     Image.asset(
-                      fondoCabeceraInicio,
+                      fondoCabeceraSegunTema(context),
                       fit: BoxFit.cover,
+                      gaplessPlayback: true,
                       errorBuilder: (context, error, stackTrace) =>
                           DecoratedBox(
                             decoration: BoxDecoration(

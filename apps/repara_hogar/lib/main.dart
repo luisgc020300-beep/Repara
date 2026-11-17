@@ -146,7 +146,10 @@ class ReparaHogarApp extends StatelessWidget {
               return const Scaffold(body: Center(child: CircularProgressIndicator()));
             }
             if (snapshot.hasData) return const CasaGateScreen();
-            return const LoginScreen(backgroundImageAsset: 'assets/images/login_background.jpg');
+            return const LoginScreen(
+              backgroundImageAsset: 'assets/images/login_background.jpg',
+              backgroundImageAssetDark: 'assets/images/login_background_dark.png',
+            );
           },
         ),
       ),

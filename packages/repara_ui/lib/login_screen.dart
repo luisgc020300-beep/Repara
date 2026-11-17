@@ -9,7 +9,7 @@ import 'package:repara_core/analytics_service.dart';
 import 'package:repara_core/design_tokens.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({this.backgroundImageAsset, super.key});
+  const LoginScreen({this.backgroundImageAsset, this.backgroundImageAssetDark, super.key});
 
   /// Fondo fotográfico a pantalla completa (pedido solo para REPARA Hogar,
   /// noviembre 2026) -- opcional y `null` por defecto para no tocar el
@@ -17,6 +17,10 @@ class LoginScreen extends StatefulWidget {
   /// `LoginScreen()` sin este parámetro y ven exactamente el mismo diseño
   /// plano de siempre.
   final String? backgroundImageAsset;
+
+  /// Foto de fondo para modo oscuro (REPARA Hogar, noviembre 2026). Si es
+  /// `null`, en modo oscuro se usa la misma que en claro.
+  final String? backgroundImageAssetDark;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -70,9 +74,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return widget.backgroundImageAsset == null
-        ? _buildSinFondo(context)
-        : _buildConFondo(context, widget.backgroundImageAsset!);
+    final esOscuro = Theme.of(context).brightness == Brightness.dark;
+    final fondo = esOscuro
+        ? (widget.backgroundImageAssetDark ?? widget.backgroundImageAsset)
+        : widget.backgroundImageAsset;
+    return fondo == null ? _buildSinFondo(context) : _buildConFondo(context, fondo);
   }
 
   // Lista de campos del formulario, compartida tal cual por los dos diseños
@@ -186,6 +192,8 @@ class _LoginScreenState extends State<LoginScreen> {
           Image.asset(
             fondo,
             fit: BoxFit.cover,
+            // Sin parpadeo en blanco si se cambia de tema con la pantalla abierta.
+            gaplessPlayback: true,
             // Si el recurso no está disponible (p.ej. todavía no se ha
             // añadido en un fork/checkout concreto), la pantalla sigue
             // siendo utilizable con un degradado de marca en vez de
