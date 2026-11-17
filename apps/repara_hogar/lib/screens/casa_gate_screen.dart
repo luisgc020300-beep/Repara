@@ -16,7 +16,9 @@ import 'casa_shell_screen.dart';
 import 'home_tab.dart'
     show
         alturaCabeceraExpandida,
+        coloresVeloCabecera,
         fondoCabeceraSegunTema,
+        paradasVeloCabecera,
         nombreUsuarioActualEnCasa;
 import 'onboarding_casa_screen.dart';
 
@@ -233,17 +235,16 @@ class _TransicionFotoCabeceraState extends State<_TransicionFotoCabecera>
                         ),
                       ),
                     ),
-                    // ...mientras aparece el velo azul de _CabeceraNavy
-                    // expandida (t = 0 allí: 0.35 / 0.75).
+                    // ...mientras aparece el velo de _CabeceraNavy expandida
+                    // (mismas funciones de home_tab.dart, así el último
+                    // fotograma es idéntico a la cabecera real).
                     DecoratedBox(
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            brandStrong.withValues(alpha: 0.35 * e),
-                            brand.withValues(alpha: 0.75 * e),
-                          ],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: coloresVeloCabecera(context, e),
+                          stops: paradasVeloCabecera,
                         ),
                       ),
                     ),

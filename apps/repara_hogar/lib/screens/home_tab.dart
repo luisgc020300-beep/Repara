@@ -759,6 +759,23 @@ String fondoCabeceraSegunTema(BuildContext context) =>
         ? fondoCabeceraInicioOscuro
         : fondoCabeceraInicio;
 
+/// Velo sobre la foto de la cabecera (noviembre 2026): degradado VERTICAL y
+/// en negro neutro, en vez del azul diagonal de antes -- el azul "lavaba" la
+/// foto de día (CEO: "la del modo claro se ve más opaca"). Algo oscuro arriba
+/// para que se lean la hora y los iconos, casi transparente en el centro para
+/// que se vea la casa, y más oscuro abajo, donde va el saludo. La foto de día
+/// es más luminosa y necesita un poco más de velo que la de noche.
+/// [intensidad] va de 0 (sin velo) a 1 (velo completo de la cabecera
+/// expandida) -- la transición de casa_gate_screen.dart lo sube de 0 a 1 y
+/// termina exactamente igual que la cabecera real.
+const List<double> paradasVeloCabecera = [0.0, 0.45, 1.0];
+
+List<Color> coloresVeloCabecera(BuildContext context, double intensidad) {
+  final oscuro = Theme.of(context).brightness == Brightness.dark;
+  final alphas = oscuro ? const [0.30, 0.05, 0.60] : const [0.35, 0.10, 0.62];
+  return [for (final a in alphas) Colors.black.withValues(alpha: a * intensidad)];
+}
+
 /// Cabecera de Inicio (rediseño visual, noviembre 2026, sobre una
 /// referencia concreta) -- se superpone al ListView (ver HomeTab.build) y
 /// se compacta con su scroll: expandida muestra marca + notificaciones +
@@ -777,11 +794,10 @@ String fondoCabeceraSegunTema(BuildContext context) =>
 /// -- antes había aquí un mensaje de confianza fijo sin dato real detrás).
 ///
 /// Fondo fotográfico (noviembre 2026, "la foto del login vuela hasta la
-/// cabecera"): la foto se ve con el degradado de arriba como un velo
-/// TRANSLÚCIDO mientras está expandida, y ese velo se vuelve opaco a
-/// medida que se compacta -- así el estado compacto sigue siendo el mismo
-/// azul liso de siempre, idéntico al AppBar de Casa (el requisito que ya
-/// exigía el comentario de arriba), y la foto solo asoma arriba del todo.
+/// cabecera"): expandida, la foto se ve con un velo negro vertical suave
+/// (coloresVeloCabecera); al compactarse, una capa del azul de la barra va
+/// tapándola hasta quedar el mismo azul liso de siempre, idéntico al AppBar
+/// de Casa (el requisito que ya exigía el comentario de arriba).
 class _CabeceraNavy extends StatelessWidget {
   const _CabeceraNavy({
     required this.casa,
@@ -831,10 +847,9 @@ class _CabeceraNavy extends StatelessWidget {
             ? Color.lerp(context.colors.brandStrong, context.colors.brand, 0.3)!
             : context.colors.brand;
 
-        // El velo pasa de translúcido (foto visible) a opaco (azul liso,
-        // igual que antes de añadir la foto) a medida que se compacta.
-        final alphaVeloArriba = 0.35 + 0.65 * t;
-        final alphaVeloAbajo = 0.75 + 0.25 * t;
+        // Encima del velo negro, una capa del azul de la barra que va de
+        // invisible (expandida, foto a la vista) a opaca (compacta: el mismo
+        // azul liso de siempre, idéntico al AppBar de Casa).
 
         final radioInferior = Radius.circular(28 * (1 - t));
 
@@ -888,23 +903,14 @@ class _CabeceraNavy extends StatelessWidget {
                 DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Color.lerp(
-                          context.colors.brandStrong,
-                          colorBarra,
-                          t,
-                        )!.withValues(alpha: alphaVeloArriba),
-                        Color.lerp(
-                          finDegradado,
-                          colorBarra,
-                          t,
-                        )!.withValues(alpha: alphaVeloAbajo),
-                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: coloresVeloCabecera(context, 1),
+                      stops: paradasVeloCabecera,
                     ),
                   ),
                 ),
+                ColoredBox(color: colorBarra.withValues(alpha: t)),
                 Padding(
                   padding: EdgeInsets.only(top: topPadding),
                   child: Column(
