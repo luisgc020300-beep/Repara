@@ -21,6 +21,28 @@ import 'app_dialog.dart';
 import 'app_error.dart';
 import 'ios_list.dart';
 
+/// Cierra sesión con la misma confirmación que ya usaba esta pantalla --
+/// reutilizada también desde el menú principal de Ajustes (noviembre 2026,
+/// rediseño de Ajustes) para que "Cerrar sesión" esté accesible sin tener
+/// que entrar primero en "Tu cuenta". Mismo diálogo, mismo signOut(), misma
+/// limpieza previa opcional -- ningún cambio de comportamiento, solo un
+/// único sitio del que depender.
+Future<void> confirmarYCerrarSesion(
+  BuildContext context, {
+  Future<void> Function()? antesDeCerrarSesion,
+}) async {
+  final confirmar = await AppDialog.confirm(
+    context,
+    title: '¿Cerrar sesión?',
+    confirmLabel: 'Cerrar sesión',
+  );
+  if (!confirmar) return;
+  await antesDeCerrarSesion?.call();
+  await FirebaseAuth.instance.signOut();
+  if (!context.mounted) return;
+  Navigator.of(context).popUntil((route) => route.isFirst);
+}
+
 class CuentaScreen extends StatefulWidget {
   const CuentaScreen({
     required this.eliminarCuentaMensaje,
@@ -45,18 +67,10 @@ class _CuentaScreenState extends State<CuentaScreen> {
   bool _eliminandoCuenta = false;
   bool _cerrandoTodo = false;
 
-  Future<void> _confirmarCerrarSesion() async {
-    final confirmar = await AppDialog.confirm(
-      context,
-      title: '¿Cerrar sesión?',
-      confirmLabel: 'Cerrar sesión',
-    );
-    if (!confirmar) return;
-    await widget.antesDeCerrarSesion?.call();
-    await FirebaseAuth.instance.signOut();
-    if (!mounted) return;
-    Navigator.of(context).popUntil((route) => route.isFirst);
-  }
+  Future<void> _confirmarCerrarSesion() => confirmarYCerrarSesion(
+    context,
+    antesDeCerrarSesion: widget.antesDeCerrarSesion,
+  );
 
   Future<void> _confirmarCerrarSesionEnTodosLosDispositivos() async {
     final confirmar = await AppDialog.confirm(
@@ -78,7 +92,10 @@ class _CuentaScreenState extends State<CuentaScreen> {
     } catch (e, st) {
       await FirebaseCrashlytics.instance.recordError(e, st);
       if (mounted) {
-        AppError.show(context, 'No se pudo cerrar la sesión en todos los dispositivos.');
+        AppError.show(
+          context,
+          'No se pudo cerrar la sesión en todos los dispositivos.',
+        );
       }
     } finally {
       if (mounted) setState(() => _cerrandoTodo = false);
@@ -105,10 +122,17 @@ class _CuentaScreenState extends State<CuentaScreen> {
       if (e.code != 'failed-precondition') {
         await FirebaseCrashlytics.instance.recordError(e, st);
       }
-      if (mounted) AppError.show(context, e.message ?? 'No se pudo eliminar la cuenta.');
+      if (mounted) {
+        AppError.show(context, e.message ?? 'No se pudo eliminar la cuenta.');
+      }
     } catch (e, st) {
       await FirebaseCrashlytics.instance.recordError(e, st);
-      if (mounted) AppError.show(context, 'No se pudo eliminar la cuenta. Inténtalo de nuevo.');
+      if (mounted) {
+        AppError.show(
+          context,
+          'No se pudo eliminar la cuenta. Inténtalo de nuevo.',
+        );
+      }
     } finally {
       if (mounted) setState(() => _eliminandoCuenta = false);
     }
@@ -139,13 +163,17 @@ class _CuentaScreenState extends State<CuentaScreen> {
               IosRow(
                 icon: Icons.person_outline,
                 iconColor: context.colors.brand,
-                title: user?.displayName?.isNotEmpty == true ? user!.displayName! : 'Tu perfil',
+                title: user?.displayName?.isNotEmpty == true
+                    ? user!.displayName!
+                    : 'Tu perfil',
                 subtitle: user?.email,
                 showChevron: false,
                 trailing: CircleAvatar(
                   radius: 16,
                   backgroundColor: context.colors.brandStrong,
-                  backgroundImage: user?.photoURL != null ? NetworkImage(user!.photoURL!) : null,
+                  backgroundImage: user?.photoURL != null
+                      ? NetworkImage(user!.photoURL!)
+                      : null,
                   child: user?.photoURL == null
                       ? Text(
                           _iniciales(user),
@@ -180,10 +208,15 @@ class _CuentaScreenState extends State<CuentaScreen> {
                     ? SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: context.colors.errorText),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: context.colors.errorText,
+                        ),
                       )
                     : null,
-                onTap: _cerrandoTodo ? null : _confirmarCerrarSesionEnTodosLosDispositivos,
+                onTap: _cerrandoTodo
+                    ? null
+                    : _confirmarCerrarSesionEnTodosLosDispositivos,
               ),
             ],
           ),
@@ -199,7 +232,10 @@ class _CuentaScreenState extends State<CuentaScreen> {
                     ? SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: context.colors.errorText),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: context.colors.errorText,
+                        ),
                       )
                     : null,
                 onTap: _eliminandoCuenta ? null : _confirmarEliminarCuenta,
