@@ -120,3 +120,44 @@ test('6. el flujo de código abierto (sin cuenta previa) también vincula el con
   const contactoSnap = await db.collection('casas').doc(casaId).collection('contactos').doc(contactoId).get();
   assert.equal(contactoSnap.data().profesionalUidVinculado, pro.uid);
 });
+
+// Corrección de seguridad (revisión automática, noviembre 2026): la
+// comprobación de existencia del contacto se hacía ANTES de comprobar que
+// quien llama pertenece a la casa -- un no-miembro podía usar la
+// diferencia entre "not-found" y el resto de errores para averiguar si un
+// contactoId concreto existe en una casa ajena. Ahora, un no-miembro
+// recibe siempre "permission-denied", sin filtrar nada sobre el contacto.
+test('7. un no-miembro recibe permission-denied, nunca información sobre si el contacto existe', async () => {
+  const owner = await crearUsuario();
+  const intruso = await crearUsuario();
+  const pro = await crearUsuario();
+  await marcarComoProfesional(pro.uid);
+  const { casaId, elementoId, registroId } = await sembrarRegistro({ ownerUid: owner.uid, estado: 'nuevo' });
+  const contactoReal = await crearContacto(casaId);
+
+  // Con un contactoId que SÍ existe en esa casa...
+  const { error: e1 } = await llamar('invitarProfesional', intruso.idToken, {
+    casaId, elementoId, registroId, profesionalUidDirecto: pro.uid, contactoId: contactoReal,
+  });
+  assert.equal(e1?.status, 'PERMISSION_DENIED');
+
+  // ...y con uno que no existe, el error debe ser exactamente el mismo --
+  // nunca NOT_FOUND, que delataría cuál de los dos casos es.
+  const { error: e2 } = await llamar('invitarProfesional', intruso.idToken, {
+    casaId, elementoId, registroId, profesionalUidDirecto: pro.uid, contactoId: 'no-existe-tampoco',
+  });
+  assert.equal(e2?.status, 'PERMISSION_DENIED');
+});
+
+test('8. un contactoId con "/" se ignora (nunca se interpreta como una ruta) y la invitación sigue sin vincular nada', async () => {
+  const owner = await crearUsuario();
+  const pro = await crearUsuario();
+  await marcarComoProfesional(pro.uid);
+  const { casaId, elementoId, registroId } = await sembrarRegistro({ ownerUid: owner.uid, estado: 'nuevo' });
+
+  const { error, result } = await llamar('invitarProfesional', owner.idToken, {
+    casaId, elementoId, registroId, profesionalUidDirecto: pro.uid, contactoId: 'algo/con/barras',
+  });
+  assert.equal(error, undefined);
+  assert.equal(result.tipo, 'directa');
+});

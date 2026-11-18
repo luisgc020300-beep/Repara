@@ -457,11 +457,13 @@ exports.invitarProfesional = onCall({ region: REGION }, async (request) => {
   // profesional real -- la única forma fiable de saber "este contacto de
   // teléfono es esta cuenta de Repara" sin confiar en una coincidencia de
   // texto (ver contactos/{ctid}.profesionalUidVinculado en firestore.rules).
-  const contactoIdLimpio = typeof contactoId === 'string' && contactoId.trim() ? contactoId.trim() : null;
-  if (contactoIdLimpio) {
-    const contactoSnap = await db.collection('casas').doc(casaId).collection('contactos').doc(contactoIdLimpio).get();
-    if (!contactoSnap.exists) throw new HttpsError('not-found', 'Ese contacto ya no existe.');
-  }
+  // Nunca un id con '/' -- .doc() de Firestore interpreta las barras como
+  // segmentos de ruta, así que sin esto un contactoId manipulado podría
+  // apuntar a un documento distinto del esperado dentro de este mismo
+  // árbol de la casa.
+  const contactoIdLimpio = typeof contactoId === 'string' && contactoId.trim() && !contactoId.includes('/')
+    ? contactoId.trim()
+    : null;
   // uidDirecto (Cercanos, noviembre 2026): cuando la invitación nace de un
   // resultado de búsqueda de profesionales cercanos, el cliente ya conoce un
   // uid de confianza (lo devolvió buscarProfesionalesCercanos, nunca el
@@ -480,6 +482,14 @@ exports.invitarProfesional = onCall({ region: REGION }, async (request) => {
   const [casaSnap, registroSnap, elementoSnap] = await Promise.all([casaRef.get(), regRef.get(), elementoRef.get()]);
   if (!casaSnap.exists || !(casaSnap.data().members || []).includes(propietarioUid)) {
     throw new HttpsError('permission-denied', 'No perteneces a esa casa.');
+  }
+  // Comprobación del contacto DESPUÉS de confirmar pertenencia a la casa
+  // (revisión de seguridad automática, noviembre 2026) -- antes se
+  // comprobaba antes, lo que dejaba a alguien ajeno a la casa averiguar si
+  // un contactoId concreto existe en ella sin necesitar ser miembro.
+  if (contactoIdLimpio) {
+    const contactoSnap = await db.collection('casas').doc(casaId).collection('contactos').doc(contactoIdLimpio).get();
+    if (!contactoSnap.exists) throw new HttpsError('not-found', 'Ese contacto ya no existe.');
   }
   if (!registroSnap.exists) throw new HttpsError('not-found', 'El registro no existe.');
   const registro = registroSnap.data();
