@@ -25,7 +25,6 @@ import 'package:repara_ui/app_error.dart';
 import '../widgets/boton_ajustes.dart';
 import '../widgets/boton_notificaciones.dart';
 import 'package:repara_ui/ios_list.dart';
-import 'package:repara_ui/scroll_to_top_button.dart';
 import 'elemento_detail_screen.dart';
 import 'garantias_proximas_screen.dart';
 import 'menu_anadir.dart';
@@ -310,8 +309,6 @@ class _HomeTabState extends State<HomeTab> {
                 alturaCompacta: alturaCompacta,
               ),
             ),
-            // A la izquierda -- a la derecha ya vive "Añadir elemento".
-            ScrollToTopButton(scrollController: _scrollCtrl, left: 16),
           ],
         ),
       ),
@@ -948,19 +945,32 @@ class _CabeceraNavy extends StatelessWidget {
                               ),
                               Row(
                                 children: [
-                                  Container(
-                                    width: 34,
-                                    height: 34,
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.16,
-                                      ),
+                                  // Doble función (CEO, noviembre 2026): el
+                                  // icono de casa de la cabecera, que ya
+                                  // estaba ahí, es también el acceso para
+                                  // volver arriba del todo -- no un botón
+                                  // flotante nuevo encima del listado.
+                                  Material(
+                                    color: Colors.white.withValues(alpha: 0.16),
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: InkWell(
                                       borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: const Icon(
-                                      Icons.home_rounded,
-                                      color: Colors.white,
-                                      size: 18,
+                                      onTap: () => scroll.animateTo(
+                                        0,
+                                        duration: const Duration(
+                                          milliseconds: 350,
+                                        ),
+                                        curve: Curves.easeOutCubic,
+                                      ),
+                                      child: const SizedBox(
+                                        width: 34,
+                                        height: 34,
+                                        child: Icon(
+                                          Icons.home_rounded,
+                                          color: Colors.white,
+                                          size: 18,
+                                        ),
+                                      ),
                                     ),
                                   ),
                                   const Spacer(),
