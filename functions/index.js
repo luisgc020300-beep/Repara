@@ -43,6 +43,19 @@ function bloqueoEliminacionActivo(casa) {
 // aunque los tres proyectos usen el mismo patrón de proxy a Anthropic.
 const _anthropicKey = defineSecret('ANTHROPIC_API_KEY');
 
+// Secreto del desplazamiento de privacidad de Cercanos (ver
+// buscarProfesionalesCercanos) -- CORRECCIÓN (revisión de seguridad
+// automática, noviembre 2026): la primera versión derivaba el
+// desplazamiento de sha256(uid) a secas, sin ninguna clave. Un uid de
+// profesional NO es secreto -- cualquier propietario para el que haya
+// trabajado lo conoce (registro.profesionalUid), así que cualquiera de
+// ellos podía recalcular el mismo hash y RESTARLO de la distancia
+// devuelta para recuperar la distancia real exacta, anulando la
+// protección por completo. Con HMAC-SHA256 y esta clave (solo vive en
+// Secret Manager, nunca en el código ni en ninguna respuesta), nadie sin
+// acceso al proyecto de Firebase puede reproducir el desplazamiento.
+const _cercanosSecreto = defineSecret('CERCANOS_DESPLAZAMIENTO_SECRET');
+
 // El valor guardado en Secret Manager llevaba un BOM (U+FEFF) al principio
 // -- invisible al revisarlo, pero fetch() revienta con "Cannot convert
 // argument to a ByteString" en CADA llamada porque 65279 no cabe en un
@@ -2854,8 +2867,13 @@ exports.crearValoracion = onCall({ region: REGION }, async (request) => {
 //     llamada): un ruido que cambiara en cada consulta se anularía
 //     promediando muchas consultas desde el mismo punto, mientras que uno
 //     fijo pone un suelo real de imprecisión que ninguna repetición reduce.
-//     Se deriva de sha256(uid) -- nunca se guarda en Firestore, se
-//     recalcula en cada llamada, siempre igual para el mismo profesional.
+//     Se deriva con HMAC-SHA256 y una clave en Secret Manager (ver
+//     _cercanosSecreto arriba) -- nunca de sha256(uid) a secas, porque el
+//     uid de un profesional no es secreto (lo conoce cualquiera que haya
+//     trabajado con él) y sin clave cualquiera podría recalcular el mismo
+//     desplazamiento y restarlo de la distancia para recuperar la real.
+//     Nunca se guarda en Firestore -- se recalcula en cada llamada, siempre
+//     igual para el mismo profesional mientras la clave no cambie.
 // =============================================================================
 const RADIO_MAXIMO_CERCANOS_KM = 50;
 const MAX_RESULTADOS_CERCANOS = 20;
@@ -2865,8 +2883,8 @@ const MAX_RESULTADOS_CERCANOS = 20;
 // bucket de como mínimo 2 km, ver distanciaAproximadaKm).
 const RADIO_DESPLAZAMIENTO_GRADOS = 0.012;
 
-function desplazamientoDeterminista(uid) {
-  const hash = crypto.createHash('sha256').update(uid).digest();
+function desplazamientoDeterminista(uid, secreto) {
+  const hash = crypto.createHmac('sha256', secreto).update(uid).digest();
   const a = hash.readUInt32BE(0) / 0xffffffff;
   const b = hash.readUInt32BE(4) / 0xffffffff;
   const angulo = a * 2 * Math.PI;
@@ -2897,7 +2915,7 @@ function distanciaAproximadaKm(km) {
   return Math.round(km / 5) * 5;
 }
 
-exports.buscarProfesionalesCercanos = onCall({ region: REGION }, async (request) => {
+exports.buscarProfesionalesCercanos = onCall({ region: REGION, secrets: [_cercanosSecreto] }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
   const uid = request.auth.uid;
   const lat = Number(request.data?.lat);
@@ -2909,6 +2927,7 @@ exports.buscarProfesionalesCercanos = onCall({ region: REGION }, async (request)
   // protege contra fuerza bruta de un código, sino contra repetir la
   // búsqueda muchas veces para triangular la posición de un profesional.
   await verificarYRegistrarIntentoCodigo(uid, 'buscarProfesionalesCercanos');
+  const secreto = _cercanosSecreto.value();
 
   const snap = await db.collection('profesionales').where('visibleCercano', '==', true).get();
   const candidatos = [];
@@ -2916,7 +2935,7 @@ exports.buscarProfesionalesCercanos = onCall({ region: REGION }, async (request)
     if (doc.id === uid) continue; // un profesional no se encuentra a sí mismo
     const d = doc.data();
     if (typeof d.lat !== 'number' || typeof d.lng !== 'number') continue;
-    const { dLat, dLng } = desplazamientoDeterminista(doc.id);
+    const { dLat, dLng } = desplazamientoDeterminista(doc.id, secreto);
     const km = distanciaKm(lat, lng, d.lat + dLat, d.lng + dLng);
     if (km > RADIO_MAXIMO_CERCANOS_KM) continue;
     candidatos.push({ uid: doc.id, km });
