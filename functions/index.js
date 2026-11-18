@@ -12,6 +12,7 @@ const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestor
 const { getAuth } = require('firebase-admin/auth');
 const { getMessaging } = require('firebase-admin/messaging');
 const { getStorage } = require('firebase-admin/storage');
+const crypto = require('crypto');
 
 // Guard idempotente (noviembre 2026): en producción nunca hay una app por
 // defecto ya creada, así que esto sigue llamando a initializeApp() exacto
@@ -2843,9 +2844,37 @@ exports.crearValoracion = onCall({ region: REGION }, async (request) => {
 //     distancias demasiado precisas.
 //   - Sin coordenadas propias del propietario guardadas en ningún sitio: las
 //     manda en cada llamada y se usan solo en memoria para este cálculo.
+//   - CORRECCIÓN (revisión de seguridad automática, noviembre 2026):
+//     redondear la distancia no basta -- con solo 3-4 búsquedas desde
+//     puntos distintos conocidos, alguien podía triangular la posición real
+//     de un profesional a partir de varias distancias de 100 m/1 km de
+//     precisión. La defensa real es desplazar la posición DEL PROFESIONAL
+//     (nunca la suya) un poco antes de calcular nada, con un desplazamiento
+//     FIJO y determinista por profesional (nunca aleatorio en cada
+//     llamada): un ruido que cambiara en cada consulta se anularía
+//     promediando muchas consultas desde el mismo punto, mientras que uno
+//     fijo pone un suelo real de imprecisión que ninguna repetición reduce.
+//     Se deriva de sha256(uid) -- nunca se guarda en Firestore, se
+//     recalcula en cada llamada, siempre igual para el mismo profesional.
 // =============================================================================
 const RADIO_MAXIMO_CERCANOS_KM = 50;
 const MAX_RESULTADOS_CERCANOS = 20;
+// ~1.3 km de radio máximo de desplazamiento -- suficiente para que ninguna
+// combinación de búsquedas reconstruya la posición real con precisión de
+// vivienda, sin desvirtuar "cerca de ti" (la cifra que se enseña es un
+// bucket de como mínimo 2 km, ver distanciaAproximadaKm).
+const RADIO_DESPLAZAMIENTO_GRADOS = 0.012;
+
+function desplazamientoDeterminista(uid) {
+  const hash = crypto.createHash('sha256').update(uid).digest();
+  const a = hash.readUInt32BE(0) / 0xffffffff;
+  const b = hash.readUInt32BE(4) / 0xffffffff;
+  const angulo = a * 2 * Math.PI;
+  // sqrt(b) -- para que el punto quede uniformemente distribuido DENTRO
+  // del círculo, no amontonado cerca del centro.
+  const radio = Math.sqrt(b) * RADIO_DESPLAZAMIENTO_GRADOS;
+  return { dLat: radio * Math.cos(angulo), dLng: radio * Math.sin(angulo) };
+}
 
 function distanciaKm(lat1, lng1, lat2, lng2) {
   const R = 6371;
@@ -2858,9 +2887,12 @@ function distanciaKm(lat1, lng1, lat2, lng2) {
 }
 
 // Redondeo deliberadamente basto -- "aproximada", nunca una cifra que
-// permita afinar más la posición real de quien se encontró.
+// permita afinar más la posición real de quien se encontró. Suelo de 2 km
+// (nunca "0.1 km" ni similar) -- coherente con el desplazamiento de arriba:
+// de nada serviría desplazar al profesional ~1.3 km y luego enseñar la
+// distancia con un decimal.
 function distanciaAproximadaKm(km) {
-  if (km < 1) return Math.round(km * 10) / 10;
+  if (km < 2) return 2;
   if (km < 10) return Math.round(km);
   return Math.round(km / 5) * 5;
 }
@@ -2884,7 +2916,8 @@ exports.buscarProfesionalesCercanos = onCall({ region: REGION }, async (request)
     if (doc.id === uid) continue; // un profesional no se encuentra a sí mismo
     const d = doc.data();
     if (typeof d.lat !== 'number' || typeof d.lng !== 'number') continue;
-    const km = distanciaKm(lat, lng, d.lat, d.lng);
+    const { dLat, dLng } = desplazamientoDeterminista(doc.id);
+    const km = distanciaKm(lat, lng, d.lat + dLat, d.lng + dLng);
     if (km > RADIO_MAXIMO_CERCANOS_KM) continue;
     candidatos.push({ uid: doc.id, km });
   }

@@ -19,6 +19,8 @@ const SIDNEY = { lat: -33.8688, lng: 151.2093 };
 const EL_CAIRO = { lat: 30.0444, lng: 31.2357 };
 const RIO = { lat: -22.9068, lng: -43.1729 };
 const CIUDAD_DEL_CABO = { lat: -33.9249, lng: 18.4241 };
+const BUENOS_AIRES = { lat: -34.6037, lng: -58.3816 };
+const MOSCU = { lat: 55.7558, lng: 37.6173 };
 
 async function crearProfesionalVisible(uid, { lat, lng, visible = true, nombreComercial, especialidad } = {}) {
   await db.collection('profesionales').doc(uid).set({
@@ -114,7 +116,33 @@ test('8. la respuesta nunca incluye coordenadas, solo distancia aproximada', asy
   assert.equal(typeof r.distanciaAproxKm, 'number');
 });
 
-test('9. límite diario de búsquedas: la 21ª del día se rechaza', async () => {
+test('9. la distancia nunca es más precisa que el suelo de 2 km (defensa contra triangulación)', async () => {
+  const owner = await crearUsuario();
+  const pro = await crearUsuario();
+  // A unos 30 metros -- si no hubiera suelo mínimo, esto se vería como
+  // "0.0 km" o similar, precisión suficiente para triangular una vivienda.
+  await crearProfesionalVisible(pro.uid, { lat: BUENOS_AIRES.lat + 0.0003, lng: BUENOS_AIRES.lng });
+
+  const { result } = await llamar('buscarProfesionalesCercanos', owner.idToken, { lat: BUENOS_AIRES.lat, lng: BUENOS_AIRES.lng });
+  assert.equal(result.resultados.length, 1);
+  assert.equal(result.resultados[0].distanciaAproxKm, 2);
+});
+
+test('10. el desplazamiento de privacidad es fijo, no aleatorio por consulta (la media de muchas consultas no revela la posición real)', async () => {
+  const owner = await crearUsuario();
+  const pro = await crearUsuario();
+  await crearProfesionalVisible(pro.uid, { lat: MOSCU.lat + 0.03, lng: MOSCU.lng }); // ~3.3 km
+
+  const distancias = [];
+  for (let i = 0; i < 3; i++) {
+    const { result } = await llamar('buscarProfesionalesCercanos', owner.idToken, { lat: MOSCU.lat, lng: MOSCU.lng });
+    distancias.push(result.resultados[0].distanciaAproxKm);
+  }
+  assert.equal(distancias[0], distancias[1]);
+  assert.equal(distancias[1], distancias[2]);
+});
+
+test('11. límite diario de búsquedas: la 21ª del día se rechaza', async () => {
   const owner = await crearUsuario();
   const hoy = new Date().toISOString().slice(0, 10);
   await db.collection('intentosCodigo').doc(`${owner.uid}_buscarProfesionalesCercanos_${hoy}`)
@@ -124,7 +152,7 @@ test('9. límite diario de búsquedas: la 21ª del día se rechaza', async () =>
   assert.equal(error?.status, 'RESOURCE_EXHAUSTED');
 });
 
-test('10. invitarProfesional con profesionalUidDirecto invita sin email ni teléfono', async () => {
+test('12. invitarProfesional con profesionalUidDirecto invita sin email ni teléfono', async () => {
   const owner = await crearUsuario();
   const pro = await crearUsuario();
   await marcarComoProfesional(pro.uid);
@@ -140,7 +168,7 @@ test('10. invitarProfesional con profesionalUidDirecto invita sin email ni telé
   assert.equal(invSnap.data().profesionalUid, pro.uid);
 });
 
-test('11. invitarProfesional rechaza un profesionalUidDirecto que no es una cuenta profesional', async () => {
+test('13. invitarProfesional rechaza un profesionalUidDirecto que no es una cuenta profesional', async () => {
   const owner = await crearUsuario();
   const noProfesional = await crearUsuario(); // nunca marcado esProfesional
   const { casaId, elementoId, registroId } = await sembrarRegistro({ ownerUid: owner.uid, estado: 'nuevo' });
@@ -151,7 +179,7 @@ test('11. invitarProfesional rechaza un profesionalUidDirecto que no es una cuen
   assert.equal(error?.status, 'NOT_FOUND');
 });
 
-test('12. invitarProfesional rechaza invitarse a uno mismo vía profesionalUidDirecto', async () => {
+test('14. invitarProfesional rechaza invitarse a uno mismo vía profesionalUidDirecto', async () => {
   const owner = await crearUsuario();
   const { casaId, elementoId, registroId } = await sembrarRegistro({ ownerUid: owner.uid, estado: 'nuevo' });
 

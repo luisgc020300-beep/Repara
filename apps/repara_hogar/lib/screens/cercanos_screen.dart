@@ -235,8 +235,11 @@ class _ListaResultados extends StatelessWidget {
   final String casaId;
   final List<ProfesionalCercano> resultados;
 
+  // El servidor nunca manda menos de 2 km (suelo deliberado contra
+  // triangulación, ver distanciaAproximadaKm en functions/index.js) -- aquí
+  // solo se formatea, nunca se afina más.
   String _distanciaLabel(double km) {
-    if (km < 1) return 'A menos de 1 km';
+    if (km <= 2) return 'A menos de 2 km';
     final esEntero = km == km.roundToDouble();
     final texto = esEntero ? km.toStringAsFixed(0) : km.toStringAsFixed(1);
     return 'A $texto km';
