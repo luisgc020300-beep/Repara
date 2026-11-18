@@ -273,6 +273,41 @@ exports.cambiarCasaActiva = onCall({ region: REGION }, async (request) => {
 });
 
 // -----------------------------------------------------------------------------
+// 2b-2. ACTUALIZAR EL NOMBRE DE PERFIL (noviembre 2026, rediseño de registro/
+// perfil de Hogar). users/{uid}.displayName ya era editable en directo por
+// el propio dueño según firestore.rules, pero createCasa/joinCasa lo COPIAN
+// dentro de cada casa (memberProfiles.{uid}.displayName, ver arriba) para que
+// storage.rules/el saludo de Inicio/las notificaciones no tengan que leer
+// users/{uid} aparte -- un cambio directo del cliente a users/{uid} dejaría
+// esas copias desincronizadas en cualquier casa a la que ya perteneciera.
+// Por eso pasa por una función: en una sola operación actualiza el original
+// y propaga la copia a TODAS las casas de casaIds (nunca solo la activa).
+// -----------------------------------------------------------------------------
+exports.actualizarNombrePerfil = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+  const uid = request.auth.uid;
+  const nombre = typeof request.data?.nombre === 'string' ? request.data.nombre.trim() : '';
+  if (!nombre || nombre.length > 60) {
+    throw new HttpsError('invalid-argument', 'Nombre inválido.');
+  }
+
+  const userRef = db.collection('users').doc(uid);
+  const userSnap = await userRef.get();
+  const casaIds = userSnap.exists ? (userSnap.data().casaIds || []) : [];
+
+  const batch = db.batch();
+  batch.set(userRef, { displayName: nombre }, { merge: true });
+  for (const casaId of casaIds) {
+    batch.update(db.collection('casas').doc(casaId), {
+      [`memberProfiles.${uid}.displayName`]: nombre,
+    });
+  }
+  await batch.commit();
+
+  return { ok: true };
+});
+
+// -----------------------------------------------------------------------------
 // 2c. MANTENER EL RESUMEN DE "PENDIENTES" (banner de Inicio, octubre 2026,
 // fusión Elemento/Trabajo/Evento). Se descartó una consulta
 // collectionGroup('registros') directa desde el cliente tras validarla

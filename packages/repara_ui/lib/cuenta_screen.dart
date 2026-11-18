@@ -48,6 +48,7 @@ class CuentaScreen extends StatefulWidget {
     required this.eliminarCuentaMensaje,
     this.antesDeCerrarSesion,
     this.mostrarCerrarSesion = true,
+    this.permitirEditarNombre = false,
     super.key,
   });
 
@@ -66,6 +67,12 @@ class CuentaScreen extends StatefulWidget {
   /// sin quitarle a Pro su único punto de cierre de sesión, que sigue
   /// mostrándola por defecto.
   final bool mostrarCerrarSesion;
+
+  /// true solo en Hogar (rediseño de registro/perfil, noviembre 2026):
+  /// convierte la fila de identidad en algo editable (nombre real que ven
+  /// los demás, vía [CuentaService.actualizarNombrePerfil]). Pro conserva
+  /// por defecto su fila de identidad de siempre, de solo lectura.
+  final bool permitirEditarNombre;
 
   @override
   State<CuentaScreen> createState() => _CuentaScreenState();
@@ -110,6 +117,24 @@ class _CuentaScreenState extends State<CuentaScreen> {
     }
   }
 
+  Future<void> _editarNombre(String? actual) async {
+    final nombre = await AppDialog.promptText(
+      context,
+      title: 'Tu nombre',
+      hint: 'Como quieres que te vean en tus casas',
+      initialValue: actual ?? '',
+    );
+    if (nombre == null || nombre.isEmpty || nombre == actual || !mounted) {
+      return;
+    }
+    try {
+      await CuentaService.actualizarNombrePerfil(nombre);
+    } catch (e, st) {
+      await FirebaseCrashlytics.instance.recordError(e, st);
+      if (mounted) AppError.show(context, 'No se pudo guardar tu nombre.');
+    }
+  }
+
   Future<void> _confirmarEliminarCuenta() async {
     final confirmar = await AppDialog.confirm(
       context,
@@ -146,16 +171,43 @@ class _CuentaScreenState extends State<CuentaScreen> {
     }
   }
 
-  String _iniciales(User? user) {
-    final nombre = user?.displayName?.trim();
-    if (nombre != null && nombre.isNotEmpty) {
-      final partes = nombre.split(RegExp(r'\s+'));
+  String _iniciales(String? nombre, String? email) {
+    final limpio = nombre?.trim();
+    if (limpio != null && limpio.isNotEmpty) {
+      final partes = limpio.split(RegExp(r'\s+'));
       final letras = partes.take(2).map((p) => p.isNotEmpty ? p[0] : '').join();
       if (letras.isNotEmpty) return letras.toUpperCase();
     }
-    final email = user?.email;
     if (email != null && email.isNotEmpty) return email[0].toUpperCase();
     return '?';
+  }
+
+  Widget _filaIdentidad(BuildContext context, User? user, String? nombre) {
+    return IosRow(
+      icon: Icons.person_outline,
+      iconColor: context.colors.brand,
+      title: (nombre?.isNotEmpty ?? false) ? nombre! : 'Tu perfil',
+      subtitle: user?.email,
+      showChevron: widget.permitirEditarNombre,
+      onTap: widget.permitirEditarNombre ? () => _editarNombre(nombre) : null,
+      trailing: CircleAvatar(
+        radius: 16,
+        backgroundColor: context.colors.brandStrong,
+        backgroundImage: user?.photoURL != null
+            ? NetworkImage(user!.photoURL!)
+            : null,
+        child: user?.photoURL == null
+            ? Text(
+                _iniciales(nombre, user?.email),
+                style: TextStyle(
+                  color: context.colors.brandOn,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                ),
+              )
+            : null,
+      ),
+    );
   }
 
   @override
@@ -168,32 +220,14 @@ class _CuentaScreenState extends State<CuentaScreen> {
         children: [
           IosSection(
             rows: [
-              IosRow(
-                icon: Icons.person_outline,
-                iconColor: context.colors.brand,
-                title: user?.displayName?.isNotEmpty == true
-                    ? user!.displayName!
-                    : 'Tu perfil',
-                subtitle: user?.email,
-                showChevron: false,
-                trailing: CircleAvatar(
-                  radius: 16,
-                  backgroundColor: context.colors.brandStrong,
-                  backgroundImage: user?.photoURL != null
-                      ? NetworkImage(user!.photoURL!)
-                      : null,
-                  child: user?.photoURL == null
-                      ? Text(
-                          _iniciales(user),
-                          style: TextStyle(
-                            color: context.colors.brandOn,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12,
-                          ),
-                        )
-                      : null,
-                ),
-              ),
+              if (widget.permitirEditarNombre && user != null)
+                StreamBuilder<String?>(
+                  stream: CuentaService.streamNombrePerfil(user.uid),
+                  builder: (context, snapshot) =>
+                      _filaIdentidad(context, user, snapshot.data),
+                )
+              else
+                _filaIdentidad(context, user, user?.displayName),
             ],
           ),
           IosSection(

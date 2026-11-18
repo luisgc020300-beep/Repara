@@ -38,6 +38,14 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _cargando = false;
   String? _error;
 
+  // Mostrar/ocultar contraseña (pulido visual del registro/login de Hogar,
+  // noviembre 2026) -- solo cuando hay foto de fondo (backgroundImageAsset
+  // != null, la señal que ya usa todo este archivo para distinguir Hogar de
+  // Pro/monolito): afinar un campo que ya existe, no toca ni añade ningún
+  // dato ni lógica de autenticación, y deja a Pro/monolito con el mismo
+  // campo exacto de siempre.
+  bool _passwordVisible = false;
+
   @override
   void dispose() {
     _emailCtrl.dispose();
@@ -108,13 +116,27 @@ class _LoginScreenState extends State<LoginScreen> {
           const SizedBox(height: ReparaSpace.s3),
           TextFormField(
             controller: _passCtrl,
-            obscureText: true,
+            obscureText: widget.backgroundImageAsset == null
+                ? true
+                : !_passwordVisible,
             autofillHints: [
               _esRegistro ? AutofillHints.newPassword : AutofillHints.password,
             ],
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Contraseña',
-              prefixIcon: Icon(Icons.lock_outline),
+              prefixIcon: const Icon(Icons.lock_outline),
+              suffixIcon: widget.backgroundImageAsset == null
+                  ? null
+                  : IconButton(
+                      icon: Icon(
+                        _passwordVisible
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                      ),
+                      onPressed: () => setState(
+                        () => _passwordVisible = !_passwordVisible,
+                      ),
+                    ),
             ),
             validator: (v) =>
                 (v == null || v.length < 6) ? 'Mínimo 6 caracteres' : null,
@@ -298,7 +320,13 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: ReparaSpace.s2),
                       Text(
-                        'Tu hogar, siempre bajo control.',
+                        // Distingue a simple vista entrar/registrarse (pulido
+                        // visual, noviembre 2026) -- antes el mismo subtítulo
+                        // se quedaba fijo en los dos modos y solo cambiaba el
+                        // texto del botón, al final del formulario.
+                        _esRegistro
+                            ? 'Crea tu cuenta para empezar a llevar el historial de tu hogar.'
+                            : 'Tu hogar, siempre bajo control.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.85),

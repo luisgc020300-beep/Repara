@@ -18,6 +18,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
+import 'package:repara_core/cuenta_service.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_core/theme_controller.dart';
 import 'package:repara_ui/app_error.dart';
@@ -275,14 +276,15 @@ Widget _cabecera(BuildContext context, String texto) => Padding(
   ),
 );
 
-String _iniciales(User? user) {
-  final nombre = user?.displayName?.trim();
-  if (nombre != null && nombre.isNotEmpty) {
-    final partes = nombre.split(RegExp(r'\s+'));
+// nombre: el real de users/{uid}.displayName (editable desde CuentaScreen),
+// no el displayName de FirebaseAuth -- ninguna de las dos apps lo escribe.
+String _iniciales(String? nombre, String? email) {
+  final limpio = nombre?.trim();
+  if (limpio != null && limpio.isNotEmpty) {
+    final partes = limpio.split(RegExp(r'\s+'));
     final letras = partes.take(2).map((p) => p.isNotEmpty ? p[0] : '').join();
     if (letras.isNotEmpty) return letras.toUpperCase();
   }
-  final email = user?.email;
   if (email != null && email.isNotEmpty) return email[0].toUpperCase();
   return '?';
 }
@@ -312,62 +314,69 @@ class _CuentaCard extends StatelessWidget {
                     'Esta acción no se puede deshacer.',
                 antesDeCerrarSesion: FcmService.olvidarEsteDispositivo,
                 mostrarCerrarSesion: false,
+                permitirEditarNombre: true,
               ),
             ),
           ),
           child: Padding(
             padding: const EdgeInsets.all(ReparaSpace.s4),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 22,
-                  backgroundColor: context.colors.brandStrong,
-                  backgroundImage: user?.photoURL != null
-                      ? NetworkImage(user!.photoURL!)
-                      : null,
-                  child: user?.photoURL == null
-                      ? Text(
-                          _iniciales(user),
-                          style: TextStyle(
-                            color: context.colors.brandOn,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 16,
+            child: StreamBuilder<String?>(
+              stream: user != null
+                  ? CuentaService.streamNombrePerfil(user.uid)
+                  : const Stream.empty(),
+              builder: (context, snapshot) {
+                final nombre = snapshot.data;
+                return Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 22,
+                      backgroundColor: context.colors.brandStrong,
+                      backgroundImage: user?.photoURL != null
+                          ? NetworkImage(user!.photoURL!)
+                          : null,
+                      child: user?.photoURL == null
+                          ? Text(
+                              _iniciales(nombre, user?.email),
+                              style: TextStyle(
+                                color: context.colors.brandOn,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                              ),
+                            )
+                          : null,
+                    ),
+                    const SizedBox(width: ReparaSpace.s3),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            (nombre?.isNotEmpty ?? false) ? nombre! : 'Tu cuenta',
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: context.colors.ink,
+                                ),
                           ),
-                        )
-                      : null,
-                ),
-                const SizedBox(width: ReparaSpace.s3),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        user?.displayName?.isNotEmpty == true
-                            ? user!.displayName!
-                            : 'Tu cuenta',
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: context.colors.ink,
+                          if (user?.email != null) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              user!.email!,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: context.colors.inkMuted),
                             ),
+                          ],
+                        ],
                       ),
-                      if (user?.email != null) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          user!.email!,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: context.colors.inkMuted),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                Icon(
-                  Icons.chevron_right,
-                  color: context.colors.inkMuted,
-                  size: 20,
-                ),
-              ],
+                    ),
+                    Icon(
+                      Icons.chevron_right,
+                      color: context.colors.inkMuted,
+                      size: 20,
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         ),

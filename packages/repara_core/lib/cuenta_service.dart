@@ -5,12 +5,25 @@
 // a repara_core en noviembre 2026 para que Hogar y Pro lo reutilicen sin
 // duplicarlo. Toda la lógica de cascada vive en la Cloud Function
 // eliminarCuenta -- aquí solo se llama.
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
 import 'security_preferences_service.dart';
 
 class CuentaService {
   static const _region = 'europe-west1';
+
+  /// El nombre real que ven los demás (no el displayName de FirebaseAuth,
+  /// que ninguna de las dos apps escribe nunca) -- ver
+  /// [actualizarNombrePerfil]. null mientras no exista el documento o no
+  /// tenga nombre todavía.
+  static Stream<String?> streamNombrePerfil(String uid) {
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .snapshots()
+        .map((doc) => doc.data()?['displayName'] as String?);
+  }
 
   /// Lanza FirebaseFunctionsException con code 'failed-precondition' si el
   /// usuario es propietario de una casa con otros miembros -- la UI debe
@@ -32,5 +45,16 @@ class CuentaService {
   static Future<void> cerrarSesionesEnTodosLosDispositivos() async {
     final callable = FirebaseFunctions.instanceFor(region: _region).httpsCallable('cerrarSesionesEnTodosLosDispositivos');
     await callable.call<Map<String, dynamic>>();
+  }
+
+  /// Cambia el nombre que ven los demás (saludo de Inicio, "Miembros de
+  /// esta casa", notificaciones) -- pasa por Cloud Function, no por una
+  /// escritura directa a users/{uid}, porque ese nombre está copiado dentro
+  /// de memberProfiles de cada casa a la que perteneces; la función
+  /// actualiza el original y propaga la copia a todas ellas en una sola
+  /// operación (rediseño de registro/perfil de Hogar, noviembre 2026).
+  static Future<void> actualizarNombrePerfil(String nombre) async {
+    final callable = FirebaseFunctions.instanceFor(region: _region).httpsCallable('actualizarNombrePerfil');
+    await callable.call<Map<String, dynamic>>({'nombre': nombre});
   }
 }
