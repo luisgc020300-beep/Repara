@@ -101,6 +101,33 @@ service cloud.firestore {
       }
     }
 
+    // ── profesionalesPublico (mejora de perfiles profesionales, noviembre
+    // 2026) -- copia de solo lo que SÍ puede verse de un profesional (nombre
+    // comercial, especialidad, nº de trabajos terminados, valoración media),
+    // mantenida por Cloud Functions a partir de profesionales/{uid} (privado)
+    // y de valoraciones (ver abajo). Cualquier usuario autenticado puede
+    // leerla -- es precisamente el documento pensado para mostrarse; nunca
+    // contiene nada de una vivienda ni un comentario de texto.
+    match /profesionalesPublico/{uid} {
+      allow read: if isAuth();
+      allow write: if false;
+    }
+
+    // ── valoraciones (mejora de perfiles profesionales, noviembre 2026) ────────
+    // Solo quien la escribió o el propio profesional valorado puede leer una
+    // valoración individual (con su comentario, si lo hay) -- nunca un
+    // tercero, para que nadie pueda deducir en qué vivienda trabajó nadie.
+    // El perfil público solo muestra la cifra agregada (ver
+    // profesionalesPublico), nunca esta lista. Solo se escribe vía
+    // crearValoracion (Cloud Function), que ya comprueba que el trabajo esté
+    // terminado, tenga profesional vinculado, y que no exista ya una
+    // valoración de este mismo propietario para este mismo registro.
+    match /valoraciones/{valId} {
+      allow read: if isAuth() &&
+          (resource.data.propietarioUid == request.auth.uid || resource.data.profesionalUid == request.auth.uid);
+      allow write: if false;
+    }
+
     // ── invitaciones (propietario invita a un profesional a UN trabajo) ────────
     match /invitaciones/{iid} {
       allow read: if isAuth() && (resource.data.propietarioUid == request.auth.uid || resource.data.profesionalUid == request.auth.uid);

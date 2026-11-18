@@ -2692,6 +2692,110 @@ exports.rechazarFinalizacionProfesional = onCall({ region: REGION }, async (requ
 });
 
 // =============================================================================
+// PERFIL PÚBLICO DEL PROFESIONAL — valoraciones + trabajos terminados
+// (mejora de perfiles profesionales, noviembre 2026). profesionales/{uid} es
+// de lectura exclusiva del propio profesional (ver firestore.rules) -- nunca
+// se abre esa lectura al cliente. En su lugar, profesionalesPublico/{uid} es
+// una copia de solo lo que SÍ puede verse (nombre comercial, especialidad,
+// nº de trabajos terminados, valoración media), mantenida aquí por Admin SDK
+// y nunca por escritura directa del cliente -- mismo criterio que
+// resumen/pendientes. Las valoraciones individuales (con el comentario, si
+// lo hay) NO son públicas: solo las lee quien la escribió o el propio
+// profesional valorado (ver firestore.rules); el perfil solo muestra la
+// cifra agregada, nunca la lista de comentarios ni a qué vivienda
+// pertenecen -- así nunca se puede deducir en qué casa trabajó.
+// =============================================================================
+
+// Nombre/especialidad visibles en el perfil público, sincronizados cada vez
+// que el profesional edita su propia ficha -- nunca al revés.
+exports.onProfesionalEscritoActualizaPerfilPublico = onDocumentWritten(
+  { region: REGION, document: 'profesionales/{uid}' },
+  async (event) => {
+    const after = event.data?.after?.exists ? event.data.after.data() : null;
+    if (!after) return; // ficha borrada -- nada que sincronizar aquí
+    const { uid } = event.params;
+    await db.collection('profesionalesPublico').doc(uid).set({
+      nombreComercial: after.nombreComercial || null,
+      especialidad: after.especialidad || null,
+    }, { merge: true });
+  }
+);
+
+// Cuenta de trabajos terminados del perfil público -- contador simple
+// (FieldValue.increment), no un recálculo completo como resumen/pendientes,
+// porque aquí basta con reaccionar a la transición de estado concreta hacia
+// o desde "terminado" con profesional asignado.
+exports.onRegistroTerminadoActualizaPerfilPublico = onDocumentWritten(
+  { region: REGION, document: 'casas/{casaId}/elementos/{elementoId}/registros/{registroId}' },
+  async (event) => {
+    const before = event.data?.before?.exists ? event.data.before.data() : null;
+    const after = event.data?.after?.exists ? event.data.after.data() : null;
+    const estabaTerminado = before?.estado === 'terminado' && !!before?.profesionalUid;
+    const estaTerminado = after?.estado === 'terminado' && !!after?.profesionalUid;
+    if (estabaTerminado === estaTerminado) return;
+    if (estaTerminado) {
+      await db.collection('profesionalesPublico').doc(after.profesionalUid).set({
+        trabajosTerminados: FieldValue.increment(1),
+      }, { merge: true });
+    } else {
+      await db.collection('profesionalesPublico').doc(before.profesionalUid).set({
+        trabajosTerminados: FieldValue.increment(-1),
+      }, { merge: true });
+    }
+  }
+);
+
+// -----------------------------------------------------------------------------
+// VALORAR UN TRABAJO TERMINADO -- solo un miembro de la casa, solo sobre un
+// registro realmente terminado y con profesional vinculado, y solo una vez
+// por (registro, propietario): el id determinista del documento
+// ("{registroId}_{uid}") hace que un segundo intento choque con el primero
+// dentro de la misma transacción, sin necesitar una consulta aparte.
+// -----------------------------------------------------------------------------
+exports.crearValoracion = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+  const uid = request.auth.uid;
+  const { casaId, elementoId, registroId, comentario } = request.data || {};
+  const puntuacion = Number(request.data?.puntuacion);
+  if (!casaId || !elementoId || !registroId) throw new HttpsError('invalid-argument', 'Faltan datos.');
+  if (!Number.isInteger(puntuacion) || puntuacion < 1 || puntuacion > 5) {
+    throw new HttpsError('invalid-argument', 'La puntuación debe ser un número entero de 1 a 5.');
+  }
+  if (!(await esMiembroCasa(casaId, uid))) throw new HttpsError('permission-denied', 'No perteneces a esa casa.');
+
+  const comentarioLimpio = typeof comentario === 'string' && comentario.trim() ? comentario.trim().slice(0, 500) : null;
+  const valRef = db.collection('valoraciones').doc(`${registroId}_${uid}`);
+
+  await db.runTransaction(async (tx) => {
+    const [valSnap, regSnap] = await Promise.all([tx.get(valRef), tx.get(registroRef(casaId, elementoId, registroId))]);
+    if (valSnap.exists) throw new HttpsError('already-exists', 'Ya has valorado este trabajo.');
+    if (!regSnap.exists) throw new HttpsError('not-found', 'El registro ya no existe.');
+    const registro = regSnap.data();
+    if (registro.estado !== 'terminado') {
+      throw new HttpsError('failed-precondition', 'Solo puedes valorar trabajos ya terminados.');
+    }
+    const profesionalUid = registro.profesionalUid;
+    if (!profesionalUid) {
+      throw new HttpsError('failed-precondition', 'Este trabajo no tiene ningún profesional vinculado.');
+    }
+    tx.set(valRef, {
+      casaId, elementoId, registroId,
+      profesionalUid,
+      propietarioUid: uid,
+      puntuacion,
+      comentario: comentarioLimpio,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    tx.set(db.collection('profesionalesPublico').doc(profesionalUid), {
+      sumaPuntuaciones: FieldValue.increment(puntuacion),
+      numValoraciones: FieldValue.increment(1),
+    }, { merge: true });
+  });
+
+  return { ok: true };
+});
+
+// =============================================================================
 // NOTIFICAR AL PROFESIONAL CUANDO SE LE REGISTRA UN PAGO
 // Los pagos se escriben directo desde el cliente (ver PagoService -- aquí no
 // hay ninguna aprobación entre dos partes que proteger, a diferencia de

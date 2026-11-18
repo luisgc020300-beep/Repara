@@ -48,6 +48,7 @@ import 'contacto_acciones.dart';
 import 'editar_registro_sheet.dart';
 import 'elemento_detail_screen.dart';
 import 'package:repara_ui/nuevo_documento_flow.dart';
+import 'perfil_profesional_screen.dart';
 import 'package:repara_ui/presupuestos_section.dart';
 import 'registro_simple/registro_cabecera.dart';
 import 'registro_simple/registro_resumen_pdf.dart';
@@ -775,7 +776,8 @@ class _CuerpoConProfesionalState extends State<_CuerpoConProfesional> {
                           // forzar uno cualquiera.
                           child: registro.profesionalUid == null
                               ? EmptyHint(
-                                  message: 'La agenda de citas no está disponible cuando el trabajo lo hacen varios profesionales a la vez.',
+                                  message:
+                                      'La agenda de citas no está disponible cuando el trabajo lo hacen varios profesionales a la vez.',
                                   icon: Icons.event_outlined,
                                 )
                               : CitaSeccion(
@@ -783,9 +785,12 @@ class _CuerpoConProfesionalState extends State<_CuerpoConProfesional> {
                                   registroId: registro.id,
                                   rol: RolEnTrabajo.propietario,
                                   registroCerrado:
-                                      registro.estado == EstadoRegistro.terminado ||
-                                      registro.estado == EstadoRegistro.archivado ||
-                                      registro.estado == EstadoRegistro.pendientePago,
+                                      registro.estado ==
+                                          EstadoRegistro.terminado ||
+                                      registro.estado ==
+                                          EstadoRegistro.archivado ||
+                                      registro.estado ==
+                                          EstadoRegistro.pendientePago,
                                 ),
                         ),
                         SingleChildScrollView(
@@ -1146,7 +1151,15 @@ class _TarjetaMantenimiento extends StatelessWidget {
 /// reales de presupuestos/cambios/pagos (historial_service.dart). El cierre
 /// nunca lleva fecha porque no existe ningún timestamp real de cuándo
 /// ocurrió -- se muestra sin inventar una.
-enum _FiltroHistorial { todo, presupuestos, cambios, pagos, documentos, finalizacion, citas }
+enum _FiltroHistorial {
+  todo,
+  presupuestos,
+  cambios,
+  pagos,
+  documentos,
+  finalizacion,
+  citas,
+}
 
 String _nombreFiltroHistorial(_FiltroHistorial f) => switch (f) {
   _FiltroHistorial.todo => 'Todo',
@@ -1249,9 +1262,7 @@ class _SeccionHistorialState extends State<_SeccionHistorial> {
             }
             final items = _filtro == _FiltroHistorial.todo
                 ? todos
-                : todos
-                    .where((i) => i.categoria == _filtro.name)
-                    .toList();
+                : todos.where((i) => i.categoria == _filtro.name).toList();
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1273,7 +1284,8 @@ class _SeccionHistorialState extends State<_SeccionHistorial> {
                 const SizedBox(height: 12),
                 if (items.isEmpty)
                   EmptyHint(
-                    message: 'Nada en "${_nombreFiltroHistorial(_filtro)}" todavía.',
+                    message:
+                        'Nada en "${_nombreFiltroHistorial(_filtro)}" todavía.',
                     icon: Icons.filter_alt_off_outlined,
                   )
                 else
@@ -1410,7 +1422,9 @@ class _SeccionHistorialState extends State<_SeccionHistorial> {
           _ => 'Cita programada',
         };
         final color = switch (e.accion) {
-          'cancelada' || 'rechazada' || 'contrapropuestaRechazada' => context.colors.errorText,
+          'cancelada' ||
+          'rechazada' ||
+          'contrapropuestaRechazada' => context.colors.errorText,
           'contrapropuesta' => context.colors.warningText,
           _ => context.colors.success,
         };
@@ -1919,16 +1933,26 @@ class _SeccionProximaVisita extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Próxima visita', style: Theme.of(context).textTheme.headlineSmall),
+            Text(
+              'Próxima visita',
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
             const SizedBox(height: 8),
             Card(
               margin: EdgeInsets.zero,
-              color: pendiente ? context.colors.warning.withValues(alpha: 0.12) : null,
+              color: pendiente
+                  ? context.colors.warning.withValues(alpha: 0.12)
+                  : null,
               child: Padding(
                 padding: const EdgeInsets.all(14),
                 child: Row(
                   children: [
-                    Icon(Icons.event_outlined, color: pendiente ? context.colors.warningText : context.colors.brand),
+                    Icon(
+                      Icons.event_outlined,
+                      color: pendiente
+                          ? context.colors.warningText
+                          : context.colors.brand,
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -1938,12 +1962,16 @@ class _SeccionProximaVisita extends StatelessWidget {
                             cita.titulo,
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
-                          Text(fechaTexto, style: Theme.of(context).textTheme.bodySmall),
+                          Text(
+                            fechaTexto,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
                           if (pendiente) ...[
                             const SizedBox(height: 4),
                             Text(
                               'Pendiente de confirmar -- ve a la pestaña "Cita" para responder.',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.colors.warningText),
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: context.colors.warningText),
                             ),
                           ],
                         ],
@@ -2125,7 +2153,9 @@ class _SeccionInvitarProfesionalState
     try {
       contactos = await ContactoService.streamContactos(widget.casa.id).first;
     } catch (e) {
-      if (mounted) AppError.show(context, 'No se pudo abrir tu libreta de contactos.');
+      if (mounted) {
+        AppError.show(context, 'No se pudo abrir tu libreta de contactos.');
+      }
       return;
     }
     if (!mounted) return;
@@ -2305,8 +2335,30 @@ class _SeccionInvitarProfesionalState
             icon: Icons.verified_user_outlined,
             iconColor: context.colors.success,
             title: widget.registro.profesionalNombre ?? 'Profesional vinculado',
-            subtitle: 'Puede ver este evento y actualizar su estado',
-            showChevron: false,
+            subtitle:
+                'Puede ver este evento y actualizar su estado -- toca para ver su perfil',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => PerfilProfesionalScreen(
+                  profesionalUid: widget.registro.profesionalUid!,
+                  nombreMostrado:
+                      widget.registro.profesionalNombre ??
+                      'Profesional vinculado',
+                  // Solo se ofrece valorar un trabajo ya terminado -- nunca
+                  // uno en curso.
+                  contextoValoracion:
+                      widget.registro.estado == EstadoRegistro.terminado
+                      ? ContextoValoracion(
+                          casaId: widget.casa.id,
+                          elementoId: widget.elementoId,
+                          registroId: widget.registro.id,
+                          tituloTrabajo: widget.registro.titulo,
+                        )
+                      : null,
+                ),
+              ),
+            ),
           ),
         ],
       );
@@ -2460,9 +2512,7 @@ const _estadosEditables = [
   EstadoRegistro.enCurso,
 ];
 
-Future<List<ElementoResumen>> _cargarElementosDisponibles(
-  String casaId,
-) async {
+Future<List<ElementoResumen>> _cargarElementosDisponibles(String casaId) async {
   final elementos = await ElementoService.streamElementos(casaId).first;
   return elementos.map((e) => (id: e.id, nombre: e.nombre)).toList();
 }
