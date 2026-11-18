@@ -13,6 +13,7 @@ class Profesional {
     this.especialidad,
     this.telefono,
     this.createdAt,
+    this.visibleCercano = false,
   });
 
   final String uid;
@@ -20,6 +21,16 @@ class Profesional {
   final String? especialidad;
   final String? telefono;
   final DateTime? createdAt;
+
+  /// Cercanos (noviembre 2026): true si este profesional ha optado por
+  /// aparecer en las búsquedas de "profesionales cercanos" de REPARA Hogar.
+  /// Nunca se activa solo -- lo pone a true el propio profesional desde sus
+  /// Ajustes, a la vez que comparte una ubicación aproximada (ver
+  /// ProfesionalService.actualizarVisibilidadCercana). Las coordenadas en sí
+  /// (profesionales/{uid}.lat/lng) son privadas y nunca viajan a este
+  /// modelo -- el propio profesional no necesita verlas, solo saber si está
+  /// visible o no.
+  final bool visibleCercano;
 
   factory Profesional.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? {};
@@ -29,6 +40,7 @@ class Profesional {
       especialidad: data['especialidad'] as String?,
       telefono: data['telefono'] as String?,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
+      visibleCercano: data['visibleCercano'] as bool? ?? false,
     );
   }
 }

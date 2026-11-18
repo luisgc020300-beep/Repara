@@ -1,11 +1,15 @@
 // lib/screens/perfil_profesional_screen.dart
 //
 // Perfil público de un profesional (mejora de perfiles profesionales,
-// noviembre 2026) -- solo se abre desde un evento al que ya está vinculado
-// (nunca desde un listado/directorio: no es un marketplace). Muestra
-// únicamente información pública y agregada -- nombre, especialidad, nº de
-// trabajos terminados y valoración media -- nunca nada de una vivienda
-// concreta, ni fotos privadas, ni comentarios de otros propietarios.
+// noviembre 2026) -- originalmente solo se abría desde un evento ya
+// vinculado; "Cercanos" (noviembre 2026) la abre también desde un resultado
+// de búsqueda por proximidad, decisión explícita y posterior del CEO (ver
+// cercanos_screen.dart). En ambos casos muestra únicamente información
+// pública y agregada -- nombre, especialidad, nº de trabajos terminados y
+// valoración media -- nunca nada de una vivienda concreta, ni fotos
+// privadas, ni comentarios de otros propietarios. [contextoValoracion] sigue
+// siendo null cuando se abre desde Cercanos (no hay trabajo que valorar
+// todavía), así que la sección de valorar simplemente no aparece.
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:repara_core/design_tokens.dart';

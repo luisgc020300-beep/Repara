@@ -24,6 +24,8 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Repara Pro usa Face ID para proteger el acceso a documentos sensibles de tus clientes.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Repara Pro usa tu ubicación aproximada solo si activas "Visible cerca de ti", para que te puedan encontrar propietarios próximos.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

@@ -161,10 +161,14 @@ Future<void> _eliminarContacto(BuildContext context, {required String casaId, re
 /// para decidir qué sigue abierto. Mismo patrón de recorrido en memoria que
 /// ElementoService.registrosConTrabajoPendiente -- sin collectionGroup ni
 /// índice nuevo.
+///
+/// Pública (noviembre 2026, Cercanos): mismo candidato que necesita
+/// cercanos_screen.dart para invitar a un profesional encontrado por
+/// proximidad a uno de tus eventos abiertos -- no duplicar este recorrido.
 Future<
   List<({String elementoId, String elementoNombre, Registro registro})>
 >
-_eventosDisponiblesParaInvitar(String casaId) async {
+eventosDisponiblesParaInvitar(String casaId) async {
   final elementos = await ElementoService.streamElementos(casaId).first;
   final resultado =
       <({String elementoId, String elementoNombre, Registro registro})>[];
@@ -188,22 +192,28 @@ _eventosDisponiblesParaInvitar(String casaId) async {
   return resultado;
 }
 
-Future<void> _invitarAUnEvento(
+/// Muestra el selector "¿a qué evento invitas a X?" y devuelve el elegido (o
+/// null si no había ninguno disponible -- ya se avisa aquí mismo -- o si se
+/// cerró sin elegir). Pública (noviembre 2026, Cercanos): mismo selector que
+/// usa cercanos_screen.dart al invitar a un profesional encontrado por
+/// proximidad, solo cambia el nombre que se muestra en el título.
+Future<({String elementoId, String elementoNombre, Registro registro})?>
+elegirEventoParaInvitar(
   BuildContext context, {
   required String casaId,
-  required Contacto contacto,
+  required String nombrePersona,
 }) async {
-  final eventos = await _eventosDisponiblesParaInvitar(casaId);
-  if (!context.mounted) return;
+  final eventos = await eventosDisponiblesParaInvitar(casaId);
+  if (!context.mounted) return null;
   if (eventos.isEmpty) {
     AppError.show(
       context,
       'No tienes ningún evento abierto a un profesional que aún esté sin asignar. '
       'Crea uno nuevo o edita uno existente para poder invitar desde aquí.',
     );
-    return;
+    return null;
   }
-  final elegido = await showModalBottomSheet<
+  return showModalBottomSheet<
     ({String elementoId, String elementoNombre, Registro registro})
   >(
     context: context,
@@ -222,7 +232,7 @@ Future<void> _invitarAUnEvento(
             Padding(
               padding: const EdgeInsets.only(bottom: ReparaSpace.s2),
               child: Text(
-                '¿A qué evento invitas a ${contacto.nombre}?',
+                '¿A qué evento invitas a $nombrePersona?',
                 style: Theme.of(ctx).textTheme.headlineSmall,
               ),
             ),
@@ -243,6 +253,18 @@ Future<void> _invitarAUnEvento(
         ),
       ),
     ),
+  );
+}
+
+Future<void> _invitarAUnEvento(
+  BuildContext context, {
+  required String casaId,
+  required Contacto contacto,
+}) async {
+  final elegido = await elegirEventoParaInvitar(
+    context,
+    casaId: casaId,
+    nombrePersona: contacto.nombre,
   );
   if (elegido == null || !context.mounted) return;
 

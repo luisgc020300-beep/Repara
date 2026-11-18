@@ -44,6 +44,9 @@ dependencies:
   local_auth: ^2.3.0
   local_auth_platform_interface: ^1.1.0
   flutter_secure_storage: ^9.2.2
+  # location_service.dart (Cercanos, noviembre 2026) -- repara_core ya lo
+  # declara, aquí explícito por el mismo motivo que local_auth arriba.
+  geolocator: ^13.0.1
 
 # Mismo conflicto que packages/repara_ui/pubspec.yaml (ver su comentario):
 # dentro del grafo de dependencias más pequeño de esta app, pdf 3.12.0

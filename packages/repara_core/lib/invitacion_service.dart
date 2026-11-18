@@ -39,6 +39,10 @@ class InvitacionService {
     required String registroId,
     String? emailProfesional,
     String? telefonoProfesional,
+    // Cercanos (noviembre 2026): cuando se invita a alguien encontrado por
+    // proximidad no hay ni email ni teléfono (son privados, Cercanos nunca
+    // los expone) -- solo el uid que ya devolvió buscarProfesionalesCercanos.
+    String? profesionalUidDirecto,
   }) async {
     final callable = FirebaseFunctions.instanceFor(
       region: _region,
@@ -49,6 +53,7 @@ class InvitacionService {
       'registroId': registroId,
       'emailProfesional': ?emailProfesional,
       'telefonoProfesional': ?telefonoProfesional,
+      'profesionalUidDirecto': ?profesionalUidDirecto,
     });
     final tipo = result.data['tipo'] as String?;
     return ResultadoInvitacion(

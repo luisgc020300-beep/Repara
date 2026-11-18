@@ -8,6 +8,11 @@
          el diálogo nativo ni el sistema puede llegar a mostrar la
          notificación aunque el envío desde el servidor sea correcto. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Cercanos (noviembre 2026) — solo COARSE, nunca FINE: la búsqueda de
+         profesionales cercanos nunca necesita ni muestra una posición
+         exacta (ver buscarProfesionalesCercanos en functions/index.js),
+         así que no se pide más precisión de la que se va a usar. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <application
         android:label="repara_hogar"
         android:name="${applicationName}"

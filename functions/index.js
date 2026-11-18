@@ -433,10 +433,18 @@ async function generarCodigoInvitacionUnico() {
 exports.invitarProfesional = onCall({ region: REGION }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
   const propietarioUid = request.auth.uid;
-  const { casaId, elementoId, registroId, emailProfesional, telefonoProfesional } = request.data || {};
+  const { casaId, elementoId, registroId, emailProfesional, telefonoProfesional, profesionalUidDirecto } = request.data || {};
   const email = typeof emailProfesional === 'string' ? emailProfesional.trim().toLowerCase() : '';
   const telefono = typeof telefonoProfesional === 'string' ? telefonoProfesional.trim() : '';
-  if (!casaId || !elementoId || !registroId || (!email && !telefono)) {
+  // uidDirecto (Cercanos, noviembre 2026): cuando la invitación nace de un
+  // resultado de búsqueda de profesionales cercanos, el cliente ya conoce un
+  // uid de confianza (lo devolvió buscarProfesionalesCercanos, nunca el
+  // propio cliente lo inventa) pero no tiene ni email ni teléfono de esa
+  // persona -- son datos privados que "Cercanos" nunca expone. Se valida
+  // igual de estricto que el camino por email (cuenta real + esProfesional),
+  // más abajo.
+  const uidDirecto = typeof profesionalUidDirecto === 'string' && profesionalUidDirecto.trim() ? profesionalUidDirecto.trim() : '';
+  if (!casaId || !elementoId || !registroId || (!email && !telefono && !uidDirecto)) {
     throw new HttpsError('invalid-argument', 'Faltan datos para la invitación.');
   }
 
@@ -470,7 +478,19 @@ exports.invitarProfesional = onCall({ region: REGION }, async (request) => {
   const fotoUrl = registro.fotoUrl || (elementoSnap.exists ? elementoSnap.data().fotoUrl : null) || null;
 
   let profesionalUid = null;
-  if (email) {
+  if (uidDirecto) {
+    // Mismo criterio de validación que el camino por email, nunca se confía
+    // ciegamente en el uid que manda el cliente: tiene que ser una cuenta
+    // real con esProfesional === true, y no puede ser uno mismo.
+    if (uidDirecto === propietarioUid) {
+      throw new HttpsError('invalid-argument', 'No puedes invitarte a ti mismo.');
+    }
+    const userSnap = await db.collection('users').doc(uidDirecto).get();
+    if (!userSnap.exists || userSnap.data().esProfesional !== true) {
+      throw new HttpsError('not-found', 'Ese profesional ya no está disponible.');
+    }
+    profesionalUid = uidDirecto;
+  } else if (email) {
     try {
       const usuarioAuth = await getAuth().getUserByEmail(email);
       if (usuarioAuth.uid === propietarioUid) {
@@ -2799,6 +2819,93 @@ exports.crearValoracion = onCall({ region: REGION }, async (request) => {
   });
 
   return { ok: true };
+});
+
+// =============================================================================
+// PROFESIONALES CERCANOS (Hogar, noviembre 2026)
+//
+// Decisión del CEO, explícita y documentada: esto SÍ es el "buscador de
+// gente nueva" que las dos tareas anteriores (Contactos, perfil profesional)
+// habían descartado a propósito -- aquí se construye adrede, para cuando el
+// propietario no tiene disponible a ninguno de sus profesionales habituales.
+//
+// Diseño de privacidad (requisito explícito: "no confiar en filtros hechos
+// solo en Flutter", "no mostrar ubicación exacta de ningún profesional"):
+//   - profesionales/{uid}.lat/lng son PRIVADOS (firestore.rules: solo el
+//     propio profesional lee/escribe su ficha, sin cambios) -- nunca se leen
+//     desde el cliente, ni siquiera el del propio profesional para esto.
+//   - Esta función es la ÚNICA que lee esas coordenadas, y nunca las
+//     devuelve: calcula la distancia en el servidor y solo manda de vuelta
+//     un número de kilómetros redondeado (más basto cuanto más lejos), igual
+//     que profesionalesPublico nunca expone en qué vivienda ha trabajado
+//     nadie. Sin esto, alguien podría repetir la búsqueda desde varios
+//     puntos y triangular la posición exacta de un profesional a partir de
+//     distancias demasiado precisas.
+//   - Sin coordenadas propias del propietario guardadas en ningún sitio: las
+//     manda en cada llamada y se usan solo en memoria para este cálculo.
+// =============================================================================
+const RADIO_MAXIMO_CERCANOS_KM = 50;
+const MAX_RESULTADOS_CERCANOS = 20;
+
+function distanciaKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const radianes = Math.PI / 180;
+  const dLat = (lat2 - lat1) * radianes;
+  const dLng = (lng2 - lng1) * radianes;
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * radianes) * Math.cos(lat2 * radianes) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// Redondeo deliberadamente basto -- "aproximada", nunca una cifra que
+// permita afinar más la posición real de quien se encontró.
+function distanciaAproximadaKm(km) {
+  if (km < 1) return Math.round(km * 10) / 10;
+  if (km < 10) return Math.round(km);
+  return Math.round(km / 5) * 5;
+}
+
+exports.buscarProfesionalesCercanos = onCall({ region: REGION }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
+  const uid = request.auth.uid;
+  const lat = Number(request.data?.lat);
+  const lng = Number(request.data?.lng);
+  if (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lng) || lng < -180 || lng > 180) {
+    throw new HttpsError('invalid-argument', 'Ubicación inválida.');
+  }
+  // Mismo límite diario que canjearCodigoInvitacion/joinCasa -- aquí no
+  // protege contra fuerza bruta de un código, sino contra repetir la
+  // búsqueda muchas veces para triangular la posición de un profesional.
+  await verificarYRegistrarIntentoCodigo(uid, 'buscarProfesionalesCercanos');
+
+  const snap = await db.collection('profesionales').where('visibleCercano', '==', true).get();
+  const candidatos = [];
+  for (const doc of snap.docs) {
+    if (doc.id === uid) continue; // un profesional no se encuentra a sí mismo
+    const d = doc.data();
+    if (typeof d.lat !== 'number' || typeof d.lng !== 'number') continue;
+    const km = distanciaKm(lat, lng, d.lat, d.lng);
+    if (km > RADIO_MAXIMO_CERCANOS_KM) continue;
+    candidatos.push({ uid: doc.id, km });
+  }
+  candidatos.sort((a, b) => a.km - b.km);
+  const top = candidatos.slice(0, MAX_RESULTADOS_CERCANOS);
+  if (top.length === 0) return { resultados: [] };
+
+  const pubSnaps = await db.getAll(...top.map((c) => db.collection('profesionalesPublico').doc(c.uid)));
+  const resultados = top.map((c, i) => {
+    const pub = pubSnaps[i].exists ? pubSnaps[i].data() : {};
+    const numValoraciones = pub.numValoraciones || 0;
+    return {
+      uid: c.uid,
+      nombreComercial: pub.nombreComercial || null,
+      especialidad: pub.especialidad || null,
+      trabajosTerminados: pub.trabajosTerminados || 0,
+      valoracionMedia: numValoraciones > 0 ? pub.sumaPuntuaciones / numValoraciones : null,
+      distanciaAproxKm: distanciaAproximadaKm(c.km),
+    };
+  });
+  return { resultados };
 });
 
 // =============================================================================

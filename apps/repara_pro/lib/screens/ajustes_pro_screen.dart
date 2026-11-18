@@ -10,6 +10,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
+import 'package:repara_core/location_service.dart';
 import 'package:repara_core/profesional.dart';
 import 'package:repara_core/profesional_service.dart';
 import 'package:repara_core/design_tokens.dart';
@@ -51,6 +52,44 @@ class _AjustesProScreenState extends State<AjustesProScreen> {
       ),
     ),
   );
+
+  // Cercanos (noviembre 2026): activar pide permiso de ubicación y manda
+  // una posición aproximada (ver ProfesionalService.actualizarVisibilidadCercana
+  // -- solo COARSE, nunca coordenadas exactas). Desactivar nunca necesita
+  // permiso, se manda directo.
+  Future<void> _alternarVisibleCercano(bool activar) async {
+    if (!activar) {
+      await ProfesionalService.actualizarVisibilidadCercana(visible: false);
+      return;
+    }
+    final permiso = await DeviceLocation.instance.solicitarPermiso();
+    if (!mounted) return;
+    if (permiso != SolicitudUbicacionResultado.concedido) {
+      AppError.show(
+        context,
+        permiso == SolicitudUbicacionResultado.servicioDesactivado
+            ? 'Activa la ubicación de tu dispositivo para hacerte visible en Cercanos.'
+            : 'Necesitamos permiso de ubicación para hacerte visible en Cercanos.',
+      );
+      return;
+    }
+    final posicion = await DeviceLocation.instance.posicionActual();
+    if (!mounted) return;
+    if (posicion == null) {
+      AppError.show(context, 'No se pudo obtener tu ubicación. Inténtalo de nuevo.');
+      return;
+    }
+    try {
+      await ProfesionalService.actualizarVisibilidadCercana(
+        visible: true,
+        lat: posicion.lat,
+        lng: posicion.lng,
+      );
+    } catch (e, st) {
+      await FirebaseCrashlytics.instance.recordError(e, st);
+      if (mounted) AppError.show(context, 'No se pudo activar Cercanos.');
+    }
+  }
 
   String _temaLabel() => switch (ThemeController.instance.mode) {
     ThemeMode.light => 'Claro',
@@ -176,6 +215,31 @@ class _AjustesProScreenState extends State<AjustesProScreen> {
                         'Teléfono',
                         perfil?.telefono,
                         (v) => ProfesionalService.actualizarPerfil(telefono: v),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: ReparaSpace.s4),
+            StreamBuilder<Profesional?>(
+              stream: ProfesionalService.streamPerfilPropio(),
+              builder: (context, snapshot) {
+                final visible = snapshot.data?.visibleCercano ?? false;
+                return IosSection(
+                  header: 'Cercanos',
+                  footer:
+                      'Si lo activas, los propietarios podrán encontrarte en "Cercanos" cuando no tengan disponible a ninguno de sus profesionales habituales. Nunca compartimos tu ubicación exacta, solo una distancia aproximada.',
+                  rows: [
+                    IosRow(
+                      icon: Icons.near_me_outlined,
+                      iconColor: context.colors.brand,
+                      title: 'Visible cerca de ti',
+                      subtitle: visible ? 'Activado' : 'Desactivado',
+                      showChevron: false,
+                      trailing: Switch(
+                        value: visible,
+                        onChanged: _alternarVisibleCercano,
                       ),
                     ),
                   ],

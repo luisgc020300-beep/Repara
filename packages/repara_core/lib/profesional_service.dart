@@ -72,6 +72,30 @@ class ProfesionalService {
     }, SetOptions(merge: true));
   }
 
+  /// Cercanos (noviembre 2026): el propio profesional opta por hacerse
+  /// visible en las búsquedas de "cerca de mí" de REPARA Hogar, compartiendo
+  /// una posición aproximada. Mismo patrón de escritura directa que
+  /// actualizarPerfil (firestore.rules: solo el propio dueño lee/escribe su
+  /// ficha) -- no hace falta Cloud Function para esto, nadie más la lee
+  /// salvo buscarProfesionalesCercanos con Admin SDK. Al desactivar, se
+  /// borran lat/lng en vez de dejarlas obsoletas -- no hay motivo para
+  /// conservar una ubicación que ya no se usa para nada.
+  static Future<void> actualizarVisibilidadCercana({
+    required bool visible,
+    double? lat,
+    double? lng,
+  }) async {
+    final uid = _uid;
+    if (uid == null) return;
+    await _db.collection('profesionales').doc(uid).set({
+      'visibleCercano': visible,
+      if (visible && lat != null && lng != null) 'lat': lat,
+      if (visible && lat != null && lng != null) 'lng': lng,
+      if (!visible) 'lat': FieldValue.delete(),
+      if (!visible) 'lng': FieldValue.delete(),
+    }, SetOptions(merge: true));
+  }
+
   /// Registros aceptados por el profesional -- copia ligera guardada por la
   /// Cloud Function al aceptar una invitación (ver responderInvitacion),
   /// para no necesitar permiso de lectura sobre casas ajenas.

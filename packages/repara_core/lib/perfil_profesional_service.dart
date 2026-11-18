@@ -4,6 +4,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:repara_core/perfil_profesional_publico.dart';
+import 'package:repara_core/profesional_cercano.dart';
 import 'package:repara_core/stream_error_logging.dart';
 
 class PerfilProfesionalService {
@@ -62,5 +63,27 @@ class PerfilProfesionalService {
       'puntuacion': puntuacion,
       if (comentario != null && comentario.isNotEmpty) 'comentario': comentario,
     });
+  }
+
+  /// Cercanos (noviembre 2026): el servidor calcula la distancia y solo
+  /// devuelve kilómetros redondeados, ya ordenados de más a menos cerca --
+  /// nunca coordenadas (ver buscarProfesionalesCercanos en
+  /// functions/index.js). Lanza FirebaseFunctionsException con code
+  /// 'resource-exhausted' si se ha repetido demasiadas veces en el día.
+  static Future<List<ProfesionalCercano>> buscarCercanos({
+    required double lat,
+    required double lng,
+  }) async {
+    final callable = FirebaseFunctions.instanceFor(
+      region: _region,
+    ).httpsCallable('buscarProfesionalesCercanos');
+    final result = await callable.call<Map<String, dynamic>>({
+      'lat': lat,
+      'lng': lng,
+    });
+    final lista = (result.data['resultados'] as List?) ?? [];
+    return lista
+        .map((e) => ProfesionalCercano.fromMap(Map<String, dynamic>.from(e as Map)))
+        .toList();
   }
 }

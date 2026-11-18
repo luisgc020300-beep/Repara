@@ -30,6 +30,8 @@
 	<string>Repara usa Face ID para proteger el acceso a documentos sensibles de tu casa.</string>
 	<key>NSContactsUsageDescription</key>
 	<string>Repara necesita acceso a tus contactos para que puedas importar a tus profesionales de confianza.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Repara usa tu ubicación aproximada solo para encontrar profesionales cercanos cuando tú lo pidas en "Cercanos".</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

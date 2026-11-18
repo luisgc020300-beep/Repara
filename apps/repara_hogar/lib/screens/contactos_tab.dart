@@ -1,7 +1,11 @@
 // lib/screens/contactos_tab.dart
 //
-// Libreta de profesionales de confianza de la casa (decisión del CEO: nunca
-// un listado público ni un buscador de gente nueva -- solo tus contactos).
+// Libreta de profesionales de confianza de la casa -- Agregados/Recientes/
+// Favoritos/la lista completa nunca buscan gente nueva, solo filtran tus
+// propios contactos (decisión del CEO, noviembre 2026). "Cercanos" es la
+// única excepción, deliberada y explícita (CEO, noviembre 2026): sí busca
+// profesionales que no conoces todavía, por proximidad -- ver
+// cercanos_screen.dart para el diseño de privacidad completo.
 import 'package:flutter/material.dart';
 import 'package:repara_core/registro_service.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -16,6 +20,7 @@ import 'package:repara_ui/app_error.dart';
 import '../widgets/boton_ajustes.dart';
 import 'package:repara_ui/ios_list.dart';
 import 'package:repara_ui/scroll_to_top_button.dart';
+import 'cercanos_screen.dart';
 import 'contacto_acciones.dart';
 import 'importar_contactos_screen.dart';
 import 'nuevo_contacto_sheet.dart';
@@ -236,6 +241,20 @@ class _ContactosTabState extends State<ContactosTab> {
           ..sort((a, b) => b.createdAt!.compareTo(a.createdAt!));
 
     return [
+      IosSection(
+        rows: [
+          IosRow(
+            icon: Icons.near_me_outlined,
+            iconColor: context.colors.brand,
+            title: 'Cercanos',
+            subtitle: 'Profesionales cerca de ti que no tienes en tu agenda',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => CercanosScreen(casaId: casa.id)),
+            ),
+          ),
+        ],
+      ),
       if (favoritos.isNotEmpty)
         IosSection(
           header: 'Favoritos',
