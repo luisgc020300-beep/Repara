@@ -15,10 +15,11 @@
 // proyecto real: initializeTestEnvironment apunta siempre al emulador
 // local (127.0.0.1:8080), nunca a repara-hogar-app.
 const test = require('node:test');
+const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { initializeTestEnvironment, assertSucceeds, assertFails } = require('@firebase/rules-unit-testing');
-const { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, addDoc } = require('firebase/firestore');
+const { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, addDoc, query, where, getDocs } = require('firebase/firestore');
 
 const { describe, it, before, after, beforeEach } = test;
 
@@ -730,6 +731,32 @@ describe('habitaciones, elementos y contactos -- solo miembros de la casa', () =
     await assertFails(getDoc(doc(as(EXTRANO), `casas/${CASA_A}/contactos`, 'c1')));
   });
 
+  // profesionalUidVinculado (vinculación de contactos, noviembre 2026):
+  // solo responderInvitacion (Cloud Function, Admin SDK) puede escribirlo
+  // -- sin esto, cualquier miembro podría apuntarlo a un uid cualquiera y
+  // hacer pasar valoraciones ajenas por las de su propio contacto.
+  it('DENY: un miembro no puede crear un contacto ya con profesionalUidVinculado puesto', async () => {
+    await assertFails(addDoc(collection(as(OWNER_A), `casas/${CASA_A}/contactos`), {
+      nombre: 'Fontanero', telefono: '600', profesionalUidVinculado: PRO,
+    }));
+  });
+
+  it('DENY: un miembro no puede escribir profesionalUidVinculado en un contacto ya existente', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `casas/${CASA_A}/contactos`, 'c-vinculable'), { nombre: 'Fontanero', telefono: '600' });
+    });
+    await assertFails(updateDoc(doc(as(OWNER_A), `casas/${CASA_A}/contactos`, 'c-vinculable'), { profesionalUidVinculado: PRO }));
+  });
+
+  it('ALLOW: un miembro sigue pudiendo editar otros campos del mismo contacto sin tocar profesionalUidVinculado', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `casas/${CASA_A}/contactos`, 'c-editable'), {
+        nombre: 'Fontanero', telefono: '600', profesionalUidVinculado: PRO,
+      });
+    });
+    await assertSucceeds(updateDoc(doc(as(OWNER_A), `casas/${CASA_A}/contactos`, 'c-editable'), { favorito: true }));
+  });
+
   // Archivado/eliminación de elementos (auditoría R5, octubre 2026): solo
   // archivarElemento/restaurarElemento (Cloud Functions, Admin SDK, saltan
   // estas reglas) pueden tocar estos campos -- el cliente nunca directamente,
@@ -768,5 +795,47 @@ describe('habitaciones, elementos y contactos -- solo miembros de la casa', () =
 
   it('DENY: tampoco se puede borrar un elemento ya archivado directamente', async () => {
     await assertFails(deleteDoc(doc(as(OWNER_A), `casas/${CASA_A}/elementos`, ELEMENTO_ARCHIVADO)));
+  });
+});
+
+// Reputación de REPARA Pro (unificación del sistema de valoraciones,
+// noviembre 2026): PerfilProfesionalService.streamMisValoracionesRecibidas
+// consulta valoraciones where('profesionalUid', '==', miUid) directamente
+// desde el cliente -- mismo patrón ya probado en este fichero para
+// invitaciones (ver "ALLOW: el profesional invitado lee la invitación")
+// y ya usado en producción por InvitacionService.streamPendientesParaMi.
+// Esto confirma que la regla existente (resource.data.profesionalUid ==
+// request.auth.uid) ya permite esa consulta tal cual, sin ningún cambio.
+describe('valoraciones -- consulta "mis valoraciones recibidas" del propio profesional', () => {
+  // beforeEach (línea ~65) limpia Firestore ANTES de cada "it", incluido el
+  // primero de este describe -- un before() de un solo seed no sobrevive a
+  // eso. Mismo patrón que el resto del fichero: sembrar dentro de cada test.
+  async function sembrarValoracion() {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'valoraciones', `${REGISTRO_A1}_${OWNER_A}`), {
+        casaId: CASA_A, elementoId: ELEMENTO_A1, registroId: REGISTRO_A1,
+        profesionalUid: PRO, propietarioUid: OWNER_A, puntuacion: 5,
+        registroTitulo: 'Cambio de caldera',
+      });
+    });
+  }
+
+  it('ALLOW: el profesional consulta sus propias valoraciones con una query por su uid', async () => {
+    await sembrarValoracion();
+    const q = query(collection(as(PRO), 'valoraciones'), where('profesionalUid', '==', PRO));
+    const snap = await assertSucceeds(getDocs(q));
+    assert.equal(snap.size, 1);
+  });
+
+  it('DENY: un profesional ajeno no puede consultar valoraciones de otro con una query por un uid que no es el suyo', async () => {
+    await sembrarValoracion();
+    const q = query(collection(as(PRO_AJENO), 'valoraciones'), where('profesionalUid', '==', PRO));
+    await assertFails(getDocs(q));
+  });
+
+  it('DENY: un extraño no puede consultar valoraciones sin relación con él', async () => {
+    await sembrarValoracion();
+    const q = query(collection(as(EXTRANO), 'valoraciones'), where('profesionalUid', '==', PRO));
+    await assertFails(getDocs(q));
   });
 });

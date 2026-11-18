@@ -65,6 +65,33 @@ class PerfilProfesionalService {
     });
   }
 
+  /// Reputación de REPARA Pro (noviembre 2026): todas las valoraciones
+  /// recibidas por el profesional que ha iniciado sesión -- mismo criterio
+  /// de consulta "solo mi propio uid" que ya usa InvitacionService.
+  /// streamPendientesParaMi (firestore.rules ya lo permite sin cambios: la
+  /// condición de lectura es justo esta igualdad). Sin orderBy en la propia
+  /// consulta a propósito, mismo motivo que InvitacionService.
+  /// streamAceptadasRecientes -- combinarlo con el where exigiría un índice
+  /// compuesto nuevo; se ordena aquí mismo tras recibir el snapshot.
+  static Stream<List<ValoracionRecibida>> streamMisValoracionesRecibidas() {
+    final uid = _uid;
+    if (uid == null) return Stream.value(const []);
+    return _db
+        .collection('valoraciones')
+        .where('profesionalUid', isEqualTo: uid)
+        .snapshots()
+        .map((s) {
+          final lista = s.docs.map(ValoracionRecibida.fromDoc).toList()
+            ..sort((a, b) {
+              final a0 = a.createdAt ?? DateTime(2000);
+              final b0 = b.createdAt ?? DateTime(2000);
+              return b0.compareTo(a0);
+            });
+          return lista;
+        })
+        .conRegistroDeErrores();
+  }
+
   /// Cercanos (noviembre 2026): el servidor calcula la distancia y solo
   /// devuelve kilómetros redondeados, ya ordenados de más a menos cerca --
   /// nunca coordenadas (ver buscarProfesionalesCercanos en

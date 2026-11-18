@@ -2137,6 +2137,14 @@ class _SeccionInvitarProfesionalState
   // la pantalla en cuanto se genera, mientras sigue en esta ficha.
   String? _ultimoCodigoGenerado;
 
+  // Vinculación de contactos (noviembre 2026): solo se manda contactoId si
+  // el teléfono que se va a invitar sigue siendo exactamente el que tenía
+  // ese contacto al elegirlo -- si el usuario edita el campo a mano
+  // después, _invitar() ya no lo manda (nunca un contactoId que ya no
+  // corresponde a lo que de verdad se va a invitar).
+  String? _contactoIdSeleccionado;
+  String? _telefonoDelContactoSeleccionado;
+
   @override
   void dispose() {
     _emailCtrl.dispose();
@@ -2219,6 +2227,8 @@ class _SeccionInvitarProfesionalState
     setState(() {
       _telefonoCtrl.text = elegido.telefono;
       _emailCtrl.clear();
+      _contactoIdSeleccionado = elegido.id;
+      _telefonoDelContactoSeleccionado = elegido.telefono;
     });
   }
 
@@ -2226,6 +2236,9 @@ class _SeccionInvitarProfesionalState
     final email = _emailCtrl.text.trim();
     final telefono = _telefonoCtrl.text.trim();
     if (email.isEmpty && telefono.isEmpty) return;
+    final contactoId = (email.isEmpty && telefono == _telefonoDelContactoSeleccionado)
+        ? _contactoIdSeleccionado
+        : null;
     setState(() => _enviando = true);
     try {
       final resultado = await InvitacionService.invitarProfesional(
@@ -2234,9 +2247,12 @@ class _SeccionInvitarProfesionalState
         registroId: widget.registro.id,
         emailProfesional: email.isEmpty ? null : email,
         telefonoProfesional: telefono.isEmpty ? null : telefono,
+        contactoId: contactoId,
       );
       _emailCtrl.clear();
       _telefonoCtrl.clear();
+      _contactoIdSeleccionado = null;
+      _telefonoDelContactoSeleccionado = null;
       unawaited(
         AnalyticsService.professionalInvited(
           metodo: resultado.esDirecta ? 'email' : 'codigo',
@@ -2329,37 +2345,55 @@ class _SeccionInvitarProfesionalState
   @override
   Widget build(BuildContext context) {
     if (widget.registro.profesionalUid != null) {
-      return IosSection(
-        rows: [
-          IosRow(
-            icon: Icons.verified_user_outlined,
-            iconColor: context.colors.success,
-            title: widget.registro.profesionalNombre ?? 'Profesional vinculado',
-            subtitle:
-                'Puede ver este evento y actualizar su estado -- toca para ver su perfil',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => PerfilProfesionalScreen(
-                  profesionalUid: widget.registro.profesionalUid!,
-                  nombreMostrado:
-                      widget.registro.profesionalNombre ??
-                      'Profesional vinculado',
-                  // Solo se ofrece valorar un trabajo ya terminado -- nunca
-                  // uno en curso.
-                  contextoValoracion:
-                      widget.registro.estado == EstadoRegistro.terminado
-                      ? ContextoValoracion(
-                          casaId: widget.casa.id,
-                          elementoId: widget.elementoId,
-                          registroId: widget.registro.id,
-                          tituloTrabajo: widget.registro.titulo,
-                        )
-                      : null,
+      final nombreProfesional =
+          widget.registro.profesionalNombre ?? 'Profesional vinculado';
+      // Acceso visible a valorar (noviembre 2026, unificación del sistema
+      // de valoraciones -- CEO: "no resulta intuitivo, el usuario no sabe
+      // que ahí puede valorar"). Antes solo se ofrecía dentro del perfil
+      // del profesional, al que había que entrar sin ningún indicio de que
+      // ahí hubiera un formulario de valorar. Ahora, con el trabajo ya
+      // terminado, la sección de valorar vive directamente aquí, con un
+      // título propio e inconfundible.
+      final contextoValoracion = widget.registro.estado == EstadoRegistro.terminado
+          ? ContextoValoracion(
+              casaId: widget.casa.id,
+              elementoId: widget.elementoId,
+              registroId: widget.registro.id,
+              tituloTrabajo: widget.registro.titulo,
+            )
+          : null;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          IosSection(
+            rows: [
+              IosRow(
+                icon: Icons.verified_user_outlined,
+                iconColor: context.colors.success,
+                title: nombreProfesional,
+                subtitle:
+                    'Puede ver este evento y actualizar su estado -- toca para ver su perfil',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => PerfilProfesionalScreen(
+                      profesionalUid: widget.registro.profesionalUid!,
+                      nombreMostrado: nombreProfesional,
+                      contextoValoracion: contextoValoracion,
+                    ),
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
+          if (contextoValoracion != null) ...[
+            const SizedBox(height: ReparaSpace.s3),
+            SeccionValorarTrabajo(
+              profesionalUid: widget.registro.profesionalUid!,
+              nombreProfesional: nombreProfesional,
+              contexto: contextoValoracion,
+            ),
+          ],
         ],
       );
     }

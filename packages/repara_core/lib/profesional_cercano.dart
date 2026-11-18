@@ -11,6 +11,7 @@ class ProfesionalCercano {
     this.especialidad,
     this.trabajosTerminados = 0,
     this.valoracionMedia,
+    this.numValoraciones = 0,
     required this.distanciaAproxKm,
   });
 
@@ -19,6 +20,7 @@ class ProfesionalCercano {
   final String? especialidad;
   final int trabajosTerminados;
   final double? valoracionMedia;
+  final int numValoraciones;
   final double distanciaAproxKm;
 
   factory ProfesionalCercano.fromMap(Map<String, dynamic> map) =>
@@ -28,6 +30,7 @@ class ProfesionalCercano {
         especialidad: map['especialidad'] as String?,
         trabajosTerminados: (map['trabajosTerminados'] as num?)?.toInt() ?? 0,
         valoracionMedia: (map['valoracionMedia'] as num?)?.toDouble(),
+        numValoraciones: (map['numValoraciones'] as num?)?.toInt() ?? 0,
         distanciaAproxKm: (map['distanciaAproxKm'] as num?)?.toDouble() ?? 0,
       );
 }

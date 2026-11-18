@@ -274,6 +274,7 @@ Future<void> _invitarAUnEvento(
       elementoId: elegido.elementoId,
       registroId: elegido.registro.id,
       telefonoProfesional: contacto.telefono,
+      contactoId: contacto.id,
     );
     unawaited(
       AnalyticsService.professionalInvited(

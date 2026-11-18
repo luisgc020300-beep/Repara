@@ -352,8 +352,20 @@ service cloud.firestore {
 
       // Libreta privada de profesionales de confianza de la casa -- nunca
       // visible fuera de sus miembros, no es un listado público.
+      //
+      // profesionalUidVinculado (vinculación de contactos, noviembre 2026):
+      // la única cuenta profesional real que responderInvitacion (Cloud
+      // Function, Admin SDK) ha verificado para este contacto, tras
+      // aceptar una invitación enviada desde él. NUNCA escribible por el
+      // cliente -- sin esto, cualquier miembro podría apuntar este campo a
+      // un uid cualquiera y hacer pasar valoraciones ajenas por las de su
+      // propio contacto.
       match /contactos/{ctid} {
-        allow read, write: if isAuth() && isMember(cid);
+        allow read: if isAuth() && isMember(cid);
+        allow create: if isAuth() && isMember(cid) && !('profesionalUidVinculado' in request.resource.data);
+        allow update: if isAuth() && isMember(cid)
+            && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['profesionalUidVinculado']);
+        allow delete: if isAuth() && isMember(cid);
       }
 
       // Un documento es visible/gestionable por los miembros de la casa como

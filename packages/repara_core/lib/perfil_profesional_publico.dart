@@ -61,3 +61,37 @@ class MiValoracion {
     );
   }
 }
+
+/// Una valoración recibida, vista por el propio profesional en REPARA Pro
+/// (reputación, noviembre 2026) -- solo lo que ya le pertenece: su
+/// puntuación, el comentario, cuándo, y el título del trabajo (ya tenía
+/// acceso de lectura a ese registro, ver firestore.rules). Nunca nombre de
+/// la vivienda, del propietario, ni ningún otro dato privado del cliente.
+class ValoracionRecibida {
+  const ValoracionRecibida({
+    required this.id,
+    required this.puntuacion,
+    this.comentario,
+    this.registroTitulo,
+    this.createdAt,
+  });
+
+  final String id;
+  final int puntuacion;
+  final String? comentario;
+  final String? registroTitulo;
+  final DateTime? createdAt;
+
+  factory ValoracionRecibida.fromDoc(
+    DocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
+    final data = doc.data() ?? {};
+    return ValoracionRecibida(
+      id: doc.id,
+      puntuacion: (data['puntuacion'] as num?)?.toInt() ?? 0,
+      comentario: data['comentario'] as String?,
+      registroTitulo: data['registroTitulo'] as String?,
+      createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
+    );
+  }
+}

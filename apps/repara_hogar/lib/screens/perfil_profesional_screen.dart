@@ -116,8 +116,9 @@ class PerfilProfesionalScreen extends StatelessWidget {
               ),
               if (contextoValoracion != null) ...[
                 const SizedBox(height: ReparaSpace.s5),
-                _SeccionValorar(
+                SeccionValorarTrabajo(
                   profesionalUid: profesionalUid,
+                  nombreProfesional: nombre,
                   contexto: contextoValoracion!,
                 ),
               ],
@@ -165,17 +166,31 @@ class _Estadistica extends StatelessWidget {
   }
 }
 
-class _SeccionValorar extends StatefulWidget {
-  const _SeccionValorar({required this.profesionalUid, required this.contexto});
+/// Sección de valorar un trabajo terminado -- pública (noviembre 2026,
+/// unificación del sistema de valoraciones) para poder embeberla
+/// directamente en registro_detail_screen.dart (acceso visible "¿Cómo ha
+/// sido el trabajo?" en el propio registro, no solo escondida dentro del
+/// perfil del profesional) además de seguir usándose aquí.
+class SeccionValorarTrabajo extends StatefulWidget {
+  const SeccionValorarTrabajo({
+    required this.profesionalUid,
+    required this.nombreProfesional,
+    required this.contexto,
+    super.key,
+  });
 
   final String profesionalUid;
+
+  /// Para dejar claro a quién corresponde la valoración -- nunca un
+  /// trabajo genérico sin nombre.
+  final String nombreProfesional;
   final ContextoValoracion contexto;
 
   @override
-  State<_SeccionValorar> createState() => _SeccionValorarState();
+  State<SeccionValorarTrabajo> createState() => _SeccionValorarTrabajoState();
 }
 
-class _SeccionValorarState extends State<_SeccionValorar> {
+class _SeccionValorarTrabajoState extends State<SeccionValorarTrabajo> {
   int _puntuacionElegida = 0;
   final _comentarioCtrl = TextEditingController();
   bool _enviando = false;
@@ -242,9 +257,24 @@ class _SeccionValorarState extends State<_SeccionValorar> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.check_circle_rounded,
+                        size: 18,
+                        color: context.colors.success,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Ya has valorado este trabajo',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
                   Text(
-                    'Tu valoración de "${widget.contexto.tituloTrabajo}"',
-                    style: Theme.of(context).textTheme.titleMedium,
+                    '${widget.nombreProfesional} · "${widget.contexto.tituloTrabajo}"',
+                    style: TextStyle(color: context.colors.inkMuted),
                   ),
                   const SizedBox(height: 6),
                   Row(
@@ -275,8 +305,13 @@ class _SeccionValorarState extends State<_SeccionValorar> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Valorar "${widget.contexto.tituloTrabajo}"',
+                  '¿Cómo ha sido el trabajo?',
                   style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${widget.nombreProfesional} · "${widget.contexto.tituloTrabajo}"',
+                  style: TextStyle(color: context.colors.inkMuted),
                 ),
                 const SizedBox(height: 8),
                 Row(

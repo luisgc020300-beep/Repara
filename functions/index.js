@@ -447,9 +447,21 @@ async function generarCodigoInvitacionUnico() {
 exports.invitarProfesional = onCall({ region: REGION }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
   const propietarioUid = request.auth.uid;
-  const { casaId, elementoId, registroId, emailProfesional, telefonoProfesional, profesionalUidDirecto } = request.data || {};
+  const { casaId, elementoId, registroId, emailProfesional, telefonoProfesional, profesionalUidDirecto, contactoId } = request.data || {};
   const email = typeof emailProfesional === 'string' ? emailProfesional.trim().toLowerCase() : '';
   const telefono = typeof telefonoProfesional === 'string' ? telefonoProfesional.trim() : '';
+  // contactoId (vinculación de contactos, noviembre 2026): cuando la
+  // invitación nace de un contacto concreto de la libreta, se guarda la
+  // referencia para que responderInvitacion pueda, en el momento exacto en
+  // que alguien ACEPTA de verdad, vincular ese contacto a la cuenta
+  // profesional real -- la única forma fiable de saber "este contacto de
+  // teléfono es esta cuenta de Repara" sin confiar en una coincidencia de
+  // texto (ver contactos/{ctid}.profesionalUidVinculado en firestore.rules).
+  const contactoIdLimpio = typeof contactoId === 'string' && contactoId.trim() ? contactoId.trim() : null;
+  if (contactoIdLimpio) {
+    const contactoSnap = await db.collection('casas').doc(casaId).collection('contactos').doc(contactoIdLimpio).get();
+    if (!contactoSnap.exists) throw new HttpsError('not-found', 'Ese contacto ya no existe.');
+  }
   // uidDirecto (Cercanos, noviembre 2026): cuando la invitación nace de un
   // resultado de búsqueda de profesionales cercanos, el cliente ya conoce un
   // uid de confianza (lo devolvió buscarProfesionalesCercanos, nunca el
@@ -534,6 +546,7 @@ exports.invitarProfesional = onCall({ region: REGION }, async (request) => {
       propietarioUid,
       profesionalUid,
       profesionalEmail: email,
+      contactoId: contactoIdLimpio,
       estado: 'pendiente',
       createdAt: FieldValue.serverTimestamp(),
     });
@@ -555,6 +568,7 @@ exports.invitarProfesional = onCall({ region: REGION }, async (request) => {
     propietarioUid,
     contactoEmail: email || null,
     contactoTelefono: telefono || null,
+    contactoId: contactoIdLimpio,
     estado: 'pendiente_registro',
     createdAt: FieldValue.serverTimestamp(),
     expiraEn: Timestamp.fromMillis(Date.now() + 30 * 24 * 60 * 60 * 1000),
@@ -605,6 +619,7 @@ exports.canjearCodigoInvitacion = onCall({ region: REGION }, async (request) => 
       propietarioUid: inv.propietarioUid,
       profesionalUid: uid,
       profesionalEmail: inv.contactoEmail || '',
+      contactoId: inv.contactoId || null,
       estado: 'pendiente',
       createdAt: FieldValue.serverTimestamp(),
     });
@@ -686,6 +701,21 @@ exports.responderInvitacion = onCall({ region: REGION }, async (request) => {
           fotoUrl: inv.fotoUrl || null,
         }),
       }, { merge: true });
+      // Vinculación de contactos (noviembre 2026): este es el único momento
+      // de todo el sistema en el que se puede afirmar con confianza real
+      // "este contacto de la libreta es esta cuenta profesional" -- el
+      // propietario eligió este contacto al invitar Y la cuenta que acepta
+      // demuestra control real de esa sesión. Nunca se infiere por
+      // coincidencia de nombre o teléfono (ver firestore.rules:
+      // contactos/{ctid}.profesionalUidVinculado no es escribible por el
+      // cliente, solo por esta función).
+      if (inv.contactoId) {
+        tx.set(
+          db.collection('casas').doc(inv.casaId).collection('contactos').doc(inv.contactoId),
+          { profesionalUidVinculado: uid },
+          { merge: true },
+        );
+      }
     }
     registrarHistorial(regRef, {
       tx, actorUid: uid, actorNombre: nombreProfesional, entidad: 'invitacion', entidadId: invitacionId,
@@ -2824,6 +2854,13 @@ exports.crearValoracion = onCall({ region: REGION }, async (request) => {
       propietarioUid: uid,
       puntuacion,
       comentario: comentarioLimpio,
+      // Referencia al trabajo (noviembre 2026, reputación de REPARA Pro) --
+      // el profesional ya tiene acceso de lectura a este mismo registro
+      // (profesionalUid == su uid, ver firestore.rules), así que el título
+      // no es un dato nuevo para él; se denormaliza aquí para que su
+      // pantalla de valoraciones no necesite leer cada registro aparte.
+      // Nunca se guarda nada de la vivienda ni del propietario.
+      registroTitulo: registro.titulo || '',
       createdAt: FieldValue.serverTimestamp(),
     });
     tx.set(db.collection('profesionalesPublico').doc(profesionalUid), {
@@ -2954,6 +2991,7 @@ exports.buscarProfesionalesCercanos = onCall({ region: REGION, secrets: [_cercan
       especialidad: pub.especialidad || null,
       trabajosTerminados: pub.trabajosTerminados || 0,
       valoracionMedia: numValoraciones > 0 ? pub.sumaPuntuaciones / numValoraciones : null,
+      numValoraciones,
       distanciaAproxKm: distanciaAproximadaKm(c.km),
     };
   });

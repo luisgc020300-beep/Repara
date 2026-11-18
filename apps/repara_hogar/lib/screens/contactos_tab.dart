@@ -7,6 +7,8 @@
 // profesionales que no conoces todavía, por proximidad -- ver
 // cercanos_screen.dart para el diseño de privacidad completo.
 import 'package:flutter/material.dart';
+import 'package:repara_core/perfil_profesional_publico.dart';
+import 'package:repara_core/perfil_profesional_service.dart';
 import 'package:repara_core/registro_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -20,6 +22,7 @@ import 'package:repara_ui/app_error.dart';
 import '../widgets/boton_ajustes.dart';
 import 'package:repara_ui/ios_list.dart';
 import 'package:repara_ui/scroll_to_top_button.dart';
+import 'package:repara_ui/valoracion_resumen.dart';
 import 'cercanos_screen.dart';
 import 'contacto_acciones.dart';
 import 'importar_contactos_screen.dart';
@@ -401,6 +404,27 @@ class _ContactoRow extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    // Vinculación de contactos (noviembre 2026): solo se
+                    // muestra valoración cuando este contacto está
+                    // verificado como una cuenta profesional real -- nunca
+                    // por coincidencia de nombre o teléfono (ver
+                    // Contacto.profesionalUidVinculado).
+                    if (contacto.profesionalUidVinculado != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: StreamBuilder<PerfilProfesionalPublico?>(
+                          stream: PerfilProfesionalService.streamPerfilPublico(
+                            contacto.profesionalUidVinculado!,
+                          ),
+                          builder: (context, snapshot) {
+                            final perfil = snapshot.data;
+                            return ValoracionResumen(
+                              valoracionMedia: perfil?.valoracionMedia,
+                              numValoraciones: perfil?.numValoraciones ?? 0,
+                            );
+                          },
+                        ),
+                      ),
                   ],
                 ),
               ),

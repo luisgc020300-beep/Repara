@@ -24,6 +24,7 @@ class Contacto {
     this.notas,
     this.favorito = false,
     this.createdAt,
+    this.profesionalUidVinculado,
   });
 
   final String id;
@@ -39,6 +40,15 @@ class Contacto {
   final bool favorito;
   final DateTime? createdAt;
 
+  /// Vinculación de contactos (noviembre 2026): la cuenta profesional real
+  /// de REPARA Pro que corresponde a este contacto, solo cuando
+  /// responderInvitacion (Cloud Function) la ha verificado -- nunca por
+  /// coincidencia de nombre o teléfono. Null mientras no haya ninguna
+  /// invitación aceptada que lo confirme; no es escribible por el cliente
+  /// (ver firestore.rules). Mientras sea null, no debe mostrarse ninguna
+  /// valoración para este contacto.
+  final String? profesionalUidVinculado;
+
   factory Contacto.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? {};
     return Contacto(
@@ -50,6 +60,7 @@ class Contacto {
       notas: data['notas'] as String?,
       favorito: data['favorito'] as bool? ?? false,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
+      profesionalUidVinculado: data['profesionalUidVinculado'] as String?,
     );
   }
 
@@ -71,5 +82,6 @@ class Contacto {
         notas: notas,
         favorito: favorito ?? this.favorito,
         createdAt: createdAt,
+        profesionalUidVinculado: profesionalUidVinculado,
       );
 }

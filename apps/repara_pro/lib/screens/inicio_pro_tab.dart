@@ -25,6 +25,7 @@ import '../widgets/boton_ajustes_pro.dart';
 import '../widgets/boton_notificaciones_pro.dart';
 import 'package:repara_ui/ios_list.dart';
 import 'package:repara_ui/scroll_to_top_button.dart';
+import 'mis_valoraciones_screen.dart';
 import 'registro_pro_detail_screen.dart';
 import 'trabajo_pro_agregado.dart';
 
@@ -125,6 +126,18 @@ class _InicioProTabState extends State<InicioProTab> {
                 IosSection(
                   header: 'Accesos rápidos',
                   rows: [
+                    IosRow(
+                      icon: Icons.star_outline_rounded,
+                      iconColor: context.colors.brand,
+                      title: 'Mi reputación',
+                      subtitle: 'Nota media, valoraciones y comentarios recibidos',
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const MisValoracionesScreen(),
+                        ),
+                      ),
+                    ),
                     IosRow(
                       icon: Icons.person_add_alt_outlined,
                       iconColor: context.colors.brand,

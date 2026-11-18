@@ -43,6 +43,11 @@ class InvitacionService {
     // proximidad no hay ni email ni teléfono (son privados, Cercanos nunca
     // los expone) -- solo el uid que ya devolvió buscarProfesionalesCercanos.
     String? profesionalUidDirecto,
+    // Vinculación de contactos (noviembre 2026): si la invitación nace de
+    // un contacto concreto de la libreta, pasar su id -- permite que, si
+    // acepta, quede vinculado de verdad a esa cuenta (ver responderInvitacion
+    // y contactos/{ctid}.profesionalUidVinculado).
+    String? contactoId,
   }) async {
     final callable = FirebaseFunctions.instanceFor(
       region: _region,
@@ -54,6 +59,7 @@ class InvitacionService {
       'emailProfesional': ?emailProfesional,
       'telefonoProfesional': ?telefonoProfesional,
       'profesionalUidDirecto': ?profesionalUidDirecto,
+      'contactoId': ?contactoId,
     });
     final tipo = result.data['tipo'] as String?;
     return ResultadoInvitacion(

@@ -19,6 +19,7 @@ import 'package:repara_core/location_service.dart';
 import 'package:repara_core/perfil_profesional_service.dart';
 import 'package:repara_core/profesional_cercano.dart';
 import 'package:repara_ui/app_error.dart';
+import 'package:repara_ui/valoracion_resumen.dart';
 
 import 'contacto_acciones.dart' show elegirEventoParaInvitar;
 import 'perfil_profesional_screen.dart';
@@ -309,20 +310,19 @@ class _ListaResultados extends StatelessWidget {
                               _distanciaLabel(p.distanciaAproxKm),
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
-                            if (p.valoracionMedia != null) ...[
-                              const SizedBox(width: 10),
-                              Icon(
-                                Icons.star_rounded,
-                                size: 14,
-                                color: context.colors.warning,
-                              ),
-                              const SizedBox(width: 2),
-                              Text(
-                                p.valoracionMedia!.toStringAsFixed(1),
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                            ],
                           ],
+                        ),
+                        const SizedBox(height: 4),
+                        // Visibilidad suficiente para decidir con quién
+                        // contactar (CEO) -- en su propia línea, no
+                        // apretujada junto a la distancia. Misma fuente
+                        // (profesionalesPublico) y mismo widget que
+                        // Contactos y REPARA Pro -- nunca una cifra propia
+                        // calculada aquí.
+                        ValoracionResumen(
+                          valoracionMedia: p.valoracionMedia,
+                          numValoraciones: p.numValoraciones,
+                          tamanoEstrella: 16,
                         ),
                       ],
                     ),
