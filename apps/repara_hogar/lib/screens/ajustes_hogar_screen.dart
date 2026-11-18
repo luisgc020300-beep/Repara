@@ -193,6 +193,7 @@ class _AjustesHogarScreenState extends State<AjustesHogarScreen> {
             ],
 
             IosSection(
+              header: 'Tema',
               rows: [
                 IosRow(
                   icon: Icons.palette_outlined,
@@ -201,6 +202,11 @@ class _AjustesHogarScreenState extends State<AjustesHogarScreen> {
                   trailing: _valorConChevron(context, _temaLabel()),
                   onTap: () => _abrirSelectorApariencia(context),
                 ),
+              ],
+            ),
+            IosSection(
+              header: 'Acerca de la app',
+              rows: [
                 IosRow(
                   icon: Icons.notifications_outlined,
                   iconColor: context.colors.brand,
@@ -212,19 +218,17 @@ class _AjustesHogarScreenState extends State<AjustesHogarScreen> {
                     ),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: ReparaSpace.s4),
-            const SeccionSeguridadDocumentos(),
-            const SizedBox(height: ReparaSpace.s4),
-            IosSection(
-              rows: [
                 IosRow(
                   icon: Icons.help_outline,
                   iconColor: context.colors.brand,
                   title: 'Contacto y soporte técnico',
                   onTap: () => _abrirSoporte(context),
                 ),
+              ],
+            ),
+            const SeccionSeguridadDocumentos(),
+            IosSection(
+              rows: [
                 IosRow(
                   icon: Icons.info_outline,
                   iconColor: context.colors.brand,
@@ -307,6 +311,7 @@ class _CuentaCard extends StatelessWidget {
                     'historial, documentos y fotos. Si la compartes con alguien más, solo se elimina tu vinculación a ella. '
                     'Esta acción no se puede deshacer.',
                 antesDeCerrarSesion: FcmService.olvidarEsteDispositivo,
+                mostrarCerrarSesion: false,
               ),
             ),
           ),

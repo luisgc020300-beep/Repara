@@ -47,6 +47,7 @@ class CuentaScreen extends StatefulWidget {
   const CuentaScreen({
     required this.eliminarCuentaMensaje,
     this.antesDeCerrarSesion,
+    this.mostrarCerrarSesion = true,
     super.key,
   });
 
@@ -58,6 +59,13 @@ class CuentaScreen extends StatefulWidget {
   /// token FCM de este dispositivo. Opcional: null si la app no tiene nada
   /// que limpiar.
   final Future<void> Function()? antesDeCerrarSesion;
+
+  /// false cuando quien instancia esta pantalla ya ofrece "Cerrar sesión"
+  /// en otro sitio (rediseño de Ajustes de Hogar, noviembre 2026: al final
+  /// de la pantalla, no dentro de "Tu cuenta") -- evita la fila duplicada
+  /// sin quitarle a Pro su único punto de cierre de sesión, que sigue
+  /// mostrándola por defecto.
+  final bool mostrarCerrarSesion;
 
   @override
   State<CuentaScreen> createState() => _CuentaScreenState();
@@ -190,14 +198,15 @@ class _CuentaScreenState extends State<CuentaScreen> {
           ),
           IosSection(
             rows: [
-              IosRow(
-                icon: Icons.logout_outlined,
-                iconColor: context.colors.errorText,
-                title: 'Cerrar sesión',
-                titleColor: context.colors.errorText,
-                showChevron: false,
-                onTap: _confirmarCerrarSesion,
-              ),
+              if (widget.mostrarCerrarSesion)
+                IosRow(
+                  icon: Icons.logout_outlined,
+                  iconColor: context.colors.errorText,
+                  title: 'Cerrar sesión',
+                  titleColor: context.colors.errorText,
+                  showChevron: false,
+                  onTap: _confirmarCerrarSesion,
+                ),
               IosRow(
                 icon: Icons.devices_outlined,
                 iconColor: context.colors.errorText,
