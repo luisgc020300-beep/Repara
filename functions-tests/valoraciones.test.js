@@ -110,7 +110,24 @@ test('7. dos propietarios de la misma casa pueden valorar el mismo trabajo cada 
   assert.equal(pubSnap.data().sumaPuntuaciones, 8);
 });
 
-test('8. (trigger) un registro que pasa a terminado con profesional incrementa trabajosTerminados', async () => {
+test('8. un profesional que también es miembro de la casa no puede valorarse a sí mismo', async () => {
+  const owner = await crearUsuario();
+  const pro = await crearUsuario();
+  const { casaId, elementoId, registroId } = await sembrarRegistro({
+    ownerUid: owner.uid, estado: 'terminado', profesionalUid: pro.uid,
+  });
+  // El profesional también es miembro de esta misma casa (p.ej. comparte
+  // vivienda con el propietario) -- esMiembroCasa por sí sola no basta.
+  await db.collection('casas').doc(casaId).update({ members: [owner.uid, pro.uid] });
+
+  const { error } = await llamar('crearValoracion', pro.idToken, { casaId, elementoId, registroId, puntuacion: 5 });
+  assert.equal(error?.status, 'PERMISSION_DENIED');
+
+  const pubSnap = await db.collection('profesionalesPublico').doc(pro.uid).get();
+  assert.ok(!pubSnap.exists || !pubSnap.data().numValoraciones);
+});
+
+test('9. (trigger) un registro que pasa a terminado con profesional incrementa trabajosTerminados', async () => {
   const owner = await crearUsuario();
   const pro = await crearUsuario();
   const { casaId, elementoId, registroId } = await sembrarRegistro({
@@ -127,7 +144,7 @@ test('8. (trigger) un registro que pasa a terminado con profesional incrementa t
   assert.equal(pub.trabajosTerminados, 1);
 });
 
-test('9. (trigger) el perfil público sincroniza nombreComercial/especialidad del profesional', async () => {
+test('10. (trigger) el perfil público sincroniza nombreComercial/especialidad del profesional', async () => {
   const pro = await crearUsuario();
   await db.collection('profesionales').doc(pro.uid).set({
     nombreComercial: 'Fontanería Ejemplo', especialidad: 'Fontanería',

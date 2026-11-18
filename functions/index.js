@@ -2778,6 +2778,12 @@ exports.crearValoracion = onCall({ region: REGION }, async (request) => {
     if (!profesionalUid) {
       throw new HttpsError('failed-precondition', 'Este trabajo no tiene ningún profesional vinculado.');
     }
+    if (profesionalUid === uid) {
+      // Un profesional puede ser también miembro de la casa donde trabaja
+      // (p.ej. comparte vivienda con el propietario) -- esMiembroCasa arriba
+      // no distingue ese caso, así que sin esto podría valorarse a sí mismo.
+      throw new HttpsError('permission-denied', 'No puedes valorar tu propio trabajo.');
+    }
     tx.set(valRef, {
       casaId, elementoId, registroId,
       profesionalUid,
