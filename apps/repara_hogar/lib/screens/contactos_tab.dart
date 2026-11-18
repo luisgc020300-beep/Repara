@@ -13,6 +13,7 @@ import 'package:repara_ui/app_dialog.dart';
 import 'package:repara_ui/app_error.dart';
 import '../widgets/boton_ajustes.dart';
 import 'package:repara_ui/ios_list.dart';
+import 'package:repara_ui/scroll_to_top_button.dart';
 import 'contacto_acciones.dart';
 import 'importar_contactos_screen.dart';
 import 'nuevo_contacto_sheet.dart';
@@ -28,11 +29,13 @@ class ContactosTab extends StatefulWidget {
 
 class _ContactosTabState extends State<ContactosTab> {
   final _busquedaCtrl = TextEditingController();
+  final _scrollCtrl = ScrollController();
   String _busqueda = '';
 
   @override
   void dispose() {
     _busquedaCtrl.dispose();
+    _scrollCtrl.dispose();
     super.dispose();
   }
 
@@ -46,8 +49,20 @@ class _ContactosTabState extends State<ContactosTab> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('AGENDA', style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 11, color: Colors.white70)),
-            Text('Contactos', style: Theme.of(context).textTheme.displayMedium?.copyWith(fontSize: 26, color: Colors.white)),
+            Text(
+              'AGENDA',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                fontSize: 11,
+                color: Colors.white70,
+              ),
+            ),
+            Text(
+              'Contactos',
+              style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                fontSize: 26,
+                color: Colors.white,
+              ),
+            ),
           ],
         ),
         actions: [
@@ -64,76 +79,97 @@ class _ContactosTabState extends State<ContactosTab> {
         icon: const Icon(Icons.add),
         label: const Text('Contacto'),
       ),
-      body: StreamBuilder<List<Contacto>>(
-        stream: ContactoService.streamContactos(casa.id),
-        builder: (context, snapshot) {
-          final contactos = snapshot.data ?? [];
-          if (contactos.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 72,
-                      height: 72,
-                      decoration: BoxDecoration(color: context.colors.brandTint, shape: BoxShape.circle),
-                      child: Icon(Icons.contact_phone_outlined, size: 32, color: context.colors.brand),
+      body: Stack(
+        children: [
+          StreamBuilder<List<Contacto>>(
+            stream: ContactoService.streamContactos(casa.id),
+            builder: (context, snapshot) {
+              final contactos = snapshot.data ?? [];
+              if (contactos.isEmpty) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 72,
+                          height: 72,
+                          decoration: BoxDecoration(
+                            color: context.colors.brandTint,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.contact_phone_outlined,
+                            size: 32,
+                            color: context.colors.brand,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Guarda aquí a tu fontanero, electricista o cualquier profesional de confianza.\nLlamarlo o avisarle será mucho más rápido.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: context.colors.inkMuted),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Guarda aquí a tu fontanero, electricista o cualquier profesional de confianza.\nLlamarlo o avisarle será mucho más rápido.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: context.colors.inkMuted),
+                  ),
+                );
+              }
+              // Filtro en memoria, mismo patrón que home_tab.dart -- la agenda
+              // nunca busca gente nueva (ver cabecera del archivo), solo filtra
+              // los contactos que ya tienes cuando la lista crece (CEO,
+              // noviembre 2026).
+              final filtrados = _busqueda.isEmpty
+                  ? contactos
+                  : contactos
+                        .where(
+                          (c) =>
+                              c.nombre.toLowerCase().contains(_busqueda) ||
+                              (c.especialidad?.toLowerCase().contains(
+                                    _busqueda,
+                                  ) ??
+                                  false),
+                        )
+                        .toList();
+              return ListView(
+                controller: _scrollCtrl,
+                padding: const EdgeInsets.fromLTRB(16, ReparaSpace.s4, 16, 90),
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: TextField(
+                      controller: _busquedaCtrl,
+                      decoration: const InputDecoration(
+                        hintText: 'Buscar contacto',
+                        prefixIcon: Icon(Icons.search, size: 20),
+                        isDense: true,
+                      ),
+                      onChanged: (v) =>
+                          setState(() => _busqueda = v.trim().toLowerCase()),
                     ),
-                  ],
-                ),
-              ),
-            );
-          }
-          // Filtro en memoria, mismo patrón que home_tab.dart -- la agenda
-          // nunca busca gente nueva (ver cabecera del archivo), solo filtra
-          // los contactos que ya tienes cuando la lista crece (CEO,
-          // noviembre 2026).
-          final filtrados = _busqueda.isEmpty
-              ? contactos
-              : contactos
-                    .where(
-                      (c) =>
-                          c.nombre.toLowerCase().contains(_busqueda) ||
-                          (c.especialidad?.toLowerCase().contains(_busqueda) ?? false),
+                  ),
+                  if (filtrados.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: Text(
+                        'Ningún contacto coincide con "$_busqueda".',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: context.colors.inkMuted),
+                      ),
                     )
-                    .toList();
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(16, ReparaSpace.s4, 16, 90),
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: TextField(
-                  controller: _busquedaCtrl,
-                  decoration: const InputDecoration(
-                    hintText: 'Buscar contacto',
-                    prefixIcon: Icon(Icons.search, size: 20),
-                    isDense: true,
-                  ),
-                  onChanged: (v) => setState(() => _busqueda = v.trim().toLowerCase()),
-                ),
-              ),
-              if (filtrados.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 24),
-                  child: Text(
-                    'Ningún contacto coincide con "$_busqueda".',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: context.colors.inkMuted),
-                  ),
-                )
-              else
-                IosSection(rows: filtrados.map((c) => _ContactoRow(casa: casa, contacto: c)).toList()),
-            ],
-          );
-        },
+                  else
+                    IosSection(
+                      rows: filtrados
+                          .map((c) => _ContactoRow(casa: casa, contacto: c))
+                          .toList(),
+                    ),
+                ],
+              );
+            },
+          ),
+          ScrollToTopButton(scrollController: _scrollCtrl, left: 16),
+        ],
       ),
     );
   }
@@ -154,20 +190,35 @@ class _ContactoRow extends StatelessWidget {
   // es llamar (CEO, octubre 2026). El resto de la tarjeta sigue abriendo ese
   // menú completo (chat, foto, editar...).
   Future<void> _confirmarLlamada(BuildContext context) async {
-    final confirmar = await AppDialog.confirm(context, title: '¿Llamar a ${contacto.nombre}?', message: contacto.telefono, confirmLabel: 'Llamar');
+    final confirmar = await AppDialog.confirm(
+      context,
+      title: '¿Llamar a ${contacto.nombre}?',
+      message: contacto.telefono,
+      confirmLabel: 'Llamar',
+    );
     if (!confirmar || !context.mounted) return;
-    final abierto = await launchUrl(Uri(scheme: 'tel', path: contacto.telefono));
-    if (!abierto && context.mounted) AppError.show(context, 'No se pudo iniciar la llamada.');
+    final abierto = await launchUrl(
+      Uri(scheme: 'tel', path: contacto.telefono),
+    );
+    if (!abierto && context.mounted) {
+      AppError.show(context, 'No se pudo iniciar la llamada.');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final esEmpresa = contacto.tipo == TipoContacto.empresa;
-    final inicial = contacto.nombre.isNotEmpty ? contacto.nombre[0].toUpperCase() : '?';
+    final inicial = contacto.nombre.isNotEmpty
+        ? contacto.nombre[0].toUpperCase()
+        : '?';
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () => mostrarAccionesContacto(context, casaId: casa.id, contacto: contacto),
+        onTap: () => mostrarAccionesContacto(
+          context,
+          casaId: casa.id,
+          contacto: contacto,
+        ),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: Row(
@@ -175,11 +226,22 @@ class _ContactoRow extends StatelessWidget {
               Container(
                 width: 42,
                 height: 42,
-                decoration: BoxDecoration(color: context.colors.brandTint, shape: BoxShape.circle),
+                decoration: BoxDecoration(
+                  color: context.colors.brandTint,
+                  shape: BoxShape.circle,
+                ),
                 child: esEmpresa
-                    ? Icon(Icons.store_outlined, size: 20, color: context.colors.brand)
+                    ? Icon(
+                        Icons.store_outlined,
+                        size: 20,
+                        color: context.colors.brand,
+                      )
                     : Center(
-                        child: Text(inicial, style: Theme.of(context).textTheme.titleMedium?.copyWith(color: context.colors.brand)),
+                        child: Text(
+                          inicial,
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(color: context.colors.brand),
+                        ),
                       ),
               ),
               const SizedBox(width: 12),
@@ -187,7 +249,10 @@ class _ContactoRow extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(contacto.nombre, style: Theme.of(context).textTheme.titleMedium),
+                    Text(
+                      contacto.nombre,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
                     Text(
                       contacto.especialidad ?? contacto.telefono,
                       style: Theme.of(context).textTheme.bodySmall,

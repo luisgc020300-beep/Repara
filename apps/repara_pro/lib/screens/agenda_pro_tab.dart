@@ -36,6 +36,7 @@ import 'package:repara_ui/app_dialog.dart';
 import 'package:repara_ui/app_error.dart';
 import '../widgets/boton_ajustes_pro.dart';
 import 'package:repara_ui/ios_list.dart';
+import 'package:repara_ui/scroll_to_top_button.dart';
 
 DateTime _soloFecha(DateTime d) => DateTime(d.year, d.month, d.day);
 
@@ -74,6 +75,14 @@ class AgendaProTab extends StatefulWidget {
 class _AgendaProTabState extends State<AgendaProTab> {
   _VistaAgenda _vista = _VistaAgenda.semana;
   DateTime _diaSeleccionado = _soloFecha(DateTime.now());
+  // Compartido entre Semana/Día -- nunca hay dos montadas a la vez.
+  final _scrollCtrl = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
 
   void _irAHoy() =>
       setState(() => _diaSeleccionado = _soloFecha(DateTime.now()));
@@ -167,51 +176,59 @@ class _AgendaProTabState extends State<AgendaProTab> {
         foregroundColor: context.colors.brandOn,
         child: const Icon(Icons.add),
       ),
-      body: StreamBuilder<List<Cita>>(
-        stream: CitaService.streamCitas(),
-        builder: (context, snapshot) {
-          final citas = snapshot.data ?? const [];
-          return Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  ReparaSpace.s4,
-                  ReparaSpace.s3,
-                  ReparaSpace.s4,
-                  ReparaSpace.s2,
-                ),
-                child: _PillToggle(
-                  opciones: const ['Día', 'Semana'],
-                  seleccionado: _vista == _VistaAgenda.dia ? 0 : 1,
-                  onSeleccionado: (i) => setState(
-                    () => _vista = i == 0
-                        ? _VistaAgenda.dia
-                        : _VistaAgenda.semana,
+      body: Stack(
+        children: [
+          StreamBuilder<List<Cita>>(
+            stream: CitaService.streamCitas(),
+            builder: (context, snapshot) {
+              final citas = snapshot.data ?? const [];
+              return Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      ReparaSpace.s4,
+                      ReparaSpace.s3,
+                      ReparaSpace.s4,
+                      ReparaSpace.s2,
+                    ),
+                    child: _PillToggle(
+                      opciones: const ['Día', 'Semana'],
+                      seleccionado: _vista == _VistaAgenda.dia ? 0 : 1,
+                      onSeleccionado: (i) => setState(
+                        () => _vista = i == 0
+                            ? _VistaAgenda.dia
+                            : _VistaAgenda.semana,
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              Expanded(
-                child: switch (_vista) {
-                  _VistaAgenda.semana => _VistaSemana(
-                    citas: citas,
-                    diaSeleccionado: _diaSeleccionado,
-                    onSeleccionarDia: (d) =>
-                        setState(() => _diaSeleccionado = d),
-                    onVerDia: _verDia,
-                    onAbrirCita: _abrirCita,
+                  Expanded(
+                    child: switch (_vista) {
+                      _VistaAgenda.semana => _VistaSemana(
+                        citas: citas,
+                        diaSeleccionado: _diaSeleccionado,
+                        onSeleccionarDia: (d) =>
+                            setState(() => _diaSeleccionado = d),
+                        onVerDia: _verDia,
+                        onAbrirCita: _abrirCita,
+                        scrollController: _scrollCtrl,
+                      ),
+                      _VistaAgenda.dia => _VistaDia(
+                        citas: citas,
+                        dia: _diaSeleccionado,
+                        onCambiarDia: (d) =>
+                            setState(() => _diaSeleccionado = d),
+                        onAbrirCita: _abrirCita,
+                        onNuevaCita: _nuevaCita,
+                        scrollController: _scrollCtrl,
+                      ),
+                    },
                   ),
-                  _VistaAgenda.dia => _VistaDia(
-                    citas: citas,
-                    dia: _diaSeleccionado,
-                    onCambiarDia: (d) => setState(() => _diaSeleccionado = d),
-                    onAbrirCita: _abrirCita,
-                    onNuevaCita: _nuevaCita,
-                  ),
-                },
-              ),
-            ],
-          );
-        },
+                ],
+              );
+            },
+          ),
+          ScrollToTopButton(scrollController: _scrollCtrl, left: 16),
+        ],
       ),
     );
   }
@@ -414,6 +431,7 @@ class _VistaSemana extends StatelessWidget {
     required this.onSeleccionarDia,
     required this.onVerDia,
     required this.onAbrirCita,
+    required this.scrollController,
   });
 
   final List<Cita> citas;
@@ -421,6 +439,7 @@ class _VistaSemana extends StatelessWidget {
   final ValueChanged<DateTime> onSeleccionarDia;
   final ValueChanged<DateTime> onVerDia;
   final void Function(Cita) onAbrirCita;
+  final ScrollController scrollController;
 
   @override
   Widget build(BuildContext context) {
@@ -462,6 +481,7 @@ class _VistaSemana extends StatelessWidget {
         const SizedBox(height: ReparaSpace.s2),
         Expanded(
           child: ListView(
+            controller: scrollController,
             padding: const EdgeInsets.fromLTRB(
               ReparaSpace.s4,
               0,
@@ -574,6 +594,7 @@ class _VistaDia extends StatelessWidget {
     required this.onCambiarDia,
     required this.onAbrirCita,
     required this.onNuevaCita,
+    required this.scrollController,
   });
 
   final List<Cita> citas;
@@ -581,6 +602,7 @@ class _VistaDia extends StatelessWidget {
   final ValueChanged<DateTime> onCambiarDia;
   final void Function(Cita) onAbrirCita;
   final VoidCallback onNuevaCita;
+  final ScrollController scrollController;
 
   @override
   Widget build(BuildContext context) {
@@ -619,6 +641,7 @@ class _VistaDia extends StatelessWidget {
           child: citasDelDia.isEmpty
               ? _EstadoVacioDia(dia: dia, onNuevaCita: onNuevaCita)
               : ListView(
+                  controller: scrollController,
                   padding: const EdgeInsets.fromLTRB(
                     ReparaSpace.s4,
                     0,
@@ -1145,7 +1168,9 @@ class _EditorCitaSheetState extends State<_EditorCitaSheet> {
       // proponga otra fecha -- tanto al crearla como en cualquier edición
       // posterior (el propietario vuelve a tener que responder a la fecha
       // nueva, no se da por aceptada en silencio).
-      estado: compartidaFinal ? EstadoCita.pendienteConfirmacion : EstadoCita.confirmada,
+      estado: compartidaFinal
+          ? EstadoCita.pendienteConfirmacion
+          : EstadoCita.confirmada,
     );
     try {
       if (_esEdicion) {

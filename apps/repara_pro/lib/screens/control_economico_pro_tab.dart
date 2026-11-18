@@ -28,6 +28,7 @@ import 'package:repara_core/design_tokens.dart';
 import 'package:repara_ui/app_error.dart';
 import '../widgets/boton_ajustes_pro.dart';
 import 'package:repara_ui/ios_list.dart';
+import 'package:repara_ui/scroll_to_top_button.dart';
 import 'registro_pro_detail_screen.dart';
 import 'trabajo_pro_agregado.dart';
 
@@ -90,6 +91,13 @@ class ControlEconomicoProTab extends StatefulWidget {
 
 class _ControlEconomicoProTabState extends State<ControlEconomicoProTab> {
   _Periodo _periodo = _Periodo.esteMes;
+  final _scrollCtrl = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -118,209 +126,217 @@ class _ControlEconomicoProTabState extends State<ControlEconomicoProTab> {
         ),
         actions: const [BotonAjustesPro()],
       ),
-      body: TrabajosProAgregadosBuilder(
-        builder: (context, trabajos, cargando) {
-          if (cargando) return const Center(child: CircularProgressIndicator());
-          final activos = trabajos
-              .where(
-                (t) =>
-                    t.columna != ColumnaTableroPro.archivado &&
-                    t.registro != null,
-              )
-              .toList();
-          final ahora = DateTime.now();
-          final (desde, hasta) = _rangoPeriodo(_periodo, ahora);
+      body: Stack(
+        children: [
+          TrabajosProAgregadosBuilder(
+            builder: (context, trabajos, cargando) {
+              if (cargando) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              final activos = trabajos
+                  .where(
+                    (t) =>
+                        t.columna != ColumnaTableroPro.archivado &&
+                        t.registro != null,
+                  )
+                  .toList();
+              final ahora = DateTime.now();
+              final (desde, hasta) = _rangoPeriodo(_periodo, ahora);
 
-          double cobradoEnPeriodo(TrabajoProAgregado t) => t.pagos
-              .where(
-                (p) =>
-                    (desde == null || !p.fecha.isBefore(desde)) &&
-                    (hasta == null || p.fecha.isBefore(hasta)),
-              )
-              .fold<double>(0, (acc, p) => acc + p.importe);
+              double cobradoEnPeriodo(TrabajoProAgregado t) => t.pagos
+                  .where(
+                    (p) =>
+                        (desde == null || !p.fecha.isBefore(desde)) &&
+                        (hasta == null || p.fecha.isBefore(hasta)),
+                  )
+                  .fold<double>(0, (acc, p) => acc + p.importe);
 
-          final importeAcordado = activos.fold<double>(
-            0,
-            (acc, t) => acc + (t.montoDebido ?? 0),
-          );
-          final importePresupuestado = activos.fold<double>(
-            0,
-            (acc, t) => acc + t.importePresupuestado,
-          );
-          final cambiosAprobados = activos.fold<double>(
-            0,
-            (acc, t) => acc + t.cambiosAprobados,
-          );
-          final totalCobradoPeriodo = activos.fold<double>(
-            0,
-            (acc, t) => acc + cobradoEnPeriodo(t),
-          );
-          final pendienteCobro = activos.fold<double>(
-            0,
-            (acc, t) => acc + (t.saldoPendiente ?? 0),
-          );
-          final trabajosConSaldo = activos
-              .where((t) => (t.saldoPendiente ?? 0) > 0)
-              .toList();
+              final importeAcordado = activos.fold<double>(
+                0,
+                (acc, t) => acc + (t.montoDebido ?? 0),
+              );
+              final importePresupuestado = activos.fold<double>(
+                0,
+                (acc, t) => acc + t.importePresupuestado,
+              );
+              final cambiosAprobados = activos.fold<double>(
+                0,
+                (acc, t) => acc + t.cambiosAprobados,
+              );
+              final totalCobradoPeriodo = activos.fold<double>(
+                0,
+                (acc, t) => acc + cobradoEnPeriodo(t),
+              );
+              final pendienteCobro = activos.fold<double>(
+                0,
+                (acc, t) => acc + (t.saldoPendiente ?? 0),
+              );
+              final trabajosConSaldo = activos
+                  .where((t) => (t.saldoPendiente ?? 0) > 0)
+                  .toList();
 
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(16, ReparaSpace.s4, 16, 24),
-            children: [
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    for (final p in _Periodo.values) ...[
-                      ChoiceChip(
-                        label: Text(_nombrePeriodo(p)),
-                        selected: _periodo == p,
-                        onSelected: (_) => setState(() => _periodo = p),
-                      ),
-                      const SizedBox(width: ReparaSpace.s2),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(height: ReparaSpace.s4),
-              Row(
+              return ListView(
+                controller: _scrollCtrl,
+                padding: const EdgeInsets.fromLTRB(16, ReparaSpace.s4, 16, 24),
                 children: [
-                  Expanded(
-                    child: _TarjetaKpi(
-                      icon: Icons.handshake_outlined,
-                      valor: '${importeAcordado.toStringAsFixed(0)} €',
-                      etiqueta: 'importe acordado',
-                    ),
-                  ),
-                  const SizedBox(width: ReparaSpace.s3),
-                  Expanded(
-                    child: _TarjetaKpi(
-                      icon: Icons.payments_outlined,
-                      valor: '${totalCobradoPeriodo.toStringAsFixed(0)} €',
-                      etiqueta:
-                          'cobrado (${_nombrePeriodo(_periodo).toLowerCase()})',
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: ReparaSpace.s3),
-              Row(
-                children: [
-                  Expanded(
-                    child: _TarjetaKpi(
-                      icon: Icons.hourglass_bottom_outlined,
-                      valor: '${pendienteCobro.toStringAsFixed(0)} €',
-                      etiqueta: 'pendiente de cobro',
-                      destacado: pendienteCobro > 0,
-                    ),
-                  ),
-                  const SizedBox(width: ReparaSpace.s3),
-                  Expanded(
-                    child: _TarjetaKpi(
-                      icon: Icons.warning_amber_outlined,
-                      valor: '${trabajosConSaldo.length}',
-                      etiqueta: 'trabajos con saldo pendiente',
-                      destacado: trabajosConSaldo.isNotEmpty,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: ReparaSpace.s5),
-              Text(
-                'Desglose',
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-              const SizedBox(height: 8),
-              IosSection(
-                rows: [
-                  IosValueRow(
-                    label: 'Presupuestado',
-                    value: '${importePresupuestado.toStringAsFixed(2)} €',
-                  ),
-                  IosValueRow(
-                    label: 'Cambios de alcance aprobados',
-                    value: '${cambiosAprobados.toStringAsFixed(2)} €',
-                  ),
-                  IosValueRow(
-                    label: 'Importe acordado',
-                    value: '${importeAcordado.toStringAsFixed(2)} €',
-                    destacado: true,
-                  ),
-                  IosValueRow(
-                    label: 'Total cobrado',
-                    value:
-                        '${activos.fold<double>(0, (acc, t) => acc + t.totalPagado).toStringAsFixed(2)} €',
-                  ),
-                  IosValueRow(
-                    label: 'Pendiente de cobro',
-                    value: '${pendienteCobro.toStringAsFixed(2)} €',
-                  ),
-                ],
-              ),
-              const SizedBox(height: ReparaSpace.s5),
-              Text(
-                'Evolución de cobros (últimos 6 meses)',
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-              const SizedBox(height: 8),
-              _GraficoEvolucionCobros(activos: activos, ahora: ahora),
-              const SizedBox(height: ReparaSpace.s5),
-              Text(
-                'Distribución de trabajos por estado',
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-              const SizedBox(height: 8),
-              _DistribucionPorEstado(activos: activos),
-              const SizedBox(height: ReparaSpace.s5),
-              Text(
-                'Trabajos con saldo pendiente',
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-              const SizedBox(height: 8),
-              if (trabajosConSaldo.isEmpty)
-                const EmptyHint(
-                  message: 'Nada pendiente de cobro ahora mismo.',
-                  icon: Icons.check_circle_outline,
-                )
-              else
-                IosSection(
-                  rows: trabajosConSaldo
-                      .map(
-                        (t) => IosRow(
-                          icon: Icons.payments_outlined,
-                          iconColor: context.colors.warningText,
-                          imageUrl: t.ref.fotoUrl,
-                          title: t.ref.registroTitulo,
-                          subtitle: t.ref.casaNombre,
-                          trailing: Text(
-                            '${t.saldoPendiente!.toStringAsFixed(2)} €',
-                            style: ReparaText.amount(context),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        for (final p in _Periodo.values) ...[
+                          ChoiceChip(
+                            label: Text(_nombrePeriodo(p)),
+                            selected: _periodo == p,
+                            onSelected: (_) => setState(() => _periodo = p),
                           ),
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => RegistroProDetailScreen(
-                                casaId: t.ref.casaId,
-                                elementoId: t.ref.elementoId,
-                                registroId: t.ref.registroId,
+                          const SizedBox(width: ReparaSpace.s2),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: ReparaSpace.s4),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _TarjetaKpi(
+                          icon: Icons.handshake_outlined,
+                          valor: '${importeAcordado.toStringAsFixed(0)} €',
+                          etiqueta: 'importe acordado',
+                        ),
+                      ),
+                      const SizedBox(width: ReparaSpace.s3),
+                      Expanded(
+                        child: _TarjetaKpi(
+                          icon: Icons.payments_outlined,
+                          valor: '${totalCobradoPeriodo.toStringAsFixed(0)} €',
+                          etiqueta:
+                              'cobrado (${_nombrePeriodo(_periodo).toLowerCase()})',
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: ReparaSpace.s3),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _TarjetaKpi(
+                          icon: Icons.hourglass_bottom_outlined,
+                          valor: '${pendienteCobro.toStringAsFixed(0)} €',
+                          etiqueta: 'pendiente de cobro',
+                          destacado: pendienteCobro > 0,
+                        ),
+                      ),
+                      const SizedBox(width: ReparaSpace.s3),
+                      Expanded(
+                        child: _TarjetaKpi(
+                          icon: Icons.warning_amber_outlined,
+                          valor: '${trabajosConSaldo.length}',
+                          etiqueta: 'trabajos con saldo pendiente',
+                          destacado: trabajosConSaldo.isNotEmpty,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: ReparaSpace.s5),
+                  Text(
+                    'Desglose',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  IosSection(
+                    rows: [
+                      IosValueRow(
+                        label: 'Presupuestado',
+                        value: '${importePresupuestado.toStringAsFixed(2)} €',
+                      ),
+                      IosValueRow(
+                        label: 'Cambios de alcance aprobados',
+                        value: '${cambiosAprobados.toStringAsFixed(2)} €',
+                      ),
+                      IosValueRow(
+                        label: 'Importe acordado',
+                        value: '${importeAcordado.toStringAsFixed(2)} €',
+                        destacado: true,
+                      ),
+                      IosValueRow(
+                        label: 'Total cobrado',
+                        value:
+                            '${activos.fold<double>(0, (acc, t) => acc + t.totalPagado).toStringAsFixed(2)} €',
+                      ),
+                      IosValueRow(
+                        label: 'Pendiente de cobro',
+                        value: '${pendienteCobro.toStringAsFixed(2)} €',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: ReparaSpace.s5),
+                  Text(
+                    'Evolución de cobros (últimos 6 meses)',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  _GraficoEvolucionCobros(activos: activos, ahora: ahora),
+                  const SizedBox(height: ReparaSpace.s5),
+                  Text(
+                    'Distribución de trabajos por estado',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  _DistribucionPorEstado(activos: activos),
+                  const SizedBox(height: ReparaSpace.s5),
+                  Text(
+                    'Trabajos con saldo pendiente',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  if (trabajosConSaldo.isEmpty)
+                    const EmptyHint(
+                      message: 'Nada pendiente de cobro ahora mismo.',
+                      icon: Icons.check_circle_outline,
+                    )
+                  else
+                    IosSection(
+                      rows: trabajosConSaldo
+                          .map(
+                            (t) => IosRow(
+                              icon: Icons.payments_outlined,
+                              iconColor: context.colors.warningText,
+                              imageUrl: t.ref.fotoUrl,
+                              title: t.ref.registroTitulo,
+                              subtitle: t.ref.casaNombre,
+                              trailing: Text(
+                                '${t.saldoPendiente!.toStringAsFixed(2)} €',
+                                style: ReparaText.amount(context),
+                              ),
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => RegistroProDetailScreen(
+                                    casaId: t.ref.casaId,
+                                    elementoId: t.ref.elementoId,
+                                    registroId: t.ref.registroId,
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
-                        ),
-                      )
-                      .toList(),
-                ),
-              const SizedBox(height: ReparaSpace.s5),
-              Text(
-                'Presupuestos',
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-              const SizedBox(height: 8),
-              _PresupuestosPorEstado(
-                activos: trabajos.where((t) => t.registro != null).toList(),
-              ),
-            ],
-          );
-        },
+                          )
+                          .toList(),
+                    ),
+                  const SizedBox(height: ReparaSpace.s5),
+                  Text(
+                    'Presupuestos',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  _PresupuestosPorEstado(
+                    activos: trabajos.where((t) => t.registro != null).toList(),
+                  ),
+                ],
+              );
+            },
+          ),
+          ScrollToTopButton(scrollController: _scrollCtrl),
+        ],
       ),
     );
   }

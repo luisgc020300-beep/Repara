@@ -28,6 +28,7 @@ import 'package:repara_core/design_tokens.dart';
 import 'package:repara_ui/app_error.dart';
 import '../widgets/boton_ajustes_pro.dart';
 import 'package:repara_ui/ios_list.dart';
+import 'package:repara_ui/scroll_to_top_button.dart';
 import 'registro_pro_detail_screen.dart';
 import 'trabajo_pro_agregado.dart';
 import 'trabajo_profesional_sheet.dart';
@@ -78,6 +79,15 @@ class _TrabajosProTabState extends State<TrabajosProTab> {
   _VistaTrabajosPro _vista = _VistaTrabajosPro.porTrabajo;
   _FiltroEstadoPro _filtro = _FiltroEstadoPro.activos;
   ColumnaTableroPro _columnaSeleccionada = ColumnaTableroPro.sinPresupuestar;
+  // Compartido entre las tres vistas -- nunca hay dos montadas a la vez (un
+  // único Expanded con switch), así que un solo controlador vale para todas.
+  final _scrollCtrl = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -113,109 +123,120 @@ class _TrabajosProTabState extends State<TrabajosProTab> {
               child: const Icon(Icons.add),
             )
           : null,
-      body: StreamBuilder<List<TrabajoProfesional>>(
-        stream: TrabajoProfesionalService.streamTrabajos(),
-        builder: (context, privadosSnapshot) {
-          final privados = privadosSnapshot.data ?? const [];
-          return TrabajosProAgregadosBuilder(
-            builder: (context, todos, cargando) {
-              if (!cargando && todos.isEmpty && privados.isEmpty) {
-                return const _EstadoVacio();
-              }
+      body: Stack(
+        children: [
+          StreamBuilder<List<TrabajoProfesional>>(
+            stream: TrabajoProfesionalService.streamTrabajos(),
+            builder: (context, privadosSnapshot) {
+              final privados = privadosSnapshot.data ?? const [];
+              return TrabajosProAgregadosBuilder(
+                builder: (context, todos, cargando) {
+                  if (!cargando && todos.isEmpty && privados.isEmpty) {
+                    return const _EstadoVacio();
+                  }
 
-              final filtrados = _vista == _VistaTrabajosPro.porCliente
-                  ? todos
-                  : todos.where((t) => _pasaFiltro(t, _filtro)).toList();
+                  final filtrados = _vista == _VistaTrabajosPro.porCliente
+                      ? todos
+                      : todos.where((t) => _pasaFiltro(t, _filtro)).toList();
 
-              return Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      ReparaSpace.s4,
-                      ReparaSpace.s3,
-                      ReparaSpace.s4,
-                      ReparaSpace.s1,
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: ChoiceChip(
-                            label: const Text('Lista'),
-                            selected: _vista == _VistaTrabajosPro.porTrabajo,
-                            onSelected: (_) => setState(
-                              () => _vista = _VistaTrabajosPro.porTrabajo,
-                            ),
-                          ),
+                  return Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          ReparaSpace.s4,
+                          ReparaSpace.s3,
+                          ReparaSpace.s4,
+                          ReparaSpace.s1,
                         ),
-                        const SizedBox(width: ReparaSpace.s2),
-                        Expanded(
-                          child: ChoiceChip(
-                            label: const Text('Tablero'),
-                            selected: _vista == _VistaTrabajosPro.tablero,
-                            onSelected: (_) => setState(
-                              () => _vista = _VistaTrabajosPro.tablero,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: ReparaSpace.s2),
-                        Expanded(
-                          child: ChoiceChip(
-                            label: const Text('Por cliente'),
-                            selected: _vista == _VistaTrabajosPro.porCliente,
-                            onSelected: (_) => setState(
-                              () => _vista = _VistaTrabajosPro.porCliente,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (_vista != _VistaTrabajosPro.porCliente)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                        ReparaSpace.s4,
-                        0,
-                        ReparaSpace.s4,
-                        ReparaSpace.s2,
-                      ),
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
                         child: Row(
                           children: [
-                            for (final f in _FiltroEstadoPro.values) ...[
-                              ChoiceChip(
-                                label: Text(_nombreFiltro(f)),
-                                selected: _filtro == f,
-                                onSelected: (_) => setState(() => _filtro = f),
+                            Expanded(
+                              child: ChoiceChip(
+                                label: const Text('Lista'),
+                                selected:
+                                    _vista == _VistaTrabajosPro.porTrabajo,
+                                onSelected: (_) => setState(
+                                  () => _vista = _VistaTrabajosPro.porTrabajo,
+                                ),
                               ),
-                              const SizedBox(width: ReparaSpace.s2),
-                            ],
+                            ),
+                            const SizedBox(width: ReparaSpace.s2),
+                            Expanded(
+                              child: ChoiceChip(
+                                label: const Text('Tablero'),
+                                selected: _vista == _VistaTrabajosPro.tablero,
+                                onSelected: (_) => setState(
+                                  () => _vista = _VistaTrabajosPro.tablero,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: ReparaSpace.s2),
+                            Expanded(
+                              child: ChoiceChip(
+                                label: const Text('Por cliente'),
+                                selected:
+                                    _vista == _VistaTrabajosPro.porCliente,
+                                onSelected: (_) => setState(
+                                  () => _vista = _VistaTrabajosPro.porCliente,
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                    ),
-                  Expanded(
-                    child: switch (_vista) {
-                      _VistaTrabajosPro.porTrabajo => _ListaPorTrabajo(
-                        trabajos: filtrados,
-                        privados: privados,
+                      if (_vista != _VistaTrabajosPro.porCliente)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            ReparaSpace.s4,
+                            0,
+                            ReparaSpace.s4,
+                            ReparaSpace.s2,
+                          ),
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                for (final f in _FiltroEstadoPro.values) ...[
+                                  ChoiceChip(
+                                    label: Text(_nombreFiltro(f)),
+                                    selected: _filtro == f,
+                                    onSelected: (_) =>
+                                        setState(() => _filtro = f),
+                                  ),
+                                  const SizedBox(width: ReparaSpace.s2),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      Expanded(
+                        child: switch (_vista) {
+                          _VistaTrabajosPro.porTrabajo => _ListaPorTrabajo(
+                            trabajos: filtrados,
+                            privados: privados,
+                            scrollController: _scrollCtrl,
+                          ),
+                          _VistaTrabajosPro.tablero => _Tablero(
+                            trabajos: filtrados,
+                            columnaSeleccionada: _columnaSeleccionada,
+                            onColumnaSeleccionada: (c) =>
+                                setState(() => _columnaSeleccionada = c),
+                            scrollController: _scrollCtrl,
+                          ),
+                          _VistaTrabajosPro.porCliente => _ListaPorCliente(
+                            trabajos: todos,
+                            scrollController: _scrollCtrl,
+                          ),
+                        },
                       ),
-                      _VistaTrabajosPro.tablero => _Tablero(
-                        trabajos: filtrados,
-                        columnaSeleccionada: _columnaSeleccionada,
-                        onColumnaSeleccionada: (c) =>
-                            setState(() => _columnaSeleccionada = c),
-                      ),
-                      _VistaTrabajosPro.porCliente => _ListaPorCliente(
-                        trabajos: todos,
-                      ),
-                    },
-                  ),
-                ],
+                    ],
+                  );
+                },
               );
             },
-          );
-        },
+          ),
+          ScrollToTopButton(scrollController: _scrollCtrl, left: 16),
+        ],
       ),
     );
   }
@@ -272,10 +293,15 @@ void _abrirTrabajo(BuildContext context, TrabajoProAgregado t) {
 }
 
 class _ListaPorTrabajo extends StatelessWidget {
-  const _ListaPorTrabajo({required this.trabajos, required this.privados});
+  const _ListaPorTrabajo({
+    required this.trabajos,
+    required this.privados,
+    required this.scrollController,
+  });
 
   final List<TrabajoProAgregado> trabajos;
   final List<TrabajoProfesional> privados;
+  final ScrollController scrollController;
 
   @override
   Widget build(BuildContext context) {
@@ -286,6 +312,7 @@ class _ListaPorTrabajo extends StatelessWidget {
       );
     }
     return ListView(
+      controller: scrollController,
       padding: const EdgeInsets.fromLTRB(
         ReparaSpace.s4,
         0,
@@ -345,11 +372,13 @@ class _Tablero extends StatelessWidget {
     required this.trabajos,
     required this.columnaSeleccionada,
     required this.onColumnaSeleccionada,
+    required this.scrollController,
   });
 
   final List<TrabajoProAgregado> trabajos;
   final ColumnaTableroPro columnaSeleccionada;
   final ValueChanged<ColumnaTableroPro> onColumnaSeleccionada;
+  final ScrollController scrollController;
 
   @override
   Widget build(BuildContext context) {
@@ -394,6 +423,7 @@ class _Tablero extends StatelessWidget {
                 );
               }
               return ListView(
+                controller: scrollController,
                 padding: const EdgeInsets.fromLTRB(
                   ReparaSpace.s4,
                   0,
@@ -443,9 +473,13 @@ class _Tablero extends StatelessWidget {
 }
 
 class _ListaPorCliente extends StatelessWidget {
-  const _ListaPorCliente({required this.trabajos});
+  const _ListaPorCliente({
+    required this.trabajos,
+    required this.scrollController,
+  });
 
   final List<TrabajoProAgregado> trabajos;
+  final ScrollController scrollController;
 
   @override
   Widget build(BuildContext context) {
@@ -455,6 +489,7 @@ class _ListaPorCliente extends StatelessWidget {
     }
     final casas = porCasa.entries.toList();
     return ListView.builder(
+      controller: scrollController,
       padding: const EdgeInsets.fromLTRB(
         ReparaSpace.s4,
         0,

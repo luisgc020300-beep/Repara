@@ -25,6 +25,7 @@ import 'package:repara_ui/app_error.dart';
 import '../widgets/boton_ajustes.dart';
 import '../widgets/boton_notificaciones.dart';
 import 'package:repara_ui/ios_list.dart';
+import 'package:repara_ui/scroll_to_top_button.dart';
 import 'elemento_detail_screen.dart';
 import 'garantias_proximas_screen.dart';
 import 'menu_anadir.dart';
@@ -309,6 +310,8 @@ class _HomeTabState extends State<HomeTab> {
                 alturaCompacta: alturaCompacta,
               ),
             ),
+            // A la izquierda -- a la derecha ya vive "Añadir elemento".
+            ScrollToTopButton(scrollController: _scrollCtrl, left: 16),
           ],
         ),
       ),
@@ -749,15 +752,16 @@ const String fondoCabeceraInicio = 'assets/images/login_background.jpg';
 
 // Versión nocturna de la misma foto para modo oscuro (noviembre 2026) --
 // también es la que usa el login en oscuro (main.dart).
-const String fondoCabeceraInicioOscuro = 'assets/images/login_background_dark.png';
+const String fondoCabeceraInicioOscuro =
+    'assets/images/login_background_dark.png';
 
 /// Foto de la cabecera según el tema -- la misma regla que el login, así la
 /// transición de casa_gate_screen.dart sigue arrancando con la foto exacta
 /// que se veía en el login, tanto en claro como en oscuro.
 String fondoCabeceraSegunTema(BuildContext context) =>
     Theme.of(context).brightness == Brightness.dark
-        ? fondoCabeceraInicioOscuro
-        : fondoCabeceraInicio;
+    ? fondoCabeceraInicioOscuro
+    : fondoCabeceraInicio;
 
 /// Velo sobre la foto de la cabecera (noviembre 2026): degradado VERTICAL y
 /// en negro neutro, en vez del azul diagonal de antes -- el azul "lavaba" la
@@ -773,7 +777,9 @@ const List<double> paradasVeloCabecera = [0.0, 0.45, 1.0];
 List<Color> coloresVeloCabecera(BuildContext context, double intensidad) {
   final oscuro = Theme.of(context).brightness == Brightness.dark;
   final alphas = oscuro ? const [0.30, 0.05, 0.60] : const [0.35, 0.10, 0.62];
-  return [for (final a in alphas) Colors.black.withValues(alpha: a * intensidad)];
+  return [
+    for (final a in alphas) Colors.black.withValues(alpha: a * intensidad),
+  ];
 }
 
 /// Cabecera de Inicio (rediseño visual, noviembre 2026, sobre una

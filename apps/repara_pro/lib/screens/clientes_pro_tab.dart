@@ -29,6 +29,7 @@ import 'package:repara_core/design_tokens.dart';
 import 'package:repara_ui/app_error.dart';
 import '../widgets/boton_ajustes_pro.dart';
 import 'package:repara_ui/ios_list.dart';
+import 'package:repara_ui/scroll_to_top_button.dart';
 import 'cliente_pro_detail_screen.dart';
 import 'cliente_profesional_detail_screen.dart';
 import 'cliente_profesional_sheet.dart';
@@ -44,8 +45,21 @@ class _ResumenCliente {
   double pendienteCobro = 0;
 }
 
-class ClientesProTab extends StatelessWidget {
+class ClientesProTab extends StatefulWidget {
   const ClientesProTab({super.key});
+
+  @override
+  State<ClientesProTab> createState() => _ClientesProTabState();
+}
+
+class _ClientesProTabState extends State<ClientesProTab> {
+  final _scrollCtrl = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -79,111 +93,122 @@ class ClientesProTab extends StatelessWidget {
         tooltip: 'Nuevo cliente privado',
         child: const Icon(Icons.add),
       ),
-      body: StreamBuilder<List<ClienteProfesional>>(
-        stream: ClienteProfesionalService.streamClientes(),
-        builder: (context, clientesSnapshot) {
-          final privados = clientesSnapshot.data ?? const [];
-          return TrabajosProAgregadosBuilder(
-            builder: (context, trabajos, cargando) {
-              if (!cargando && trabajos.isEmpty && privados.isEmpty) {
-                return const EmptyHint(
-                  message:
-                      'Todavía no tienes clientes -- crea uno nuevo o acepta una invitación.',
-                  icon: Icons.people_outline,
-                );
-              }
+      body: Stack(
+        children: [
+          StreamBuilder<List<ClienteProfesional>>(
+            stream: ClienteProfesionalService.streamClientes(),
+            builder: (context, clientesSnapshot) {
+              final privados = clientesSnapshot.data ?? const [];
+              return TrabajosProAgregadosBuilder(
+                builder: (context, trabajos, cargando) {
+                  if (!cargando && trabajos.isEmpty && privados.isEmpty) {
+                    return const EmptyHint(
+                      message:
+                          'Todavía no tienes clientes -- crea uno nuevo o acepta una invitación.',
+                      icon: Icons.people_outline,
+                    );
+                  }
 
-              final porCasa = <String, _ResumenCliente>{};
-              for (final t in trabajos) {
-                final resumen = porCasa.putIfAbsent(
-                  t.ref.casaId,
-                  () => _ResumenCliente(t.ref.casaId, t.ref.casaNombre),
-                );
-                resumen.trabajos++;
-                if (t.columna != ColumnaTableroPro.terminado &&
-                    t.columna != ColumnaTableroPro.archivado) {
-                  resumen.activos++;
-                }
-                resumen.pendienteCobro += t.saldoPendiente ?? 0;
-              }
-              final derivados = porCasa.values.toList()
-                ..sort((a, b) => a.casaNombre.compareTo(b.casaNombre));
-              final privadosOrdenados = [...privados]
-                ..sort((a, b) => a.nombre.compareTo(b.nombre));
+                  final porCasa = <String, _ResumenCliente>{};
+                  for (final t in trabajos) {
+                    final resumen = porCasa.putIfAbsent(
+                      t.ref.casaId,
+                      () => _ResumenCliente(t.ref.casaId, t.ref.casaNombre),
+                    );
+                    resumen.trabajos++;
+                    if (t.columna != ColumnaTableroPro.terminado &&
+                        t.columna != ColumnaTableroPro.archivado) {
+                      resumen.activos++;
+                    }
+                    resumen.pendienteCobro += t.saldoPendiente ?? 0;
+                  }
+                  final derivados = porCasa.values.toList()
+                    ..sort((a, b) => a.casaNombre.compareTo(b.casaNombre));
+                  final privadosOrdenados = [...privados]
+                    ..sort((a, b) => a.nombre.compareTo(b.nombre));
 
-              return ListView(
-                padding: const EdgeInsets.fromLTRB(16, ReparaSpace.s4, 16, 90),
-                children: [
-                  if (privadosOrdenados.isNotEmpty) ...[
-                    IosSection(
-                      rows: privadosOrdenados
-                          .map(
-                            (c) => IosRow(
-                              icon: Icons.person_outline,
-                              iconColor: context.colors.brand,
-                              title: c.nombre,
-                              subtitle: c.telefono ?? c.email,
-                              trailing: const _InsigniaPrivado(),
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      ClienteProfesionalDetailScreen(
-                                        cliente: c,
-                                      ),
-                                ),
-                              ),
-                            ),
-                          )
-                          .toList(),
+                  return ListView(
+                    controller: _scrollCtrl,
+                    padding: const EdgeInsets.fromLTRB(
+                      16,
+                      ReparaSpace.s4,
+                      16,
+                      90,
                     ),
-                    const SizedBox(height: ReparaSpace.s4),
-                  ],
-                  if (derivados.isNotEmpty)
-                    IosSection(
-                      rows: derivados
-                          .map(
-                            (c) => IosRow(
-                              icon: Icons.house_outlined,
-                              iconColor: context.colors.brand,
-                              title: c.casaNombre,
-                              subtitle:
-                                  '${c.trabajos} trabajo${c.trabajos == 1 ? '' : 's'} · ${c.activos} activo${c.activos == 1 ? '' : 's'}',
-                              trailing: c.pendienteCobro > 0
-                                  ? Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          '${c.pendienteCobro.toStringAsFixed(0)} €',
-                                          style: ReparaText.amount(context),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Icon(
-                                          Icons.chevron_right,
-                                          color: context.colors.inkMuted,
-                                          size: 20,
-                                        ),
-                                      ],
-                                    )
-                                  : null,
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ClienteProDetailScreen(
-                                    casaId: c.casaId,
-                                    casaNombre: c.casaNombre,
+                    children: [
+                      if (privadosOrdenados.isNotEmpty) ...[
+                        IosSection(
+                          rows: privadosOrdenados
+                              .map(
+                                (c) => IosRow(
+                                  icon: Icons.person_outline,
+                                  iconColor: context.colors.brand,
+                                  title: c.nombre,
+                                  subtitle: c.telefono ?? c.email,
+                                  trailing: const _InsigniaPrivado(),
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          ClienteProfesionalDetailScreen(
+                                            cliente: c,
+                                          ),
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ),
-                          )
-                          .toList(),
-                    ),
-                ],
+                              )
+                              .toList(),
+                        ),
+                        const SizedBox(height: ReparaSpace.s4),
+                      ],
+                      if (derivados.isNotEmpty)
+                        IosSection(
+                          rows: derivados
+                              .map(
+                                (c) => IosRow(
+                                  icon: Icons.house_outlined,
+                                  iconColor: context.colors.brand,
+                                  title: c.casaNombre,
+                                  subtitle:
+                                      '${c.trabajos} trabajo${c.trabajos == 1 ? '' : 's'} · ${c.activos} activo${c.activos == 1 ? '' : 's'}',
+                                  trailing: c.pendienteCobro > 0
+                                      ? Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              '${c.pendienteCobro.toStringAsFixed(0)} €',
+                                              style: ReparaText.amount(context),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Icon(
+                                              Icons.chevron_right,
+                                              color: context.colors.inkMuted,
+                                              size: 20,
+                                            ),
+                                          ],
+                                        )
+                                      : null,
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ClienteProDetailScreen(
+                                        casaId: c.casaId,
+                                        casaNombre: c.casaNombre,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                        ),
+                    ],
+                  );
+                },
               );
             },
-          );
-        },
+          ),
+          ScrollToTopButton(scrollController: _scrollCtrl, left: 16),
+        ],
       ),
     );
   }

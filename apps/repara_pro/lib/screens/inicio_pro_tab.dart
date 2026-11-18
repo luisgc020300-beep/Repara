@@ -24,6 +24,7 @@ import 'package:repara_ui/app_error.dart';
 import '../widgets/boton_ajustes_pro.dart';
 import '../widgets/boton_notificaciones_pro.dart';
 import 'package:repara_ui/ios_list.dart';
+import 'package:repara_ui/scroll_to_top_button.dart';
 import 'registro_pro_detail_screen.dart';
 import 'trabajo_pro_agregado.dart';
 
@@ -32,8 +33,21 @@ const _mensajeInvitarCliente =
     'presupuestos y fotos organizados en un solo sitio, no perdido entre WhatsApps. '
     'Créate una cuenta gratis y así te puedo mandar presupuestos y avisarte de cambios directamente ahí.';
 
-class InicioProTab extends StatelessWidget {
+class InicioProTab extends StatefulWidget {
   const InicioProTab({super.key});
+
+  @override
+  State<InicioProTab> createState() => _InicioProTabState();
+}
+
+class _InicioProTabState extends State<InicioProTab> {
+  final _scrollCtrl = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -60,81 +74,84 @@ class InicioProTab extends StatelessWidget {
             ),
           ],
         ),
-        actions: const [
-          BotonNotificacionesPro(),
-          BotonAjustesPro(),
-        ],
+        actions: const [BotonNotificacionesPro(), BotonAjustesPro()],
       ),
-      body: TrabajosProAgregadosBuilder(
-        builder: (context, trabajos, cargando) => ListView(
-          padding: const EdgeInsets.fromLTRB(16, ReparaSpace.s4, 16, 24),
-          children: [
-            _KpisHero(trabajos: trabajos),
-            const SizedBox(height: ReparaSpace.s5),
-            Text(
-              'Invitaciones pendientes',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 8),
-            StreamBuilder<List<Invitacion>>(
-              stream: InvitacionService.streamPendientesParaMi(),
-              builder: (context, snapshot) {
-                final invitaciones = snapshot.data ?? [];
-                if (invitaciones.isEmpty) {
-                  return const EmptyHint(
-                    message: 'No tienes invitaciones nuevas.',
-                    icon: Icons.mail_outline,
-                  );
-                }
-                return Column(
-                  children: invitaciones
-                      .map((i) => _InvitacionCard(invitacion: i))
-                      .toList(),
-                );
-              },
-            ),
-            const SizedBox(height: ReparaSpace.s5),
-            Text(
-              'Necesita tu atención',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 8),
-            _NecesitaAtencion(trabajos: trabajos, cargando: cargando),
-            const SizedBox(height: ReparaSpace.s5),
-            Text(
-              'Actividad reciente',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 8),
-            _ActividadReciente(trabajos: trabajos),
-            const SizedBox(height: ReparaSpace.s5),
-            IosSection(
-              header: 'Accesos rápidos',
-              rows: [
-                IosRow(
-                  icon: Icons.person_add_alt_outlined,
-                  iconColor: context.colors.brand,
-                  title: 'Invita a un cliente a Repara',
-                  subtitle:
-                      'Para que puedas mandarle presupuestos y avisos desde aquí',
-                  trailing: Icon(
-                    Icons.share_outlined,
-                    size: 18,
-                    color: context.colors.inkMuted,
-                  ),
-                  showChevron: false,
-                  // sharePositionOrigin obligatorio en iOS -- ver nota en
-                  // contacto_acciones.dart.
-                  onTap: () => Share.share(
-                    _mensajeInvitarCliente,
-                    sharePositionOrigin:
-                        Offset.zero & MediaQuery.of(context).size,
-                  ),
+      body: Stack(
+        children: [
+          TrabajosProAgregadosBuilder(
+            builder: (context, trabajos, cargando) => ListView(
+              controller: _scrollCtrl,
+              padding: const EdgeInsets.fromLTRB(16, ReparaSpace.s4, 16, 24),
+              children: [
+                _KpisHero(trabajos: trabajos),
+                const SizedBox(height: ReparaSpace.s5),
+                Text(
+                  'Invitaciones pendientes',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const SizedBox(height: 8),
+                StreamBuilder<List<Invitacion>>(
+                  stream: InvitacionService.streamPendientesParaMi(),
+                  builder: (context, snapshot) {
+                    final invitaciones = snapshot.data ?? [];
+                    if (invitaciones.isEmpty) {
+                      return const EmptyHint(
+                        message: 'No tienes invitaciones nuevas.',
+                        icon: Icons.mail_outline,
+                      );
+                    }
+                    return Column(
+                      children: invitaciones
+                          .map((i) => _InvitacionCard(invitacion: i))
+                          .toList(),
+                    );
+                  },
+                ),
+                const SizedBox(height: ReparaSpace.s5),
+                Text(
+                  'Necesita tu atención',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const SizedBox(height: 8),
+                _NecesitaAtencion(trabajos: trabajos, cargando: cargando),
+                const SizedBox(height: ReparaSpace.s5),
+                Text(
+                  'Actividad reciente',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const SizedBox(height: 8),
+                _ActividadReciente(trabajos: trabajos),
+                const SizedBox(height: ReparaSpace.s5),
+                IosSection(
+                  header: 'Accesos rápidos',
+                  rows: [
+                    IosRow(
+                      icon: Icons.person_add_alt_outlined,
+                      iconColor: context.colors.brand,
+                      title: 'Invita a un cliente a Repara',
+                      subtitle:
+                          'Para que puedas mandarle presupuestos y avisos desde aquí',
+                      trailing: Icon(
+                        Icons.share_outlined,
+                        size: 18,
+                        color: context.colors.inkMuted,
+                      ),
+                      showChevron: false,
+                      // sharePositionOrigin obligatorio en iOS -- ver nota en
+                      // contacto_acciones.dart.
+                      onTap: () => Share.share(
+                        _mensajeInvitarCliente,
+                        sharePositionOrigin:
+                            Offset.zero & MediaQuery.of(context).size,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+          ScrollToTopButton(scrollController: _scrollCtrl),
+        ],
       ),
     );
   }

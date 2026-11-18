@@ -28,14 +28,28 @@ import 'package:repara_ui/app_dialog.dart';
 import 'package:repara_ui/app_error.dart';
 import '../widgets/boton_ajustes.dart';
 import 'package:repara_ui/ios_list.dart';
+import 'package:repara_ui/scroll_to_top_button.dart';
 import 'elemento_detail_screen.dart';
 import 'elementos_archivados_screen.dart';
 import 'nuevo_elemento_screen.dart';
 
-class CasaTab extends StatelessWidget {
+class CasaTab extends StatefulWidget {
   const CasaTab({required this.casa, super.key});
 
   final Casa casa;
+
+  @override
+  State<CasaTab> createState() => _CasaTabState();
+}
+
+class _CasaTabState extends State<CasaTab> {
+  final _scrollCtrl = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
 
   Future<void> _nuevaHabitacion(BuildContext context, int orden) async {
     final nombre = await AppDialog.promptText(
@@ -52,7 +66,7 @@ class CasaTab extends StatelessWidget {
       return;
     }
     try {
-      await HabitacionService.crear(casa.id, nombre, orden: orden);
+      await HabitacionService.crear(widget.casa.id, nombre, orden: orden);
     } catch (e, st) {
       if (context.mounted) {
         AppError.show(
@@ -67,6 +81,7 @@ class CasaTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final casa = widget.casa;
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: 68,
@@ -83,9 +98,10 @@ class CasaTab extends StatelessWidget {
             ),
             Text(
               casa.nombre,
-              style: Theme.of(
-                context,
-              ).textTheme.displayMedium?.copyWith(fontSize: 26, color: Colors.white),
+              style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                fontSize: 26,
+                color: Colors.white,
+              ),
             ),
           ],
         ),
@@ -103,95 +119,101 @@ class CasaTab extends StatelessWidget {
           BotonAjustes(casa: casa),
         ],
       ),
-      body: StreamBuilder<List<Habitacion>>(
-        stream: HabitacionService.streamHabitaciones(casa.id),
-        builder: (context, habSnapshot) {
-          final habitaciones = habSnapshot.data ?? [];
-          return StreamBuilder<List<Elemento>>(
-            stream: ElementoService.streamElementos(casa.id),
-            builder: (context, elemSnapshot) {
-              final elementos = elemSnapshot.data ?? const <Elemento>[];
-              final porHabitacion = <String, List<Elemento>>{};
-              for (final e in elementos) {
-                final hid = e.habitacionId;
-                if (hid != null) (porHabitacion[hid] ??= []).add(e);
-              }
-              final subtituloCasa = habitaciones.isEmpty
-                  ? null
-                  : '${habitaciones.length} habitaci${habitaciones.length == 1 ? 'ón' : 'ones'} · '
-                        '${elementos.length} elemento${elementos.length == 1 ? '' : 's'}';
-              return ListView(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                children: [
-                  if (habitaciones.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 24),
-                      child: Column(
-                        children: [
-                          Container(
-                            width: 72,
-                            height: 72,
-                            decoration: BoxDecoration(
-                              color: context.colors.brandTint,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.meeting_room_outlined,
-                              size: 32,
-                              color: context.colors.brand,
+      body: Stack(
+        children: [
+          StreamBuilder<List<Habitacion>>(
+            stream: HabitacionService.streamHabitaciones(casa.id),
+            builder: (context, habSnapshot) {
+              final habitaciones = habSnapshot.data ?? [];
+              return StreamBuilder<List<Elemento>>(
+                stream: ElementoService.streamElementos(casa.id),
+                builder: (context, elemSnapshot) {
+                  final elementos = elemSnapshot.data ?? const <Elemento>[];
+                  final porHabitacion = <String, List<Elemento>>{};
+                  for (final e in elementos) {
+                    final hid = e.habitacionId;
+                    if (hid != null) (porHabitacion[hid] ??= []).add(e);
+                  }
+                  final subtituloCasa = habitaciones.isEmpty
+                      ? null
+                      : '${habitaciones.length} habitaci${habitaciones.length == 1 ? 'ón' : 'ones'} · '
+                            '${elementos.length} elemento${elementos.length == 1 ? '' : 's'}';
+                  return ListView(
+                    controller: _scrollCtrl,
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                    children: [
+                      if (habitaciones.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 24),
+                          child: Column(
+                            children: [
+                              Container(
+                                width: 72,
+                                height: 72,
+                                decoration: BoxDecoration(
+                                  color: context.colors.brandTint,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.meeting_room_outlined,
+                                  size: 32,
+                                  color: context.colors.brand,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Todavía no has añadido ninguna habitación.\nEmpieza por el salón, la cocina o el baño.',
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
+                        )
+                      else ...[
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: ReparaSpace.s2,
+                          ),
+                          child: Text(
+                            'Habitaciones',
+                            style: Theme.of(context).textTheme.headlineSmall,
+                          ),
+                        ),
+                        if (subtituloCasa != null)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Text(
+                              subtituloCasa,
+                              style: Theme.of(context).textTheme.bodySmall,
                             ),
                           ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Todavía no has añadido ninguna habitación.\nEmpieza por el salón, la cocina o el baño.',
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.bodySmall,
+                        const SizedBox(height: 4),
+                        ...habitaciones.map(
+                          (h) => _HabitacionCard(
+                            casa: casa,
+                            habitacion: h,
+                            elementos: porHabitacion[h.id] ?? const [],
                           ),
-                        ],
-                      ),
-                    )
-                  else ...[
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: ReparaSpace.s2,
-                      ),
-                      child: Text(
-                        'Habitaciones',
-                        style: Theme.of(context).textTheme.headlineSmall,
-                      ),
-                    ),
-                    if (subtituloCasa != null)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: Text(
-                          subtituloCasa,
-                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () =>
+                              _nuevaHabitacion(context, habitaciones.length),
+                          icon: const Icon(Icons.add),
+                          label: const Text('Añadir habitación'),
                         ),
                       ),
-                    const SizedBox(height: 4),
-                    ...habitaciones.map(
-                      (h) => _HabitacionCard(
-                        casa: casa,
-                        habitacion: h,
-                        elementos: porHabitacion[h.id] ?? const [],
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () =>
-                          _nuevaHabitacion(context, habitaciones.length),
-                      icon: const Icon(Icons.add),
-                      label: const Text('Añadir habitación'),
-                    ),
-                  ),
-                ],
+                    ],
+                  );
+                },
               );
             },
-          );
-        },
+          ),
+          ScrollToTopButton(scrollController: _scrollCtrl),
+        ],
       ),
     );
   }

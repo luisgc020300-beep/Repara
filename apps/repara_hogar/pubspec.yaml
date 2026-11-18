@@ -66,7 +66,10 @@ dev_dependencies:
   # notificaciones activas, noviembre 2026).
   fake_cloud_firestore: ^4.1.0
 
-# Mismo icono que el monolito, reutilizado tal cual (CEO, noviembre 2026).
+# Mismo trazo que el monolito, recoloreado al navy real de marca
+# (ReparaColors.light.brandStrong, #183650) en vez del verde que llevaba
+# antes -- pulido visual, noviembre 2026. El monolito no es la app que se
+# publica, queda fuera de este cambio.
 flutter_launcher_icons:
   android: true
   ios: true
