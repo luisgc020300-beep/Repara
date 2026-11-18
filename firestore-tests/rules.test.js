@@ -536,6 +536,44 @@ describe('users -- cada usuario solo ve/edita su propio perfil', () => {
   it('DENY: otro usuario no puede escribir en el documento de usuario ajeno', async () => {
     await assertFails(updateDoc(doc(as(EXTRANO), 'users', OWNER_A), { activeCasaId: CASA_B }));
   });
+
+  // CORRECCIÓN DE SEGURIDAD (P0, noviembre 2026): casaIds/registrosProRefs
+  // alimentan los custom claims (sincronizarClaimsUid) que storage.rules usa
+  // como única fuente de verdad de membresía -- ver el comentario junto a
+  // estas reglas en firestore.rules. Antes de la corrección, el dueño podía
+  // escribirse a mano un casaId ajeno aquí y, llamando a sincronizarClaims,
+  // obtener acceso real a los documentos/fotos de esa casa en Storage.
+  it('DENY (seguridad): el propio dueño no puede colarse un casaId ajeno a mano', async () => {
+    await assertFails(updateDoc(doc(as(OWNER_A), 'users', OWNER_A), { casaIds: [CASA_A, CASA_B] }));
+  });
+
+  it('DENY (seguridad): el propio dueño no puede colarse un registroId ajeno a mano', async () => {
+    await assertFails(updateDoc(doc(as(OWNER_A), 'users', OWNER_A), {
+      registrosProRefs: [{ casaId: CASA_B, elementoId: ELEMENTO_B1, registroId: REGISTRO_B1 }],
+    }));
+  });
+
+  it('ALLOW: el dueño sigue pudiendo editar otros campos legítimos de su perfil', async () => {
+    await assertSucceeds(updateDoc(doc(as(OWNER_A), 'users', OWNER_A), { displayName: 'Ana García' }));
+  });
+
+  it('ALLOW: el alta inicial del perfil (casaIds vacío, sin registrosProRefs) sigue funcionando', async () => {
+    await assertSucceeds(setDoc(doc(as(EXTRANO), 'users', EXTRANO), {
+      displayName: 'usuario-externo', activeCasaId: null, casaIds: [], createdAt: new Date(),
+    }));
+  });
+
+  it('DENY (seguridad): no se puede crear el perfil propio ya con un casaId ajeno dentro', async () => {
+    await assertFails(setDoc(doc(as(EXTRANO), 'users', EXTRANO), {
+      displayName: 'usuario-externo', activeCasaId: CASA_A, casaIds: [CASA_A], createdAt: new Date(),
+    }));
+  });
+
+  it('DENY (seguridad): no se puede crear el perfil propio ya con registrosProRefs dentro', async () => {
+    await assertFails(setDoc(doc(as(EXTRANO), 'users', EXTRANO), {
+      displayName: 'usuario-externo', activeCasaId: null, casaIds: [], registrosProRefs: [], createdAt: new Date(),
+    }));
+  });
 });
 
 describe('profesionales -- cada profesional solo ve/edita su propia ficha', () => {

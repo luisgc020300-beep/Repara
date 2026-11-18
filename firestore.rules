@@ -31,8 +31,31 @@ service cloud.firestore {
     function estadoControlado(v) { return v == 'terminado' || v == 'archivado' || v == 'pendienteConfirmacion' || v == 'pendientePago'; }
 
     // ── users ────────────────────────────────────────────────────────────────
+    // CORRECCIÓN DE SEGURIDAD (P0, noviembre 2026): este documento era de
+    // escritura totalmente libre para su propio dueño, incluidos casaIds y
+    // registrosProRefs -- dos campos que sincronizarClaimsUid (Cloud
+    // Function) copiaba sin verificar dentro de los custom claims del
+    // token de Auth, y que storage.rules usa como ÚNICA fuente de verdad
+    // de "¿eres miembro de esta casa/profesional de este registro?" (no
+    // puede leer Firestore por la diferencia de región, ver storage.rules).
+    // Un cliente podía escribirse a mano el id de una casa o un registro
+    // ajenos ahí y, llamando a sincronizarClaims, conseguir acceso real a
+    // los documentos/fotos de esa casa o registro ajenos en Storage.
+    // Ahora ninguno de los dos es escribible por el cliente en ningún
+    // momento -- nacen vacíos en asegurarPerfilUsuario() (lib/services/
+    // casa_service.dart) y solo createCasa/joinCasa/responderInvitacion/
+    // eliminarCuenta (Admin SDK, Cloud Functions) los mutan después.
     match /users/{uid} {
-      allow read, write: if isAuth() && isOwner(uid);
+      allow read: if isAuth() && isOwner(uid);
+
+      allow create: if isAuth() && isOwner(uid)
+          && (!('casaIds' in request.resource.data) || request.resource.data.casaIds.size() == 0)
+          && !('registrosProRefs' in request.resource.data);
+
+      allow update: if isAuth() && isOwner(uid)
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['casaIds', 'registrosProRefs']);
+
+      allow delete: if isAuth() && isOwner(uid);
     }
 
     // ── profesionales (perfil profesional, sección 17 del spec) ────────────────

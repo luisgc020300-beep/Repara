@@ -111,15 +111,33 @@ async function verificarYRegistrarIntentoCodigo(uid, accion) {
 // no puede comprobar "¿eres miembro de esta casa?" leyendo Firestore
 // directamente -- en su lugar lee un custom claim del token de Auth
 // (casaIds/registrosProId), que SÍ viaja con cada petición sin depender de
-// la región. Estas claims se recalculan aquí, en el servidor, a partir del
-// mismo estado de Firestore que ya es la fuente de verdad -- nunca al
-// revés, para que no puedan desincronizarse por un fallo del cliente.
+// la región.
+//
+// CORRECCIÓN DE SEGURIDAD (P0, noviembre 2026): esta función decía calcular
+// las claims "a partir del mismo estado de Firestore que ya es la fuente de
+// verdad", pero leía users/{uid}.casaIds/registrosProRefs -- un documento
+// que firestore.rules deja escribir libremente a su propio dueño. Un
+// cliente podía escribirse a mano el id de una casa o un registro ajenos
+// ahí y, llamando a sincronizarClaims (función pública, solo exige estar
+// autenticado), conseguir ese id en su token -- y storage.rules, que SOLO
+// mira el token (nunca Firestore, por la limitación de región de arriba),
+// le daría acceso real a los documentos/fotos de esa casa o registro
+// ajenos. Ahora las claims se derivan SIEMPRE de la pertenencia real:
+// casas/{cid}.members (nunca escribible por el cliente, solo por
+// createCasa/joinCasa/eliminarCuenta) y registros/{rid}.profesionalUid
+// (nunca escribible por el cliente, solo por responderInvitacion) --
+// users/{uid}.casaIds/registrosProRefs ya no se leen aquí para nada; además
+// firestore.rules ahora bloquea que el cliente los toque directamente (ver
+// comentario junto a esas reglas), así que esta función es la única fuente
+// real de las claims en ambos sentidos.
 // =============================================================================
 async function sincronizarClaimsUid(uid) {
-  const snap = await db.collection('users').doc(uid).get();
-  const data = snap.exists ? snap.data() : {};
-  const casaIds = data.casaIds || [];
-  const registrosProId = (data.registrosProRefs || []).map((r) => r.registroId).filter(Boolean);
+  const [casasSnap, registrosSnap] = await Promise.all([
+    db.collection('casas').where('members', 'array-contains', uid).get(),
+    db.collectionGroup('registros').where('profesionalUid', '==', uid).get(),
+  ]);
+  const casaIds = casasSnap.docs.map((d) => d.id);
+  const registrosProId = registrosSnap.docs.map((d) => d.id);
   await getAuth().setCustomUserClaims(uid, { casaIds, registrosProId });
 }
 
@@ -251,10 +269,19 @@ exports.joinCasa = onCall({ region: REGION }, async (request) => {
 
 // -----------------------------------------------------------------------------
 // 2b. CAMBIAR DE CASA ACTIVA (octubre 2026, feedback de producto: gente con
-// más de una propiedad). createCasa/joinCasa ya guardaban casaIds como
-// array -- esto es lo único que faltaba, pasar por CF (no escritura directa
-// del cliente) para no fiarse de que el cliente valide pertenencia, mismo
-// criterio que activarModoProfesional.
+// más de una propiedad). Pasa por CF (no escritura directa del cliente)
+// para no fiarse de que el cliente valide pertenencia, mismo criterio que
+// activarModoProfesional.
+//
+// CORRECCIÓN DE SEGURIDAD (P0, noviembre 2026): comprobaba la pertenencia
+// contra users/{uid}.casaIds -- el mismo campo de escritura libre para el
+// cliente que motivó la corrección de sincronizarClaimsUid más arriba. Un
+// casaId ajeno colado ahí no daba acceso real a los datos de esa casa (
+// firestore.rules para casas/{cid} ya comprobaba casas/{cid}.members, nunca
+// este campo), pero sí dejaba activeCasaId apuntando a una casa ajena sin
+// comprobación real. Ahora se comprueba directamente casas/{casaId}.members,
+// la misma fuente de verdad que ya usan firestore.rules y
+// sincronizarClaimsUid.
 // -----------------------------------------------------------------------------
 exports.cambiarCasaActiva = onCall({ region: REGION }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
@@ -262,9 +289,8 @@ exports.cambiarCasaActiva = onCall({ region: REGION }, async (request) => {
   const { casaId } = request.data || {};
   if (!casaId) throw new HttpsError('invalid-argument', 'Falta casaId.');
 
-  const userSnap = await db.collection('users').doc(uid).get();
-  const casaIds = userSnap.exists ? (userSnap.data().casaIds || []) : [];
-  if (!casaIds.includes(casaId)) {
+  const casaSnap = await db.collection('casas').doc(casaId).get();
+  if (!casaSnap.exists || !(casaSnap.data().members || []).includes(uid)) {
     throw new HttpsError('permission-denied', 'No perteneces a esa casa.');
   }
 
