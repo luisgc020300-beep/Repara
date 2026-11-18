@@ -281,7 +281,17 @@ exports.cambiarCasaActiva = onCall({ region: REGION }, async (request) => {
 // users/{uid} aparte -- un cambio directo del cliente a users/{uid} dejaría
 // esas copias desincronizadas en cualquier casa a la que ya perteneciera.
 // Por eso pasa por una función: en una sola operación actualiza el original
-// y propaga la copia a TODAS las casas de casaIds (nunca solo la activa).
+// y propaga la copia a todas las casas a las que uid pertenece DE VERDAD.
+//
+// Nunca a partir de users/{uid}.casaIds (auditoría de seguridad, noviembre
+// 2026): ese campo lo puede escribir el propio dueño sin pasar por ninguna
+// función (ver firestore.rules, /users/{uid} es allow read, write libre para
+// isOwner), así que un cliente podría meterse a mano el id de una casa ajena
+// ahí y, llamando a esta función, forzar una escritura en memberProfiles de
+// esa casa -- un IDOR real. casas/{cid}.members, en cambio, solo lo escriben
+// las Cloud Functions (createCasa/joinCasa/eliminarCuenta), nunca el
+// cliente, así que consultarlo con array-contains es la fuente de verdad
+// correcta de pertenencia.
 // -----------------------------------------------------------------------------
 exports.actualizarNombrePerfil = onCall({ region: REGION }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Debes estar autenticado.');
@@ -291,14 +301,12 @@ exports.actualizarNombrePerfil = onCall({ region: REGION }, async (request) => {
     throw new HttpsError('invalid-argument', 'Nombre inválido.');
   }
 
-  const userRef = db.collection('users').doc(uid);
-  const userSnap = await userRef.get();
-  const casaIds = userSnap.exists ? (userSnap.data().casaIds || []) : [];
+  const casasSnap = await db.collection('casas').where('members', 'array-contains', uid).get();
 
   const batch = db.batch();
-  batch.set(userRef, { displayName: nombre }, { merge: true });
-  for (const casaId of casaIds) {
-    batch.update(db.collection('casas').doc(casaId), {
+  batch.set(db.collection('users').doc(uid), { displayName: nombre }, { merge: true });
+  for (const casaDoc of casasSnap.docs) {
+    batch.update(casaDoc.ref, {
       [`memberProfiles.${uid}.displayName`]: nombre,
     });
   }
