@@ -3,11 +3,13 @@
 // Libreta de profesionales de confianza de la casa (decisión del CEO: nunca
 // un listado público ni un buscador de gente nueva -- solo tus contactos).
 import 'package:flutter/material.dart';
+import 'package:repara_core/registro_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/casa.dart';
 import '../models/contacto.dart';
 import '../services/contacto_service.dart';
+import '../services/elemento_service.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_ui/app_dialog.dart';
 import 'package:repara_ui/app_error.dart';
@@ -17,6 +19,30 @@ import 'package:repara_ui/scroll_to_top_button.dart';
 import 'contacto_acciones.dart';
 import 'importar_contactos_screen.dart';
 import 'nuevo_contacto_sheet.dart';
+
+/// Cuántas veces (nº de registros) aparece cada contacto en
+/// Registro.profesionales de toda la casa -- "agregados a un trabajo", para
+/// distinguir a quien de verdad ha trabajado contigo de quien solo está
+/// guardado en la libreta sin usar todavía. Mismo patrón ya en producción
+/// que ElementoService.registrosConTrabajoPendiente: recorrer elementos y
+/// luego sus registros en memoria, sin collectionGroup ni índice nuevo.
+Future<Map<String, int>> _vecesAgregadoPorContacto(String casaId) async {
+  final elementos = await ElementoService.streamElementos(casaId).first;
+  final conteo = <String, int>{};
+  for (final elemento in elementos) {
+    final registros = await RegistroService.streamRegistros(
+      casaId,
+      elemento.id,
+    ).first;
+    for (final r in registros) {
+      for (final p in r.profesionales) {
+        final id = p.contactoId;
+        if (id != null) conteo[id] = (conteo[id] ?? 0) + 1;
+      }
+    }
+  }
+  return conteo;
+}
 
 class ContactosTab extends StatefulWidget {
   const ContactosTab({required this.casa, super.key});
@@ -31,6 +57,13 @@ class _ContactosTabState extends State<ContactosTab> {
   final _busquedaCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
   String _busqueda = '';
+  late Future<Map<String, int>> _vecesAgregadoFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _vecesAgregadoFuture = _vecesAgregadoPorContacto(widget.casa.id);
+  }
 
   @override
   void dispose() {
@@ -158,12 +191,17 @@ class _ContactosTabState extends State<ContactosTab> {
                         style: TextStyle(color: context.colors.inkMuted),
                       ),
                     )
-                  else
+                  else if (_busqueda.isNotEmpty)
+                    // Mientras se busca, lista plana -- las secciones de
+                    // abajo (Favoritos/Agregados/Recientes) son accesos
+                    // rápidos para cuando NO se sabe ya a quién se busca.
                     IosSection(
                       rows: filtrados
                           .map((c) => _ContactoRow(casa: casa, contacto: c))
                           .toList(),
-                    ),
+                    )
+                  else
+                    ..._secciones(context, casa, filtrados),
                 ],
               );
             },
@@ -172,6 +210,72 @@ class _ContactosTabState extends State<ContactosTab> {
         ],
       ),
     );
+  }
+
+  /// Organización de Contactos (noviembre 2026): accesos rápidos arriba
+  /// (Favoritos/Agregados a un trabajo/Recientes), la libreta completa
+  /// siempre debajo -- nunca se oculta a nadie, solo se adelanta a quien
+  /// hace falta encontrar más rápido. [contactos] ya viene filtrado por la
+  /// búsqueda (vacía aquí, solo se llama sin búsqueda activa).
+  List<Widget> _secciones(
+    BuildContext context,
+    Casa casa,
+    List<Contacto> contactos,
+  ) {
+    final favoritos = contactos.where((c) => c.favorito).toList();
+    final ahora = DateTime.now();
+    final recientes =
+        contactos
+            .where(
+              (c) =>
+                  !c.favorito &&
+                  c.createdAt != null &&
+                  ahora.difference(c.createdAt!) <= const Duration(days: 14),
+            )
+            .toList()
+          ..sort((a, b) => b.createdAt!.compareTo(a.createdAt!));
+
+    return [
+      if (favoritos.isNotEmpty)
+        IosSection(
+          header: 'Favoritos',
+          rows: favoritos
+              .map((c) => _ContactoRow(casa: casa, contacto: c))
+              .toList(),
+        ),
+      FutureBuilder<Map<String, int>>(
+        future: _vecesAgregadoFuture,
+        builder: (context, snapshot) {
+          final conteo = snapshot.data;
+          if (conteo == null) return const SizedBox.shrink();
+          final agregados =
+              contactos.where((c) => !c.favorito && (conteo[c.id] ?? 0) > 0).toList()
+                ..sort(
+                  (a, b) => (conteo[b.id] ?? 0).compareTo(conteo[a.id] ?? 0),
+                );
+          if (agregados.isEmpty) return const SizedBox.shrink();
+          return IosSection(
+            header: 'Ya han trabajado contigo',
+            rows: agregados
+                .map((c) => _ContactoRow(casa: casa, contacto: c))
+                .toList(),
+          );
+        },
+      ),
+      if (recientes.isNotEmpty)
+        IosSection(
+          header: 'Añadidos recientemente',
+          rows: recientes
+              .map((c) => _ContactoRow(casa: casa, contacto: c))
+              .toList(),
+        ),
+      IosSection(
+        header: 'Todos tus contactos',
+        rows: contactos
+            .map((c) => _ContactoRow(casa: casa, contacto: c))
+            .toList(),
+      ),
+    ];
   }
 }
 
@@ -202,6 +306,25 @@ class _ContactoRow extends StatelessWidget {
     );
     if (!abierto && context.mounted) {
       AppError.show(context, 'No se pudo iniciar la llamada.');
+    }
+  }
+
+  Future<void> _alternarFavorito(BuildContext context) async {
+    try {
+      await ContactoService.alternarFavorito(
+        casa.id,
+        contacto.id,
+        !contacto.favorito,
+      );
+    } catch (e, st) {
+      if (context.mounted) {
+        AppError.show(
+          context,
+          'No se pudo actualizar el favorito.',
+          error: e,
+          stackTrace: st,
+        );
+      }
     }
   }
 
@@ -261,6 +384,18 @@ class _ContactoRow extends StatelessWidget {
                     ),
                   ],
                 ),
+              ),
+              IconButton(
+                icon: Icon(
+                  contacto.favorito ? Icons.star_rounded : Icons.star_border_rounded,
+                  color: contacto.favorito
+                      ? context.colors.warning
+                      : context.colors.inkMuted,
+                ),
+                tooltip: contacto.favorito
+                    ? 'Quitar de favoritos'
+                    : 'Marcar como favorito',
+                onPressed: () => _alternarFavorito(context),
               ),
               IconButton(
                 icon: Icon(Icons.call_outlined, color: context.colors.brand),

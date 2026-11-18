@@ -10,13 +10,21 @@
 // acciones distintas en vez de una: abrir el chat con texto ya escrito, o
 // compartir foto+texto por el selector nativo (donde WhatsApp es una opción
 // más, junto a SMS/email/etc.).
+import 'dart:async';
+
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:repara_core/analytics_service.dart';
+import 'package:repara_core/invitacion_service.dart';
+import 'package:repara_core/registro.dart';
+import 'package:repara_core/registro_service.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/contacto.dart';
 import '../services/contacto_service.dart';
+import '../services/elemento_service.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_ui/app_dialog.dart';
 import 'package:repara_ui/app_error.dart';
@@ -64,6 +72,27 @@ Future<void> mostrarAccionesContacto(BuildContext context, {required String casa
                 telefono: contacto.telefono,
                 antesDeCadaAccion: () => Navigator.pop(ctx),
               ),
+            ),
+            // Invitar a una cuenta real de Repara (distinto de "compartir un
+            // evento" con el selector de profesionales, y distinto de
+            // "agregar un contacto" de arriba -- CEO, noviembre 2026: dejar
+            // claras las tres cosas). Reutiliza exactamente el mismo
+            // mecanismo que ya usa la ficha del evento
+            // (InvitacionService.invitarProfesional), solo que entrando
+            // desde el contacto en vez de desde el evento.
+            IosSection(
+              rows: [
+                IosRow(
+                  icon: Icons.person_add_alt_outlined,
+                  iconColor: context.colors.brand,
+                  title: 'Invitar a un evento de Repara',
+                  subtitle: 'Vincula su cuenta a uno de tus eventos abiertos',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _invitarAUnEvento(context, casaId: casaId, contacto: contacto);
+                  },
+                ),
+              ],
             ),
             IosSection(
               rows: [
@@ -113,6 +142,156 @@ Future<void> _eliminarContacto(BuildContext context, {required String casaId, re
   } catch (e, st) {
     if (context.mounted) {
       AppError.show(context, 'No se pudo eliminar el contacto.', error: e, stackTrace: st);
+    }
+  }
+}
+
+// -----------------------------------------------------------------------
+// Invitar un contacto a una cuenta real de Repara, para un evento concreto
+// (noviembre 2026, mejora de Contactos/invitaciones). Reutiliza tal cual
+// InvitacionService.invitarProfesional -- el mismo mecanismo de
+// _SeccionInvitarProfesional en registro_detail_screen.dart, solo que el
+// punto de entrada es el contacto, no el evento, y el teléfono ya viene
+// relleno de la libreta.
+// -----------------------------------------------------------------------
+
+/// Eventos "con profesional" de la casa que siguen activos y todavía no
+/// tienen ninguna cuenta vinculada -- candidatos reales a invitación, mismo
+/// criterio (RegistroService.esTrabajoActivo) que ya usa el resto de la app
+/// para decidir qué sigue abierto. Mismo patrón de recorrido en memoria que
+/// ElementoService.registrosConTrabajoPendiente -- sin collectionGroup ni
+/// índice nuevo.
+Future<
+  List<({String elementoId, String elementoNombre, Registro registro})>
+>
+_eventosDisponiblesParaInvitar(String casaId) async {
+  final elementos = await ElementoService.streamElementos(casaId).first;
+  final resultado =
+      <({String elementoId, String elementoNombre, Registro registro})>[];
+  for (final elemento in elementos) {
+    final registros = await RegistroService.streamRegistros(
+      casaId,
+      elemento.id,
+    ).first;
+    for (final r in registros) {
+      if (r.esConProfesional &&
+          r.profesionalUid == null &&
+          RegistroService.esTrabajoActivo(r)) {
+        resultado.add((
+          elementoId: elemento.id,
+          elementoNombre: elemento.nombre,
+          registro: r,
+        ));
+      }
+    }
+  }
+  return resultado;
+}
+
+Future<void> _invitarAUnEvento(
+  BuildContext context, {
+  required String casaId,
+  required Contacto contacto,
+}) async {
+  final eventos = await _eventosDisponiblesParaInvitar(casaId);
+  if (!context.mounted) return;
+  if (eventos.isEmpty) {
+    AppError.show(
+      context,
+      'No tienes ningún evento abierto a un profesional que aún esté sin asignar. '
+      'Crea uno nuevo o edita uno existente para poder invitar desde aquí.',
+    );
+    return;
+  }
+  final elegido = await showModalBottomSheet<
+    ({String elementoId, String elementoNombre, Registro registro})
+  >(
+    context: context,
+    builder: (ctx) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          ReparaSpace.s4,
+          ReparaSpace.s2,
+          ReparaSpace.s4,
+          ReparaSpace.s4,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: ReparaSpace.s2),
+              child: Text(
+                '¿A qué evento invitas a ${contacto.nombre}?',
+                style: Theme.of(ctx).textTheme.headlineSmall,
+              ),
+            ),
+            IosSection(
+              rows: eventos
+                  .map(
+                    (e) => IosRow(
+                      icon: Icons.build_outlined,
+                      iconColor: ctx.colors.brand,
+                      title: e.registro.titulo,
+                      subtitle: e.elementoNombre,
+                      onTap: () => Navigator.pop(ctx, e),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+  if (elegido == null || !context.mounted) return;
+
+  try {
+    final resultado = await InvitacionService.invitarProfesional(
+      casaId: casaId,
+      elementoId: elegido.elementoId,
+      registroId: elegido.registro.id,
+      telefonoProfesional: contacto.telefono,
+    );
+    unawaited(
+      AnalyticsService.professionalInvited(
+        metodo: resultado.esDirecta ? 'telefono' : 'codigo',
+      ),
+    );
+    if (!context.mounted) return;
+    if (resultado.esDirecta) {
+      AppError.showSuccess(context, 'Invitación enviada a ${contacto.nombre}.');
+    } else if (resultado.codigo != null) {
+      final mensaje =
+          'Te invito a "${elegido.registro.titulo}" en Repara.\n'
+          'Descárgate la app, crea tu cuenta y activa el modo profesional, y luego introduce este código de invitación: ${resultado.codigo}';
+      try {
+        await Share.share(
+          mensaje,
+          sharePositionOrigin: Offset.zero & MediaQuery.of(context).size,
+        );
+      } catch (_) {
+        // La invitación ya se generó -- que falle el selector de compartir
+        // no debe parecer que la invitación falló.
+      }
+    }
+  } on FirebaseFunctionsException catch (e, st) {
+    if (context.mounted) {
+      AppError.show(
+        context,
+        e.message ?? 'No se pudo enviar la invitación.',
+        error: e,
+        stackTrace: st,
+      );
+    }
+  } catch (e, st) {
+    if (context.mounted) {
+      AppError.show(
+        context,
+        'No se pudo enviar la invitación.',
+        error: e,
+        stackTrace: st,
+      );
     }
   }
 }

@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import '../models/contacto.dart';
 import '../services/contacto_service.dart';
 import 'package:repara_core/design_tokens.dart';
+import 'package:repara_ui/app_dialog.dart';
 import 'package:repara_ui/app_error.dart';
 
 Future<void> mostrarNuevoContactoSheet(
@@ -85,6 +86,36 @@ class _NuevoContactoFormState extends State<_NuevoContactoForm> {
       );
       return;
     }
+    // Evitar duplicados (CEO, noviembre 2026): mismo criterio que ya usa
+    // importar_contactos_screen.dart al traer contactos del teléfono, pero
+    // aquí también para lo que se escribe a mano. Un mismo teléfono puede
+    // llegar legítimamente dos veces (p.ej. una empresa y su encargado
+    // personal), así que avisa y deja confirmar -- no bloquea.
+    try {
+      final existentes = await ContactoService.streamContactos(
+        widget.casaId,
+      ).first;
+      final duplicado = ContactoService.buscarPorTelefono(
+        existentes,
+        telefono,
+        excluirId: widget.existente?.id,
+      );
+      if (duplicado != null && mounted) {
+        final continuar = await AppDialog.confirm(
+          context,
+          title: 'Ese teléfono ya está guardado',
+          message:
+              'Ya tienes a "${duplicado.nombre}" con este mismo número. '
+              '¿Seguro que quieres guardarlo también como "$nombre"?',
+          confirmLabel: 'Guardar de todas formas',
+        );
+        if (!continuar || !mounted) return;
+      }
+    } catch (_) {
+      // Sin acceso a la libreta para comprobar -- se sigue pudiendo
+      // guardar, igual que si la comprobación nunca hubiera existido.
+    }
+    if (!mounted) return;
     setState(() => _guardando = true);
     final contacto = Contacto(
       id: widget.existente?.id ?? '',
@@ -94,6 +125,7 @@ class _NuevoContactoFormState extends State<_NuevoContactoForm> {
       especialidad: _especialidadCtrl.text.trim().isEmpty
           ? null
           : _especialidadCtrl.text.trim(),
+      favorito: widget.existente?.favorito ?? false,
     );
     try {
       if (widget.existente != null) {

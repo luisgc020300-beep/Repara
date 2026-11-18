@@ -27,7 +27,9 @@ import 'package:repara_core/registro.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../models/casa.dart';
+import '../models/contacto.dart';
 import '../models/elemento.dart';
+import '../services/contacto_service.dart';
 import '../services/elemento_service.dart';
 import 'package:repara_core/documento_gate.dart';
 import 'package:repara_core/pago_service.dart';
@@ -2114,6 +2116,82 @@ class _SeccionInvitarProfesionalState
     super.dispose();
   }
 
+  // Elegir de la libreta en vez de escribir el teléfono a mano (noviembre
+  // 2026, mejora de invitaciones) -- solo rellena el campo, la invitación
+  // en sí sigue siendo la misma llamada de siempre a invitarProfesional.
+  // Favoritos primero, mismo criterio de prioridad que Contactos.
+  Future<void> _elegirDeContactos() async {
+    List<Contacto> contactos;
+    try {
+      contactos = await ContactoService.streamContactos(widget.casa.id).first;
+    } catch (e) {
+      if (mounted) AppError.show(context, 'No se pudo abrir tu libreta de contactos.');
+      return;
+    }
+    if (!mounted) return;
+    if (contactos.isEmpty) {
+      AppError.show(context, 'Todavía no tienes ningún contacto guardado.');
+      return;
+    }
+    final ordenados = [...contactos]
+      ..sort((a, b) {
+        if (a.favorito != b.favorito) return a.favorito ? -1 : 1;
+        return a.nombre.compareTo(b.nombre);
+      });
+    final elegido = await showModalBottomSheet<Contacto>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            ReparaSpace.s4,
+            ReparaSpace.s2,
+            ReparaSpace.s4,
+            ReparaSpace.s4,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: ReparaSpace.s2),
+                child: Text(
+                  'Elige un contacto',
+                  style: Theme.of(ctx).textTheme.headlineSmall,
+                ),
+              ),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: IosSection(
+                    rows: ordenados
+                        .map(
+                          (c) => IosRow(
+                            icon: c.favorito
+                                ? Icons.star_rounded
+                                : Icons.person_outline,
+                            iconColor: c.favorito
+                                ? ctx.colors.warning
+                                : ctx.colors.brand,
+                            title: c.nombre,
+                            subtitle: c.especialidad ?? c.telefono,
+                            onTap: () => Navigator.pop(ctx, c),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (elegido == null || !mounted) return;
+    setState(() {
+      _telefonoCtrl.text = elegido.telefono;
+      _emailCtrl.clear();
+    });
+  }
+
   Future<void> _invitar() async {
     final email = _emailCtrl.text.trim();
     final telefono = _telefonoCtrl.text.trim();
@@ -2316,7 +2394,13 @@ class _SeccionInvitarProfesionalState
                   'Invita a tu profesional de confianza -- si ya tiene cuenta en Repara, le llega directo; si no, te doy un código para que se lo mandes tú.',
                   style: Theme.of(context).textTheme.bodyLarge,
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: _elegirDeContactos,
+                  icon: const Icon(Icons.contact_phone_outlined, size: 18),
+                  label: const Text('Elegir de tus contactos'),
+                ),
+                const SizedBox(height: 10),
                 TextField(
                   controller: _emailCtrl,
                   keyboardType: TextInputType.emailAddress,

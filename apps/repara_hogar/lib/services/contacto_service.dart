@@ -35,4 +35,28 @@ class ContactoService {
   static Future<void> eliminar(String casaId, String contactoId) async {
     await _col(casaId).doc(contactoId).delete();
   }
+
+  static Future<void> alternarFavorito(String casaId, String contactoId, bool favorito) async {
+    await _col(casaId).doc(contactoId).update({'favorito': favorito});
+  }
+
+  static String _soloDigitos(String telefono) => telefono.replaceAll(RegExp(r'[^0-9]'), '');
+
+  /// Mismo contacto ya guardado con ese teléfono (comparado solo por
+  /// dígitos, igual que importar_contactos_screen.dart) -- para avisar
+  /// antes de crear un duplicado al añadir uno nuevo a mano. [excluirId] es
+  /// el propio contacto al editar, para no chocar consigo mismo.
+  static Contacto? buscarPorTelefono(
+    List<Contacto> contactos,
+    String telefono, {
+    String? excluirId,
+  }) {
+    final buscado = _soloDigitos(telefono);
+    if (buscado.isEmpty) return null;
+    for (final c in contactos) {
+      if (c.id == excluirId) continue;
+      if (_soloDigitos(c.telefono) == buscado) return c;
+    }
+    return null;
+  }
 }

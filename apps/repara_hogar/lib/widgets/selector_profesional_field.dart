@@ -177,6 +177,15 @@ class _SelectorSheetState extends State<_SelectorSheet> {
   @override
   Widget build(BuildContext context) {
     final manuales = _sel.where((p) => p.contactoId == null).toList();
+    // Favoritos primero (noviembre 2026, organización de Contactos) --
+    // mismo criterio que el selector de invitación y la propia pantalla de
+    // Contactos, para no decidir "quién va antes" de tres formas distintas
+    // en la app.
+    final contactosOrdenados = [...widget.contactos]
+      ..sort((a, b) {
+        if (a.favorito != b.favorito) return a.favorito ? -1 : 1;
+        return a.nombre.compareTo(b.nombre);
+      });
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.only(
@@ -203,11 +212,17 @@ class _SelectorSheetState extends State<_SelectorSheet> {
                 child: ListView(
                   shrinkWrap: true,
                   children: [
-                    for (final c in widget.contactos)
+                    for (final c in contactosOrdenados)
                       CheckboxListTile(
                         value: _sel.any((p) => p.contactoId == c.id),
                         onChanged: (_) => _alternar(c),
                         controlAffinity: ListTileControlAffinity.leading,
+                        secondary: c.favorito
+                            ? Icon(
+                                Icons.star_rounded,
+                                color: context.colors.warning,
+                              )
+                            : null,
                         title: Text(c.nombre),
                         subtitle: Text(
                           [c.especialidad, c.telefono]

@@ -22,6 +22,7 @@ class Contacto {
     required this.tipo,
     this.especialidad,
     this.notas,
+    this.favorito = false,
     this.createdAt,
   });
 
@@ -31,6 +32,11 @@ class Contacto {
   final TipoContacto tipo;
   final String? especialidad;
   final String? notas;
+
+  /// Marcado a mano por el propietario (noviembre 2026, organización de
+  /// Contactos) -- ningún criterio automático, solo lo que el usuario
+  /// decide destacar.
+  final bool favorito;
   final DateTime? createdAt;
 
   factory Contacto.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
@@ -42,6 +48,7 @@ class Contacto {
       tipo: tipoContactoFromString(data['tipo'] as String?),
       especialidad: data['especialidad'] as String?,
       notas: data['notas'] as String?,
+      favorito: data['favorito'] as bool? ?? false,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
     );
   }
@@ -52,5 +59,17 @@ class Contacto {
         'tipo': tipo.name,
         if (especialidad != null) 'especialidad': especialidad,
         if (notas != null) 'notas': notas,
+        'favorito': favorito,
       };
+
+  Contacto copyWith({bool? favorito}) => Contacto(
+        id: id,
+        nombre: nombre,
+        telefono: telefono,
+        tipo: tipo,
+        especialidad: especialidad,
+        notas: notas,
+        favorito: favorito ?? this.favorito,
+        createdAt: createdAt,
+      );
 }
