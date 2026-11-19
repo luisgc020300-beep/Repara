@@ -10,6 +10,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
+import 'package:repara_core/especialidad_profesional.dart';
 import 'package:repara_core/location_service.dart';
 import 'package:repara_core/profesional.dart';
 import 'package:repara_core/profesional_service.dart';
@@ -58,6 +59,15 @@ class _AjustesProScreenState extends State<AjustesProScreen> {
     }
   }
 
+  Future<void> _guardarCampo(Future<void> Function() guardar) async {
+    try {
+      await guardar();
+    } catch (e, st) {
+      await FirebaseCrashlytics.instance.recordError(e, st);
+      if (mounted) AppError.show(context, 'No se pudo guardar.');
+    }
+  }
+
   Future<void> _editarCampo(
     String titulo,
     String? actual,
@@ -73,12 +83,61 @@ class _AjustesProScreenState extends State<AjustesProScreen> {
       maxLines: maxLines,
     );
     if (valor == null) return;
-    try {
-      await guardar(valor);
-    } catch (e, st) {
-      await FirebaseCrashlytics.instance.recordError(e, st);
-      if (mounted) AppError.show(context, 'No se pudo guardar.');
-    }
+    await _guardarCampo(() => guardar(valor));
+  }
+
+  /// Especialidad (organizar las especialidades profesionales, noviembre
+  /// 2026): selector con una lista cerrada en vez de solo texto libre --
+  /// "Otro" sigue abriendo el mismo diálogo de texto de siempre, así que
+  /// cualquier profesional que ya tuviera guardado algo fuera de la lista
+  /// puede seguir escribiéndolo igual, sin perder nada.
+  Future<void> _abrirSelectorEspecialidad(
+    BuildContext context,
+    String? actual,
+  ) {
+    return showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            ReparaSpace.s4,
+            ReparaSpace.s2,
+            ReparaSpace.s4,
+            ReparaSpace.s4,
+          ),
+          child: SingleChildScrollView(
+            child: IosSection(
+              rows: [
+                for (final e in especialidadesProfesionales)
+                  IosRow(
+                    icon: Icons.category_outlined,
+                    iconColor: context.colors.brand,
+                    title: e,
+                    selected: actual == e,
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      if (e == especialidadProfesionalOtra) {
+                        _editarCampo(
+                          'Especialidad',
+                          actual,
+                          (v) =>
+                              ProfesionalService.actualizarPerfil(especialidad: v),
+                        );
+                      } else {
+                        _guardarCampo(
+                          () => ProfesionalService.actualizarPerfil(
+                            especialidad: e,
+                          ),
+                        );
+                      }
+                    },
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   /// Foto del perfil profesional (mejora de perfiles, noviembre 2026) --
@@ -287,11 +346,10 @@ class _AjustesProScreenState extends State<AjustesProScreen> {
                           icon: Icons.category_outlined,
                           iconColor: context.colors.brand,
                           title: perfil?.especialidad?.isNotEmpty == true ? perfil!.especialidad! : 'Especialidad',
-                          subtitle: 'Toca para editar',
-                          onTap: () => _editarCampo(
-                            'Especialidad',
+                          subtitle: 'Toca para elegir',
+                          onTap: () => _abrirSelectorEspecialidad(
+                            context,
                             perfil?.especialidad,
-                            (v) => ProfesionalService.actualizarPerfil(especialidad: v),
                           ),
                         ),
                         IosRow(
