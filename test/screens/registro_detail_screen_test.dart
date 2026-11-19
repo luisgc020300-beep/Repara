@@ -190,8 +190,12 @@ void main() {
       // aparezca, no con que aparezca una sola vez).
       expect(find.text('Presupuestos'), findsWidgets);
 
-      // Historial de la reparación -- los 4 eventos sembrados.
-      expect(find.text('Historial de la reparación'), findsOneWidget);
+      // Historial -- desplegable cerrado por defecto (CEO, noviembre 2026:
+      // "simplemente la palabra historial con un desplegable"); hay que
+      // desplegarlo para ver los 4 eventos sembrados.
+      expect(find.text('Historial'), findsOneWidget);
+      await tester.tap(find.text('Historial'));
+      await tester.pumpAndSettle();
       expect(find.textContaining('Fontanero Pepe'), findsWidgets);
 
       expect(tester.takeException(), isNull);
@@ -244,7 +248,7 @@ void main() {
 
       expect(find.text('Próxima visita'), findsOneWidget);
       expect(find.text('Presupuestos'), findsWidgets);
-      expect(find.text('Historial de la reparación'), findsOneWidget);
+      expect(find.text('Historial'), findsOneWidget);
       expect((await registroRef.get()).data()?['tituloDebug'], 'Vuelta 14');
       expect(tester.takeException(), isNull);
     },
@@ -295,7 +299,9 @@ void main() {
       expect(find.text('Revisión in situ'), findsOneWidget);
       expect(find.text('Presupuestos'), findsWidgets);
       expect(find.text('Presupuesto #1 · v1'), findsOneWidget);
-      expect(find.text('Historial de la reparación'), findsOneWidget);
+      expect(find.text('Historial'), findsOneWidget);
+      await tester.tap(find.text('Historial'));
+      await tester.pumpAndSettle();
       expect(find.textContaining('Fontanero Pepe'), findsWidgets);
       expect(tester.takeException(), isNull);
     },

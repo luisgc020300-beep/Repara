@@ -20,6 +20,7 @@ import 'package:repara_core/design_tokens.dart';
 import 'package:repara_core/documento_service.dart';
 import 'package:repara_core/historial_service.dart';
 import 'package:repara_core/invitacion_service.dart';
+import 'package:repara_core/presupuesto_service.dart';
 
 const _casa = Casa(
   id: 'c1',
@@ -68,6 +69,7 @@ void main() {
     DocumentoService.debugFirestoreOverride = null;
     HistorialService.debugFirestoreOverride = null;
     InvitacionService.debugFirestoreOverride = null;
+    PresupuestoService.debugFirestoreOverride = null;
   });
 
   testWidgets(
@@ -120,6 +122,11 @@ void main() {
       DocumentoService.debugFirestoreOverride = db;
       HistorialService.debugFirestoreOverride = db;
       InvitacionService.debugFirestoreOverride = db;
+      // PresupuestosSection vive en _ResumenTab (registro_detail_screen.dart)
+      // -- antes de que "Compartir resumen" se moviera al final del scroll
+      // (CEO, noviembre 2026), nunca llegaba a construirse en este test sin
+      // hacer scroll, así que esta carencia pasaba desapercibida.
+      PresupuestoService.debugFirestoreOverride = db;
 
       await tester.pumpWidget(
         MaterialApp(
@@ -135,6 +142,19 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Finalizar'), findsNothing);
+      // "Compartir resumen" ya no es una barra fija: vive al final del
+      // scroll del Resumen (CEO, noviembre 2026: "que no quede fija abajo
+      // tapando cosas").
+      await tester.scrollUntilVisible(
+        find.text('Compartir resumen'),
+        300,
+        scrollable: find
+            .descendant(
+              of: find.byKey(const ValueKey('tab-resumen')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
       expect(find.text('Compartir resumen'), findsOneWidget);
     },
   );

@@ -11,9 +11,11 @@
 //    widget en sí.
 // 2. "Descargar PDF" solo existía en el registro simple (RegistroSimpleAcciones,
 //    RegistroResumenPdf). El registro con profesional ahora también lo
-//    ofrece en su barra inferior, junto a "Compartir resumen" -- mismo
-//    RegistroResumenPdf, que ya era genérico (usa registro.presupuesto o
-//    registro.coste según toque, ver montoDebidoRegistro).
+//    ofrece, junto a "Compartir resumen", al final del scroll de su pestaña
+//    Resumen (noviembre 2026: dejó de ser una barra fija fuera de las
+//    pestañas) -- mismo RegistroResumenPdf, que ya era genérico (usa
+//    registro.presupuesto o registro.coste según toque, ver
+//    montoDebidoRegistro).
 //
 // Usa FakeFirebaseFirestore, nada de Firebase real.
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -150,6 +152,22 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      // Compartir/Descargar PDF ya no es una barra fija: vive al final del
+      // scroll del Resumen (CEO, noviembre 2026: "que no quede fija abajo
+      // tapando cosas"). El scrollable se busca DENTRO de la pestaña
+      // Resumen -- el TabBar también es "scrollable" (isScrollable: true),
+      // así que find.byType(Scrollable).first puede coger el de las
+      // pestañas en vez de la lista.
+      await tester.scrollUntilVisible(
+        find.text('Compartir resumen'),
+        300,
+        scrollable: find
+            .descendant(
+              of: find.byKey(const ValueKey('tab-resumen')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
       expect(find.text('Compartir resumen'), findsOneWidget);
       expect(find.text('Descargar PDF'), findsOneWidget);
     },
@@ -186,6 +204,16 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await tester.scrollUntilVisible(
+        find.text('Finalizar'),
+        300,
+        scrollable: find
+            .descendant(
+              of: find.byKey(const ValueKey('tab-resumen')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
       expect(find.text('Finalizar'), findsOneWidget);
       expect(find.text('Descargar PDF'), findsOneWidget);
     },

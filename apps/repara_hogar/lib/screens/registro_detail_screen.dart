@@ -762,6 +762,12 @@ class _CuerpoConProfesionalState extends State<_CuerpoConProfesional> {
                           elementoId: elementoId,
                           registro: registro,
                           elemento: elemento,
+                          pagos: pagos,
+                          totalPagado: totalPagado,
+                          onFinalizar: onFinalizar,
+                          onCompartirResumen: onCompartirResumen,
+                          generandoPdf: _generandoPdf,
+                          onDescargarPdf: () => _descargarPdf(pagos, totalPagado),
                         ),
                         SingleChildScrollView(
                           key: const ValueKey('tab-cita'),
@@ -831,80 +837,6 @@ class _CuerpoConProfesionalState extends State<_CuerpoConProfesional> {
                       ],
                     ),
                   ),
-                  SafeArea(
-                    key: const ValueKey('pie-acciones'),
-                    top: false,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-                      // Antes había además un FloatingActionButton
-                      // "Finalizar" flotando sobre esta misma barra -- se
-                      // solapaban visualmente. Una sola barra con las dos
-                      // acciones evita el choque y mantiene ambas alcanzables.
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (_estadoControlado(registro.estado))
-                            SizedBox(
-                              width: double.infinity,
-                              child: FilledButton.icon(
-                                onPressed: () => onCompartirResumen(
-                                  pagos.isEmpty ? null : totalPagado,
-                                ),
-                                icon: const Icon(
-                                  Icons.ios_share_outlined,
-                                  size: 18,
-                                ),
-                                label: const Text('Compartir resumen'),
-                              ),
-                            )
-                          else
-                            Row(
-                              children: [
-                                OutlinedButton(
-                                  onPressed: () => onCompartirResumen(
-                                    pagos.isEmpty ? null : totalPagado,
-                                  ),
-                                  child: const Icon(
-                                    Icons.ios_share_outlined,
-                                    size: 18,
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: FilledButton.icon(
-                                    onPressed: onFinalizar,
-                                    icon: const Icon(Icons.check, size: 18),
-                                    label: const Text('Finalizar'),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          const SizedBox(height: 10),
-                          SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton.icon(
-                              onPressed: _generandoPdf
-                                  ? null
-                                  : () => _descargarPdf(pagos, totalPagado),
-                              icon: _generandoPdf
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Icon(
-                                      Icons.picture_as_pdf_outlined,
-                                      size: 18,
-                                    ),
-                              label: const Text('Descargar PDF'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
                 ],
               ),
             );
@@ -920,6 +852,12 @@ class _ResumenTab extends StatelessWidget {
     required this.casa,
     required this.elementoId,
     required this.registro,
+    required this.pagos,
+    required this.totalPagado,
+    required this.onFinalizar,
+    required this.onCompartirResumen,
+    required this.generandoPdf,
+    required this.onDescargarPdf,
     this.elemento,
     super.key,
   });
@@ -928,6 +866,19 @@ class _ResumenTab extends StatelessWidget {
   final String elementoId;
   final Registro registro;
   final Elemento? elemento;
+  // Compartir/Finalizar/Descargar PDF (CEO, noviembre 2026: "quiero que
+  // quede abajo de la pantalla pero que si hago scroll hacia arriba deje
+  // de verse, que aparezca al final de todo lo que haya en la pestaña, no
+  // fija abajo") -- antes era una barra fija fuera del TabBarView, visible
+  // en cualquier pestaña y tapando contenido. Ahora vive al final del
+  // propio scroll del Resumen, igual que ya hacía RegistroSimpleAcciones
+  // en el registro sin profesional.
+  final List<Pago> pagos;
+  final double totalPagado;
+  final VoidCallback onFinalizar;
+  final void Function(double? pagado) onCompartirResumen;
+  final bool generandoPdf;
+  final VoidCallback onDescargarPdf;
 
   @override
   Widget build(BuildContext context) {
@@ -1045,11 +996,86 @@ class _ResumenTab extends StatelessWidget {
           elemento: elemento,
         ),
         const SizedBox(height: 20),
-        _SeccionHistorial(
-          key: const ValueKey('resumen-historial'),
-          casa: casa,
-          elementoId: elementoId,
-          registro: registro,
+        // Compartir resumen/Finalizar/Descargar PDF, al final del scroll
+        // del Resumen -- antes eran una barra fija fuera de las pestañas,
+        // visible y tapando contenido aunque se hiciera scroll (CEO,
+        // noviembre 2026).
+        Column(
+          key: const ValueKey('resumen-acciones'),
+          children: [
+            if (_estadoControlado(registro.estado))
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () => onCompartirResumen(
+                    pagos.isEmpty ? null : totalPagado,
+                  ),
+                  icon: const Icon(Icons.ios_share_outlined, size: 18),
+                  label: const Text('Compartir resumen'),
+                ),
+              )
+            else
+              Row(
+                children: [
+                  OutlinedButton(
+                    onPressed: () => onCompartirResumen(
+                      pagos.isEmpty ? null : totalPagado,
+                    ),
+                    child: const Icon(Icons.ios_share_outlined, size: 18),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: onFinalizar,
+                      icon: const Icon(Icons.check, size: 18),
+                      label: const Text('Finalizar'),
+                    ),
+                  ),
+                ],
+              ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: generandoPdf ? null : onDescargarPdf,
+                icon: generandoPdf
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                label: const Text('Descargar PDF'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        // Historial como desplegable cerrado por defecto, al final de todo
+        // (CEO, noviembre 2026: "simplemente la palabra historial con un
+        // desplegable si quieres verlo") -- mismo patrón ya usado en el
+        // registro sin profesional (ver _CuerpoSimple más abajo).
+        Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            title: Row(
+              children: [
+                Icon(Icons.show_chart, size: 16, color: context.colors.inkMuted),
+                const SizedBox(width: 6),
+                Text('Historial', style: Theme.of(context).textTheme.headlineSmall),
+              ],
+            ),
+            children: [
+              _SeccionHistorial(
+                key: const ValueKey('resumen-historial'),
+                casa: casa,
+                elementoId: elementoId,
+                registro: registro,
+                mostrarTitulo: false,
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -1153,27 +1179,7 @@ class _TarjetaMantenimiento extends StatelessWidget {
 /// reales de presupuestos/cambios/pagos (historial_service.dart). El cierre
 /// nunca lleva fecha porque no existe ningún timestamp real de cuándo
 /// ocurrió -- se muestra sin inventar una.
-enum _FiltroHistorial {
-  todo,
-  presupuestos,
-  cambios,
-  pagos,
-  documentos,
-  finalizacion,
-  citas,
-}
-
-String _nombreFiltroHistorial(_FiltroHistorial f) => switch (f) {
-  _FiltroHistorial.todo => 'Todo',
-  _FiltroHistorial.presupuestos => 'Presupuestos',
-  _FiltroHistorial.cambios => 'Cambios',
-  _FiltroHistorial.pagos => 'Pagos',
-  _FiltroHistorial.documentos => 'Documentos',
-  _FiltroHistorial.finalizacion => 'Finalización',
-  _FiltroHistorial.citas => 'Citas',
-};
-
-class _SeccionHistorial extends StatefulWidget {
+class _SeccionHistorial extends StatelessWidget {
   const _SeccionHistorial({
     required this.casa,
     required this.elementoId,
@@ -1192,18 +1198,11 @@ class _SeccionHistorial extends StatefulWidget {
   final bool mostrarTitulo;
 
   @override
-  State<_SeccionHistorial> createState() => _SeccionHistorialState();
-}
-
-class _SeccionHistorialState extends State<_SeccionHistorial> {
-  _FiltroHistorial _filtro = _FiltroHistorial.todo;
-
-  @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (widget.mostrarTitulo) ...[
+        if (mostrarTitulo) ...[
           Row(
             children: [
               Icon(Icons.show_chart, size: 16, color: context.colors.inkMuted),
@@ -1218,9 +1217,9 @@ class _SeccionHistorialState extends State<_SeccionHistorial> {
         ],
         StreamBuilder<List<HistorialEvento>>(
           stream: HistorialService.streamHistorial(
-            widget.casa.id,
-            widget.elementoId,
-            widget.registro.id,
+            casa.id,
+            elementoId,
+            registro.id,
           ),
           builder: (context, snapshot) {
             final eventos = snapshot.data ?? [];
@@ -1232,12 +1231,18 @@ class _SeccionHistorialState extends State<_SeccionHistorial> {
             final yaTieneEventoDeRegistro = eventos.any(
               (e) => e.entidad == EntidadHistorial.registro,
             );
+            // Siempre se muestra todo (CEO, noviembre 2026: "si el
+            // historial va a mostrar todo no hace falta que ponga 'todo'")
+            // -- antes había chips Todo/Presupuestos/Cambios/... para
+            // filtrar; un "Todo" que ya lo era por defecto no aportaba
+            // nada, así que se quitó el filtro entero en vez de dejar una
+            // opción redundante.
             final todos = <TimelineItem>[
               if (!yaTieneEventoDeRegistro &&
-                  (widget.registro.estado == EstadoRegistro.terminado ||
-                      widget.registro.estado == EstadoRegistro.archivado))
+                  (registro.estado == EstadoRegistro.terminado ||
+                      registro.estado == EstadoRegistro.archivado))
                 TimelineItem(
-                  titulo: widget.registro.estado == EstadoRegistro.archivado
+                  titulo: registro.estado == EstadoRegistro.archivado
                       ? 'Evento archivado'
                       : 'Trabajo finalizado',
                   subtitulo: 'Marcado como terminado',
@@ -1246,7 +1251,7 @@ class _SeccionHistorialState extends State<_SeccionHistorial> {
                   categoria: 'finalizacion',
                 ),
               if (!yaTieneEventoDeRegistro &&
-                  widget.registro.estado == EstadoRegistro.pendientePago)
+                  registro.estado == EstadoRegistro.pendientePago)
                 TimelineItem(
                   titulo: 'Trabajo confirmado',
                   subtitulo: 'Pendiente de cobrar del todo',
@@ -1262,38 +1267,7 @@ class _SeccionHistorialState extends State<_SeccionHistorial> {
                 icon: Icons.show_chart,
               );
             }
-            final items = _filtro == _FiltroHistorial.todo
-                ? todos
-                : todos.where((i) => i.categoria == _filtro.name).toList();
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      for (final f in _FiltroHistorial.values) ...[
-                        ChoiceChip(
-                          label: Text(_nombreFiltroHistorial(f)),
-                          selected: _filtro == f,
-                          onSelected: (_) => setState(() => _filtro = f),
-                        ),
-                        const SizedBox(width: 8),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                if (items.isEmpty)
-                  EmptyHint(
-                    message:
-                        'Nada en "${_nombreFiltroHistorial(_filtro)}" todavía.',
-                    icon: Icons.filter_alt_off_outlined,
-                  )
-                else
-                  HistorialTimeline(items: items),
-              ],
-            );
+            return HistorialTimeline(items: todos);
           },
         ),
       ],
