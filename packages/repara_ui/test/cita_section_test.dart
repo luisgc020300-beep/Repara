@@ -28,6 +28,7 @@ import 'package:repara_core/registro.dart' show RolEnTrabajo;
 import 'package:repara_ui/cita_section.dart';
 
 const _profesionalUid = 'pro1';
+const _casaId = 'c1';
 const _registroId = 'r1';
 const _citaId = 'cita1';
 
@@ -47,7 +48,7 @@ Future<FakeFirebaseFirestore> _prepararCita({
         'fecha': Timestamp.fromDate(fecha ?? DateTime(2026, 11, 20, 10)),
         'todoElDia': false,
         'compartida': true,
-        'casaId': 'c1',
+        'casaId': _casaId,
         'elementoId': 'e1',
         'registroId': _registroId,
         'completada': false,
@@ -68,6 +69,7 @@ Widget _envolver(RolEnTrabajo rol, {bool registroCerrado = false}) => MaterialAp
   home: Scaffold(
     body: CitaSeccion(
       profesionalUid: _profesionalUid,
+      casaId: _casaId,
       registroId: _registroId,
       rol: rol,
       registroCerrado: registroCerrado,

@@ -338,6 +338,7 @@ class RegistroProDetailScreen extends StatelessWidget {
                 CitaSeccion(
                   key: const ValueKey('pro-cita'),
                   profesionalUid: registro.profesionalUid!,
+                  casaId: casaId,
                   registroId: registroId,
                   rol: RolEnTrabajo.profesional,
                   registroCerrado:

@@ -64,15 +64,26 @@ class CitaService {
 
   /// Lado Hogar (noviembre 2026): lee la agenda de UN profesional concreto
   /// -- no la del uid autenticado, por eso no usa [_col] -- filtrando solo
-  /// las citas de este trabajo. [compartida] se filtra en cliente: como
-  /// mucho hay un puñado de citas por trabajo, no merece un índice
-  /// compuesto nuevo solo para esto. firestore.rules es quien de verdad
-  /// protege el acceso -- una cita no compartida de este mismo trabajo
-  /// simplemente no llega aquí (el propietario no tiene permiso de
-  /// lectura sobre ella), así que el filtro de cliente es solo una
-  /// comodidad, no la barrera de seguridad real.
+  /// las citas de este trabajo.
+  ///
+  /// CORRECCIÓN (noviembre 2026, "la cita no aparece en su apartado aunque
+  /// sí en el historial"): `compartida`/`casaId` tienen que ir en el propio
+  /// `where()`, no filtrarse después en el cliente. La regla de
+  /// firestore.rules (`resource.data.compartida == true && resource.data.
+  /// casaId != null && isMember(...)`) depende de campos del documento que
+  /// esta consulta no acotaba -- y para una consulta de lista (a diferencia
+  /// de un `get()` de un documento suelto) Firestore no evalúa la regla
+  /// documento a documento: exige que la propia consulta demuestre
+  /// estructuralmente que ningún resultado posible puede incumplirla, o
+  /// deniega la petición ENTERA con permission-denied. Sin estos dos
+  /// `where`, esa demostración era imposible y la consulta se denegaba por
+  /// completo (nunca se filtraba solo el documento problemático) -- el
+  /// `StreamBuilder` de CitaSeccion no comprueba `snapshot.hasError`, así
+  /// que ese error se traducía en una lista vacía silenciosa. Demostrado
+  /// contra el emulador real, no solo por lectura de la regla.
   static Stream<List<Cita>> streamCitasCompartidas({
     required String profesionalUid,
+    required String casaId,
     required String registroId,
   }) {
     return _db
@@ -80,12 +91,11 @@ class CitaService {
         .doc(profesionalUid)
         .collection('citas')
         .where('registroId', isEqualTo: registroId)
+        .where('compartida', isEqualTo: true)
+        .where('casaId', isEqualTo: casaId)
         .snapshots()
         .map(
-          (s) => s.docs
-              .map(Cita.fromDoc)
-              .where((c) => c.compartida)
-              .toList()
+          (s) => s.docs.map(Cita.fromDoc).toList()
             ..sort((a, b) => a.fecha.compareTo(b.fecha)),
         )
         .conRegistroDeErrores()

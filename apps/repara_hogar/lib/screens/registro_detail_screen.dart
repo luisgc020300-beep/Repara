@@ -782,6 +782,7 @@ class _CuerpoConProfesionalState extends State<_CuerpoConProfesional> {
                                 )
                               : CitaSeccion(
                                   profesionalUid: registro.profesionalUid!,
+                                  casaId: casa.id,
                                   registroId: registro.id,
                                   rol: RolEnTrabajo.propietario,
                                   registroCerrado:
@@ -1018,6 +1019,7 @@ class _ResumenTab extends StatelessWidget {
           _SeccionProximaVisita(
             key: const ValueKey('resumen-proxima-visita'),
             profesionalUid: registro.profesionalUid!,
+            casaId: casa.id,
             registroId: registro.id,
           ),
         ],
@@ -1901,11 +1903,13 @@ class _SeccionCategoriaDocumentos extends StatelessWidget {
 class _SeccionProximaVisita extends StatelessWidget {
   const _SeccionProximaVisita({
     required this.profesionalUid,
+    required this.casaId,
     required this.registroId,
     super.key,
   });
 
   final String profesionalUid;
+  final String casaId;
   final String registroId;
 
   @override
@@ -1913,6 +1917,7 @@ class _SeccionProximaVisita extends StatelessWidget {
     return StreamBuilder<List<Cita>>(
       stream: CitaService.streamCitasCompartidas(
         profesionalUid: profesionalUid,
+        casaId: casaId,
         registroId: registroId,
       ),
       builder: (context, snapshot) {

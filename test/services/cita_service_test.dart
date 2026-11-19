@@ -220,6 +220,7 @@ void main() {
 
       final citas = await CitaService.streamCitasCompartidas(
         profesionalUid: _uid,
+        casaId: 'c1',
         registroId: 'r1',
       ).first;
       expect(citas, hasLength(1));

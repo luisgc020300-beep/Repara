@@ -28,6 +28,7 @@ import 'app_error.dart';
 class CitaSeccion extends StatelessWidget {
   const CitaSeccion({
     required this.profesionalUid,
+    required this.casaId,
     required this.registroId,
     required this.rol,
     this.registroCerrado = false,
@@ -35,6 +36,7 @@ class CitaSeccion extends StatelessWidget {
   });
 
   final String profesionalUid;
+  final String casaId;
   final String registroId;
   final RolEnTrabajo rol;
 
@@ -48,6 +50,7 @@ class CitaSeccion extends StatelessWidget {
     return StreamBuilder<List<Cita>>(
       stream: CitaService.streamCitasCompartidas(
         profesionalUid: profesionalUid,
+        casaId: casaId,
         registroId: registroId,
       ),
       builder: (context, snapshot) {
