@@ -466,6 +466,19 @@ ThemeData _buildReparaTheme(Brightness brightness) {
         borderRadius: BorderRadius.circular(ReparaRadius.md),
       ),
     ),
+    // Esquinas superiores redondeadas por defecto para TODO
+    // showModalBottomSheet (pulido de consistencia visual, noviembre
+    // 2026) -- antes solo lo tenían las hojas que fijaban `shape` a mano
+    // (editar_registro_sheet.dart y similares); el resto (p.ej. el
+    // selector de Apariencia en Ajustes) caía al cuadrado por defecto de
+    // Material sin que nadie lo hubiera decidido así. Mismo radio que ya
+    // usan esas hojas (ReparaRadius.lg), ahora como default del tema en
+    // vez de repetido hoja a hoja.
+    bottomSheetTheme: BottomSheetThemeData(
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(ReparaRadius.lg)),
+      ),
+    ),
     // Sin el divider gris por defecto de Material -- el indicador ya marca
     // la pestaña activa, un divider encima solo añadía una línea gris que
     // competía con el borde fino del resto del sistema. Indicador como
