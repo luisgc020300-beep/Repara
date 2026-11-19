@@ -2791,6 +2791,11 @@ exports.onProfesionalEscritoActualizaPerfilPublico = onDocumentWritten(
     await db.collection('profesionalesPublico').doc(uid).set({
       nombreComercial: after.nombreComercial || null,
       especialidad: after.especialidad || null,
+      // Foto y descripción (mejora de perfiles, noviembre 2026) -- mismo
+      // criterio que nombreComercial/especialidad: solo lo que el propio
+      // profesional ha decidido hacer público, nunca nada de una vivienda.
+      fotoUrl: after.fotoUrl || null,
+      descripcion: after.descripcion || null,
     }, { merge: true });
   }
 );
@@ -2999,6 +3004,10 @@ exports.buscarProfesionalesCercanos = onCall({ region: REGION, secrets: [_cercan
       uid: c.uid,
       nombreComercial: pub.nombreComercial || null,
       especialidad: pub.especialidad || null,
+      // Foto de perfil (mejora de perfiles, noviembre 2026) -- mismo dato
+      // público que ya se lee aquí para numValoraciones/trabajosTerminados,
+      // sin ninguna consulta nueva.
+      fotoUrl: pub.fotoUrl || null,
       trabajosTerminados: pub.trabajosTerminados || 0,
       valoracionMedia: numValoraciones > 0 ? pub.sumaPuntuaciones / numValoraciones : null,
       numValoraciones,

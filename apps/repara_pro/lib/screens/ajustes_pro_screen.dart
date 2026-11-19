@@ -18,6 +18,7 @@ import 'package:repara_core/theme_controller.dart';
 import 'package:repara_ui/app_dialog.dart';
 import 'package:repara_ui/app_error.dart';
 import 'package:repara_ui/cuenta_screen.dart';
+import 'package:repara_ui/editor_foto_perfil.dart';
 import 'package:repara_ui/ios_list.dart';
 import 'package:repara_ui/notificaciones_preferencias_screen.dart';
 import 'package:repara_ui/seccion_seguridad_documentos.dart';
@@ -57,8 +58,20 @@ class _AjustesProScreenState extends State<AjustesProScreen> {
     }
   }
 
-  Future<void> _editarCampo(String titulo, String? actual, Future<void> Function(String) guardar) async {
-    final valor = await AppDialog.promptText(context, title: titulo, initialValue: actual ?? '');
+  Future<void> _editarCampo(
+    String titulo,
+    String? actual,
+    Future<void> Function(String) guardar, {
+    int? minLines,
+    int? maxLines,
+  }) async {
+    final valor = await AppDialog.promptText(
+      context,
+      title: titulo,
+      initialValue: actual ?? '',
+      minLines: minLines,
+      maxLines: maxLines,
+    );
     if (valor == null) return;
     try {
       await guardar(valor);
@@ -66,6 +79,22 @@ class _AjustesProScreenState extends State<AjustesProScreen> {
       await FirebaseCrashlytics.instance.recordError(e, st);
       if (mounted) AppError.show(context, 'No se pudo guardar.');
     }
+  }
+
+  /// Foto del perfil profesional (mejora de perfiles, noviembre 2026) --
+  /// distinta de la foto personal de CuentaScreen (FirebaseAuth.photoURL):
+  /// esta es la que ve el propietario en perfil_profesional_screen.dart/
+  /// Cercanos, así que vive en profesionales/{uid}.fotoUrl, sincronizada a
+  /// profesionalesPublico por la Cloud Function correspondiente.
+  Future<void> _cambiarFotoProfesional(String? fotoActual) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    await editarFotoPerfil(
+      context,
+      storagePath: 'profesionales/$uid/foto',
+      tieneFotoActual: fotoActual != null,
+      onGuardar: ProfesionalService.actualizarFoto,
+    );
   }
 
   void _abrirCuenta(BuildContext context) => Navigator.push(
@@ -211,41 +240,86 @@ class _AjustesProScreenState extends State<AjustesProScreen> {
               stream: ProfesionalService.streamPerfilPropio(),
               builder: (context, snapshot) {
                 final perfil = snapshot.data;
-                return IosSection(
-                  header: 'Tu perfil profesional',
-                  rows: [
-                    IosRow(
-                      icon: Icons.badge_outlined,
-                      iconColor: context.colors.brand,
-                      title: perfil?.nombreComercial?.isNotEmpty == true ? perfil!.nombreComercial! : 'Nombre comercial',
-                      subtitle: 'Toca para editar',
-                      onTap: () => _editarCampo(
-                        'Nombre comercial',
-                        perfil?.nombreComercial,
-                        (v) => ProfesionalService.actualizarPerfil(nombreComercial: v),
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Foto del perfil público -- toca para cambiarla/
+                    // eliminarla (mejora de perfiles, noviembre 2026).
+                    Center(
+                      child: Material(
+                        color: Colors.transparent,
+                        shape: const CircleBorder(),
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                          onTap: () => _cambiarFotoProfesional(perfil?.fotoUrl),
+                          child: CircleAvatar(
+                            radius: 32,
+                            backgroundColor: context.colors.brandTint,
+                            backgroundImage: perfil?.fotoUrl != null
+                                ? NetworkImage(perfil!.fotoUrl!)
+                                : null,
+                            child: perfil?.fotoUrl == null
+                                ? Icon(
+                                    Icons.add_a_photo_outlined,
+                                    color: context.colors.brand,
+                                  )
+                                : null,
+                          ),
+                        ),
                       ),
                     ),
-                    IosRow(
-                      icon: Icons.category_outlined,
-                      iconColor: context.colors.brand,
-                      title: perfil?.especialidad?.isNotEmpty == true ? perfil!.especialidad! : 'Especialidad',
-                      subtitle: 'Toca para editar',
-                      onTap: () => _editarCampo(
-                        'Especialidad',
-                        perfil?.especialidad,
-                        (v) => ProfesionalService.actualizarPerfil(especialidad: v),
-                      ),
-                    ),
-                    IosRow(
-                      icon: Icons.phone_outlined,
-                      iconColor: context.colors.brand,
-                      title: perfil?.telefono?.isNotEmpty == true ? perfil!.telefono! : 'Teléfono de contacto',
-                      subtitle: 'Toca para editar',
-                      onTap: () => _editarCampo(
-                        'Teléfono',
-                        perfil?.telefono,
-                        (v) => ProfesionalService.actualizarPerfil(telefono: v),
-                      ),
+                    const SizedBox(height: ReparaSpace.s3),
+                    IosSection(
+                      header: 'Tu perfil profesional',
+                      rows: [
+                        IosRow(
+                          icon: Icons.badge_outlined,
+                          iconColor: context.colors.brand,
+                          title: perfil?.nombreComercial?.isNotEmpty == true ? perfil!.nombreComercial! : 'Nombre comercial',
+                          subtitle: 'Toca para editar',
+                          onTap: () => _editarCampo(
+                            'Nombre comercial',
+                            perfil?.nombreComercial,
+                            (v) => ProfesionalService.actualizarPerfil(nombreComercial: v),
+                          ),
+                        ),
+                        IosRow(
+                          icon: Icons.category_outlined,
+                          iconColor: context.colors.brand,
+                          title: perfil?.especialidad?.isNotEmpty == true ? perfil!.especialidad! : 'Especialidad',
+                          subtitle: 'Toca para editar',
+                          onTap: () => _editarCampo(
+                            'Especialidad',
+                            perfil?.especialidad,
+                            (v) => ProfesionalService.actualizarPerfil(especialidad: v),
+                          ),
+                        ),
+                        IosRow(
+                          icon: Icons.phone_outlined,
+                          iconColor: context.colors.brand,
+                          title: perfil?.telefono?.isNotEmpty == true ? perfil!.telefono! : 'Teléfono de contacto',
+                          subtitle: 'Toca para editar',
+                          onTap: () => _editarCampo(
+                            'Teléfono',
+                            perfil?.telefono,
+                            (v) => ProfesionalService.actualizarPerfil(telefono: v),
+                          ),
+                        ),
+                        IosRow(
+                          icon: Icons.notes_outlined,
+                          iconColor: context.colors.brand,
+                          title: perfil?.descripcion?.isNotEmpty == true ? perfil!.descripcion! : 'Descripción',
+                          subtitle: 'Toca para editar',
+                          dense: perfil?.descripcion?.isNotEmpty == true,
+                          onTap: () => _editarCampo(
+                            'Descripción',
+                            perfil?.descripcion,
+                            (v) => ProfesionalService.actualizarPerfil(descripcion: v),
+                            minLines: 3,
+                            maxLines: 6,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 );

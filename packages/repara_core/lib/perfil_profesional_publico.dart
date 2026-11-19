@@ -13,6 +13,8 @@ class PerfilProfesionalPublico {
     required this.uid,
     this.nombreComercial,
     this.especialidad,
+    this.fotoUrl,
+    this.descripcion,
     this.trabajosTerminados = 0,
     this.sumaPuntuaciones = 0,
     this.numValoraciones = 0,
@@ -21,6 +23,12 @@ class PerfilProfesionalPublico {
   final String uid;
   final String? nombreComercial;
   final String? especialidad;
+
+  /// Mejora de perfiles, noviembre 2026 -- sincronizados desde
+  /// profesionales/{uid} vía Cloud Function, igual que nombreComercial/
+  /// especialidad justo arriba.
+  final String? fotoUrl;
+  final String? descripcion;
   final int trabajosTerminados;
   final int sumaPuntuaciones;
   final int numValoraciones;
@@ -37,6 +45,8 @@ class PerfilProfesionalPublico {
       uid: doc.id,
       nombreComercial: data['nombreComercial'] as String?,
       especialidad: data['especialidad'] as String?,
+      fotoUrl: data['fotoUrl'] as String?,
+      descripcion: data['descripcion'] as String?,
       trabajosTerminados: (data['trabajosTerminados'] as num?)?.toInt() ?? 0,
       sumaPuntuaciones: (data['sumaPuntuaciones'] as num?)?.toInt() ?? 0,
       numValoraciones: (data['numValoraciones'] as num?)?.toInt() ?? 0,

@@ -40,6 +40,9 @@ dependencies:
   # Pro, noviembre 2026) -- mismas versiones que la app principal.
   firebase_auth: ^6.1.4
   file_picker: ^8.1.4
+  # editor_foto_perfil.dart (mejora de perfiles, noviembre 2026) -- misma
+  # versión que la app principal.
+  firebase_storage: ^13.0.5
 
 # pdf 3.12.0 depende de archive 4.0.9 Y de image (sin fijar versión) --
 # dentro del grafo de dependencias más pequeño de este paquete (menos

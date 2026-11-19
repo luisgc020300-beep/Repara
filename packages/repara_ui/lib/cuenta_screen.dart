@@ -19,6 +19,7 @@ import 'package:repara_core/cuenta_service.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'app_dialog.dart';
 import 'app_error.dart';
+import 'editor_foto_perfil.dart';
 import 'ios_list.dart';
 
 /// Cierra sesión con la misma confirmación que ya usaba esta pantalla --
@@ -49,6 +50,7 @@ class CuentaScreen extends StatefulWidget {
     this.antesDeCerrarSesion,
     this.mostrarCerrarSesion = true,
     this.permitirEditarNombre = false,
+    this.permitirEditarDescripcion = false,
     super.key,
   });
 
@@ -73,6 +75,13 @@ class CuentaScreen extends StatefulWidget {
   /// los demás, vía [CuentaService.actualizarNombrePerfil]). Pro conserva
   /// por defecto su fila de identidad de siempre, de solo lectura.
   final bool permitirEditarNombre;
+
+  /// true solo en Hogar (mejora de perfiles, noviembre 2026): añade una
+  /// sección "Descripción" editable, vía [CuentaService.
+  /// actualizarDescripcionPerfil]. Pro no la muestra aquí porque su
+  /// descripción pública vive en el perfil profesional (Ajustes Pro ->
+  /// Tu perfil profesional), no en la identidad personal de esta pantalla.
+  final bool permitirEditarDescripcion;
 
   @override
   State<CuentaScreen> createState() => _CuentaScreenState();
@@ -135,6 +144,48 @@ class _CuentaScreenState extends State<CuentaScreen> {
     }
   }
 
+  /// Foto de perfil personal (mejora de perfiles, noviembre 2026) -- se
+  /// guarda en FirebaseAuth.photoURL, no en Firestore: es exactamente el
+  /// mismo campo que esta pantalla y ajustes_hogar_screen.dart/
+  /// ajustes_pro_screen.dart ya leían para pintar el avatar (user?.photoURL),
+  /// así que no hace falta ningún campo nuevo ni tocar dónde se muestra --
+  /// solo rellenarlo de verdad. reload() + setState refrescan
+  /// FirebaseAuth.instance.currentUser, que esta pantalla no escucha como
+  /// stream.
+  Future<void> _cambiarFoto(User? user) async {
+    if (user == null) return;
+    await editarFotoPerfil(
+      context,
+      storagePath: 'users/${user.uid}/avatar/foto',
+      tieneFotoActual: user.photoURL != null,
+      onGuardar: (url) async {
+        await user.updateProfile(photoURL: url);
+        await user.reload();
+        if (mounted) setState(() {});
+      },
+    );
+  }
+
+  Future<void> _editarDescripcion(String? actual) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    final descripcion = await AppDialog.promptText(
+      context,
+      title: 'Descripción',
+      hint: 'Unas palabras sobre ti',
+      initialValue: actual ?? '',
+      minLines: 3,
+      maxLines: 6,
+    );
+    if (descripcion == null || descripcion == actual || !mounted) return;
+    try {
+      await CuentaService.actualizarDescripcionPerfil(user.uid, descripcion);
+    } catch (e, st) {
+      await FirebaseCrashlytics.instance.recordError(e, st);
+      if (mounted) AppError.show(context, 'No se pudo guardar la descripción.');
+    }
+  }
+
   Future<void> _confirmarEliminarCuenta() async {
     final confirmar = await AppDialog.confirm(
       context,
@@ -190,22 +241,34 @@ class _CuentaScreenState extends State<CuentaScreen> {
       subtitle: user?.email,
       showChevron: widget.permitirEditarNombre,
       onTap: widget.permitirEditarNombre ? () => _editarNombre(nombre) : null,
-      trailing: CircleAvatar(
-        radius: 16,
-        backgroundColor: context.colors.brandStrong,
-        backgroundImage: user?.photoURL != null
-            ? NetworkImage(user!.photoURL!)
-            : null,
-        child: user?.photoURL == null
-            ? Text(
-                _iniciales(nombre, user?.email),
-                style: TextStyle(
-                  color: context.colors.brandOn,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 12,
-                ),
-              )
-            : null,
+      // Foto independiente del resto de la fila: tocar el avatar cambia la
+      // foto, tocar el resto de la fila edita el nombre (mejora de
+      // perfiles, noviembre 2026) -- Material+InkWell circular propio para
+      // que el tap/ripple se note como del avatar, no como de toda la fila.
+      trailing: Material(
+        color: Colors.transparent,
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => _cambiarFoto(user),
+          child: CircleAvatar(
+            radius: 16,
+            backgroundColor: context.colors.brandStrong,
+            backgroundImage: user?.photoURL != null
+                ? NetworkImage(user!.photoURL!)
+                : null,
+            child: user?.photoURL == null
+                ? Text(
+                    _iniciales(nombre, user?.email),
+                    style: TextStyle(
+                      color: context.colors.brandOn,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                  )
+                : null,
+          ),
+        ),
       ),
     );
   }
@@ -230,6 +293,27 @@ class _CuentaScreenState extends State<CuentaScreen> {
                 _filaIdentidad(context, user, user?.displayName),
             ],
           ),
+          if (widget.permitirEditarDescripcion && user != null)
+            StreamBuilder<String?>(
+              stream: CuentaService.streamDescripcionPerfil(user.uid),
+              builder: (context, snapshot) {
+                final descripcion = snapshot.data;
+                return IosSection(
+                  header: 'Descripción',
+                  rows: [
+                    IosRow(
+                      icon: Icons.notes_outlined,
+                      iconColor: context.colors.brand,
+                      title: (descripcion?.isNotEmpty ?? false)
+                          ? descripcion!
+                          : 'Añade unas palabras sobre ti',
+                      dense: (descripcion?.isNotEmpty ?? false),
+                      onTap: () => _editarDescripcion(descripcion),
+                    ),
+                  ],
+                );
+              },
+            ),
           IosSection(
             rows: [
               if (widget.mostrarCerrarSesion)

@@ -22,16 +22,17 @@ const CIUDAD_DEL_CABO = { lat: -33.9249, lng: 18.4241 };
 const BUENOS_AIRES = { lat: -34.6037, lng: -58.3816 };
 const MOSCU = { lat: 55.7558, lng: 37.6173 };
 
-async function crearProfesionalVisible(uid, { lat, lng, visible = true, nombreComercial, especialidad } = {}) {
+async function crearProfesionalVisible(uid, { lat, lng, visible = true, nombreComercial, especialidad, fotoUrl } = {}) {
   await db.collection('profesionales').doc(uid).set({
     visibleCercano: visible,
     ...(lat != null ? { lat } : {}),
     ...(lng != null ? { lng } : {}),
   }, { merge: true });
-  if (nombreComercial || especialidad) {
+  if (nombreComercial || especialidad || fotoUrl) {
     await db.collection('profesionalesPublico').doc(uid).set({
       ...(nombreComercial ? { nombreComercial } : {}),
       ...(especialidad ? { especialidad } : {}),
+      ...(fotoUrl ? { fotoUrl } : {}),
     }, { merge: true });
   }
 }
@@ -187,4 +188,36 @@ test('14. invitarProfesional rechaza invitarse a uno mismo vía profesionalUidDi
     casaId, elementoId, registroId, profesionalUidDirecto: owner.uid,
   });
   assert.equal(error?.status, 'INVALID_ARGUMENT');
+});
+
+// Mejora de perfiles profesionales (noviembre 2026): la respuesta de
+// Cercanos reutiliza el mismo documento profesionalesPublico que ya leía
+// para numValoraciones/trabajosTerminados -- sin consulta nueva.
+// TOKIO/SIDNEY, no EL_CAIRO/RIO: esas dos ya tienen profesionales VISIBLES
+// de otros tests de este archivo dentro del radio de 50 km (la colección no
+// se limpia entre tests, ver cabecera) -- un recuento exacto ahí daría
+// falsos positivos/negativos según el orden de ejecución.
+test('15. la respuesta incluye fotoUrl cuando el profesional la tiene en su perfil público', async () => {
+  const owner = await crearUsuario();
+  const conFoto = await crearUsuario();
+  await crearProfesionalVisible(conFoto.uid, {
+    lat: TOKIO.lat + 0.01, lng: TOKIO.lng,
+    nombreComercial: 'Pintor', fotoUrl: 'https://ejemplo.com/foto.jpg',
+  });
+
+  const { error, result } = await llamar('buscarProfesionalesCercanos', owner.idToken, { lat: TOKIO.lat, lng: TOKIO.lng });
+  assert.equal(error, undefined);
+  assert.equal(result.resultados.length, 1);
+  assert.equal(result.resultados[0].fotoUrl, 'https://ejemplo.com/foto.jpg');
+});
+
+test('16. la respuesta tiene fotoUrl null cuando el profesional no ha subido ninguna', async () => {
+  const owner = await crearUsuario();
+  const sinFoto = await crearUsuario();
+  await crearProfesionalVisible(sinFoto.uid, { lat: SIDNEY.lat + 0.01, lng: SIDNEY.lng, nombreComercial: 'Albañil' });
+
+  const { error, result } = await llamar('buscarProfesionalesCercanos', owner.idToken, { lat: SIDNEY.lat, lng: SIDNEY.lng });
+  assert.equal(error, undefined);
+  assert.equal(result.resultados.length, 1);
+  assert.equal(result.resultados[0].fotoUrl, null);
 });

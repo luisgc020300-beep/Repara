@@ -49,6 +49,9 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  # cuenta_service_test.dart/profesional_service_test.dart (mejora de
+  # perfiles, noviembre 2026) -- misma versión que las apps principales.
+  fake_cloud_firestore: ^4.1.0
 
 flutter:
   # Paquete puro de lógica -- sin assets ni plugins nativos propios.

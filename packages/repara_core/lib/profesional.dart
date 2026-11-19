@@ -12,6 +12,8 @@ class Profesional {
     this.nombreComercial,
     this.especialidad,
     this.telefono,
+    this.fotoUrl,
+    this.descripcion,
     this.createdAt,
     this.visibleCercano = false,
   });
@@ -20,6 +22,17 @@ class Profesional {
   final String? nombreComercial;
   final String? especialidad;
   final String? telefono;
+
+  /// Foto del perfil profesional (mejora de perfiles, noviembre 2026) --
+  /// nunca la del usuario de FirebaseAuth (esa es la identidad personal de
+  /// CuentaScreen, independiente) -- editable solo desde Ajustes Pro, se
+  /// sincroniza a profesionalesPublico/{uid} para que el propietario la vea
+  /// sin necesitar acceso a esta ficha privada.
+  final String? fotoUrl;
+
+  /// Breve presentación del profesional, visible en su perfil público (igual
+  /// criterio que fotoUrl: privada aquí, sincronizada a profesionalesPublico).
+  final String? descripcion;
   final DateTime? createdAt;
 
   /// Cercanos (noviembre 2026): true si este profesional ha optado por
@@ -39,6 +52,8 @@ class Profesional {
       nombreComercial: data['nombreComercial'] as String?,
       especialidad: data['especialidad'] as String?,
       telefono: data['telefono'] as String?,
+      fotoUrl: data['fotoUrl'] as String?,
+      descripcion: data['descripcion'] as String?,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
       visibleCercano: data['visibleCercano'] as bool? ?? false,
     );

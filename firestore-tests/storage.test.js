@@ -163,3 +163,53 @@ describe('resto de rutas de la casa (elementos, contactos...) -- solo miembros, 
     await assertFails(miembro(CASA_A).ref(`casas/${CASA_B}/elementos/algun-elemento/foto`).putString('x', 'raw'));
   });
 });
+
+describe('foto personal de la cuenta (users/{uid}/avatar) -- mejora de perfiles, noviembre 2026', () => {
+  function usuario(uid) {
+    return testEnv.authenticatedContext(uid, {}).storage();
+  }
+
+  it('ALLOW: el propio usuario sube su foto de perfil', async () => {
+    await assertSucceeds(usuario('owner-a').ref('users/owner-a/avatar/foto').putString('x', 'raw'));
+  });
+
+  it('ALLOW: cualquier autenticado puede leer la foto de otro usuario (misma foto que ya enseña FirebaseAuth.photoURL)', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.storage().ref('users/owner-a/avatar/foto').putString('x', 'raw');
+    });
+    await assertSucceeds(usuario('usuario-externo').ref('users/owner-a/avatar/foto').getDownloadURL());
+  });
+
+  it('DENY: un usuario no puede subir la foto de perfil de otro', async () => {
+    await assertFails(usuario('usuario-externo').ref('users/owner-a/avatar/foto').putString('x', 'raw'));
+  });
+
+  it('DENY: un usuario no autenticado no puede leer ni escribir', async () => {
+    await assertFails(sinAutenticar().ref('users/owner-a/avatar/foto').putString('x', 'raw'));
+  });
+});
+
+describe('foto del perfil profesional (profesionales/{uid}/foto) -- mejora de perfiles, noviembre 2026', () => {
+  function usuario(uid) {
+    return testEnv.authenticatedContext(uid, {}).storage();
+  }
+
+  it('ALLOW: el propio profesional sube su foto de perfil público', async () => {
+    await assertSucceeds(usuario('profesional-x').ref('profesionales/profesional-x/foto').putString('x', 'raw'));
+  });
+
+  it('ALLOW: un propietario que todavía no tiene relación con este profesional puede leer su foto (se enseña en Cercanos/perfil público)', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.storage().ref('profesionales/profesional-x/foto').putString('x', 'raw');
+    });
+    await assertSucceeds(usuario('owner-a').ref('profesionales/profesional-x/foto').getDownloadURL());
+  });
+
+  it('DENY: un profesional no puede subir la foto de otro profesional', async () => {
+    await assertFails(usuario('profesional-y').ref('profesionales/profesional-x/foto').putString('x', 'raw'));
+  });
+
+  it('DENY: un usuario no autenticado no puede leer ni escribir', async () => {
+    await assertFails(sinAutenticar().ref('profesionales/profesional-x/foto').putString('x', 'raw'));
+  });
+});

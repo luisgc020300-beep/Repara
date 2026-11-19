@@ -9,6 +9,7 @@ class ProfesionalCercano {
     required this.uid,
     this.nombreComercial,
     this.especialidad,
+    this.fotoUrl,
     this.trabajosTerminados = 0,
     this.valoracionMedia,
     this.numValoraciones = 0,
@@ -18,6 +19,10 @@ class ProfesionalCercano {
   final String uid;
   final String? nombreComercial;
   final String? especialidad;
+
+  /// Mejora de perfiles, noviembre 2026 -- mismo dato público que ya
+  /// devolvía la función para numValoraciones/trabajosTerminados.
+  final String? fotoUrl;
   final int trabajosTerminados;
   final double? valoracionMedia;
   final int numValoraciones;
@@ -28,6 +33,7 @@ class ProfesionalCercano {
         uid: map['uid'] as String? ?? '',
         nombreComercial: map['nombreComercial'] as String?,
         especialidad: map['especialidad'] as String?,
+        fotoUrl: map['fotoUrl'] as String?,
         trabajosTerminados: (map['trabajosTerminados'] as num?)?.toInt() ?? 0,
         valoracionMedia: (map['valoracionMedia'] as num?)?.toDouble(),
         numValoraciones: (map['numValoraciones'] as num?)?.toInt() ?? 0,

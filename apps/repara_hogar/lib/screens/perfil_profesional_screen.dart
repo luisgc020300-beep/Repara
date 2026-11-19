@@ -68,12 +68,16 @@ class PerfilProfesionalScreen extends StatelessWidget {
                 child: CircleAvatar(
                   radius: 36,
                   backgroundColor: context.colors.brandTint,
-                  child: Text(
-                    nombre.isNotEmpty ? nombre[0].toUpperCase() : '?',
-                    style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                      color: context.colors.brand,
-                    ),
-                  ),
+                  backgroundImage: perfil?.fotoUrl != null
+                      ? NetworkImage(perfil!.fotoUrl!)
+                      : null,
+                  child: perfil?.fotoUrl == null
+                      ? Text(
+                          nombre.isNotEmpty ? nombre[0].toUpperCase() : '?',
+                          style: Theme.of(context).textTheme.displaySmall
+                              ?.copyWith(color: context.colors.brand),
+                        )
+                      : null,
                 ),
               ),
               const SizedBox(height: ReparaSpace.s3),
@@ -88,6 +92,14 @@ class PerfilProfesionalScreen extends StatelessWidget {
                   perfil!.especialidad!,
                   textAlign: TextAlign.center,
                   style: TextStyle(color: context.colors.inkMuted),
+                ),
+              ],
+              if (perfil?.descripcion?.isNotEmpty ?? false) ...[
+                const SizedBox(height: ReparaSpace.s3),
+                Text(
+                  perfil!.descripcion!,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyLarge,
                 ),
               ],
               const SizedBox(height: ReparaSpace.s5),

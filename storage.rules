@@ -46,5 +46,28 @@ service firebase.storage {
     match /casas/{casaId}/{allPaths=**} {
       allow read, write: if isMember(casaId);
     }
+
+    // ── fotos de perfil (mejora de perfiles, noviembre 2026) ───────────────────
+    // Foto personal de la cuenta (CuentaScreen, Hogar y Pro) -- solo el propio
+    // dueño la sube/borra; lectura abierta a cualquier autenticado porque es
+    // la misma foto que ya se enseña via FirebaseAuth.photoURL, pensada para
+    // verse. Mismo patrón de nombre de archivo fijo que elemento_service.dart
+    // (subirFoto): una foto nueva sustituye a la anterior, nunca se acumulan
+    // archivos sueltos.
+    match /users/{uid}/avatar/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Foto del perfil profesional público (ProfesionalService.actualizarPerfil)
+    // -- se sincroniza a profesionalesPublico/{uid} vía Cloud Function y la ven
+    // propietarios que todavía no tienen ninguna relación con este profesional
+    // (perfil_profesional_screen.dart, Cercanos), así que la lectura también
+    // tiene que ser abierta a cualquier autenticado, nunca solo a isMember de
+    // una casa concreta.
+    match /profesionales/{uid}/foto/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
   }
 }

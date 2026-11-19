@@ -278,10 +278,15 @@ class _ListaResultados extends StatelessWidget {
                   CircleAvatar(
                     radius: 22,
                     backgroundColor: context.colors.brandTint,
-                    child: Text(
-                      nombre.isNotEmpty ? nombre[0].toUpperCase() : '?',
-                      style: TextStyle(color: context.colors.brand),
-                    ),
+                    backgroundImage: p.fotoUrl != null
+                        ? NetworkImage(p.fotoUrl!)
+                        : null,
+                    child: p.fotoUrl == null
+                        ? Text(
+                            nombre.isNotEmpty ? nombre[0].toUpperCase() : '?',
+                            style: TextStyle(color: context.colors.brand),
+                          )
+                        : null,
                   ),
                   const SizedBox(width: 12),
                   Expanded(

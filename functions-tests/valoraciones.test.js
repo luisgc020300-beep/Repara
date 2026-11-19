@@ -157,3 +157,22 @@ test('10. (trigger) el perfil público sincroniza nombreComercial/especialidad d
   assert.equal(pub.nombreComercial, 'Fontanería Ejemplo');
   assert.equal(pub.especialidad, 'Fontanería');
 });
+
+// Mejora de perfiles profesionales (noviembre 2026): mismo trigger que el
+// test anterior, ahora también con fotoUrl/descripcion -- lo que el cliente
+// guarda via ProfesionalService.actualizarPerfil/actualizarFoto.
+test('11. (trigger) el perfil público sincroniza fotoUrl/descripcion del profesional', async () => {
+  const pro = await crearUsuario();
+  await db.collection('profesionales').doc(pro.uid).set({
+    nombreComercial: 'Electricidad Ejemplo',
+    fotoUrl: 'https://ejemplo.com/foto.jpg',
+    descripcion: 'Más de 10 años de experiencia en instalaciones eléctricas.',
+  });
+
+  const pub = await esperarA(async () => {
+    const snap = await db.collection('profesionalesPublico').doc(pro.uid).get();
+    return snap.exists && snap.data().fotoUrl ? snap.data() : null;
+  });
+  assert.equal(pub.fotoUrl, 'https://ejemplo.com/foto.jpg');
+  assert.equal(pub.descripcion, 'Más de 10 años de experiencia en instalaciones eléctricas.');
+});

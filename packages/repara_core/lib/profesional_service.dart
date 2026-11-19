@@ -62,13 +62,32 @@ class ProfesionalService {
         .conRegistroDeErrores();
   }
 
-  static Future<void> actualizarPerfil({String? nombreComercial, String? especialidad, String? telefono}) async {
+  static Future<void> actualizarPerfil({
+    String? nombreComercial,
+    String? especialidad,
+    String? telefono,
+    String? descripcion,
+  }) async {
     final uid = _uid;
     if (uid == null) return;
     await _db.collection('profesionales').doc(uid).set({
       'nombreComercial': ?nombreComercial,
       'especialidad': ?especialidad,
       'telefono': ?telefono,
+      'descripcion': ?descripcion,
+    }, SetOptions(merge: true));
+  }
+
+  /// Foto del perfil profesional (mejora de perfiles, noviembre 2026) --
+  /// aparte de actualizarPerfil porque el flujo real es distinto (subir a
+  /// Storage primero, ver ElementoService.subirFoto para el mismo patrón),
+  /// no un campo de texto más. null borra la foto (no el archivo en
+  /// Storage), igual que ElementoService.actualizarFoto.
+  static Future<void> actualizarFoto(String? fotoUrl) async {
+    final uid = _uid;
+    if (uid == null) return;
+    await _db.collection('profesionales').doc(uid).set({
+      'fotoUrl': fotoUrl,
     }, SetOptions(merge: true));
   }
 
