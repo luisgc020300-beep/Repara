@@ -16,6 +16,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:repara_core/analytics_service.dart';
+import 'package:repara_core/invitacion.dart';
 import 'package:repara_core/invitacion_service.dart';
 import 'package:repara_core/registro.dart';
 import 'package:repara_core/registro_service.dart';
@@ -181,6 +182,20 @@ eventosDisponiblesParaInvitar(String casaId) async {
       if (r.esConProfesional &&
           r.profesionalUid == null &&
           RegistroService.esTrabajoActivo(r)) {
+        // Evitar invitaciones duplicadas (noviembre 2026, mejora de
+        // invitaciones): sin esto, un evento con una invitación ya
+        // pendiente (mandada desde su propia ficha, ver
+        // _SeccionInvitarProfesional en registro_detail_screen.dart)
+        // seguía apareciendo aquí -- invitarProfesional no comprueba en
+        // servidor si ya hay una pendiente, así que se podía acabar con
+        // dos invitaciones activas a la vez para el mismo evento, una desde
+        // cada camino (Contactos/Cercanos y la propia ficha del evento).
+        final ultima = await InvitacionService.streamUltimaInvitacionDe(
+          r.id,
+        ).first;
+        if (ultima != null && ultima.estado == EstadoInvitacion.pendiente) {
+          continue;
+        }
         resultado.add((
           elementoId: elemento.id,
           elementoNombre: elemento.nombre,

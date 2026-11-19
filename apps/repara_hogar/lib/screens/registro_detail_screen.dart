@@ -44,6 +44,7 @@ import 'package:repara_ui/estado_registro_chip.dart';
 import '../widgets/historial_timeline.dart';
 import 'package:repara_ui/ios_list.dart';
 import 'package:repara_ui/pagos_section.dart';
+import 'cercanos_screen.dart';
 import 'contacto_acciones.dart';
 import 'editar_registro_sheet.dart';
 import 'elemento_detail_screen.dart';
@@ -2134,7 +2135,9 @@ class _SeccionInvitarProfesionalState
   // Elegir de la libreta en vez de escribir el teléfono a mano (noviembre
   // 2026, mejora de invitaciones) -- solo rellena el campo, la invitación
   // en sí sigue siendo la misma llamada de siempre a invitarProfesional.
-  // Favoritos primero, mismo criterio de prioridad que Contactos.
+  // La propia hoja (_SelectorContactoInvitacion) separa Favoritos, deja
+  // buscar, y ofrece un atajo a Cercanos -- aquí solo se interpreta el
+  // resultado.
   Future<void> _elegirDeContactos() async {
     List<Contacto> contactos;
     try {
@@ -2146,63 +2149,23 @@ class _SeccionInvitarProfesionalState
       return;
     }
     if (!mounted) return;
-    if (contactos.isEmpty) {
-      AppError.show(context, 'Todavía no tienes ningún contacto guardado.');
+    final resultado = await showModalBottomSheet<Object>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) =>
+          _SelectorContactoInvitacion(casaId: widget.casa.id, contactos: contactos),
+    );
+    if (resultado == null || !mounted) return;
+    if (resultado == _SelectorContactoInvitacion.irACercanos) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => CercanosScreen(casaId: widget.casa.id),
+        ),
+      );
       return;
     }
-    final ordenados = [...contactos]
-      ..sort((a, b) {
-        if (a.favorito != b.favorito) return a.favorito ? -1 : 1;
-        return a.nombre.compareTo(b.nombre);
-      });
-    final elegido = await showModalBottomSheet<Contacto>(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            ReparaSpace.s4,
-            ReparaSpace.s2,
-            ReparaSpace.s4,
-            ReparaSpace.s4,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(bottom: ReparaSpace.s2),
-                child: Text(
-                  'Elige un contacto',
-                  style: Theme.of(ctx).textTheme.headlineSmall,
-                ),
-              ),
-              Flexible(
-                child: SingleChildScrollView(
-                  child: IosSection(
-                    rows: ordenados
-                        .map(
-                          (c) => IosRow(
-                            icon: c.favorito
-                                ? Icons.star_rounded
-                                : Icons.person_outline,
-                            iconColor: c.favorito
-                                ? ctx.colors.warning
-                                : ctx.colors.brand,
-                            title: c.nombre,
-                            subtitle: c.especialidad ?? c.telefono,
-                            onTap: () => Navigator.pop(ctx, c),
-                          ),
-                        )
-                        .toList(),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    if (elegido == null || !mounted) return;
+    final elegido = resultado as Contacto;
     setState(() {
       _telefonoCtrl.text = elegido.telefono;
       _emailCtrl.clear();
@@ -2503,6 +2466,164 @@ class _SeccionInvitarProfesionalState
           ),
         );
       },
+    );
+  }
+}
+
+/// Hoja de "elegir un contacto" al invitar a un profesional (mejora de
+/// invitaciones, noviembre 2026) -- antes era una lista plana (favoritos
+/// solo ordenados primero, sin buscador ni forma de llegar a Cercanos desde
+/// aquí). Ahora separa Favoritos del resto (mismo criterio de IosSection
+/// con cabecera ya usado en toda la app) y deja buscar por nombre o
+/// especialidad, con el mismo patrón de buscador de contactos_tab.dart --
+/// no un buscador nuevo. "Buscar cerca de ti" cierra esta hoja y abre
+/// Cercanos tal cual ya existe (sin tocar su funcionamiento), para cuando
+/// el profesional buscado no está en la libreta.
+class _SelectorContactoInvitacion extends StatefulWidget {
+  const _SelectorContactoInvitacion({
+    required this.casaId,
+    required this.contactos,
+  });
+
+  final String casaId;
+  final List<Contacto> contactos;
+
+  /// Valor especial devuelto por Navigator.pop() cuando se elige "Buscar
+  /// cerca de ti" -- distinto de un Contacto real y de null (hoja cerrada
+  /// sin elegir nada), para que quien llama sepa qué pantalla abrir.
+  static const irACercanos = Object();
+
+  @override
+  State<_SelectorContactoInvitacion> createState() =>
+      _SelectorContactoInvitacionState();
+}
+
+class _SelectorContactoInvitacionState
+    extends State<_SelectorContactoInvitacion> {
+  final _busquedaCtrl = TextEditingController();
+  String _busqueda = '';
+
+  @override
+  void dispose() {
+    _busquedaCtrl.dispose();
+    super.dispose();
+  }
+
+  IosRow _filaContacto(Contacto c) => IosRow(
+    icon: c.favorito ? Icons.star_rounded : Icons.person_outline,
+    iconColor: c.favorito ? context.colors.warning : context.colors.brand,
+    title: c.nombre,
+    subtitle: c.especialidad ?? c.telefono,
+    onTap: () => Navigator.pop(context, c),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final filtrados = _busqueda.isEmpty
+        ? widget.contactos
+        : widget.contactos
+              .where(
+                (c) =>
+                    c.nombre.toLowerCase().contains(_busqueda) ||
+                    (c.especialidad?.toLowerCase().contains(_busqueda) ??
+                        false),
+              )
+              .toList();
+    final favoritos = filtrados.where((c) => c.favorito).toList()
+      ..sort((a, b) => a.nombre.compareTo(b.nombre));
+    final resto = filtrados.where((c) => !c.favorito).toList()
+      ..sort((a, b) => a.nombre.compareTo(b.nombre));
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.85,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              ReparaSpace.s4,
+              ReparaSpace.s2,
+              ReparaSpace.s4,
+              ReparaSpace.s4,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: ReparaSpace.s3),
+                  child: Text(
+                    'Elige un contacto',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                ),
+                if (widget.contactos.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: ReparaSpace.s3),
+                    child: TextField(
+                      controller: _busquedaCtrl,
+                      decoration: const InputDecoration(
+                        hintText: 'Buscar contacto',
+                        prefixIcon: Icon(Icons.search, size: 20),
+                        isDense: true,
+                      ),
+                      onChanged: (v) =>
+                          setState(() => _busqueda = v.trim().toLowerCase()),
+                    ),
+                  ),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (favoritos.isNotEmpty) ...[
+                          IosSection(
+                            header: 'Favoritos',
+                            rows: favoritos.map(_filaContacto).toList(),
+                          ),
+                        ],
+                        if (resto.isNotEmpty)
+                          IosSection(
+                            header: favoritos.isNotEmpty ? 'Todos' : null,
+                            rows: resto.map(_filaContacto).toList(),
+                          ),
+                        if (filtrados.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: ReparaSpace.s4,
+                            ),
+                            child: Text(
+                              widget.contactos.isEmpty
+                                  ? 'Todavía no tienes ningún contacto guardado.'
+                                  : 'Ningún contacto coincide con "$_busqueda".',
+                              style: TextStyle(color: context.colors.inkMuted),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: ReparaSpace.s2),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.pop(
+                      context,
+                      _SelectorContactoInvitacion.irACercanos,
+                    ),
+                    icon: const Icon(Icons.near_me_outlined, size: 18),
+                    label: const Text('Buscar profesionales cerca de ti'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
