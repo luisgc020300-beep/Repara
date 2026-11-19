@@ -2780,6 +2780,31 @@ exports.rechazarFinalizacionProfesional = onCall({ region: REGION }, async (requ
 // pertenecen -- así nunca se puede deducir en qué casa trabajó.
 // =============================================================================
 
+// fotoUrl (mejora de perfiles, noviembre 2026) -- ProfesionalService.
+// actualizarFoto() es una escritura DIRECTA del cliente a profesionales/{uid}
+// (firestore.rules solo exige isOwner, sin validar el contenido), así que
+// nada impide que ahí dentro llegue cualquier cadena, no necesariamente la
+// URL de descarga real de SU propia foto en Storage. Como este trigger
+// copia el valor a profesionalesPublico/{uid}, que CUALQUIER propietario
+// autenticado puede leer (Cercanos, perfil_profesional_screen.dart) y cuyo
+// cliente la renderiza directamente con NetworkImage(fotoUrl) -- una URL
+// ajena ahí sería una forma de rastreo/fuga de IP contra cualquiera que
+// mire ese perfil, nunca solo contra el propio profesional (hallazgo de
+// revisión automática de seguridad). Se exige que la URL sea exactamente
+// la de descarga de ESE uid concreto en el propio bucket de Storage del
+// proyecto en marcha (nunca un dominio ajeno ni la foto de otro uid);
+// cualquier otra cosa se descarta en vez de propagarse.
+function urlFotoProfesionalEsValida(url, uid) {
+  if (typeof url !== 'string') return false;
+  const bucket = getStorage().bucket().name;
+  const prefijo = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/profesionales%2F${uid}%2Ffoto?`;
+  return url.startsWith(prefijo) && url.includes('alt=media');
+}
+
+// Igual criterio que el comentario de una valoración (crearValoracion) --
+// nunca se confía en el tamaño que el cliente decida mandar.
+const DESCRIPCION_PROFESIONAL_MAX_LEN = 500;
+
 // Nombre/especialidad visibles en el perfil público, sincronizados cada vez
 // que el profesional edita su propia ficha -- nunca al revés.
 exports.onProfesionalEscritoActualizaPerfilPublico = onDocumentWritten(
@@ -2788,14 +2813,18 @@ exports.onProfesionalEscritoActualizaPerfilPublico = onDocumentWritten(
     const after = event.data?.after?.exists ? event.data.after.data() : null;
     if (!after) return; // ficha borrada -- nada que sincronizar aquí
     const { uid } = event.params;
+    const descripcion = typeof after.descripcion === 'string'
+      ? after.descripcion.trim().slice(0, DESCRIPCION_PROFESIONAL_MAX_LEN) || null
+      : null;
     await db.collection('profesionalesPublico').doc(uid).set({
       nombreComercial: after.nombreComercial || null,
       especialidad: after.especialidad || null,
       // Foto y descripción (mejora de perfiles, noviembre 2026) -- mismo
       // criterio que nombreComercial/especialidad: solo lo que el propio
       // profesional ha decidido hacer público, nunca nada de una vivienda.
-      fotoUrl: after.fotoUrl || null,
-      descripcion: after.descripcion || null,
+      // fotoUrl, validada arriba -- nunca se copia tal cual.
+      fotoUrl: urlFotoProfesionalEsValida(after.fotoUrl, uid) ? after.fotoUrl : null,
+      descripcion,
     }, { merge: true });
   }
 );

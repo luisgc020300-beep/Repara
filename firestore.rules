@@ -63,7 +63,29 @@ service cloud.firestore {
     // la consulta directamente, solo a través de invitarProfesional (Cloud
     // Function con Admin SDK, que no pasa por estas reglas).
     match /profesionales/{uid} {
-      allow read, write: if isAuth() && isOwner(uid);
+      allow read: if isAuth() && isOwner(uid);
+
+      // create/update (en vez del allow write genérico de antes) -- mejora
+      // de perfiles, noviembre 2026, corrección de revisión automática de
+      // seguridad: fotoUrl/descripcion viajan sin cambios hasta
+      // profesionalesPublico/{uid} (ver el trigger
+      // onProfesionalEscritoActualizaPerfilPublico en functions/index.js),
+      // que cualquier propietario autenticado puede leer y cuyo cliente
+      // pinta fotoUrl directo con NetworkImage -- sin esto, cualquier
+      // cadena ahí sería una forma de rastreo/fuga de IP contra quien mire
+      // ese perfil, no solo contra el propio profesional. fotoUrl debe ser
+      // exactamente la URL de descarga de SU propia foto en Storage (nunca
+      // un dominio ajeno ni la foto de otro uid); descripcion, una cadena
+      // acotada (el trigger la recorta igual, esto es defensa en
+      // profundidad, no el único límite).
+      allow create, update: if isAuth() && isOwner(uid)
+          && (!('fotoUrl' in request.resource.data) || request.resource.data.fotoUrl == null
+              || (request.resource.data.fotoUrl is string
+                  && request.resource.data.fotoUrl.matches('^https://firebasestorage\\.googleapis\\.com/v0/b/[^/]+/o/profesionales%2F' + uid + '%2Ffoto\\?.*alt=media.*$')))
+          && (!('descripcion' in request.resource.data) || request.resource.data.descripcion == null
+              || (request.resource.data.descripcion is string && request.resource.data.descripcion.size() <= 500));
+
+      allow delete: if isAuth() && isOwner(uid);
 
       // ── agenda (ampliación funcional REPARA Pro, Fase 4, noviembre 2026) ──
       // Planificación puramente personal del profesional -- nunca dinero, nunca

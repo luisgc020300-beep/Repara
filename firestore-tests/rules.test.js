@@ -589,6 +589,40 @@ describe('profesionales -- cada profesional solo ve/edita su propia ficha', () =
   it('DENY: un propietario no puede leer directamente la ficha de un profesional (solo vía invitarProfesional)', async () => {
     await assertFails(getDoc(doc(as(OWNER_A), 'profesionales', PRO)));
   });
+
+  // Mejora de perfiles, noviembre 2026 (corrección de revisión automática
+  // de seguridad): fotoUrl se copia tal cual a profesionalesPublico/{uid}
+  // (ver functions/index.js) y el cliente la pinta con NetworkImage --
+  // tiene que ser exactamente la URL de descarga de la propia foto de ESE
+  // profesional en Storage, nunca un dominio ajeno ni la foto de otro uid.
+  describe('fotoUrl/descripcion -- validadas en la propia escritura (defensa en profundidad)', () => {
+    const urlValida = `https://firebasestorage.googleapis.com/v0/b/repara-reglas-test.appspot.com/o/profesionales%2F${PRO}%2Ffoto?alt=media&token=abc-123`;
+
+    it('ALLOW: el propio profesional guarda la URL de descarga real de SU foto', async () => {
+      await assertSucceeds(updateDoc(doc(as(PRO), 'profesionales', PRO), { fotoUrl: urlValida }));
+    });
+
+    it('ALLOW: el propio profesional borra su foto (null)', async () => {
+      await assertSucceeds(updateDoc(doc(as(PRO), 'profesionales', PRO), { fotoUrl: null }));
+    });
+
+    it('DENY: una URL de un dominio ajeno (posible rastreo/fuga de IP de quien vea el perfil)', async () => {
+      await assertFails(updateDoc(doc(as(PRO), 'profesionales', PRO), { fotoUrl: 'https://evil.example.com/track.png' }));
+    });
+
+    it('DENY: la URL de descarga real, pero de la foto de OTRO profesional', async () => {
+      const urlDeOtro = `https://firebasestorage.googleapis.com/v0/b/repara-reglas-test.appspot.com/o/profesionales%2F${PRO_AJENO}%2Ffoto?alt=media&token=abc-123`;
+      await assertFails(updateDoc(doc(as(PRO), 'profesionales', PRO), { fotoUrl: urlDeOtro }));
+    });
+
+    it('ALLOW: una descripción de longitud normal', async () => {
+      await assertSucceeds(updateDoc(doc(as(PRO), 'profesionales', PRO), { descripcion: 'Más de 10 años de experiencia.' }));
+    });
+
+    it('DENY: una descripción de más de 500 caracteres', async () => {
+      await assertFails(updateDoc(doc(as(PRO), 'profesionales', PRO), { descripcion: 'x'.repeat(501) }));
+    });
+  });
 });
 
 describe('invitaciones -- solo las dos partes implicadas, y el profesional solo cambia "estado"', () => {

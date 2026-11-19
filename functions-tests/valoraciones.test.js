@@ -8,7 +8,15 @@
 // directamente. Contra el Emulator Suite real -- ver helpers.js.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { db, crearUsuario, llamar, sembrarRegistro, esperarA } = require('./helpers');
+const { db, crearUsuario, llamar, sembrarRegistro, esperarA, PROJECT_ID } = require('./helpers');
+
+// Mismo bucket por defecto que usa getStorage().bucket() sin argumento en
+// este proyecto de pruebas -- ver el comentario de BUCKET_POR_DEFECTO en
+// helpers.js. Hace falta una URL de descarga con esta forma exacta para
+// que urlFotoProfesionalEsValida() (functions/index.js) la acepte.
+function urlFotoValida(uid) {
+  return `https://firebasestorage.googleapis.com/v0/b/${PROJECT_ID}.appspot.com/o/profesionales%2F${uid}%2Ffoto?alt=media&token=test-token`;
+}
 
 test('1. el propietario valora un trabajo terminado con profesional vinculado', async () => {
   const owner = await crearUsuario();
@@ -163,9 +171,10 @@ test('10. (trigger) el perfil público sincroniza nombreComercial/especialidad d
 // guarda via ProfesionalService.actualizarPerfil/actualizarFoto.
 test('11. (trigger) el perfil público sincroniza fotoUrl/descripcion del profesional', async () => {
   const pro = await crearUsuario();
+  const url = urlFotoValida(pro.uid);
   await db.collection('profesionales').doc(pro.uid).set({
     nombreComercial: 'Electricidad Ejemplo',
-    fotoUrl: 'https://ejemplo.com/foto.jpg',
+    fotoUrl: url,
     descripcion: 'Más de 10 años de experiencia en instalaciones eléctricas.',
   });
 
@@ -173,6 +182,41 @@ test('11. (trigger) el perfil público sincroniza fotoUrl/descripcion del profes
     const snap = await db.collection('profesionalesPublico').doc(pro.uid).get();
     return snap.exists && snap.data().fotoUrl ? snap.data() : null;
   });
-  assert.equal(pub.fotoUrl, 'https://ejemplo.com/foto.jpg');
+  assert.equal(pub.fotoUrl, url);
   assert.equal(pub.descripcion, 'Más de 10 años de experiencia en instalaciones eléctricas.');
+});
+
+// Corrección de revisión automática de seguridad (noviembre 2026):
+// profesionales/{uid}.fotoUrl ya está validada en firestore.rules (ver
+// rules.test.js), pero este trigger es la última línea de defensa real
+// contra lo que de verdad llega a profesionalesPublico/{uid} -- se
+// escribe directamente con el Admin SDK (se salta las reglas, como
+// cualquier dato que llegara por otro camino) para probar el trigger en
+// sí, no solo la regla de arriba.
+test('12. (trigger) una fotoUrl que no es la URL de descarga real de ESE profesional nunca llega a profesionalesPublico', async () => {
+  const pro = await crearUsuario();
+  await db.collection('profesionales').doc(pro.uid).set({
+    nombreComercial: 'Fontanería Maliciosa',
+    fotoUrl: 'https://evil.example.com/track.png?uid=' + pro.uid,
+  });
+
+  const pub = await esperarA(async () => {
+    const snap = await db.collection('profesionalesPublico').doc(pro.uid).get();
+    return snap.exists && snap.data().nombreComercial ? snap.data() : null;
+  });
+  assert.equal(pub.fotoUrl, null);
+});
+
+test('13. (trigger) una descripcion de más de 500 caracteres se recorta antes de llegar a profesionalesPublico', async () => {
+  const pro = await crearUsuario();
+  await db.collection('profesionales').doc(pro.uid).set({
+    nombreComercial: 'Pintor',
+    descripcion: 'x'.repeat(600),
+  });
+
+  const pub = await esperarA(async () => {
+    const snap = await db.collection('profesionalesPublico').doc(pro.uid).get();
+    return snap.exists && snap.data().nombreComercial ? snap.data() : null;
+  });
+  assert.equal(pub.descripcion.length, 500);
 });
