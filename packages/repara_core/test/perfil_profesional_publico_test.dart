@@ -4,6 +4,7 @@
 // PerfilProfesionalPublico.fromDoc -- sincronizados por la Cloud Function
 // onProfesionalEscritoActualizaPerfilPublico (ver functions/index.js), este
 // test solo cubre el parseo del documento ya sincronizado.
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:repara_core/perfil_profesional_publico.dart';
@@ -32,4 +33,34 @@ void main() {
     expect(perfil.fotoUrl, isNull);
     expect(perfil.descripcion, isNull);
   });
+
+  test(
+    'PerfilProfesionalPublico.fromDoc() lee trabajosPorTipo/desde cuando existen (historial profesional, punto 7)',
+    () async {
+      final db = FakeFirebaseFirestore();
+      await db.collection('profesionalesPublico').doc('pro-3').set({
+        'nombreComercial': 'Fontanería Y',
+        'trabajosPorTipo': {'reparacion': 3, 'mantenimiento': 1},
+        'desde': Timestamp.fromDate(DateTime(2026, 3, 1)),
+      });
+      final doc = await db.collection('profesionalesPublico').doc('pro-3').get();
+      final perfil = PerfilProfesionalPublico.fromDoc(doc);
+
+      expect(perfil.trabajosPorTipo, {'reparacion': 3, 'mantenimiento': 1});
+      expect(perfil.desde, DateTime(2026, 3, 1));
+    },
+  );
+
+  test(
+    'PerfilProfesionalPublico.fromDoc() deja trabajosPorTipo vacío y desde en null si no existen',
+    () async {
+      final db = FakeFirebaseFirestore();
+      await db.collection('profesionalesPublico').doc('pro-4').set({'nombreComercial': 'Sin historial'});
+      final doc = await db.collection('profesionalesPublico').doc('pro-4').get();
+      final perfil = PerfilProfesionalPublico.fromDoc(doc);
+
+      expect(perfil.trabajosPorTipo, isEmpty);
+      expect(perfil.desde, isNull);
+    },
+  );
 }

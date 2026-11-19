@@ -220,3 +220,80 @@ test('13. (trigger) una descripcion de más de 500 caracteres se recorta antes d
   });
   assert.equal(pub.descripcion.length, 500);
 });
+
+// Historial profesional visible antes de contactar (punto 7, noviembre
+// 2026): el desglose por tipo complementa trabajosTerminados sin exponer
+// nunca el título del trabajo ni el nombre del elemento.
+test('14. (trigger) un registro que pasa a terminado con profesional incrementa trabajosPorTipo según su categoría', async () => {
+  const owner = await crearUsuario();
+  const pro = await crearUsuario();
+  const { casaId, elementoId, registroId } = await sembrarRegistro({
+    ownerUid: owner.uid, estado: 'enCurso', profesionalUid: pro.uid, tipo: 'reparacion',
+  });
+
+  await db.collection('casas').doc(casaId).collection('elementos').doc(elementoId)
+    .collection('registros').doc(registroId).update({ estado: 'terminado' });
+
+  const pub = await esperarA(async () => {
+    const snap = await db.collection('profesionalesPublico').doc(pro.uid).get();
+    return snap.exists && snap.data().trabajosTerminados === 1 ? snap.data() : null;
+  });
+  assert.equal(pub.trabajosPorTipo.reparacion, 1);
+});
+
+test('15. (trigger) volver a abrir un trabajo terminado decrementa su categoría en trabajosPorTipo', async () => {
+  const owner = await crearUsuario();
+  const pro = await crearUsuario();
+  const { casaId, elementoId, registroId } = await sembrarRegistro({
+    ownerUid: owner.uid, estado: 'terminado', profesionalUid: pro.uid, tipo: 'mantenimiento',
+  });
+  await esperarA(async () => {
+    const snap = await db.collection('profesionalesPublico').doc(pro.uid).get();
+    return snap.exists && snap.data().trabajosTerminados === 1 ? snap.data() : null;
+  });
+
+  await db.collection('casas').doc(casaId).collection('elementos').doc(elementoId)
+    .collection('registros').doc(registroId).update({ estado: 'enCurso' });
+
+  const pub = await esperarA(async () => {
+    const snap = await db.collection('profesionalesPublico').doc(pro.uid).get();
+    return snap.exists && snap.data().trabajosTerminados === 0 ? snap.data() : null;
+  });
+  assert.equal(pub.trabajosPorTipo.mantenimiento, 0);
+});
+
+// Corrección de revisión automática de seguridad (igual criterio que el
+// test 12 de fotoUrl): 'tipo' lo escribe el propio propietario sin que
+// firestore.rules valide su contenido -- un valor fuera de la lista cerrada
+// de TipoRegistro nunca debe llegar como clave de trabajosPorTipo.
+test('16. (trigger) un tipo fuera de la lista cerrada nunca llega a trabajosPorTipo', async () => {
+  const owner = await crearUsuario();
+  const pro = await crearUsuario();
+  const { casaId, elementoId, registroId } = await sembrarRegistro({
+    ownerUid: owner.uid, estado: 'enCurso', profesionalUid: pro.uid, tipo: '__proto__',
+  });
+
+  await db.collection('casas').doc(casaId).collection('elementos').doc(elementoId)
+    .collection('registros').doc(registroId).update({ estado: 'terminado' });
+
+  const pub = await esperarA(async () => {
+    const snap = await db.collection('profesionalesPublico').doc(pro.uid).get();
+    return snap.exists && snap.data().trabajosTerminados === 1 ? snap.data() : null;
+  });
+  assert.equal(pub.trabajosPorTipo, undefined);
+});
+
+test('17. (trigger) el perfil público sincroniza la fecha de alta (desde) del profesional', async () => {
+  const pro = await crearUsuario();
+  await db.collection('profesionales').doc(pro.uid).set({
+    nombreComercial: 'Carpintería Ejemplo',
+    createdAt: new Date('2026-03-01T00:00:00Z'),
+  });
+
+  const pub = await esperarA(async () => {
+    const snap = await db.collection('profesionalesPublico').doc(pro.uid).get();
+    return snap.exists && snap.data().nombreComercial ? snap.data() : null;
+  });
+  assert.ok(pub.desde);
+  assert.equal(pub.desde.toDate().toISOString(), '2026-03-01T00:00:00.000Z');
+});

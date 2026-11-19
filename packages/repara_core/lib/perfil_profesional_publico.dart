@@ -18,6 +18,8 @@ class PerfilProfesionalPublico {
     this.trabajosTerminados = 0,
     this.sumaPuntuaciones = 0,
     this.numValoraciones = 0,
+    this.trabajosPorTipo = const {},
+    this.desde,
   });
 
   final String uid;
@@ -32,6 +34,18 @@ class PerfilProfesionalPublico {
   final int trabajosTerminados;
   final int sumaPuntuaciones;
   final int numValoraciones;
+
+  /// Historial profesional (punto 7, noviembre 2026): nº de trabajos
+  /// terminados por [TipoRegistro] (claves = `TipoRegistro.name`, ver
+  /// registro.dart) -- nunca títulos ni nombres de elemento, solo la
+  /// categoría cerrada. Mantenido por la misma Cloud Function que
+  /// [trabajosTerminados]; puede faltar alguna clave o estar vacío en
+  /// profesionales sin ningún trabajo terminado todavía.
+  final Map<String, int> trabajosPorTipo;
+
+  /// Fecha de alta del profesional en Repara, o null si el documento es
+  /// anterior a que este campo se empezara a sincronizar.
+  final DateTime? desde;
 
   /// null si todavía no tiene ninguna valoración -- nunca se muestra "0.0".
   double? get valoracionMedia =>
@@ -50,6 +64,11 @@ class PerfilProfesionalPublico {
       trabajosTerminados: (data['trabajosTerminados'] as num?)?.toInt() ?? 0,
       sumaPuntuaciones: (data['sumaPuntuaciones'] as num?)?.toInt() ?? 0,
       numValoraciones: (data['numValoraciones'] as num?)?.toInt() ?? 0,
+      trabajosPorTipo: (data['trabajosPorTipo'] as Map?)?.map(
+            (k, v) => MapEntry(k as String, (v as num?)?.toInt() ?? 0),
+          ) ??
+          const {},
+      desde: (data['desde'] as Timestamp?)?.toDate(),
     );
   }
 }

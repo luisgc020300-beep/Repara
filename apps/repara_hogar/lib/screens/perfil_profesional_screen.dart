@@ -12,9 +12,11 @@
 // todavía), así que la sección de valorar simplemente no aparece.
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_core/perfil_profesional_publico.dart';
 import 'package:repara_core/perfil_profesional_service.dart';
+import 'package:repara_core/registro.dart';
 import 'package:repara_ui/app_error.dart';
 
 /// Datos del trabajo terminado desde el que se abre el perfil, para ofrecer
@@ -102,6 +104,16 @@ class PerfilProfesionalScreen extends StatelessWidget {
                   style: Theme.of(context).textTheme.bodyLarge,
                 ),
               ],
+              if (perfil?.desde != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'En Repara desde ${DateFormat('MMMM yyyy', 'es_ES').format(perfil!.desde!)}',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: context.colors.inkMuted),
+                ),
+              ],
               const SizedBox(height: ReparaSpace.s5),
               Row(
                 children: [
@@ -126,6 +138,15 @@ class PerfilProfesionalScreen extends StatelessWidget {
                   ),
                 ],
               ),
+              if ((perfil?.trabajosPorTipo ?? const {}).values.any((n) => n > 0)) ...[
+                const SizedBox(height: ReparaSpace.s5),
+                Text(
+                  'Historial de trabajos',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                _HistorialPorTipo(trabajosPorTipo: perfil!.trabajosPorTipo),
+              ],
               if (contextoValoracion != null) ...[
                 const SizedBox(height: ReparaSpace.s5),
                 SeccionValorarTrabajo(
@@ -174,6 +195,41 @@ class _Estadistica extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Desglose del historial profesional por tipo de trabajo (punto 7,
+/// noviembre 2026) -- solo categorías cerradas ([TipoRegistro]) y su
+/// conteo, nunca títulos ni nombres de elemento (ver el trigger que
+/// mantiene profesionalesPublico/{uid} en functions/index.js). Ordenado de
+/// más a menos frecuente, y solo se listan las categorías con al menos un
+/// trabajo -- sin filas en cero que no aportan nada.
+class _HistorialPorTipo extends StatelessWidget {
+  const _HistorialPorTipo({required this.trabajosPorTipo});
+
+  final Map<String, int> trabajosPorTipo;
+
+  @override
+  Widget build(BuildContext context) {
+    final entradas = trabajosPorTipo.entries.where((e) => e.value > 0).toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final e in entradas)
+          Chip(
+            avatar: Icon(
+              Icons.handyman_outlined,
+              size: 16,
+              color: context.colors.brand,
+            ),
+            label: Text(
+              '${nombreTipoRegistro(tipoRegistroFromString(e.key))} · ${e.value}',
+            ),
+          ),
+      ],
     );
   }
 }

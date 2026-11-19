@@ -86,7 +86,7 @@ function idUnico(prefijo) {
 
 // Siembra una casa + elemento + registro mínimos, con el owner ya como
 // miembro -- lo que casi todos los tests necesitan como punto de partida.
-async function sembrarRegistro({ ownerUid, presupuesto = null, estado = 'nuevo', profesionalUid = null }) {
+async function sembrarRegistro({ ownerUid, presupuesto = null, estado = 'nuevo', profesionalUid = null, tipo = null }) {
   const casaId = idUnico('casa');
   const elementoId = idUnico('elemento');
   const registroId = idUnico('registro');
@@ -102,6 +102,7 @@ async function sembrarRegistro({ ownerUid, presupuesto = null, estado = 'nuevo',
       estado,
       ...(presupuesto != null ? { presupuesto } : {}),
       ...(profesionalUid ? { profesionalUid } : {}),
+      ...(tipo ? { tipo } : {}),
     });
 
   return { casaId, elementoId, registroId };

@@ -2771,13 +2771,16 @@ exports.rechazarFinalizacionProfesional = onCall({ region: REGION }, async (requ
 // de lectura exclusiva del propio profesional (ver firestore.rules) -- nunca
 // se abre esa lectura al cliente. En su lugar, profesionalesPublico/{uid} es
 // una copia de solo lo que SÍ puede verse (nombre comercial, especialidad,
-// nº de trabajos terminados, valoración media), mantenida aquí por Admin SDK
-// y nunca por escritura directa del cliente -- mismo criterio que
-// resumen/pendientes. Las valoraciones individuales (con el comentario, si
-// lo hay) NO son públicas: solo las lee quien la escribió o el propio
-// profesional valorado (ver firestore.rules); el perfil solo muestra la
-// cifra agregada, nunca la lista de comentarios ni a qué vivienda
-// pertenecen -- así nunca se puede deducir en qué casa trabajó.
+// nº de trabajos terminados -- desglosado por tipo --, valoración media,
+// fecha de alta), mantenida aquí por Admin SDK y nunca por escritura directa
+// del cliente -- mismo criterio que resumen/pendientes. Las valoraciones
+// individuales (con el comentario, si lo hay) NO son públicas: solo las lee
+// quien la escribió o el propio profesional valorado (ver firestore.rules);
+// el perfil solo muestra la cifra agregada, nunca la lista de comentarios
+// ni a qué vivienda pertenecen -- así nunca se puede deducir en qué casa
+// trabajó. El desglose por tipo (historial profesional, punto 7, noviembre
+// 2026) es por la misma razón solo una categoría cerrada (TipoRegistro) y
+// un contador, nunca el título del trabajo ni el nombre del elemento.
 // =============================================================================
 
 // fotoUrl (mejora de perfiles, noviembre 2026) -- ProfesionalService.
@@ -2805,6 +2808,23 @@ function urlFotoProfesionalEsValida(url, uid) {
 // nunca se confía en el tamaño que el cliente decida mandar.
 const DESCRIPCION_PROFESIONAL_MAX_LEN = 500;
 
+// Historial profesional visible antes de contactar (mejora de perfiles,
+// noviembre 2026, punto 7): además del total de trabajosTerminados, se
+// desglosa por tipo (TipoRegistro en registro.dart) para que un propietario
+// vea en qué clase de trabajos tiene experiencia real el profesional --
+// nunca títulos ni nombres de elemento (son texto libre del propietario,
+// podrían contener cualquier cosa) y nunca la vivienda en la que trabajó.
+// 'tipo' lo escribe el propio propietario en su registro sin que
+// firestore.rules valide su contenido (no hay por qué: dentro de su propia
+// casa puede poner lo que quiera) -- pero como este trigger SÍ propaga el
+// valor a un documento público, hace falta la misma lista cerrada que usa
+// el modelo Dart antes de usarlo como clave de un mapa público, igual
+// criterio que urlFotoProfesionalEsValida con fotoUrl.
+const TIPOS_REGISTRO_VALIDOS = new Set([
+  'compra', 'averia', 'reparacion', 'mantenimiento',
+  'instalacion', 'reforma', 'sustitucion', 'nota',
+]);
+
 // Nombre/especialidad visibles en el perfil público, sincronizados cada vez
 // que el profesional edita su propia ficha -- nunca al revés.
 exports.onProfesionalEscritoActualizaPerfilPublico = onDocumentWritten(
@@ -2825,6 +2845,10 @@ exports.onProfesionalEscritoActualizaPerfilPublico = onDocumentWritten(
       // fotoUrl, validada arriba -- nunca se copia tal cual.
       fotoUrl: urlFotoProfesionalEsValida(after.fotoUrl, uid) ? after.fotoUrl : null,
       descripcion,
+      // "Profesional en Repara desde..." (historial profesional, punto 7,
+      // noviembre 2026) -- fecha real de alta, no inventada; ya existía en
+      // profesionales/{uid} pero nunca se había copiado al perfil público.
+      desde: after.createdAt || null,
     }, { merge: true });
   }
 );
@@ -2842,13 +2866,23 @@ exports.onRegistroTerminadoActualizaPerfilPublico = onDocumentWritten(
     const estaTerminado = after?.estado === 'terminado' && !!after?.profesionalUid;
     if (estabaTerminado === estaTerminado) return;
     if (estaTerminado) {
-      await db.collection('profesionalesPublico').doc(after.profesionalUid).set({
-        trabajosTerminados: FieldValue.increment(1),
-      }, { merge: true });
+      const campos = { trabajosTerminados: FieldValue.increment(1) };
+      // Objeto anidado de verdad, no una clave con un punto literal -- set()
+      // con merge:true (a diferencia de update()) NO interpreta "a.b" como
+      // ruta: crearía un campo llamado "trabajosPorTipo.reparacion" en vez
+      // de trabajosPorTipo.reparacion anidado. merge:true sí fusiona mapas
+      // anidados campo a campo, así que esto no pisa otras categorías ya
+      // guardadas.
+      if (TIPOS_REGISTRO_VALIDOS.has(after.tipo)) {
+        campos.trabajosPorTipo = { [after.tipo]: FieldValue.increment(1) };
+      }
+      await db.collection('profesionalesPublico').doc(after.profesionalUid).set(campos, { merge: true });
     } else {
-      await db.collection('profesionalesPublico').doc(before.profesionalUid).set({
-        trabajosTerminados: FieldValue.increment(-1),
-      }, { merge: true });
+      const campos = { trabajosTerminados: FieldValue.increment(-1) };
+      if (TIPOS_REGISTRO_VALIDOS.has(before.tipo)) {
+        campos.trabajosPorTipo = { [before.tipo]: FieldValue.increment(-1) };
+      }
+      await db.collection('profesionalesPublico').doc(before.profesionalUid).set(campos, { merge: true });
     }
   }
 );
