@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:repara_core/analytics_service.dart';
+import 'package:repara_core/cuenta_service.dart';
 
 import 'package:repara_core/design_tokens.dart';
 
@@ -32,6 +33,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _nombreCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   bool _esRegistro = false;
@@ -48,6 +50,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
+    _nombreCtrl.dispose();
     _emailCtrl.dispose();
     _passCtrl.dispose();
     super.dispose();
@@ -65,6 +68,20 @@ class _LoginScreenState extends State<LoginScreen> {
           email: _emailCtrl.text.trim(),
           password: _passCtrl.text,
         );
+        // Nombre al registrarse (punto 9, personalización, noviembre 2026)
+        // -- opcional y en el mejor esfuerzo: sin esto, cualquier cuenta
+        // nueva aparecía como "Tu perfil" (saludo de Inicio, miembros de la
+        // casa, notificaciones) hasta que alguien entraba a mano en Ajustes
+        // a ponerlo. Si falla, la cuenta ya está creada e iniciada sesión
+        // igualmente -- se puede poner el nombre después desde Ajustes.
+        final nombre = _nombreCtrl.text.trim();
+        if (nombre.isNotEmpty) {
+          try {
+            await CuentaService.actualizarNombrePerfil(nombre);
+          } catch (_) {
+            // Best-effort -- ver comentario de arriba.
+          }
+        }
         unawaited(AnalyticsService.authSignupCompleted());
       } else {
         await FirebaseAuth.instance.signInWithEmailAndPassword(
@@ -102,6 +119,23 @@ class _LoginScreenState extends State<LoginScreen> {
     AutofillGroup(
       child: Column(
         children: [
+          // Nombre (punto 9, personalización, noviembre 2026) -- solo al
+          // registrarse, y opcional: sin él, cualquier cuenta nueva aparece
+          // como "Tu perfil" en el saludo de Inicio y en "Miembros de esta
+          // casa" hasta que alguien lo pone a mano en Ajustes. No añade
+          // fricción al login (que sigue solo con correo+contraseña).
+          if (_esRegistro) ...[
+            TextFormField(
+              controller: _nombreCtrl,
+              textCapitalization: TextCapitalization.words,
+              autofillHints: const [AutofillHints.name],
+              decoration: const InputDecoration(
+                labelText: 'Nombre (opcional)',
+                prefixIcon: Icon(Icons.badge_outlined),
+              ),
+            ),
+            const SizedBox(height: ReparaSpace.s3),
+          ],
           TextFormField(
             controller: _emailCtrl,
             keyboardType: TextInputType.emailAddress,

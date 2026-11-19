@@ -224,7 +224,15 @@ class _AjustesProScreenState extends State<AjustesProScreen> {
     ],
   );
 
-  Future<void> _abrirSelectorTema(BuildContext context) {
+  // Igual criterio que Hogar (ajustes_hogar_screen.dart): marca de
+  // verificación junto al modo activo, no solo el resaltado de `selected`
+  // -- coherencia de personalización de tema entre las dos apps (punto 9,
+  // noviembre 2026).
+  Widget? _check(BuildContext context, bool seleccionado) => seleccionado
+      ? Icon(Icons.check, color: context.colors.brand, size: 20)
+      : null;
+
+  Future<void> _abrirSelectorApariencia(BuildContext context) {
     return showModalBottomSheet<void>(
       context: context,
       builder: (ctx) => SafeArea(
@@ -238,6 +246,7 @@ class _AjustesProScreenState extends State<AjustesProScreen> {
                   icon: Icons.light_mode_outlined,
                   iconColor: context.colors.brand,
                   title: 'Claro',
+                  trailing: _check(context, ThemeController.instance.mode == ThemeMode.light),
                   selected: ThemeController.instance.mode == ThemeMode.light,
                   onTap: () {
                     ThemeController.instance.setMode(ThemeMode.light);
@@ -248,6 +257,7 @@ class _AjustesProScreenState extends State<AjustesProScreen> {
                   icon: Icons.dark_mode_outlined,
                   iconColor: context.colors.brand,
                   title: 'Oscuro',
+                  trailing: _check(context, ThemeController.instance.mode == ThemeMode.dark),
                   selected: ThemeController.instance.mode == ThemeMode.dark,
                   onTap: () {
                     ThemeController.instance.setMode(ThemeMode.dark);
@@ -258,6 +268,7 @@ class _AjustesProScreenState extends State<AjustesProScreen> {
                   icon: Icons.smartphone_outlined,
                   iconColor: context.colors.brand,
                   title: 'Igual que el sistema',
+                  trailing: _check(context, ThemeController.instance.mode == ThemeMode.system),
                   selected: ThemeController.instance.mode == ThemeMode.system,
                   onTap: () {
                     ThemeController.instance.setMode(ThemeMode.system);
@@ -409,23 +420,19 @@ class _AjustesProScreenState extends State<AjustesProScreen> {
               },
             ),
             const SizedBox(height: ReparaSpace.s4),
+            // Mismo header+fila que Hogar ("Tema" / "Apariencia") -- antes
+            // esta fila se llamaba "Tema" aquí pero "Apariencia" en Hogar
+            // para el mismo ajuste (punto 9, noviembre 2026: coherencia de
+            // personalización entre las dos apps).
             IosSection(
+              header: 'Tema',
               rows: [
                 IosRow(
                   icon: Icons.palette_outlined,
                   iconColor: context.colors.brand,
-                  title: 'Tema',
+                  title: 'Apariencia',
                   trailing: _valorConChevron(context, _temaLabel()),
-                  onTap: () => _abrirSelectorTema(context),
-                ),
-                IosRow(
-                  icon: Icons.notifications_outlined,
-                  iconColor: context.colors.brand,
-                  title: 'Notificaciones',
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const NotificacionesPreferenciasScreen()),
-                  ),
+                  onTap: () => _abrirSelectorApariencia(context),
                 ),
               ],
             ),
@@ -435,6 +442,15 @@ class _AjustesProScreenState extends State<AjustesProScreen> {
             IosSection(
               header: 'Acerca de la app',
               rows: [
+                IosRow(
+                  icon: Icons.notifications_outlined,
+                  iconColor: context.colors.brand,
+                  title: 'Notificaciones',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const NotificacionesPreferenciasScreen()),
+                  ),
+                ),
                 IosRow(
                   icon: Icons.help_outline,
                   iconColor: context.colors.brand,
