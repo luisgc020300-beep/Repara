@@ -21,6 +21,14 @@ import 'package:repara_ui/cuenta_screen.dart';
 import 'package:repara_ui/ios_list.dart';
 import 'package:repara_ui/notificaciones_preferencias_screen.dart';
 import 'package:repara_ui/seccion_seguridad_documentos.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import 'acerca_pro_screen.dart';
+
+// Mismo canal de contacto ya usado en Hogar/monolito
+// (ajustes_hogar_screen.dart / settings_screen.dart) -- nunca se inventa
+// una dirección ni un servicio nuevo.
+const _emailSoporte = 'luisgc020300@gmail.com';
 
 class AjustesProScreen extends StatefulWidget {
   const AjustesProScreen({super.key});
@@ -30,6 +38,25 @@ class AjustesProScreen extends StatefulWidget {
 }
 
 class _AjustesProScreenState extends State<AjustesProScreen> {
+  Future<void> _abrirSoporte(BuildContext context) async {
+    final uri = Uri(
+      scheme: 'mailto',
+      path: _emailSoporte,
+      query: 'subject=${Uri.encodeComponent('Ayuda con REPARA Pro')}',
+    );
+    try {
+      final abierto = await launchUrl(uri);
+      if (!abierto && context.mounted) {
+        AppError.show(context, 'No se pudo abrir el correo.');
+      }
+    } catch (e, st) {
+      await FirebaseCrashlytics.instance.recordError(e, st);
+      if (context.mounted) {
+        AppError.show(context, 'No se pudo abrir el correo.');
+      }
+    }
+  }
+
   Future<void> _editarCampo(String titulo, String? actual, Future<void> Function(String) guardar) async {
     final valor = await AppDialog.promptText(context, title: titulo, initialValue: actual ?? '');
     if (valor == null) return;
@@ -49,6 +76,9 @@ class _AjustesProScreenState extends State<AjustesProScreen> {
             'Se borra tu perfil profesional y todos tus clientes y trabajos privados guardados en REPARA Pro. '
             'Si tienes una vivienda en REPARA Hogar con otros miembros, deberás salir de ella antes. '
             'Esta acción no se puede deshacer.',
+        // false porque "Cerrar sesión" ya está en el menú principal de
+        // Ajustes (mismo motivo que en Hogar) -- evita la fila duplicada.
+        mostrarCerrarSesion: false,
       ),
     ),
   );
@@ -269,6 +299,40 @@ class _AjustesProScreenState extends State<AjustesProScreen> {
             ),
             const SizedBox(height: ReparaSpace.s4),
             const SeccionSeguridadDocumentos(),
+            const SizedBox(height: ReparaSpace.s4),
+            IosSection(
+              header: 'Acerca de la app',
+              rows: [
+                IosRow(
+                  icon: Icons.help_outline,
+                  iconColor: context.colors.brand,
+                  title: 'Contacto y soporte técnico',
+                  onTap: () => _abrirSoporte(context),
+                ),
+                IosRow(
+                  icon: Icons.info_outline,
+                  iconColor: context.colors.brand,
+                  title: 'Acerca de REPARA',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AcercaProScreen()),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: ReparaSpace.s4),
+            IosSection(
+              rows: [
+                IosRow(
+                  icon: Icons.logout_outlined,
+                  iconColor: context.colors.errorText,
+                  title: 'Cerrar sesión',
+                  titleColor: context.colors.errorText,
+                  showChevron: false,
+                  onTap: () => confirmarYCerrarSesion(context),
+                ),
+              ],
+            ),
           ],
         ),
       ),

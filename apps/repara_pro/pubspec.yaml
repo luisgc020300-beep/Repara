@@ -47,6 +47,10 @@ dependencies:
   # location_service.dart (Cercanos, noviembre 2026) -- repara_core ya lo
   # declara, aquí explícito por el mismo motivo que local_auth arriba.
   geolocator: ^13.0.1
+  # ajustes_pro_screen.dart/acerca_pro_screen.dart (Contacto y soporte /
+  # enlaces legales, noviembre 2026) -- repara_ui ya lo declara, aquí
+  # explícito por el mismo motivo que local_auth/geolocator arriba.
+  url_launcher: ^6.3.1
 
 # Mismo conflicto que packages/repara_ui/pubspec.yaml (ver su comentario):
 # dentro del grafo de dependencias más pequeño de esta app, pdf 3.12.0
