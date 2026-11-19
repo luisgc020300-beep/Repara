@@ -924,19 +924,33 @@ class _CabeceraNavy extends StatelessWidget {
                               ),
                               Row(
                                 children: [
-                                  Container(
-                                    width: 34,
-                                    height: 34,
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.16,
-                                      ),
+                                  // Doble función (igual que en apps/repara_hogar/
+                                  // lib/screens/home_tab.dart): el icono de casa de
+                                  // la cabecera, que ya estaba ahí, es también el
+                                  // acceso para volver arriba del todo -- aquí
+                                  // tenía la decoración pero nunca el InkWell/onTap
+                                  // real, así que no hacía nada al tocarlo.
+                                  Material(
+                                    color: Colors.white.withValues(alpha: 0.16),
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: InkWell(
                                       borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: const Icon(
-                                      Icons.home_rounded,
-                                      color: Colors.white,
-                                      size: 18,
+                                      onTap: () => scroll.animateTo(
+                                        0,
+                                        duration: const Duration(
+                                          milliseconds: 350,
+                                        ),
+                                        curve: Curves.easeOutCubic,
+                                      ),
+                                      child: const SizedBox(
+                                        width: 34,
+                                        height: 34,
+                                        child: Icon(
+                                          Icons.home_rounded,
+                                          color: Colors.white,
+                                          size: 18,
+                                        ),
+                                      ),
                                     ),
                                   ),
                                   const Spacer(),
