@@ -23,14 +23,26 @@ import 'package:repara_ui/editor_foto_perfil.dart';
 import 'package:repara_ui/ios_list.dart';
 import 'package:repara_ui/notificaciones_preferencias_screen.dart';
 import 'package:repara_ui/seccion_seguridad_documentos.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'acerca_pro_screen.dart';
+import 'mis_valoraciones_screen.dart';
 
 // Mismo canal de contacto ya usado en Hogar/monolito
 // (ajustes_hogar_screen.dart / settings_screen.dart) -- nunca se inventa
 // una dirección ni un servicio nuevo.
 const _emailSoporte = 'luisgc020300@gmail.com';
+
+// "Mi reputación" e "Invita a un cliente a Repara" vivían en los Accesos
+// rápidos de Inicio -- el CEO pidió moverlos aquí (noviembre 2026): la
+// reputación como una fila más de "Tu perfil profesional" (es un dato del
+// perfil, no una acción del día a día) y la invitación como su propia
+// sección independiente, para que Inicio se quede solo con lo operativo.
+const _mensajeInvitarCliente =
+    'Llevo el mantenimiento de tus trabajos con Repara -- así queda todo el historial, '
+    'presupuestos y fotos organizados en un solo sitio, no perdido entre WhatsApps. '
+    'Créate una cuenta gratis y así te puedo mandar presupuestos y avisarte de cambios directamente ahí.';
 
 class AjustesProScreen extends StatefulWidget {
   const AjustesProScreen({super.key});
@@ -388,11 +400,49 @@ class _AjustesProScreenState extends State<AjustesProScreen> {
                             maxLines: 6,
                           ),
                         ),
+                        IosRow(
+                          icon: Icons.star_outline_rounded,
+                          iconColor: context.colors.brand,
+                          title: 'Mi reputación',
+                          subtitle: 'Nota media, valoraciones y comentarios recibidos',
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const MisValoracionesScreen(),
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ],
                 );
               },
+            ),
+            const SizedBox(height: ReparaSpace.s4),
+            IosSection(
+              header: 'Invita a tus clientes',
+              rows: [
+                IosRow(
+                  icon: Icons.person_add_alt_outlined,
+                  iconColor: context.colors.brand,
+                  title: 'Invita a un cliente a Repara',
+                  subtitle:
+                      'Para que puedas mandarle presupuestos y avisos desde aquí',
+                  trailing: Icon(
+                    Icons.share_outlined,
+                    size: 18,
+                    color: context.colors.inkMuted,
+                  ),
+                  showChevron: false,
+                  // sharePositionOrigin obligatorio en iOS -- ver nota en
+                  // contacto_acciones.dart.
+                  onTap: () => Share.share(
+                    _mensajeInvitarCliente,
+                    sharePositionOrigin:
+                        Offset.zero & MediaQuery.of(context).size,
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: ReparaSpace.s4),
             StreamBuilder<Profesional?>(

@@ -45,6 +45,14 @@ import 'seguridad_screen.dart';
 
 const _emailSoporte = 'luisgc020300@gmail.com';
 
+// "Invita a un cliente a Repara" vivía en los Accesos rápidos de Inicio Pro
+// -- el CEO pidió moverlo a Ajustes como sección propia, independiente del
+// resto (noviembre 2026), para que Inicio se quede solo con lo operativo.
+const _mensajeInvitarCliente =
+    'Llevo el mantenimiento de tus trabajos con Repara -- así queda todo el historial, '
+    'presupuestos y fotos organizados en un solo sitio, no perdido entre WhatsApps. '
+    'Créate una cuenta gratis y así te puedo mandar presupuestos y avisarte de cambios directamente ahí.';
+
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({this.casa, this.modoPro = false, super.key});
 
@@ -244,6 +252,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ],
                   );
                 },
+              ),
+
+            if (widget.modoPro)
+              IosSection(
+                header: 'Invita a tus clientes',
+                rows: [
+                  IosRow(
+                    icon: Icons.person_add_alt_outlined,
+                    iconColor: context.colors.brand,
+                    title: 'Invita a un cliente a Repara',
+                    subtitle:
+                        'Para que puedas mandarle presupuestos y avisos desde aquí',
+                    trailing: Icon(
+                      Icons.share_outlined,
+                      size: 18,
+                      color: context.colors.inkMuted,
+                    ),
+                    showChevron: false,
+                    // sharePositionOrigin obligatorio en iOS -- ver nota en
+                    // contacto_acciones.dart.
+                    onTap: () => Share.share(
+                      _mensajeInvitarCliente,
+                      sharePositionOrigin:
+                          Offset.zero & MediaQuery.of(context).size,
+                    ),
+                  ),
+                ],
               ),
 
             IosSection(

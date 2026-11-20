@@ -17,7 +17,6 @@ import 'package:repara_core/historial_service.dart';
 import 'package:repara_core/invitacion.dart';
 import 'package:repara_core/invitacion_service.dart';
 import 'package:repara_core/profesional.dart';
-import 'package:share_plus/share_plus.dart';
 
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_ui/app_error.dart';
@@ -26,11 +25,6 @@ import '../../widgets/boton_notificaciones.dart';
 import 'package:repara_ui/ios_list.dart';
 import 'registro_pro_detail_screen.dart';
 import 'trabajo_pro_agregado.dart';
-
-const _mensajeInvitarCliente =
-    'Llevo el mantenimiento de tus trabajos con Repara -- así queda todo el historial, '
-    'presupuestos y fotos organizados en un solo sitio, no perdido entre WhatsApps. '
-    'Créate una cuenta gratis y así te puedo mandar presupuestos y avisarte de cambios directamente ahí.';
 
 class InicioProTab extends StatelessWidget {
   const InicioProTab({super.key});
@@ -107,32 +101,6 @@ class InicioProTab extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             _ActividadReciente(trabajos: trabajos),
-            const SizedBox(height: ReparaSpace.s5),
-            IosSection(
-              header: 'Accesos rápidos',
-              rows: [
-                IosRow(
-                  icon: Icons.person_add_alt_outlined,
-                  iconColor: context.colors.brand,
-                  title: 'Invita a un cliente a Repara',
-                  subtitle:
-                      'Para que puedas mandarle presupuestos y avisos desde aquí',
-                  trailing: Icon(
-                    Icons.share_outlined,
-                    size: 18,
-                    color: context.colors.inkMuted,
-                  ),
-                  showChevron: false,
-                  // sharePositionOrigin obligatorio en iOS -- ver nota en
-                  // contacto_acciones.dart.
-                  onTap: () => Share.share(
-                    _mensajeInvitarCliente,
-                    sharePositionOrigin:
-                        Offset.zero & MediaQuery.of(context).size,
-                  ),
-                ),
-              ],
-            ),
           ],
         ),
       ),
