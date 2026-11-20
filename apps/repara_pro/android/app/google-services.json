@@ -12,7 +12,20 @@
           "package_name": "com.riskrunner.repara"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "199074592333-opnla2uom90jj1uhnteih1ksr24ik51a.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.riskrunner.repara",
+            "certificate_hash": "3cdfe582395a681dbab74d658a92c1b07e9718d0"
+          }
+        },
+        {
+          "client_id": "199074592333-7fuccroopcmlvdmjmeovjna7d5b68l3a.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCk78ygZpaBFF4tnQPBKW-XU33PACuYMxo"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "199074592333-7fuccroopcmlvdmjmeovjna7d5b68l3a.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "199074592333-kfac91orovrsvbk02bic1k4sm7s0o6no.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.riskrunner.repara.reparaHogar"
+              }
+            }
+          ]
         }
       }
     },
@@ -31,7 +56,12 @@
           "package_name": "com.riskrunner.repara.repara"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "199074592333-7fuccroopcmlvdmjmeovjna7d5b68l3a.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCk78ygZpaBFF4tnQPBKW-XU33PACuYMxo"
@@ -39,7 +69,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "199074592333-7fuccroopcmlvdmjmeovjna7d5b68l3a.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "199074592333-kfac91orovrsvbk02bic1k4sm7s0o6no.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.riskrunner.repara.reparaHogar"
+              }
+            }
+          ]
         }
       }
     },
@@ -50,7 +92,20 @@
           "package_name": "com.riskrunner.repara.repara_hogar"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "199074592333-hvpladtknlpp9fk35ot6bekl128cd5ev.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.riskrunner.repara.repara_hogar",
+            "certificate_hash": "3cdfe582395a681dbab74d658a92c1b07e9718d0"
+          }
+        },
+        {
+          "client_id": "199074592333-7fuccroopcmlvdmjmeovjna7d5b68l3a.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCk78ygZpaBFF4tnQPBKW-XU33PACuYMxo"
@@ -58,7 +113,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "199074592333-7fuccroopcmlvdmjmeovjna7d5b68l3a.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "199074592333-kfac91orovrsvbk02bic1k4sm7s0o6no.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.riskrunner.repara.reparaHogar"
+              }
+            }
+          ]
         }
       }
     },
@@ -69,7 +136,20 @@
           "package_name": "com.riskrunner.repara.repara_pro"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "199074592333-8kbk4esb6c7mnj0ehvlihra0usift8c4.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.riskrunner.repara.repara_pro",
+            "certificate_hash": "3cdfe582395a681dbab74d658a92c1b07e9718d0"
+          }
+        },
+        {
+          "client_id": "199074592333-7fuccroopcmlvdmjmeovjna7d5b68l3a.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCk78ygZpaBFF4tnQPBKW-XU33PACuYMxo"
@@ -77,7 +157,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "199074592333-7fuccroopcmlvdmjmeovjna7d5b68l3a.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "199074592333-kfac91orovrsvbk02bic1k4sm7s0o6no.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.riskrunner.repara.reparaHogar"
+              }
+            }
+          ]
         }
       }
     }

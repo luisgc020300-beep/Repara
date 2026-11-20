@@ -26,6 +26,15 @@
 	<string>Repara Pro usa Face ID para proteger el acceso a documentos sensibles de tus clientes.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Repara Pro usa tu ubicación aproximada solo si activas "Visible cerca de ti", para que te puedan encontrar propietarios próximos.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.199074592333-vr7m58ckocf0mlfmfqsqlobcumhpc3e2</string>
+			</array>
+		</dict>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>
