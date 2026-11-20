@@ -13,6 +13,7 @@ import 'package:repara_core/invitacion_service.dart';
 
 import '../models/casa.dart';
 import '../services/casa_service.dart';
+import '../services/invitacion_hogar_service.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_ui/app_dialog.dart';
 import 'package:repara_ui/app_error.dart';
@@ -56,6 +57,41 @@ class _GestionarViviendaScreenState extends State<GestionarViviendaScreen> {
         AppError.showSuccess(
           context,
           'Vinculado a "${resultado.registroTitulo}" en ${resultado.casaNombre}. Acéptalo desde Inicio Pro.',
+        );
+      }
+    } catch (e, st) {
+      await FirebaseCrashlytics.instance.recordError(e, st);
+      if (mounted) AppError.show(context, 'Ese código no es válido o ya se ha usado.');
+    }
+  }
+
+  // Dirección inversa de _canjearCodigoTrabajo (CEO, noviembre 2026): un
+  // profesional, desde REPARA Pro, puede invitar a un cliente que todavía no
+  // tiene cuenta en Hogar y compartirle un código (ver _compartirCodigo en
+  // trabajo_profesional_sheet.dart, que literalmente le dice "cuando te pida
+  // un código de invitación, introduce: X"). InvitacionHogarService.
+  // canjearCodigo ya existía, pero ninguna pantalla lo llamaba -- sin esto,
+  // ese cliente no tenía dónde introducir el código. Tras canjearlo, la
+  // invitación aparece sola en "Solicitudes de profesionales" en Inicio
+  // (_SolicitudesProfesionales ya existente, sin cambios).
+  Future<void> _canjearCodigoProfesional() async {
+    final codigo = await AppDialog.promptText(
+      context,
+      title: 'Código de invitación',
+      hint: 'Ej. AB12CD',
+      confirmLabel: 'Canjear',
+      textCapitalization: TextCapitalization.characters,
+    );
+    if (codigo == null || codigo.isEmpty || !mounted) return;
+    try {
+      final resultado = await InvitacionHogarService.canjearCodigo(codigo);
+      if (mounted) {
+        final titulo = resultado.titulo ?? 'ese trabajo';
+        final profesional = resultado.profesionalNombre;
+        AppError.showSuccess(
+          context,
+          'Vinculado a "$titulo"${profesional != null ? ' con $profesional' : ''}. '
+          'Acéptalo desde "Solicitudes de profesionales" en Inicio.',
         );
       }
     } catch (e, st) {
@@ -120,9 +156,16 @@ class _GestionarViviendaScreenState extends State<GestionarViviendaScreen> {
               IosRow(
                 icon: Icons.confirmation_number_outlined,
                 iconColor: context.colors.brand,
-                title: '¿Tienes un código de invitación?',
-                subtitle: 'Un cliente te lo habrá pasado para un trabajo suyo',
+                title: '¿Eres profesional y un cliente te ha dado un código?',
+                subtitle: 'Para vincularte a un trabajo suyo',
                 onTap: _canjearCodigoTrabajo,
+              ),
+              IosRow(
+                icon: Icons.handshake_outlined,
+                iconColor: context.colors.brand,
+                title: '¿Un profesional te ha invitado a un trabajo?',
+                subtitle: 'Te habrá dado un código para vincularlo aquí',
+                onTap: _canjearCodigoProfesional,
               ),
             ],
           ),
