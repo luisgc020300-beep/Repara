@@ -1018,7 +1018,7 @@ class _ResumenTab extends StatelessWidget {
             else
               Row(
                 children: [
-                  OutlinedButton(
+                  FilledButton(
                     onPressed: () => onCompartirResumen(
                       pagos.isEmpty ? null : totalPagado,
                     ),
@@ -1037,7 +1037,7 @@ class _ResumenTab extends StatelessWidget {
             const SizedBox(height: 10),
             SizedBox(
               width: double.infinity,
-              child: OutlinedButton.icon(
+              child: FilledButton.icon(
                 onPressed: generandoPdf ? null : onDescargarPdf,
                 icon: generandoPdf
                     ? const SizedBox(
