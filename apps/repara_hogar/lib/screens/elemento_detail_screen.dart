@@ -36,6 +36,7 @@ import 'package:repara_core/registro_service.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_ui/app_dialog.dart';
 import 'package:repara_ui/app_error.dart';
+import 'package:repara_ui/ayuda_primer_uso.dart';
 import '../widgets/documento_abrir.dart';
 import 'package:repara_ui/estado_registro_chip.dart' show nombreEstadoRegistro;
 import 'package:repara_ui/foto_ampliada_screen.dart';
@@ -113,8 +114,20 @@ class ElementoDetailScreen extends StatelessWidget {
                     icon: Icons.edit_outlined,
                     iconColor: ctx.colors.brand,
                     title: 'Añadir evento a mano',
-                    onTap: () {
+                    onTap: () async {
                       Navigator.pop(ctx);
+                      await mostrarAyudaPrimerUso(
+                        context,
+                        clave: 'nuevo_evento',
+                        icon: Icons.edit_outlined,
+                        titulo: '¿Qué es un evento?',
+                        mensaje:
+                            'Un evento es cualquier cosa que le pase a este elemento: una avería, '
+                            'una reparación, un mantenimiento, una compra... Si lo hace un profesional '
+                            'de Repara Pro, podrás invitarlo justo después de guardarlo para llevar '
+                            'presupuesto y pagos; si no, se queda anotado en el historial.',
+                      );
+                      if (!context.mounted) return;
                       abrirNuevoRegistroScreen(
                         context,
                         casa: casa,

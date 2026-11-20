@@ -243,7 +243,9 @@ class _HomeTabState extends State<HomeTab> {
                                   ),
                                   const SizedBox(height: 16),
                                   Text(
-                                    'Todavía no hay ningún elemento aquí.\nToca "Añadir" para crear el primero.',
+                                    'Aquí verás todo lo que tiene tu casa: electrodomésticos, '
+                                    'muebles, instalaciones...\nToca "Añadir elemento" para '
+                                    'registrar el primero y empezar a llevar su historial.',
                                     textAlign: TextAlign.center,
                                     style: Theme.of(
                                       context,

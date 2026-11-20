@@ -26,6 +26,7 @@ import '../services/habitacion_service.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_ui/app_dialog.dart';
 import 'package:repara_ui/app_error.dart';
+import 'package:repara_ui/ayuda_primer_uso.dart';
 import '../widgets/boton_ajustes.dart';
 import 'package:repara_ui/ios_list.dart';
 import 'package:repara_ui/scroll_to_top_button.dart';
@@ -52,6 +53,17 @@ class _CasaTabState extends State<CasaTab> {
   }
 
   Future<void> _nuevaHabitacion(BuildContext context, int orden) async {
+    await mostrarAyudaPrimerUso(
+      context,
+      clave: 'nueva_habitacion',
+      icon: Icons.meeting_room_outlined,
+      titulo: '¿Para qué sirven las habitaciones?',
+      mensaje:
+          'Organiza tu casa por habitaciones (salón, cocina, baño, garaje...) '
+          'para encontrar después cada elemento más rápido. Dentro de cada una '
+          'irás añadiendo lo que tenga: electrodomésticos, muebles, instalaciones...',
+    );
+    if (!context.mounted) return;
     final nombre = await AppDialog.promptText(
       context,
       title: 'Nueva habitación',
@@ -162,7 +174,9 @@ class _CasaTabState extends State<CasaTab> {
                               ),
                               const SizedBox(height: 16),
                               Text(
-                                'Todavía no has añadido ninguna habitación.\nEmpieza por el salón, la cocina o el baño.',
+                                'Organiza tu casa por habitaciones -- salón, cocina, baño...\n'
+                                'Dentro de cada una irás guardando sus elementos (electrodomésticos, '
+                                'muebles, instalaciones) para encontrarlos después más rápido.',
                                 textAlign: TextAlign.center,
                                 style: Theme.of(context).textTheme.bodySmall,
                               ),
@@ -278,7 +292,9 @@ class _HabitacionCard extends StatelessWidget {
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16),
                 child: EmptyHint(
-                  message: 'Sin elementos todavía.',
+                  message:
+                      'Sin elementos todavía. Añade aquí lo que tenga esta '
+                      'habitación: electrodomésticos, muebles, instalaciones...',
                   icon: Icons.category_outlined,
                 ),
               )
@@ -297,15 +313,29 @@ class _HabitacionCard extends StatelessWidget {
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: TextButton.icon(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => NuevoElementoScreen(
-                        casa: casa,
-                        habitacionIdInicial: habitacion.id,
+                  onPressed: () async {
+                    await mostrarAyudaPrimerUso(
+                      context,
+                      clave: 'nuevo_elemento',
+                      icon: Icons.inventory_2_outlined,
+                      titulo: '¿Qué es un elemento?',
+                      mensaje:
+                          'Un elemento es cualquier cosa de tu casa que quieras llevar controlada: '
+                          'una caldera, un electrodoméstico, un mueble, una instalación... '
+                          'Aquí guardas sus datos (marca, garantía, mantenimiento) y, con el tiempo, '
+                          'todo su historial de averías, reparaciones y gastos.',
+                    );
+                    if (!context.mounted) return;
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => NuevoElementoScreen(
+                          casa: casa,
+                          habitacionIdInicial: habitacion.id,
+                        ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
                   icon: const Icon(Icons.add, size: 18),
                   label: const Text('Añadir elemento'),
                 ),

@@ -10,6 +10,7 @@ import '../models/casa.dart';
 import '../models/elemento.dart';
 import 'package:repara_core/design_tokens.dart';
 import '../services/elemento_service.dart';
+import 'package:repara_ui/ayuda_primer_uso.dart';
 import 'package:repara_ui/ios_list.dart';
 import 'package:repara_ui/nuevo_documento_flow.dart';
 import 'nuevo_elemento_screen.dart';
@@ -50,8 +51,20 @@ Future<void> mostrarMenuAnadir(BuildContext context, {required Casa casa}) {
                   icon: Icons.add_circle_outline,
                   iconColor: ctx.colors.brand,
                   title: 'Añadir elemento a mano',
-                  onTap: () {
+                  onTap: () async {
                     Navigator.pop(ctx);
+                    await mostrarAyudaPrimerUso(
+                      context,
+                      clave: 'nuevo_elemento',
+                      icon: Icons.inventory_2_outlined,
+                      titulo: '¿Qué es un elemento?',
+                      mensaje:
+                          'Un elemento es cualquier cosa de tu casa que quieras llevar controlada: '
+                          'una caldera, un electrodoméstico, un mueble, una instalación... '
+                          'Aquí guardas sus datos (marca, garantía, mantenimiento) y, con el tiempo, '
+                          'todo su historial de averías, reparaciones y gastos.',
+                    );
+                    if (!context.mounted) return;
                     Navigator.push(context, MaterialPageRoute(builder: (_) => NuevoElementoScreen(casa: casa)));
                   },
                 ),

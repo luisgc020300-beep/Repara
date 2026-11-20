@@ -19,6 +19,7 @@ import '../services/elemento_service.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_ui/app_dialog.dart';
 import 'package:repara_ui/app_error.dart';
+import 'package:repara_ui/ayuda_primer_uso.dart';
 import '../widgets/boton_ajustes.dart';
 import 'package:repara_ui/ios_list.dart';
 import 'package:repara_ui/scroll_to_top_button.dart';
@@ -116,7 +117,20 @@ class _ContactosTabState extends State<ContactosTab> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => mostrarNuevoContactoSheet(context, casaId: casa.id),
+        onPressed: () async {
+          await mostrarAyudaPrimerUso(
+            context,
+            clave: 'nuevo_contacto',
+            icon: Icons.contact_phone_outlined,
+            titulo: '¿Para qué sirven los contactos?',
+            mensaje:
+                'Guarda aquí a tu fontanero, electricista o cualquier profesional '
+                'de confianza. Desde su ficha podrás llamarle o invitarle a un '
+                'trabajo en un toque, sin buscar su número cada vez.',
+          );
+          if (!context.mounted) return;
+          mostrarNuevoContactoSheet(context, casaId: casa.id);
+        },
         icon: const Icon(Icons.add),
         label: const Text('Contacto'),
       ),
