@@ -118,7 +118,7 @@ class ElementoDetailScreen extends StatelessWidget {
                       Navigator.pop(ctx);
                       abrirNuevoRegistroScreen(
                         context,
-                        casaId: casa.id,
+                        casa: casa,
                         elementoId: elemento.id,
                         elementoNombre: elemento.nombre,
                       );

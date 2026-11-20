@@ -98,6 +98,11 @@ class _SelectorProfesionalesFieldState
       child: InputDecorator(
         decoration: InputDecoration(
           labelText: 'Profesionales (opcional)',
+          // Aclaración (CEO, noviembre 2026: se confundía con "¿Lo hace un
+          // profesional de Repara Pro?") -- esto es solo una anotación de
+          // quién hizo el trabajo, nunca una invitación real ni activa
+          // presupuesto/pagos, tenga o no esa persona cuenta en Repara.
+          helperText: 'Quién lo hizo, tenga o no cuenta en Repara',
           suffixIcon: _cargando
               ? const Padding(
                   padding: EdgeInsets.all(12),

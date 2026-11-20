@@ -19,10 +19,19 @@
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:repara/models/casa.dart';
 import 'package:repara/screens/nuevo_registro_screen.dart';
 import 'package:repara/services/contacto_service.dart';
 import 'package:repara_core/registro_service.dart';
 import 'package:repara_core/design_tokens.dart';
+
+const _casa = Casa(
+  id: 'c1',
+  nombre: 'Mi casa',
+  ownerUid: 'u1',
+  members: ['u1'],
+  memberProfiles: {},
+);
 
 void main() {
   tearDown(() {
@@ -47,7 +56,7 @@ void main() {
                 child: FilledButton(
                   onPressed: () => abrirNuevoRegistroScreen(
                     context,
-                    casaId: 'c1',
+                    casa: _casa,
                     elementoId: 'e1',
                     elementoNombre: 'Caldera',
                   ),

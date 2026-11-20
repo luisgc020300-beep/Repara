@@ -39,11 +39,13 @@ import 'package:repara_core/registro_service.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_ui/app_error.dart';
 import 'package:repara_ui/seccion_formulario.dart';
+import '../models/casa.dart';
 import '../widgets/selector_profesional_field.dart';
+import 'registro_detail_screen.dart';
 
 Future<void> abrirNuevoRegistroScreen(
   BuildContext context, {
-  required String casaId,
+  required Casa casa,
   required String elementoId,
   required String elementoNombre,
 }) {
@@ -51,7 +53,7 @@ Future<void> abrirNuevoRegistroScreen(
     context,
     MaterialPageRoute(
       builder: (_) => _NuevoRegistroScreen(
-        casaId: casaId,
+        casa: casa,
         elementoId: elementoId,
         elementoNombre: elementoNombre,
       ),
@@ -61,12 +63,12 @@ Future<void> abrirNuevoRegistroScreen(
 
 class _NuevoRegistroScreen extends StatefulWidget {
   const _NuevoRegistroScreen({
-    required this.casaId,
+    required this.casa,
     required this.elementoId,
     required this.elementoNombre,
   });
 
-  final String casaId;
+  final Casa casa;
   final String elementoId;
   final String elementoNombre;
 
@@ -132,8 +134,8 @@ class _NuevoRegistroScreenState extends State<_NuevoRegistroScreen> {
         ? const <ProfesionalRegistro>[]
         : _profesionales;
     try {
-      await RegistroService.crear(
-        widget.casaId,
+      final nuevoId = await RegistroService.crear(
+        widget.casa.id,
         widget.elementoId,
         Registro(
           id: '',
@@ -169,7 +171,28 @@ class _NuevoRegistroScreenState extends State<_NuevoRegistroScreen> {
       // si el usuario cancela antes de llegar aquí. _guardando ya impide que
       // un doble toque dispare esta rama dos veces (ver onPressed más abajo).
       unawaited(AnalyticsService.workCreated(tipo: _tipo.name));
-      if (mounted) Navigator.pop(context);
+      if (!mounted) return;
+      if (_esConProfesional) {
+        // Con profesional, el siguiente paso casi siempre es invitar a uno
+        // (CEO, noviembre 2026: "es el doble de trabajo pulsar esa opción y
+        // elegirlo en otra pestaña diferente") -- no se puede invitar antes
+        // de que el registro exista de verdad (invitarProfesional exige un
+        // registroId real), pero sí se puede evitar que el usuario tenga que
+        // volver a buscar el evento recién creado: se entra directo en su
+        // ficha, reemplazando esta pantalla, en vez de volver a la lista.
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => RegistroDetailScreen(
+              casa: widget.casa,
+              elementoId: widget.elementoId,
+              registroId: nuevoId,
+            ),
+          ),
+        );
+      } else {
+        Navigator.pop(context);
+      }
     } catch (e, st) {
       if (mounted) {
         AppError.show(
@@ -228,9 +251,12 @@ class _NuevoRegistroScreenState extends State<_NuevoRegistroScreen> {
                 ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('¿Lo hace un profesional?'),
+                  title: const Text('¿Lo hace un profesional de Repara Pro?'),
                   subtitle: const Text(
-                    'Activa presupuesto, pagos e invitación de profesional',
+                    'Solo si vas a invitar a alguien con cuenta en Repara Pro: '
+                    'podrá enviarte un presupuesto formal, cobrar y confirmar '
+                    'cuando termine. Lo invitas justo después de guardar '
+                    'este evento, no en esta pantalla.',
                   ),
                   value: _esConProfesional,
                   onChanged: (v) => setState(() => _esConProfesional = v),
@@ -263,10 +289,24 @@ class _NuevoRegistroScreenState extends State<_NuevoRegistroScreen> {
                   ),
                 ),
                 const SizedBox(height: ReparaSpace.s3),
+                Text(
+                  'Fecha',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: context.colors.inkMuted,
+                  ),
+                ),
+                const SizedBox(height: 4),
                 OutlinedButton.icon(
                   onPressed: _elegirFecha,
                   icon: const Icon(Icons.calendar_today_outlined, size: 16),
                   label: Text('${_fecha.day}/${_fecha.month}/${_fecha.year}'),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Cuándo ocurrió o se hizo el trabajo -- no es la fecha de garantía.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: context.colors.inkMuted,
+                  ),
                 ),
                 if (!_esConProfesional) ...[
                   const SizedBox(height: ReparaSpace.s2),
@@ -278,6 +318,12 @@ class _NuevoRegistroScreenState extends State<_NuevoRegistroScreen> {
                     ),
                     value: _yaRealizado,
                     onChanged: (v) => setState(() => _yaRealizado = v),
+                  ),
+                  const SizedBox(height: ReparaSpace.s3),
+                  SelectorProfesionalesField(
+                    casaId: widget.casa.id,
+                    seleccionados: _profesionales,
+                    onChanged: (v) => setState(() => _profesionales = v),
                   ),
                 ],
               ],
@@ -295,11 +341,6 @@ class _NuevoRegistroScreenState extends State<_NuevoRegistroScreen> {
                     decoration: const InputDecoration(labelText: 'Coste (€)'),
                   ),
                   const SizedBox(height: ReparaSpace.s3),
-                  SelectorProfesionalesField(
-                    casaId: widget.casaId,
-                    seleccionados: _profesionales,
-                    onChanged: (v) => setState(() => _profesionales = v),
-                  ),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     title: const Text('¿Se paga a plazos?'),
