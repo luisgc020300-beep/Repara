@@ -16,6 +16,10 @@ import 'package:repara_ui/ios_list.dart';
 // REPARA, con dos secciones (#privacidad / #terminos).
 const _urlLegal = 'https://claude.ai/artifact/G771r2pFWuiAFRXxHA69rC';
 
+// Contacto de soporte (noviembre 2026) -- mismo buzón en Hogar, Pro y el
+// monolito: un único punto de contacto para todo REPARA.
+const _emailSoporte = 'ayudaycontactorepara@gmail.com';
+
 // pubspec.yaml de apps/repara_pro: version: 1.0.0+1 -- literal aquí por el
 // mismo motivo que en Hogar: añadir package_info_plus solo para leer un
 // dato ya estático en el build sería una dependencia nueva innecesaria.
@@ -45,6 +49,21 @@ class _AcercaProScreenState extends State<AcercaProScreen> {
     }
   }
 
+  Future<void> _contactarSoporte() async {
+    final uri = Uri(
+      scheme: 'mailto',
+      path: _emailSoporte,
+      query: 'subject=${Uri.encodeComponent('Soporte REPARA Pro')}',
+    );
+    try {
+      final abierto = await launchUrl(uri);
+      if (!abierto && mounted) AppError.show(context, 'No se pudo abrir el correo.');
+    } catch (e, st) {
+      await FirebaseCrashlytics.instance.recordError(e, st);
+      if (mounted) AppError.show(context, 'No se pudo abrir el correo.');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -66,6 +85,19 @@ class _AcercaProScreenState extends State<AcercaProScreen> {
                 iconColor: context.colors.brand,
                 title: 'Versión $_version',
                 showChevron: false,
+              ),
+            ],
+          ),
+          const SizedBox(height: ReparaSpace.s4),
+          IosSection(
+            header: 'Ayuda',
+            rows: [
+              IosRow(
+                icon: Icons.email_outlined,
+                iconColor: context.colors.brand,
+                title: 'Contacto de soporte',
+                subtitle: _emailSoporte,
+                onTap: _contactarSoporte,
               ),
             ],
           ),

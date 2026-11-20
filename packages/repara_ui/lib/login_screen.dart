@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:repara_core/analytics_service.dart';
 import 'package:repara_core/cuenta_service.dart';
 
@@ -101,6 +102,88 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  // "Continuar con Google" (noviembre 2026) -- sirve tanto para entrar como
+  // para registrarse: signInWithCredential crea la cuenta de Firebase Auth
+  // sola si no existía. Igual que en el registro con correo, el nombre se
+  // rellena best-effort (ver comentario de _enviar) para que el saludo de
+  // Inicio no se quede en "Tu perfil".
+  Future<void> _iniciarSesionConGoogle() async {
+    setState(() {
+      _cargando = true;
+      _error = null;
+    });
+    try {
+      final googleUser = await GoogleSignIn().signIn();
+      if (googleUser == null) {
+        if (mounted) setState(() => _cargando = false);
+        return;
+      }
+      final googleAuth = await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      final userCred = await FirebaseAuth.instance.signInWithCredential(
+        credential,
+      );
+      final esNuevo = userCred.additionalUserInfo?.isNewUser ?? false;
+      if (esNuevo) {
+        final nombre = userCred.user?.displayName?.trim();
+        if (nombre != null && nombre.isNotEmpty) {
+          try {
+            await CuentaService.actualizarNombrePerfil(nombre);
+          } catch (_) {
+            // Best-effort -- ver comentario de _enviar.
+          }
+        }
+        unawaited(AnalyticsService.authSignupCompleted());
+      } else {
+        unawaited(AnalyticsService.authLogin());
+      }
+    } on FirebaseAuthException catch (e) {
+      setState(() => _error = e.message ?? 'Error al iniciar sesión con Google');
+    } catch (_) {
+      setState(() => _error = 'No se pudo iniciar sesión con Google.');
+    } finally {
+      if (mounted) setState(() => _cargando = false);
+    }
+  }
+
+  // "¿Olvidaste tu contraseña?" (noviembre 2026) -- usa el mismo campo de
+  // correo del formulario, no uno aparte: si el usuario ya lo escribió para
+  // entrar y falló, no tiene que volver a teclearlo.
+  Future<void> _recuperarContrasena() async {
+    final email = _emailCtrl.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
+      setState(
+        () => _error = 'Escribe tu correo arriba para recuperar la contraseña.',
+      );
+      return;
+    }
+    setState(() {
+      _cargando = true;
+      _error = null;
+    });
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Te hemos enviado un correo a $email para restablecer tu contraseña.'),
+          ),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      setState(
+        () => _error = e.message ?? 'No se pudo enviar el correo de recuperación.',
+      );
+    } catch (_) {
+      setState(() => _error = 'No se pudo enviar el correo de recuperación.');
+    } finally {
+      if (mounted) setState(() => _cargando = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final esOscuro = Theme.of(context).brightness == Brightness.dark;
@@ -175,6 +258,19 @@ class _LoginScreenState extends State<LoginScreen> {
             validator: (v) =>
                 (v == null || v.length < 6) ? 'Mínimo 6 caracteres' : null,
           ),
+          // "¿Olvidaste tu contraseña?" (noviembre 2026) -- solo al entrar,
+          // no al registrarse (ahí la contraseña todavía no existe).
+          if (!_esRegistro)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: _cargando ? null : _recuperarContrasena,
+                style: widget.backgroundImageAsset == null
+                    ? null
+                    : TextButton.styleFrom(foregroundColor: Colors.white),
+                child: const Text('¿Olvidaste tu contraseña?'),
+              ),
+            ),
         ],
       ),
     ),
@@ -206,6 +302,48 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             )
           : Text(_esRegistro ? 'Crear cuenta' : 'Entrar'),
+    ),
+    const SizedBox(height: ReparaSpace.s4),
+    Row(
+      children: [
+        Expanded(
+          child: Divider(
+            color: widget.backgroundImageAsset == null
+                ? null
+                : Colors.white.withValues(alpha: 0.4),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: ReparaSpace.s3),
+          child: Text(
+            'o',
+            style: TextStyle(
+              color: widget.backgroundImageAsset == null
+                  ? context.colors.inkMuted
+                  : Colors.white70,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Divider(
+            color: widget.backgroundImageAsset == null
+                ? null
+                : Colors.white.withValues(alpha: 0.4),
+          ),
+        ),
+      ],
+    ),
+    const SizedBox(height: ReparaSpace.s4),
+    OutlinedButton.icon(
+      onPressed: _cargando ? null : _iniciarSesionConGoogle,
+      style: widget.backgroundImageAsset == null
+          ? null
+          : OutlinedButton.styleFrom(
+              foregroundColor: Colors.white,
+              side: BorderSide(color: Colors.white.withValues(alpha: 0.6)),
+            ),
+      icon: const _GoogleIcon(),
+      label: const Text('Continuar con Google'),
     ),
   ];
 
@@ -392,4 +530,85 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
+}
+
+// Logo "G" de Google pintado a mano (sin añadir ningún asset de imagen al
+// paquete) -- mismas proporciones/colores oficiales que el resto de botones
+// "Continuar con Google" del ecosistema.
+class _GoogleIcon extends StatelessWidget {
+  const _GoogleIcon();
+
+  @override
+  Widget build(BuildContext context) =>
+      CustomPaint(size: const Size(18, 18), painter: _GoogleIconPainter());
+}
+
+class _GoogleIconPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = size.width / 24;
+    final p1 = Paint()..color = const Color(0xFF4285F4);
+    final p2 = Paint()..color = const Color(0xFF34A853);
+    final p3 = Paint()..color = const Color(0xFFFBBC05);
+    final p4 = Paint()..color = const Color(0xFFEA4335);
+
+    canvas.drawPath(
+      Path()
+        ..moveTo(22.56 * s, 12.25 * s)
+        ..lineTo(22.36 * s, 10 * s)
+        ..lineTo(12 * s, 10 * s)
+        ..lineTo(12 * s, 14.26 * s)
+        ..lineTo(17.92 * s, 14.26 * s)
+        ..cubicTo(17.66 * s, 15.63 * s, 16.88 * s, 16.79 * s, 15.71 * s, 17.57 * s)
+        ..lineTo(15.71 * s, 20.34 * s)
+        ..lineTo(19.28 * s, 20.34 * s)
+        ..cubicTo(21.36 * s, 18.42 * s, 22.56 * s, 15.60 * s, 22.56 * s, 12.25 * s)
+        ..close(),
+      p1,
+    );
+
+    canvas.drawPath(
+      Path()
+        ..moveTo(12 * s, 23 * s)
+        ..cubicTo(14.97 * s, 23 * s, 17.46 * s, 22.02 * s, 19.28 * s, 20.34 * s)
+        ..lineTo(15.71 * s, 17.57 * s)
+        ..cubicTo(14.73 * s, 18.23 * s, 13.48 * s, 18.63 * s, 12 * s, 18.63 * s)
+        ..cubicTo(9.14 * s, 18.63 * s, 6.71 * s, 16.70 * s, 5.84 * s, 14.10 * s)
+        ..lineTo(2.18 * s, 14.10 * s)
+        ..lineTo(2.18 * s, 16.94 * s)
+        ..cubicTo(3.99 * s, 20.53 * s, 7.70 * s, 23 * s, 12 * s, 23 * s)
+        ..close(),
+      p2,
+    );
+
+    canvas.drawPath(
+      Path()
+        ..moveTo(5.84 * s, 14.09 * s)
+        ..cubicTo(5.62 * s, 13.43 * s, 5.49 * s, 12.73 * s, 5.49 * s, 12 * s)
+        ..cubicTo(5.49 * s, 11.27 * s, 5.62 * s, 10.57 * s, 5.84 * s, 9.91 * s)
+        ..lineTo(5.84 * s, 7.07 * s)
+        ..lineTo(2.18 * s, 7.07 * s)
+        ..cubicTo(1.43 * s, 8.55 * s, 1 * s, 10.22 * s, 1 * s, 12 * s)
+        ..cubicTo(1 * s, 13.78 * s, 1.43 * s, 15.45 * s, 2.18 * s, 16.93 * s)
+        ..lineTo(5.84 * s, 14.09 * s)
+        ..close(),
+      p3,
+    );
+
+    canvas.drawPath(
+      Path()
+        ..moveTo(12 * s, 5.38 * s)
+        ..cubicTo(13.62 * s, 5.38 * s, 15.06 * s, 5.94 * s, 16.21 * s, 7.02 * s)
+        ..lineTo(19.36 * s, 3.87 * s)
+        ..cubicTo(17.45 * s, 2.09 * s, 14.97 * s, 1 * s, 12 * s, 1 * s)
+        ..cubicTo(7.70 * s, 1 * s, 3.99 * s, 3.47 * s, 2.18 * s, 7.07 * s)
+        ..lineTo(5.84 * s, 9.91 * s)
+        ..cubicTo(6.71 * s, 7.31 * s, 9.14 * s, 5.38 * s, 12 * s, 5.38 * s)
+        ..close(),
+      p4,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_) => false;
 }

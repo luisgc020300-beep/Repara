@@ -20,6 +20,10 @@ import 'guia_uso_screen.dart';
 // #terminos).
 const _urlLegal = 'https://claude.ai/artifact/G771r2pFWuiAFRXxHA69rC';
 
+// Contacto de soporte (noviembre 2026) -- mismo buzón en Hogar, Pro y el
+// monolito: un único punto de contacto para todo REPARA.
+const _emailSoporte = 'ayudaycontactorepara@gmail.com';
+
 // pubspec.yaml: version: 1.0.0+1 -- literal aquí porque añadir
 // package_info_plus solo para leer esto en tiempo de ejecución sería una
 // dependencia nueva innecesaria para un dato que ya es estático en el build.
@@ -46,6 +50,21 @@ class _AcercaHogarScreenState extends State<AcercaHogarScreen> {
     } catch (e, st) {
       await FirebaseCrashlytics.instance.recordError(e, st);
       if (mounted) AppError.show(context, 'No se pudo abrir el enlace.');
+    }
+  }
+
+  Future<void> _contactarSoporte() async {
+    final uri = Uri(
+      scheme: 'mailto',
+      path: _emailSoporte,
+      query: 'subject=${Uri.encodeComponent('Soporte REPARA Hogar')}',
+    );
+    try {
+      final abierto = await launchUrl(uri);
+      if (!abierto && mounted) AppError.show(context, 'No se pudo abrir el correo.');
+    } catch (e, st) {
+      await FirebaseCrashlytics.instance.recordError(e, st);
+      if (mounted) AppError.show(context, 'No se pudo abrir el correo.');
     }
   }
 
@@ -86,6 +105,13 @@ class _AcercaHogarScreenState extends State<AcercaHogarScreen> {
                   context,
                   MaterialPageRoute(builder: (_) => const GuiaUsoScreen()),
                 ),
+              ),
+              IosRow(
+                icon: Icons.email_outlined,
+                iconColor: context.colors.brand,
+                title: 'Contacto de soporte',
+                subtitle: _emailSoporte,
+                onTap: _contactarSoporte,
               ),
             ],
           ),

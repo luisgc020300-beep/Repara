@@ -16,6 +16,10 @@ import 'package:repara_ui/ios_list.dart';
 // desarrollador.
 const _urlLegal = 'https://claude.ai/artifact/G771r2pFWuiAFRXxHA69rC';
 
+// Contacto de soporte (noviembre 2026) -- buzón dedicado, igual en las dos
+// apps y el monolito: un único punto de contacto para todo REPARA.
+const _emailSoporte = 'ayudaycontactorepara@gmail.com';
+
 class AcercaScreen extends StatefulWidget {
   const AcercaScreen({super.key});
 
@@ -35,6 +39,21 @@ class _AcercaScreenState extends State<AcercaScreen> {
     }
   }
 
+  Future<void> _contactarSoporte() async {
+    final uri = Uri(
+      scheme: 'mailto',
+      path: _emailSoporte,
+      query: 'subject=${Uri.encodeComponent('Soporte REPARA')}',
+    );
+    try {
+      final abierto = await launchUrl(uri);
+      if (!abierto && mounted) AppError.show(context, 'No se pudo abrir el correo.');
+    } catch (e, st) {
+      await FirebaseCrashlytics.instance.recordError(e, st);
+      if (mounted) AppError.show(context, 'No se pudo abrir el correo.');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -50,6 +69,18 @@ class _AcercaScreenState extends State<AcercaScreen> {
                 title: 'REPARA',
                 subtitle: 'La memoria digital de tu vivienda',
                 showChevron: false,
+              ),
+            ],
+          ),
+          IosSection(
+            header: 'Ayuda',
+            rows: [
+              IosRow(
+                icon: Icons.email_outlined,
+                iconColor: context.colors.brand,
+                title: 'Contacto de soporte',
+                subtitle: _emailSoporte,
+                onTap: _contactarSoporte,
               ),
             ],
           ),

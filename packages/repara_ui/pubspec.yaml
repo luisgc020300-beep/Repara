@@ -39,6 +39,11 @@ dependencies:
   # login_screen.dart y nuevo_documento_flow.dart (integración de REPARA
   # Pro, noviembre 2026) -- mismas versiones que la app principal.
   firebase_auth: ^6.1.4
+  # login_screen.dart: "Continuar con Google" (noviembre 2026) -- versión 6.x
+  # porque su API (GoogleSignIn().signIn()) es la que usa el resto del
+  # código; la 7.x cambia a GoogleSignIn.instance.initialize()/authenticate()
+  # y exigiría reescribir el flujo.
+  google_sign_in: ^6.2.2
   file_picker: ^8.1.4
   # editor_foto_perfil.dart (mejora de perfiles, noviembre 2026) -- misma
   # versión que la app principal.
