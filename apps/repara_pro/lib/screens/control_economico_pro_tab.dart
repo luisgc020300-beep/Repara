@@ -367,7 +367,7 @@ class _TarjetaKpi extends StatelessWidget {
           children: [
             Icon(icon, size: 22, color: color),
             const SizedBox(height: ReparaSpace.s2),
-            Text(
+            ReparaText.amountFit(
               valor,
               style: Theme.of(
                 context,

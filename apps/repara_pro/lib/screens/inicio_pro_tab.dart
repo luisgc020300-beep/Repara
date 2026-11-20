@@ -294,7 +294,7 @@ class _TarjetaHero extends StatelessWidget {
           children: [
             Icon(icon, size: 22, color: color),
             const SizedBox(height: ReparaSpace.s2),
-            Text(
+            ReparaText.amountFit(
               valor,
               style: Theme.of(
                 context,
@@ -326,8 +326,9 @@ class _TarjetaMini extends StatelessWidget {
         ),
         child: Column(
           children: [
-            Text(
+            ReparaText.amountFit(
               valor,
+              alignment: Alignment.center,
               style: Theme.of(
                 context,
               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),

@@ -49,6 +49,17 @@ Future<void> mostrarAyudaPrimerUso(
       actions: [
         FilledButton(
           onPressed: () => Navigator.pop(ctx),
+          // El tema global del FilledButton (ver filledButtonTheme en
+          // design_tokens.dart) solo fija el padding VERTICAL -- en los
+          // CTAs de ancho completo da igual (los estira su contenedor),
+          // pero aquí, sin ancho forzado, deja el padding horizontal a 0 y
+          // el texto queda pegado a los bordes de la píldora.
+          style: FilledButton.styleFrom(
+            padding: const EdgeInsets.symmetric(
+              horizontal: ReparaSpace.s6,
+              vertical: ReparaSpace.s3,
+            ),
+          ),
           child: const Text('Entendido'),
         ),
       ],

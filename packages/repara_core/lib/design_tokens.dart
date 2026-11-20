@@ -325,6 +325,26 @@ class ReparaText {
       fontFeatures: const [FontFeature.tabularFigures()],
     );
   }
+
+  /// Importe dentro de una columna/tarjeta estrecha (tarjetas KPI, el
+  /// resumen de 3 columnas de un registro...) -- sin esto, un número con
+  /// más dígitos que el hueco disponible envuelve a una segunda línea
+  /// justo antes del "€" (el espacio es el único punto de corte), y el
+  /// símbolo se ve "caído" debajo del importe (CEO, noviembre 2026). En
+  /// vez de partir la línea, se encoge entero para seguir cabiendo en una
+  /// sola -- nunca trunca el valor, que es justo lo que no se puede
+  /// permitir en una cifra de dinero.
+  static Widget amountFit(
+    String texto, {
+    required TextStyle? style,
+    AlignmentGeometry alignment = Alignment.centerLeft,
+  }) {
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: alignment,
+      child: Text(texto, style: style, maxLines: 1, softWrap: false),
+    );
+  }
 }
 
 ThemeData _buildReparaTheme(Brightness brightness) {

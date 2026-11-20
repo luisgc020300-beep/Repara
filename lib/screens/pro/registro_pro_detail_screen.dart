@@ -289,7 +289,7 @@ class RegistroProDetailScreen extends StatelessWidget {
                               ?.copyWith(color: context.colors.inkMuted),
                         ),
                         const SizedBox(height: 2),
-                        Text(
+                        ReparaText.amountFit(
                           '${registro.presupuesto!.toStringAsFixed(0)} €',
                           style: ReparaText.amount(context, large: true),
                         ),

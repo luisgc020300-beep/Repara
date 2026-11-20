@@ -488,7 +488,7 @@ class _TarjetaEconomica extends StatelessWidget {
             children: [
               columna(
                 etiquetaTotal,
-                Text(
+                ReparaText.amountFit(
                   '${_formatoImporte(presupuesto)} €',
                   style: importeStyle(),
                 ),
@@ -496,7 +496,7 @@ class _TarjetaEconomica extends StatelessWidget {
               divisor(),
               columna(
                 'Pagado',
-                Text(
+                ReparaText.amountFit(
                   '${_formatoImporte(pagado)} €',
                   style: importeStyle(color: context.colors.successText),
                 ),
@@ -527,7 +527,7 @@ class _TarjetaEconomica extends StatelessWidget {
                     )
                   : columna(
                       'Saldo',
-                      Text(
+                      ReparaText.amountFit(
                         '${_formatoImporte(saldo)} €',
                         style: importeStyle(),
                       ),
