@@ -19,7 +19,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { initializeTestEnvironment, assertSucceeds, assertFails } = require('@firebase/rules-unit-testing');
-const { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, addDoc, query, where, getDocs } = require('firebase/firestore');
+const { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, addDoc, query, where, orderBy, limit, getDocs } = require('firebase/firestore');
 
 const { describe, it, before, after, beforeEach } = test;
 
@@ -652,6 +652,40 @@ describe('invitaciones -- solo las dos partes implicadas, y el profesional solo 
 
   it('DENY: un profesional ajeno no puede responder una invitación que no es suya', async () => {
     await assertFails(updateDoc(doc(as(PRO_AJENO), 'invitaciones', 'inv-a1'), { estado: 'aceptada' }));
+  });
+});
+
+// Bug real reportado por el CEO (noviembre 2026): el botón de invitar (tanto
+// desde Cercanos como desde Contactos) no hacía nada -- ni mensaje de error
+// ni la hoja de selección. Causa: InvitacionService.streamUltimaInvitacionDe
+// (usada por eventosDisponiblesParaInvitar para evitar invitaciones
+// duplicadas, ver contacto_acciones.dart) consulta 'invitaciones' filtrando
+// solo por registroId, sin ningún where sobre el propio uid -- la regla de
+// arriba (propietarioUid == auth.uid || profesionalUid == auth.uid) no se
+// puede demostrar únicamente a partir de esa consulta, así que Firestore
+// deniega la consulta ENTERA con permission-denied en vez de filtrar en
+// silencio (la regla de LIST/QUERY es estructural, no se evalúa documento a
+// documento). Como ninguna función de la cadena (eventosDisponiblesParaInvitar
+// -> elegirEventoParaInvitar -> _invitar) atrapaba este error concreto, la
+// excepción quedaba sin capturar y no se veía nada en pantalla.
+describe('invitaciones -- consulta "última invitación de este registro" (streamUltimaInvitacionDe)', () => {
+  it('DENY (bug real): sin filtrar también por el propio uid, ni el propio propietario puede hacer esta consulta', async () => {
+    await assertFails(getDocs(query(
+      collection(as(OWNER_A), 'invitaciones'),
+      where('registroId', '==', REGISTRO_A1),
+      orderBy('createdAt', 'desc'),
+      limit(1),
+    )));
+  });
+
+  it('ALLOW (corrección): añadiendo where("propietarioUid", "==", miUid) la misma consulta sí es válida', async () => {
+    await assertSucceeds(getDocs(query(
+      collection(as(OWNER_A), 'invitaciones'),
+      where('registroId', '==', REGISTRO_A1),
+      where('propietarioUid', '==', OWNER_A),
+      orderBy('createdAt', 'desc'),
+      limit(1),
+    )));
   });
 });
 

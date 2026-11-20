@@ -27,12 +27,18 @@ void main() {
     ElementoService.debugFirestoreOverride = db;
     RegistroService.debugFirestoreOverride = db;
     InvitacionService.debugFirestoreOverride = db;
+    // streamUltimaInvitacionDe ahora filtra también por propietarioUid
+    // (corrección de un permission-denied real en producción, noviembre
+    // 2026) -- debe coincidir con el propietarioUid sembrado en
+    // sembrarInvitacionPendiente para que el test siga probando lo mismo.
+    InvitacionService.debugUidOverride = 'owner-1';
   });
 
   tearDown(() {
     ElementoService.debugFirestoreOverride = null;
     RegistroService.debugFirestoreOverride = null;
     InvitacionService.debugFirestoreOverride = null;
+    InvitacionService.debugUidOverride = null;
   });
 
   Future<void> sembrarElemento() async {

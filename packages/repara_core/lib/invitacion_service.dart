@@ -113,16 +113,44 @@ class InvitacionService {
   }
 
   /// La última invitación enviada para un registro (puede no haber ninguna).
+  ///
+  /// CORRECCIÓN (bug real reportado por el CEO, noviembre 2026): el botón de
+  /// invitar (desde Cercanos y desde Contactos) no hacía nada -- ni mensaje
+  /// ni hoja de selección, con un evento realmente disponible para invitar.
+  /// Causa: esta consulta filtraba solo por registroId, sin ningún where
+  /// sobre el propio uid. firestore.rules exige demostrar, a partir de la
+  /// propia consulta, que `propietarioUid == auth.uid` (o profesionalUid)
+  /// para cada resultado posible -- al no haberlo, Firestore deniega la
+  /// consulta ENTERA con permission-denied (regla de lista/query, que se
+  /// evalúa de forma estructural, no documento a documento) en vez de
+  /// filtrar en silencio. Como nada en la cadena de llamada (eventosDisponibles
+  /// ParaInvitar/elegirEventoParaInvitar/_SeccionInvitarProfesional) atrapaba
+  /// ese error concreto, la excepción quedaba sin capturar y no se veía
+  /// nada en pantalla. Confirmado con dos tests nuevos contra el emulador
+  /// real en firestore-tests/rules.test.js.
+  ///
+  /// Se añade `propietarioUid == miUid`: en los tres sitios que llaman a
+  /// esto hoy (ambos registro_detail_screen.dart y contacto_acciones.dart)
+  /// quien pregunta es siempre quien envió la invitación -- igual que ya
+  /// exige la regla. Nota: si en la misma casa otro miembro (no quien
+  /// invitó) mira este mismo registro, no ve la invitación de su compañero
+  /// (la regla ya era así desde antes, no es un cambio de alcance de esta
+  /// corrección) y en teoría podría enviar una segunda -- limitación
+  /// preexistente de "las invitaciones son privadas entre quien invita y el
+  /// profesional", no algo que resolver aquí.
   static Stream<Invitacion?> streamUltimaInvitacionDe(String registroId) {
+    final uid = _uid;
+    if (uid == null) return Stream.value(null);
     return _db
         .collection('invitaciones')
         .where('registroId', isEqualTo: registroId)
+        .where('propietarioUid', isEqualTo: uid)
         .orderBy('createdAt', descending: true)
         .limit(1)
         .snapshots()
         .map((s) => s.docs.isEmpty ? null : Invitacion.fromDoc(s.docs.first))
         .conRegistroDeErrores()
-        .compartido('invitacionUltima:$registroId');
+        .compartido('invitacionUltima:$registroId:$uid');
   }
 
   /// Invitaciones pendientes de respuesta para el profesional actual.
