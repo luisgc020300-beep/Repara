@@ -53,14 +53,22 @@ void main() async {
   Intl.defaultLocale = 'es_ES';
 
   if (!kIsWeb) {
-    await FirebaseAppCheck.instance.activate(
-      providerAndroid: kDebugMode
-          ? const AndroidDebugProvider()
-          : const AndroidPlayIntegrityProvider(),
-      providerApple: kDebugMode
-          ? const AppleDebugProvider()
-          : const AppleAppAttestProvider(),
-    );
+    // Igual criterio que Hogar (apps/repara_hogar/lib/main.dart) -- si
+    // falla la activación (p.ej. Play Integrity no disponible en ese
+    // dispositivo concreto), no debe tirar abajo el arranque de toda la
+    // app. Antes esta llamada no estaba protegida aquí en Pro.
+    try {
+      await FirebaseAppCheck.instance.activate(
+        providerAndroid: kDebugMode
+            ? const AndroidDebugProvider()
+            : const AndroidPlayIntegrityProvider(),
+        providerApple: kDebugMode
+            ? const AppleDebugProvider()
+            : const AppleAppAttestProvider(),
+      );
+    } catch (e) {
+      debugPrint('App Check no se pudo activar: $e');
+    }
   }
 
   FirebaseFirestore.instance.settings = const Settings(

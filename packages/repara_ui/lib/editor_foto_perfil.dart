@@ -32,6 +32,16 @@ Future<void> editarFotoPerfil(
   required Future<void> Function(String? url) onGuardar,
 }) async {
   final picker = ImagePicker();
+  // Corrección (CEO, noviembre 2026: "al intentar hacer una foto de
+  // perfil, no se sube, sigue apareciendo la letra" -- en Ajustes Pro y en
+  // Tu cuenta): picker.pickImage() puede lanzar (permiso de cámara/
+  // galería denegado, sin cámara disponible...) y antes nada capturaba
+  // ese error dentro de la propia hoja -- una excepción sin atrapar en un
+  // onTap no muestra nada al usuario, simplemente no pasaba nada visible.
+  // Se atrapa aquí y se guarda el mensaje para avisar, con el context
+  // estable de fuera (el de la hoja se cierra con la propia excepción),
+  // en cuanto termine showModalBottomSheet.
+  String? errorSeleccion;
   final foto = await showModalBottomSheet<XFile?>(
     context: context,
     builder: (ctx) => SafeArea(
@@ -50,14 +60,20 @@ Future<void> editarFotoPerfil(
               title: 'Hacer una foto',
               onTap: () async {
                 final navigator = Navigator.of(ctx);
-                final imagen = await picker.pickImage(
-                  source: ImageSource.camera,
-                  imageQuality: 85,
-                  maxWidth: 1600,
-                  maxHeight: 1600,
-                );
-                if (!ctx.mounted) return;
-                navigator.pop(imagen);
+                try {
+                  final imagen = await picker.pickImage(
+                    source: ImageSource.camera,
+                    imageQuality: 85,
+                    maxWidth: 1600,
+                    maxHeight: 1600,
+                  );
+                  if (!ctx.mounted) return;
+                  navigator.pop(imagen);
+                } catch (e) {
+                  errorSeleccion =
+                      'No se pudo abrir la cámara. Revisa los permisos de la app.';
+                  if (ctx.mounted) navigator.pop();
+                }
               },
             ),
             IosRow(
@@ -66,14 +82,20 @@ Future<void> editarFotoPerfil(
               title: 'Elegir de la galería',
               onTap: () async {
                 final navigator = Navigator.of(ctx);
-                final imagen = await picker.pickImage(
-                  source: ImageSource.gallery,
-                  imageQuality: 85,
-                  maxWidth: 1600,
-                  maxHeight: 1600,
-                );
-                if (!ctx.mounted) return;
-                navigator.pop(imagen);
+                try {
+                  final imagen = await picker.pickImage(
+                    source: ImageSource.gallery,
+                    imageQuality: 85,
+                    maxWidth: 1600,
+                    maxHeight: 1600,
+                  );
+                  if (!ctx.mounted) return;
+                  navigator.pop(imagen);
+                } catch (e) {
+                  errorSeleccion =
+                      'No se pudo abrir la galería. Revisa los permisos de la app.';
+                  if (ctx.mounted) navigator.pop();
+                }
               },
             ),
             if (tieneFotoActual)
@@ -93,6 +115,9 @@ Future<void> editarFotoPerfil(
       ),
     ),
   );
+  if (errorSeleccion != null && context.mounted) {
+    AppError.show(context, errorSeleccion!);
+  }
   if (foto == null || !context.mounted) return;
   try {
     final ref = FirebaseStorage.instance.ref().child(storagePath);
