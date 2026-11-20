@@ -50,7 +50,6 @@ class CuentaScreen extends StatefulWidget {
     this.antesDeCerrarSesion,
     this.mostrarCerrarSesion = true,
     this.permitirEditarNombre = false,
-    this.permitirEditarDescripcion = false,
     super.key,
   });
 
@@ -75,13 +74,6 @@ class CuentaScreen extends StatefulWidget {
   /// los demás, vía [CuentaService.actualizarNombrePerfil]). Pro conserva
   /// por defecto su fila de identidad de siempre, de solo lectura.
   final bool permitirEditarNombre;
-
-  /// true solo en Hogar (mejora de perfiles, noviembre 2026): añade una
-  /// sección "Descripción" editable, vía [CuentaService.
-  /// actualizarDescripcionPerfil]. Pro no la muestra aquí porque su
-  /// descripción pública vive en el perfil profesional (Ajustes Pro ->
-  /// Tu perfil profesional), no en la identidad personal de esta pantalla.
-  final bool permitirEditarDescripcion;
 
   @override
   State<CuentaScreen> createState() => _CuentaScreenState();
@@ -164,26 +156,6 @@ class _CuentaScreenState extends State<CuentaScreen> {
         if (mounted) setState(() {});
       },
     );
-  }
-
-  Future<void> _editarDescripcion(String? actual) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-    final descripcion = await AppDialog.promptText(
-      context,
-      title: 'Descripción',
-      hint: 'Unas palabras sobre ti',
-      initialValue: actual ?? '',
-      minLines: 3,
-      maxLines: 6,
-    );
-    if (descripcion == null || descripcion == actual || !mounted) return;
-    try {
-      await CuentaService.actualizarDescripcionPerfil(user.uid, descripcion);
-    } catch (e, st) {
-      await FirebaseCrashlytics.instance.recordError(e, st);
-      if (mounted) AppError.show(context, 'No se pudo guardar la descripción.');
-    }
   }
 
   Future<void> _confirmarEliminarCuenta() async {
@@ -293,27 +265,6 @@ class _CuentaScreenState extends State<CuentaScreen> {
                 _filaIdentidad(context, user, user?.displayName),
             ],
           ),
-          if (widget.permitirEditarDescripcion && user != null)
-            StreamBuilder<String?>(
-              stream: CuentaService.streamDescripcionPerfil(user.uid),
-              builder: (context, snapshot) {
-                final descripcion = snapshot.data;
-                return IosSection(
-                  header: 'Descripción',
-                  rows: [
-                    IosRow(
-                      icon: Icons.notes_outlined,
-                      iconColor: context.colors.brand,
-                      title: (descripcion?.isNotEmpty ?? false)
-                          ? descripcion!
-                          : 'Añade unas palabras sobre ti',
-                      dense: (descripcion?.isNotEmpty ?? false),
-                      onTap: () => _editarDescripcion(descripcion),
-                    ),
-                  ],
-                );
-              },
-            ),
           IosSection(
             rows: [
               if (widget.mostrarCerrarSesion)

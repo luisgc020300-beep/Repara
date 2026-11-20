@@ -315,7 +315,6 @@ class _CuentaCard extends StatelessWidget {
                 antesDeCerrarSesion: FcmService.olvidarEsteDispositivo,
                 mostrarCerrarSesion: false,
                 permitirEditarNombre: true,
-                permitirEditarDescripcion: true,
               ),
             ),
           ),

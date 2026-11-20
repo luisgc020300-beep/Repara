@@ -7,22 +7,11 @@
 // eliminarCuenta -- aquí solo se llama.
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
-import 'package:flutter/foundation.dart';
 
 import 'security_preferences_service.dart';
 
 class CuentaService {
   static const _region = 'europe-west1';
-
-  /// Seam de solo test -- nunca se asigna en código de producción. Ver
-  /// casa_service.dart para el criterio general. Solo [streamDescripcionPerfil]/
-  /// [actualizarDescripcionPerfil] lo usan (el resto de este archivo son
-  /// Cloud Functions, no escrituras directas).
-  @visibleForTesting
-  static FirebaseFirestore? debugFirestoreOverride;
-
-  static FirebaseFirestore get _db =>
-      debugFirestoreOverride ?? FirebaseFirestore.instance;
 
   /// El nombre real que ven los demás (no el displayName de FirebaseAuth,
   /// que ninguna de las dos apps escribe nunca) -- ver
@@ -34,31 +23,6 @@ class CuentaService {
         .doc(uid)
         .snapshots()
         .map((doc) => doc.data()?['displayName'] as String?);
-  }
-
-  /// Breve presentación personal (mejora de perfiles, noviembre 2026) --
-  /// solo visible en la propia CuentaScreen de Hogar (ver
-  /// permitirEditarDescripcion), nunca a otros miembros de la casa: a
-  /// diferencia de displayName, no se copia en memberProfiles porque ninguna
-  /// pantalla muestra hoy el perfil de otro miembro, así que no hace falta
-  /// pasar por Cloud Function -- escritura directa, igual que
-  /// users/{uid}.displayName ya permitía firestore.rules antes de que
-  /// existiera actualizarNombrePerfil.
-  static Stream<String?> streamDescripcionPerfil(String uid) {
-    return _db
-        .collection('users')
-        .doc(uid)
-        .snapshots()
-        .map((doc) => doc.data()?['descripcion'] as String?);
-  }
-
-  static Future<void> actualizarDescripcionPerfil(
-    String uid,
-    String descripcion,
-  ) async {
-    await _db.collection('users').doc(uid).set({
-      'descripcion': descripcion,
-    }, SetOptions(merge: true));
   }
 
   /// Lanza FirebaseFunctionsException con code 'failed-precondition' si el
