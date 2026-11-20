@@ -2,7 +2,8 @@
 //
 // "Acerca de REPARA" (rediseño de Ajustes, noviembre 2026) -- identidad de
 // la app, versión (de pubspec.yaml, sin añadir package_info_plus solo para
-// esto) y los enlaces legales. Versión Hogar de lib/screens/acerca_screen.dart
+// esto), la guía de uso (texto nativo, ver guia_uso_screen.dart) y los
+// enlaces legales. Versión Hogar de lib/screens/acerca_screen.dart
 // (monolito), con el mismo enlace legal -- no se inventa ningún documento
 // nuevo, es el mismo ya publicado.
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
@@ -12,18 +13,12 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_ui/app_error.dart';
 import 'package:repara_ui/ios_list.dart';
+import 'guia_uso_screen.dart';
 
 // Misma URL que el monolito (lib/screens/acerca_screen.dart) -- un único
 // documento legal para todo REPARA, con dos secciones (#privacidad /
 // #terminos).
 const _urlLegal = 'https://claude.ai/artifact/G771r2pFWuiAFRXxHA69rC';
-
-// Guía de uso (CEO, noviembre 2026: "un documento en el que se explique todo
-// lo referente a la app -- introducción, funcionalidades, posibles dudas")
-// -- introducción, tour de las 3 pestañas, elementos/eventos, profesionales
-// de Repara Pro vs. Contactos, documentos/garantías, compartir la vivienda y
-// preguntas frecuentes.
-const _urlGuia = 'https://claude.ai/artifact/BAF5hzA9KyjNt6wXzRa84f';
 
 // pubspec.yaml: version: 1.0.0+1 -- literal aquí porque añadir
 // package_info_plus solo para leer esto en tiempo de ejecución sería una
@@ -43,21 +38,6 @@ class _AcercaHogarScreenState extends State<AcercaHogarScreen> {
     try {
       final abierto = await launchUrl(
         uri,
-        mode: LaunchMode.externalApplication,
-      );
-      if (!abierto && mounted) {
-        AppError.show(context, 'No se pudo abrir el enlace.');
-      }
-    } catch (e, st) {
-      await FirebaseCrashlytics.instance.recordError(e, st);
-      if (mounted) AppError.show(context, 'No se pudo abrir el enlace.');
-    }
-  }
-
-  Future<void> _abrirGuia() async {
-    try {
-      final abierto = await launchUrl(
-        Uri.parse(_urlGuia),
         mode: LaunchMode.externalApplication,
       );
       if (!abierto && mounted) {
@@ -102,7 +82,10 @@ class _AcercaHogarScreenState extends State<AcercaHogarScreen> {
                 iconColor: context.colors.brand,
                 title: 'Guía de uso',
                 subtitle: 'Qué hace la app y preguntas frecuentes',
-                onTap: _abrirGuia,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const GuiaUsoScreen()),
+                ),
               ),
             ],
           ),
