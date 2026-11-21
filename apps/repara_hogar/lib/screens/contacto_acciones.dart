@@ -276,11 +276,28 @@ Future<void> _invitarAUnEvento(
   required String casaId,
   required Contacto contacto,
 }) async {
-  final elegido = await elegirEventoParaInvitar(
-    context,
-    casaId: casaId,
-    nombrePersona: contacto.nombre,
-  );
+  // Mismo bug real que en cercanos_screen.dart (CEO, noviembre 2026): sin
+  // este try/catch, un fallo de eventosDisponiblesParaInvitar() quedaba sin
+  // capturar y el botón de invitar parecía no hacer nada.
+  final elegido = await (() async {
+    try {
+      return await elegirEventoParaInvitar(
+        context,
+        casaId: casaId,
+        nombrePersona: contacto.nombre,
+      );
+    } catch (e, st) {
+      if (context.mounted) {
+        AppError.show(
+          context,
+          'No se pudo comprobar tus eventos abiertos a un profesional.',
+          error: e,
+          stackTrace: st,
+        );
+      }
+      return null;
+    }
+  })();
   if (elegido == null || !context.mounted) return;
 
   try {

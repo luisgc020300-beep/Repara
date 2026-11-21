@@ -354,11 +354,30 @@ class _ListaResultados extends StatelessWidget {
     ProfesionalCercano p,
     String nombre,
   ) async {
-    final elegido = await elegirEventoParaInvitar(
-      context,
-      casaId: casaId,
-      nombrePersona: nombre,
-    );
+    // Bug real (CEO, noviembre 2026: "le doy al + y no hace nada"): si
+    // eventosDisponiblesParaInvitar() falla (p.ej. consulta a Firestore sin
+    // índice), la excepción no tenía ningún try/catch alrededor y quedaba
+    // sin capturar -- el botón parecía no hacer nada en absoluto, sin
+    // mensaje de error ni nada visible.
+    final elegido = await (() async {
+      try {
+        return await elegirEventoParaInvitar(
+          context,
+          casaId: casaId,
+          nombrePersona: nombre,
+        );
+      } catch (e, st) {
+        if (context.mounted) {
+          AppError.show(
+            context,
+            'No se pudo comprobar tus eventos abiertos a un profesional.',
+            error: e,
+            stackTrace: st,
+          );
+        }
+        return null;
+      }
+    })();
     if (elegido == null || !context.mounted) return;
     try {
       final resultado = await InvitacionService.invitarProfesional(
