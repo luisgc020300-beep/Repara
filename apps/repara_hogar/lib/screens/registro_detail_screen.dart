@@ -892,6 +892,16 @@ class _ResumenTab extends StatelessWidget {
         ? registro.listaProfesionales
         : registro.profesionales;
     return ListView(
+      // Física de scroll firme, sin rebote elástico (CEO, noviembre 2026:
+      // "al llegar al final se queda bloqueada y empieza a botar, no puedo
+      // hacer scroll" -- específicamente en trabajos con profesional, que
+      // tienen más secciones dependientes de streams al final de la lista,
+      // como "Próxima visita"). Con el rebote elástico por defecto de iOS,
+      // si el contenido cambia de alto justo mientras se está en el borde
+      // inferior, el límite de scroll se recalcula en mitad del rebote y
+      // puede quedar oscilando sin asentarse nunca -- clamping elimina ese
+      // bucle por completo, sin rebote que pueda quedarse atascado.
+      physics: const ClampingScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
       children: [
         // "terminado"/"archivado"/"pendienteConfirmacion" nunca son opción
