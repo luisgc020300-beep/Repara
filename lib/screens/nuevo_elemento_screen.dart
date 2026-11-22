@@ -24,6 +24,7 @@ import '../services/elemento_service.dart';
 import '../services/habitacion_service.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_ui/app_error.dart';
+import 'package:repara_ui/confirmar_salida_formulario.dart';
 import 'package:repara_ui/seccion_formulario.dart';
 
 class NuevoElementoScreen extends StatefulWidget {
@@ -76,6 +77,11 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
       widget.existente?.habitacionId ?? widget.habitacionIdInicial;
   bool _guardando = false;
   bool _sugiriendo = false;
+  // Se pone a true justo antes del pop que sigue a un guardado con éxito --
+  // sin esto, ConfirmarSalidaFormulario interceptaría también ESE pop (al
+  // bloquear canPop incondicionalmente) y preguntaría "¿Salir sin guardar?"
+  // aunque los datos ya estén guardados de verdad.
+  bool _guardadoConExito = false;
 
   /// Eco visual en el propio campo del mismo error que ya muestra el
   /// snackbar de [AppError.show] -- no sustituye ese aviso (se conserva tal
@@ -234,6 +240,7 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
         await ElementoService.crear(widget.casa.id, elemento);
         unawaited(AnalyticsService.firstElementCreated());
       }
+      _guardadoConExito = true;
       if (mounted) Navigator.pop(context);
     } catch (e, st) {
       if (mounted) {
@@ -266,232 +273,257 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
     });
   }
 
+  // Solo al crear (CEO: "cuando estás creando... pierdes el proceso") -- al
+  // editar un elemento existente no se pregunta, para no complicar el caso
+  // de corregir un typo y salir.
+  bool _hayCambiosSinGuardar() =>
+      !_guardadoConExito &&
+      widget.existente == null &&
+      (_nombreCtrl.text.trim().isNotEmpty ||
+          _marcaCtrl.text.trim().isNotEmpty ||
+          _modeloCtrl.text.trim().isNotEmpty ||
+          _costeCtrl.text.trim().isNotEmpty ||
+          _profesionalCtrl.text.trim().isNotEmpty ||
+          _intervaloCtrl.text.trim().isNotEmpty ||
+          _fechaInstalacion != null ||
+          _garantiaHasta != null ||
+          _habitacionId != widget.habitacionIdInicial);
+
   @override
   Widget build(BuildContext context) {
     final editando = widget.existente != null;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(editando ? 'Editar elemento' : 'Nuevo elemento'),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(ReparaSpace.s4),
-        children: [
-          SeccionFormulario(
-            titulo: 'Datos básicos',
-            children: [
-              TextField(
-                controller: _nombreCtrl,
-                decoration: InputDecoration(
-                  labelText: 'Nombre (p.ej. Aire acondicionado)',
-                  errorText: _mostrarErrorNombre
-                      ? 'Escribe un nombre para el elemento.'
-                      : null,
+    return ConfirmarSalidaFormulario(
+      hayCambiosSinGuardar: _hayCambiosSinGuardar,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(editando ? 'Editar elemento' : 'Nuevo elemento'),
+        ),
+        body: ListView(
+          padding: const EdgeInsets.all(ReparaSpace.s4),
+          children: [
+            SeccionFormulario(
+              titulo: 'Datos básicos',
+              children: [
+                TextField(
+                  controller: _nombreCtrl,
+                  decoration: InputDecoration(
+                    labelText: 'Nombre (p.ej. Aire acondicionado)',
+                    errorText: _mostrarErrorNombre
+                        ? 'Escribe un nombre para el elemento.'
+                        : null,
+                  ),
+                  onChanged: (_) {
+                    if (_mostrarErrorNombre) {
+                      setState(() => _mostrarErrorNombre = false);
+                    }
+                  },
                 ),
-                onChanged: (_) {
-                  if (_mostrarErrorNombre) {
-                    setState(() => _mostrarErrorNombre = false);
-                  }
-                },
-              ),
-              const SizedBox(height: ReparaSpace.s3),
-              StreamBuilder<List<Habitacion>>(
-                stream: HabitacionService.streamHabitaciones(widget.casa.id),
-                builder: (context, snapshot) {
-                  final habitaciones = snapshot.data ?? [];
-                  return DropdownButtonFormField<String?>(
-                    initialValue: _habitacionId,
-                    decoration: const InputDecoration(labelText: 'Ubicación'),
-                    items: [
-                      const DropdownMenuItem(
-                        value: null,
-                        child: Text('Sin ubicación concreta'),
+                const SizedBox(height: ReparaSpace.s3),
+                StreamBuilder<List<Habitacion>>(
+                  stream: HabitacionService.streamHabitaciones(widget.casa.id),
+                  builder: (context, snapshot) {
+                    final habitaciones = snapshot.data ?? [];
+                    return DropdownButtonFormField<String?>(
+                      initialValue: _habitacionId,
+                      decoration: const InputDecoration(labelText: 'Ubicación'),
+                      items: [
+                        const DropdownMenuItem(
+                          value: null,
+                          child: Text('Sin ubicación concreta'),
+                        ),
+                        ...habitaciones.map(
+                          (h) => DropdownMenuItem(
+                            value: h.id,
+                            child: Text(h.nombre),
+                          ),
+                        ),
+                      ],
+                      onChanged: (v) => setState(() => _habitacionId = v),
+                    );
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: ReparaSpace.s4),
+            SeccionFormulario(
+              titulo: 'Detalles',
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _marcaCtrl,
+                        decoration: const InputDecoration(labelText: 'Marca'),
                       ),
-                      ...habitaciones.map(
-                        (h) => DropdownMenuItem(
-                          value: h.id,
-                          child: Text(h.nombre),
+                    ),
+                    const SizedBox(width: ReparaSpace.s3),
+                    Expanded(
+                      child: TextField(
+                        controller: _modeloCtrl,
+                        decoration: const InputDecoration(labelText: 'Modelo'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: ReparaSpace.s3),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _costeCtrl,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: 'Coste (€)',
                         ),
                       ),
-                    ],
-                    onChanged: (v) => setState(() => _habitacionId = v),
-                  );
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: ReparaSpace.s4),
-          SeccionFormulario(
-            titulo: 'Detalles',
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _marcaCtrl,
-                      decoration: const InputDecoration(labelText: 'Marca'),
                     ),
-                  ),
-                  const SizedBox(width: ReparaSpace.s3),
-                  Expanded(
-                    child: TextField(
-                      controller: _modeloCtrl,
-                      decoration: const InputDecoration(labelText: 'Modelo'),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: ReparaSpace.s3),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _costeCtrl,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(labelText: 'Coste (€)'),
-                    ),
-                  ),
-                  const SizedBox(width: ReparaSpace.s3),
-                  Expanded(
-                    child: RawAutocomplete<Contacto>(
-                      textEditingController: _profesionalCtrl,
-                      focusNode: _profesionalFocusNode,
-                      displayStringForOption: (c) => c.nombre,
-                      // Vacío (campo recién tocado) -> todos los contactos
-                      // guardados, no solo los que coinciden con lo tecleado.
-                      optionsBuilder: (value) => value.text.isEmpty
-                          ? _contactos
-                          : _contactos.where(
-                              (c) => c.nombre.toLowerCase().contains(
-                                value.text.toLowerCase(),
+                    const SizedBox(width: ReparaSpace.s3),
+                    Expanded(
+                      child: RawAutocomplete<Contacto>(
+                        textEditingController: _profesionalCtrl,
+                        focusNode: _profesionalFocusNode,
+                        displayStringForOption: (c) => c.nombre,
+                        // Vacío (campo recién tocado) -> todos los contactos
+                        // guardados, no solo los que coinciden con lo tecleado.
+                        optionsBuilder: (value) => value.text.isEmpty
+                            ? _contactos
+                            : _contactos.where(
+                                (c) => c.nombre.toLowerCase().contains(
+                                  value.text.toLowerCase(),
+                                ),
+                              ),
+                        onSelected: (c) => _profesionalCtrl.text = c.nombre,
+                        fieldViewBuilder:
+                            (
+                              context,
+                              controller,
+                              focusNode,
+                              onFieldSubmitted,
+                            ) => TextField(
+                              controller: controller,
+                              focusNode: focusNode,
+                              decoration: const InputDecoration(
+                                labelText: 'Profesional (opcional)',
                               ),
                             ),
-                      onSelected: (c) => _profesionalCtrl.text = c.nombre,
-                      fieldViewBuilder:
-                          (context, controller, focusNode, onFieldSubmitted) =>
-                              TextField(
-                                controller: controller,
-                                focusNode: focusNode,
-                                decoration: const InputDecoration(
-                                  labelText: 'Profesional (opcional)',
-                                ),
-                              ),
-                      optionsViewBuilder: (context, onSelected, options) =>
-                          Align(
-                            alignment: Alignment.topLeft,
-                            child: Material(
-                              elevation: 4,
-                              borderRadius: BorderRadius.circular(10),
-                              child: ConstrainedBox(
-                                constraints: const BoxConstraints(
-                                  maxHeight: 220,
-                                  minWidth: 220,
-                                ),
-                                child: ListView.builder(
-                                  padding: EdgeInsets.zero,
-                                  shrinkWrap: true,
-                                  itemCount: options.length,
-                                  itemBuilder: (context, i) {
-                                    final c = options.elementAt(i);
-                                    return ListTile(
-                                      dense: true,
-                                      title: Text(c.nombre),
-                                      subtitle: c.especialidad != null
-                                          ? Text(c.especialidad!)
-                                          : null,
-                                      onTap: () => onSelected(c),
-                                    );
-                                  },
+                        optionsViewBuilder: (context, onSelected, options) =>
+                            Align(
+                              alignment: Alignment.topLeft,
+                              child: Material(
+                                elevation: 4,
+                                borderRadius: BorderRadius.circular(10),
+                                child: ConstrainedBox(
+                                  constraints: const BoxConstraints(
+                                    maxHeight: 220,
+                                    minWidth: 220,
+                                  ),
+                                  child: ListView.builder(
+                                    padding: EdgeInsets.zero,
+                                    shrinkWrap: true,
+                                    itemCount: options.length,
+                                    itemBuilder: (context, i) {
+                                      final c = options.elementAt(i);
+                                      return ListTile(
+                                        dense: true,
+                                        title: Text(c.nombre),
+                                        subtitle: c.especialidad != null
+                                            ? Text(c.especialidad!)
+                                            : null,
+                                        onTap: () => onSelected(c),
+                                      );
+                                    },
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: ReparaSpace.s4),
-          SeccionFormulario(
-            titulo: 'Fechas',
-            children: [
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => _elegirFecha(esGarantia: false),
-                  icon: const Icon(Icons.calendar_today_outlined, size: 18),
-                  label: Text(
-                    _fechaInstalacion == null
-                        ? 'Fecha de instalación'
-                        : '${_fechaInstalacion!.day}/${_fechaInstalacion!.month}/${_fechaInstalacion!.year}',
-                  ),
-                ),
-              ),
-              const SizedBox(height: ReparaSpace.s2),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => _elegirFecha(esGarantia: true),
-                  icon: const Icon(Icons.shield_outlined, size: 18),
-                  label: Text(
-                    _garantiaHasta == null
-                        ? 'Garantía hasta (opcional)'
-                        : '${_garantiaHasta!.day}/${_garantiaHasta!.month}/${_garantiaHasta!.year}',
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: ReparaSpace.s4),
-          SeccionFormulario(
-            titulo: 'Revisión periódica (opcional)',
-            subtitulo:
-                'Repara te avisará cuando toque revisarlo. Puedes escribir el número a mano o pedirle una sugerencia a la IA según el tipo de elemento.',
-            children: [
-              TextField(
-                controller: _intervaloCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Revisar cada cuántos meses',
-                ),
-              ),
-              const SizedBox(height: ReparaSpace.s2),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: _sugiriendo ? null : _sugerirIntervalo,
-                  icon: _sugiriendo
-                      ? const SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.auto_awesome_outlined, size: 18),
-                  label: const Text('Sugerir con IA'),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: ReparaSpace.s6),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: _guardando ? null : _guardar,
-              child: _guardando
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
                       ),
-                    )
-                  : Text(editando ? 'Guardar cambios' : 'Guardar elemento'),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ),
-        ],
+            const SizedBox(height: ReparaSpace.s4),
+            SeccionFormulario(
+              titulo: 'Fechas',
+              children: [
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _elegirFecha(esGarantia: false),
+                    icon: const Icon(Icons.calendar_today_outlined, size: 18),
+                    label: Text(
+                      _fechaInstalacion == null
+                          ? 'Fecha de instalación'
+                          : '${_fechaInstalacion!.day}/${_fechaInstalacion!.month}/${_fechaInstalacion!.year}',
+                    ),
+                  ),
+                ),
+                const SizedBox(height: ReparaSpace.s2),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _elegirFecha(esGarantia: true),
+                    icon: const Icon(Icons.shield_outlined, size: 18),
+                    label: Text(
+                      _garantiaHasta == null
+                          ? 'Garantía hasta (opcional)'
+                          : '${_garantiaHasta!.day}/${_garantiaHasta!.month}/${_garantiaHasta!.year}',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: ReparaSpace.s4),
+            SeccionFormulario(
+              titulo: 'Revisión periódica (opcional)',
+              subtitulo:
+                  'Repara te avisará cuando toque revisarlo. Puedes escribir el número a mano o pedirle una sugerencia a la IA según el tipo de elemento.',
+              children: [
+                TextField(
+                  controller: _intervaloCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Revisar cada cuántos meses',
+                  ),
+                ),
+                const SizedBox(height: ReparaSpace.s2),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _sugiriendo ? null : _sugerirIntervalo,
+                    icon: _sugiriendo
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.auto_awesome_outlined, size: 18),
+                    label: const Text('Sugerir con IA'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: ReparaSpace.s6),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _guardando ? null : _guardar,
+                child: _guardando
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Text(editando ? 'Guardar cambios' : 'Guardar elemento'),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -602,8 +602,19 @@ class _ResumenCasa extends StatelessWidget {
         ElementoService.conGarantiaProximaAVencer(casa.id),
         ElementoService.conRevisionPendiente(casa.id),
         ElementoService.registrosConTrabajoPendiente(casa.id),
+        ElementoService.conGarantia(casa.id),
+        ElementoService.conMantenimientoConfigurado(casa.id),
       ]),
       builder: (context, snapshot) {
+        // "garantias"/"revisiones" (próximas a vencer/pendientes) deciden el
+        // aviso urgente y el resaltado de color de la tarjeta -- el NÚMERO
+        // que se ve en la tarjeta usa en cambio el total real guardado
+        // (CEO, noviembre 2026: "aunque tengas garantías/revisiones,
+        // aparece un 0 en ambas a no ser que te acerques a la fecha" --
+        // antes el número Y el resaltado venían de la misma lista
+        // "próxima", así que una garantía guardada para dentro de mucho no
+        // se reflejaba en absoluto en la tarjeta, aunque al entrar sí
+        // aparecía en "Todas las garantías"/"Todo el mantenimiento").
         final garantias = (snapshot.data?[0] as List<Elemento>?) ?? const [];
         final revisiones = (snapshot.data?[1] as List<Elemento>?) ?? const [];
         final pendientes =
@@ -618,6 +629,10 @@ class _ResumenCasa extends StatelessWidget {
                   })
                 >?) ??
             const [];
+        final garantiasTotal =
+            (snapshot.data?[3] as List<Elemento>?) ?? const [];
+        final revisionesTotal =
+            (snapshot.data?[4] as List<Elemento>?) ?? const [];
         final avisoMasUrgente = _avisoMasUrgente(garantias, revisiones);
 
         return Column(
@@ -629,26 +644,22 @@ class _ResumenCasa extends StatelessWidget {
                   child: _StatCard(
                     icon: Icons.shield_outlined,
                     iconColor: context.colors.brand,
-                    numero: garantias.length,
+                    numero: garantiasTotal.length,
                     etiqueta: 'Garantías',
                     destacado: garantias.isNotEmpty,
-                    onTap: () async {
-                      final elementos = await ElementoService.conGarantia(
-                        casa.id,
-                      );
-                      if (context.mounted) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => GarantiasProximasScreen(
-                              casa: casa,
-                              elementos: elementos,
-                              titulo: 'Todas las garantías',
-                            ),
-                          ),
-                        );
-                      }
-                    },
+                    // Ya tenemos el total cargado arriba (garantiasTotal) --
+                    // reutilizarlo evita repetir la misma consulta a
+                    // Firestore que ya se acaba de resolver.
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => GarantiasProximasScreen(
+                          casa: casa,
+                          elementos: garantiasTotal,
+                          titulo: 'Todas las garantías',
+                        ),
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: ReparaSpace.s2),
@@ -656,27 +667,20 @@ class _ResumenCasa extends StatelessWidget {
                   child: _StatCard(
                     icon: Icons.build_circle_outlined,
                     iconColor: context.colors.warning,
-                    numero: revisiones.length,
+                    numero: revisionesTotal.length,
                     etiqueta: 'Revisión',
                     destacado: revisiones.isNotEmpty,
-                    onTap: () async {
-                      final elementos =
-                          await ElementoService.conMantenimientoConfigurado(
-                            casa.id,
-                          );
-                      if (context.mounted) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => RevisionesPendientesScreen(
-                              casa: casa,
-                              elementos: elementos,
-                              titulo: 'Todo el mantenimiento',
-                            ),
-                          ),
-                        );
-                      }
-                    },
+                    // Ya tenemos el total cargado arriba (revisionesTotal).
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => RevisionesPendientesScreen(
+                          casa: casa,
+                          elementos: revisionesTotal,
+                          titulo: 'Todo el mantenimiento',
+                        ),
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: ReparaSpace.s2),

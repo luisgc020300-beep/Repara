@@ -38,6 +38,7 @@ import 'package:repara_core/registro.dart';
 import 'package:repara_core/registro_service.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_ui/app_error.dart';
+import 'package:repara_ui/confirmar_salida_formulario.dart';
 import 'package:repara_ui/seccion_formulario.dart';
 import '../models/casa.dart';
 import '../widgets/selector_profesional_field.dart';
@@ -85,6 +86,11 @@ class _NuevoRegistroScreenState extends State<_NuevoRegistroScreen> {
   final _plazoFrecuenciaCtrl = TextEditingController();
   final _plazoImporteCtrl = TextEditingController();
   DateTime _fecha = DateTime.now();
+  // Para poder comparar más tarde si el usuario llegó a tocar la fecha --
+  // comparar contra un nuevo DateTime.now() en ese momento nunca sería
+  // igual (difieren los milisegundos), así que se guarda el valor inicial
+  // real en vez de repetir la llamada.
+  late final DateTime _fechaInicial = _fecha;
   bool _esConProfesional = false;
   bool _pagaAPlazos = false;
   // CEO, noviembre 2026: "a veces el trabajo no está hecho al registrarlo,
@@ -94,6 +100,11 @@ class _NuevoRegistroScreenState extends State<_NuevoRegistroScreen> {
   // (pendiente de presupuesto/invitación) por su propio flujo.
   bool _yaRealizado = true;
   bool _guardando = false;
+  // Se pone a true justo antes del pop/pushReplacement que sigue a un
+  // guardado con éxito -- sin esto, ConfirmarSalidaFormulario interceptaría
+  // también ESE pop (al bloquear canPop incondicionalmente) y preguntaría
+  // "¿Salir sin guardar?" aunque los datos ya estén guardados de verdad.
+  bool _guardadoConExito = false;
 
   /// Eco visual en el propio campo del mismo error que ya muestra el
   /// snackbar de [AppError.show] -- mismo criterio que nuevo_contacto_
@@ -172,6 +183,7 @@ class _NuevoRegistroScreenState extends State<_NuevoRegistroScreen> {
       // un doble toque dispare esta rama dos veces (ver onPressed más abajo).
       unawaited(AnalyticsService.workCreated(tipo: _tipo.name));
       if (!mounted) return;
+      _guardadoConExito = true;
       if (_esConProfesional) {
         // Con profesional, el siguiente paso casi siempre es invitar a uno
         // (CEO, noviembre 2026: "es el doble de trabajo pulsar esa opción y
@@ -217,205 +229,223 @@ class _NuevoRegistroScreenState extends State<_NuevoRegistroScreen> {
     if (elegida != null) setState(() => _fecha = elegida);
   }
 
+  bool _hayCambiosSinGuardar() =>
+      !_guardadoConExito &&
+      (_tituloCtrl.text.trim().isNotEmpty ||
+          _descripcionCtrl.text.trim().isNotEmpty ||
+          _costeCtrl.text.trim().isNotEmpty ||
+          _profesionales.isNotEmpty ||
+          _plazoFrecuenciaCtrl.text.trim().isNotEmpty ||
+          _plazoImporteCtrl.text.trim().isNotEmpty ||
+          _esConProfesional ||
+          _pagaAPlazos ||
+          !_yaRealizado ||
+          _tipo != TipoRegistro.reparacion ||
+          _fecha != _fechaInicial);
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Añadir evento')),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(ReparaSpace.s4),
-          children: [
-            Text(
-              'Añade un evento a mano',
-              style: Theme.of(context).textTheme.displaySmall,
-            ),
-            const SizedBox(height: ReparaSpace.s1),
-            Text(
-              'Rellena los datos del trabajo o incidencia.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: ReparaSpace.s4),
-            SeccionFormulario(
-              titulo: 'Tipo de evento',
-              children: [
-                Wrap(
-                  spacing: ReparaSpace.s2,
-                  runSpacing: ReparaSpace.s2,
-                  children: TipoRegistro.values.map((t) {
-                    return ChoiceChip(
-                      label: Text(nombreTipoRegistro(t)),
-                      selected: _tipo == t,
-                      onSelected: (_) => setState(() => _tipo = t),
-                    );
-                  }).toList(),
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('¿Lo hace un profesional de Repara Pro?'),
-                  subtitle: const Text(
-                    'Solo si vas a invitar a alguien con cuenta en Repara Pro: '
-                    'podrá enviarte un presupuesto formal, cobrar y confirmar '
-                    'cuando termine. Lo invitas justo después de guardar '
-                    'este evento, no en esta pantalla.',
+    return ConfirmarSalidaFormulario(
+      hayCambiosSinGuardar: _hayCambiosSinGuardar,
+      child: Scaffold(
+        appBar: AppBar(title: const Text('Añadir evento')),
+        body: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.all(ReparaSpace.s4),
+            children: [
+              Text(
+                'Añade un evento a mano',
+                style: Theme.of(context).textTheme.displaySmall,
+              ),
+              const SizedBox(height: ReparaSpace.s1),
+              Text(
+                'Rellena los datos del trabajo o incidencia.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: ReparaSpace.s4),
+              SeccionFormulario(
+                titulo: 'Tipo de evento',
+                children: [
+                  Wrap(
+                    spacing: ReparaSpace.s2,
+                    runSpacing: ReparaSpace.s2,
+                    children: TipoRegistro.values.map((t) {
+                      return ChoiceChip(
+                        label: Text(nombreTipoRegistro(t)),
+                        selected: _tipo == t,
+                        onSelected: (_) => setState(() => _tipo = t),
+                      );
+                    }).toList(),
                   ),
-                  value: _esConProfesional,
-                  onChanged: (v) => setState(() => _esConProfesional = v),
-                ),
-              ],
-            ),
-            const SizedBox(height: ReparaSpace.s4),
-            SeccionFormulario(
-              titulo: 'Información del evento',
-              children: [
-                TextField(
-                  controller: _tituloCtrl,
-                  decoration: InputDecoration(
-                    labelText: 'Título (p.ej. Reparación de fuga)',
-                    errorText: _mostrarErrorTitulo ? 'Obligatorio' : null,
-                  ),
-                  onChanged: (_) {
-                    if (_mostrarErrorTitulo) {
-                      setState(() => _mostrarErrorTitulo = false);
-                    }
-                  },
-                ),
-                const SizedBox(height: ReparaSpace.s3),
-                TextField(
-                  controller: _descripcionCtrl,
-                  minLines: 1,
-                  maxLines: 4,
-                  decoration: const InputDecoration(
-                    labelText: 'Descripción (opcional)',
-                  ),
-                ),
-                const SizedBox(height: ReparaSpace.s3),
-                Text(
-                  'Fecha',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: context.colors.inkMuted,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                OutlinedButton.icon(
-                  onPressed: _elegirFecha,
-                  icon: const Icon(Icons.calendar_today_outlined, size: 16),
-                  label: Text('${_fecha.day}/${_fecha.month}/${_fecha.year}'),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Cuándo ocurrió o se hizo el trabajo -- no es la fecha de garantía.',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: context.colors.inkMuted,
-                  ),
-                ),
-                if (!_esConProfesional) ...[
-                  const SizedBox(height: ReparaSpace.s2),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('¿Ya se ha realizado el trabajo?'),
+                    title: const Text('¿Lo hace un profesional de Repara Pro?'),
                     subtitle: const Text(
-                      'Desactívalo si todavía está pendiente de hacer',
+                      'Solo si vas a invitar a alguien con cuenta en Repara Pro: '
+                      'podrá enviarte un presupuesto formal, cobrar y confirmar '
+                      'cuando termine. Lo invitas justo después de guardar '
+                      'este evento, no en esta pantalla.',
                     ),
-                    value: _yaRealizado,
-                    onChanged: (v) => setState(() => _yaRealizado = v),
-                  ),
-                  const SizedBox(height: ReparaSpace.s3),
-                  SelectorProfesionalesField(
-                    casaId: widget.casa.id,
-                    seleccionados: _profesionales,
-                    onChanged: (v) => setState(() => _profesionales = v),
+                    value: _esConProfesional,
+                    onChanged: (v) => setState(() => _esConProfesional = v),
                   ),
                 ],
-              ],
-            ),
-            const SizedBox(height: ReparaSpace.s4),
-            if (!_esConProfesional)
+              ),
+              const SizedBox(height: ReparaSpace.s4),
               SeccionFormulario(
-                titulo: 'Información económica',
+                titulo: 'Información del evento',
                 children: [
                   TextField(
-                    controller: _costeCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
+                    controller: _tituloCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Título (p.ej. Reparación de fuga)',
+                      errorText: _mostrarErrorTitulo ? 'Obligatorio' : null,
                     ),
-                    decoration: const InputDecoration(labelText: 'Coste (€)'),
+                    onChanged: (_) {
+                      if (_mostrarErrorTitulo) {
+                        setState(() => _mostrarErrorTitulo = false);
+                      }
+                    },
                   ),
                   const SizedBox(height: ReparaSpace.s3),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('¿Se paga a plazos?'),
-                    subtitle: const Text(
-                      'Para calcular cuándo toca el próximo pago',
+                  TextField(
+                    controller: _descripcionCtrl,
+                    minLines: 1,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      labelText: 'Descripción (opcional)',
                     ),
-                    value: _pagaAPlazos,
-                    onChanged: (v) => setState(() => _pagaAPlazos = v),
                   ),
-                  if (_pagaAPlazos)
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _plazoFrecuenciaCtrl,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              labelText: 'Cada cuántos meses',
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: ReparaSpace.s3),
-                        Expanded(
-                          child: TextField(
-                            controller: _plazoImporteCtrl,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            decoration: const InputDecoration(
-                              labelText: 'Importe por plazo (€)',
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                ],
-              )
-            else
-              SeccionFormulario(
-                titulo: 'Información económica',
-                children: [
+                  const SizedBox(height: ReparaSpace.s3),
                   Text(
-                    'El coste y el profesional de este trabajo se fijan '
-                    'después, desde el propio evento: invita al profesional '
-                    'y, cuando acepte, podrá enviarte un presupuesto.',
-                    style: Theme.of(context).textTheme.bodySmall,
+                    'Fecha',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: context.colors.inkMuted,
+                    ),
                   ),
+                  const SizedBox(height: 4),
+                  OutlinedButton.icon(
+                    onPressed: _elegirFecha,
+                    icon: const Icon(Icons.calendar_today_outlined, size: 16),
+                    label: Text('${_fecha.day}/${_fecha.month}/${_fecha.year}'),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Cuándo ocurrió o se hizo el trabajo -- no es la fecha de garantía.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: context.colors.inkMuted,
+                    ),
+                  ),
+                  if (!_esConProfesional) ...[
+                    const SizedBox(height: ReparaSpace.s2),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('¿Ya se ha realizado el trabajo?'),
+                      subtitle: const Text(
+                        'Desactívalo si todavía está pendiente de hacer',
+                      ),
+                      value: _yaRealizado,
+                      onChanged: (v) => setState(() => _yaRealizado = v),
+                    ),
+                    const SizedBox(height: ReparaSpace.s3),
+                    SelectorProfesionalesField(
+                      casaId: widget.casa.id,
+                      seleccionados: _profesionales,
+                      onChanged: (v) => setState(() => _profesionales = v),
+                    ),
+                  ],
                 ],
               ),
-            const SizedBox(height: ReparaSpace.s6),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: _guardando ? null : _guardar,
-                child: _guardando
-                    ? SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: context.colors.brandOn,
-                        ),
-                      )
-                    : const Text('Guardar'),
+              const SizedBox(height: ReparaSpace.s4),
+              if (!_esConProfesional)
+                SeccionFormulario(
+                  titulo: 'Información económica',
+                  children: [
+                    TextField(
+                      controller: _costeCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: const InputDecoration(labelText: 'Coste (€)'),
+                    ),
+                    const SizedBox(height: ReparaSpace.s3),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('¿Se paga a plazos?'),
+                      subtitle: const Text(
+                        'Para calcular cuándo toca el próximo pago',
+                      ),
+                      value: _pagaAPlazos,
+                      onChanged: (v) => setState(() => _pagaAPlazos = v),
+                    ),
+                    if (_pagaAPlazos)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _plazoFrecuenciaCtrl,
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                labelText: 'Cada cuántos meses',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: ReparaSpace.s3),
+                          Expanded(
+                            child: TextField(
+                              controller: _plazoImporteCtrl,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
+                              decoration: const InputDecoration(
+                                labelText: 'Importe por plazo (€)',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
+                )
+              else
+                SeccionFormulario(
+                  titulo: 'Información económica',
+                  children: [
+                    Text(
+                      'El coste y el profesional de este trabajo se fijan '
+                      'después, desde el propio evento: invita al profesional '
+                      'y, cuando acepte, podrá enviarte un presupuesto.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              const SizedBox(height: ReparaSpace.s6),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: _guardando ? null : _guardar,
+                  child: _guardando
+                      ? SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: context.colors.brandOn,
+                          ),
+                        )
+                      : const Text('Guardar'),
+                ),
               ),
-            ),
-            const SizedBox(height: ReparaSpace.s2),
-            SizedBox(
-              width: double.infinity,
-              child: TextButton(
-                onPressed: _guardando ? null : () => Navigator.pop(context),
-                child: const Text('Cancelar'),
+              const SizedBox(height: ReparaSpace.s2),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: _guardando ? null : () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
