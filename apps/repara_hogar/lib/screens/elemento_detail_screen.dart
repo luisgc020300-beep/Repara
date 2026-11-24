@@ -844,6 +844,12 @@ class _AccionesElementoState extends State<_AccionesElemento> {
     try {
       final ubicacion = await _ubicacion();
       final trabajos = await _trabajosConDetalle();
+      // Documentación vinculada (Bloque F del expediente, noviembre 2026) --
+      // mismo stream que ya usa la propia ficha para la sección "Documentos".
+      final documentos = await DocumentoService.streamDocumentos(
+        widget.casa.id,
+        elementoId: widget.elemento.id,
+      ).first;
       if (!context.mounted) return;
       await ElementoResumenPdf.descargar(
         context,
@@ -851,6 +857,7 @@ class _AccionesElementoState extends State<_AccionesElemento> {
         elemento: widget.elemento,
         ubicacion: ubicacion,
         trabajos: trabajos,
+        documentos: documentos,
       );
     } catch (e, st) {
       if (context.mounted) {
