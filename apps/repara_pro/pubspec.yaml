@@ -31,6 +31,9 @@ dependencies:
   # subidos por el profesional, ver DocumentoService en repara_core) --
   # misma versión que la app principal.
   firebase_storage: ^13.0.5
+  # Notificaciones push (FCM, noviembre 2026) -- misma versión que la app
+  # principal (ver lib/services/fcm_service.dart).
+  firebase_messaging: ^16.0.3
   intl: ^0.20.2
   # trabajo_profesional_sheet.dart/inicio_pro_tab.dart (código de invitación
   # a compartir) -- misma versión que la app principal.
@@ -66,6 +69,11 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   fake_cloud_firestore: ^4.1.0
   flutter_launcher_icons: ^0.14.4
+  # Tests de ayuda_primer_uso_pro_test.dart y otros que simulan el estado
+  # "ya visto"/"nunca visto" de PrimerUsoService (repara_core ya lo declara,
+  # aquí explícito por el mismo motivo que local_auth/geolocator en
+  # dependencies arriba).
+  shared_preferences: ^2.3.0
 
 # Icono propio de Pro (CEO, noviembre 2026): llave inglesa geométrica de
 # doble boca, mismo lenguaje de trazos rectilíneos que el icono de

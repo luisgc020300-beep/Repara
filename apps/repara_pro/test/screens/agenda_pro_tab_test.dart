@@ -12,12 +12,23 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:repara_pro/screens/agenda_pro_tab.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_core/cita_service.dart';
+import 'package:repara_core/primer_uso_service.dart';
 import 'package:repara_core/profesional_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 const _uid = 'pro-1';
 
 void main() {
   setUpAll(() => initializeDateFormatting('es_ES'));
+
+  // Sin esto, el primer toque en "+" mostraría el diálogo de ayuda "¿Para
+  // qué sirve la Agenda?" (auditoría de calidad, noviembre 2026) en vez de
+  // abrir la hoja directamente -- este archivo no es el que prueba ese
+  // diálogo.
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    await PrimerUsoService.marcarVisto('nueva_cita_pro');
+  });
 
   tearDown(() {
     CitaService.debugFirestoreOverride = null;

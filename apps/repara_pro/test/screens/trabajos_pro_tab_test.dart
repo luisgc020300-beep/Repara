@@ -229,4 +229,79 @@ void main() {
       expect(find.text('Trabajo privado sin invitación'), findsNothing);
     },
   );
+
+  testWidgets(
+    '"Por cliente" muestra el estado vacío cuando no hay clientes compartidos que mostrar',
+    (tester) async {
+      // Solo un trabajo privado, ningún registrosProRefs compartido con
+      // REPARA Hogar -- el caso exacto que dejaba "Por cliente" en blanco
+      // (auditoría de calidad, noviembre 2026): "todos" (compartidos) vacío
+      // no activa el estado vacío global porque "privados" no lo está.
+      final db = FakeFirebaseFirestore();
+      await db.collection('users').doc(_uid).set({'registrosProRefs': []});
+      ProfesionalService.debugFirestoreOverride = db;
+      ProfesionalService.debugUidOverride = _uid;
+      RegistroService.debugFirestoreOverride = db;
+      PagoService.debugFirestoreOverride = db;
+      PresupuestoService.debugFirestoreOverride = db;
+      CambioAlcanceService.debugFirestoreOverride = db;
+      TrabajoProfesionalService.debugFirestoreOverride = db;
+      TrabajoProfesionalService.debugUidOverride = _uid;
+
+      await TrabajoProfesionalService.crear(
+        const TrabajoProfesional(
+          id: '',
+          clienteId: 'cliente-1',
+          clienteNombre: 'Cliente privado',
+          titulo: 'Trabajo privado sin invitación',
+          tipo: TipoRegistro.reparacion,
+          estado: EstadoTrabajoProfesional.abierto,
+        ),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildReparaLightTheme(),
+          home: const TrabajosProTab(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Por cliente'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ningún trabajo con este filtro.'), findsOneWidget);
+      expect(find.byIcon(Icons.filter_alt_off_outlined), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    '"Por cliente" sigue mostrando los clientes agrupados cuando sí hay trabajos compartidos',
+    (tester) async {
+      final db = await _seed();
+      ProfesionalService.debugFirestoreOverride = db;
+      ProfesionalService.debugUidOverride = _uid;
+      RegistroService.debugFirestoreOverride = db;
+      PagoService.debugFirestoreOverride = db;
+      PresupuestoService.debugFirestoreOverride = db;
+      CambioAlcanceService.debugFirestoreOverride = db;
+      TrabajoProfesionalService.debugFirestoreOverride = db;
+      TrabajoProfesionalService.debugUidOverride = _uid;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildReparaLightTheme(),
+          home: const TrabajosProTab(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Por cliente'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ningún trabajo con este filtro.'), findsNothing);
+      expect(find.text('Casa Norte'), findsOneWidget);
+      expect(find.text('Casa Sur'), findsOneWidget);
+    },
+  );
 }

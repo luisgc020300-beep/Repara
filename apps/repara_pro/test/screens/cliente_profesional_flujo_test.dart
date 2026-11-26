@@ -16,7 +16,9 @@ import 'package:repara_pro/services/trabajo_profesional_service.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_core/cambio_alcance_service.dart';
 import 'package:repara_core/presupuesto_service.dart';
+import 'package:repara_core/primer_uso_service.dart';
 import 'package:repara_core/profesional_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 const _uid = 'pro-1';
 
@@ -51,6 +53,15 @@ Future<FakeFirebaseFirestore> _crearDbVacia() async {
 
 void main() {
   tearDown(_limpiarOverrides);
+  // Sin esto, el primer toque en "+" de cada test mostraría el diálogo de
+  // ayuda "¿Qué es un cliente privado?" (ver trabajos_pro_tab.dart y
+  // clientes_pro_tab.dart, auditoría de calidad noviembre 2026) en vez de
+  // abrir la hoja directamente -- este archivo no es el que prueba ese
+  // diálogo (ver ayuda_primer_uso_pro_test.dart).
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    await PrimerUsoService.marcarVisto('nuevo_cliente_privado');
+  });
 
   testWidgets(
     'crear un cliente privado lo muestra en la lista con la insignia PRIVADO',
@@ -58,7 +69,10 @@ void main() {
       await _crearDbVacia();
 
       await tester.pumpWidget(
-        MaterialApp(theme: buildReparaLightTheme(), home: const ClientesProTab()),
+        MaterialApp(
+          theme: buildReparaLightTheme(),
+          home: const ClientesProTab(),
+        ),
       );
       await tester.pumpAndSettle();
 
@@ -83,7 +97,10 @@ void main() {
       await _crearDbVacia();
 
       await tester.pumpWidget(
-        MaterialApp(theme: buildReparaLightTheme(), home: const ClientesProTab()),
+        MaterialApp(
+          theme: buildReparaLightTheme(),
+          home: const ClientesProTab(),
+        ),
       );
       await tester.pumpAndSettle();
 
@@ -99,7 +116,10 @@ void main() {
       await tester.tap(find.text('María López'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Sin trabajos todavía con este cliente.'), findsOneWidget);
+      expect(
+        find.text('Sin trabajos todavía con este cliente.'),
+        findsOneWidget,
+      );
 
       await tester.tap(find.text('Nuevo trabajo'));
       await tester.pumpAndSettle();

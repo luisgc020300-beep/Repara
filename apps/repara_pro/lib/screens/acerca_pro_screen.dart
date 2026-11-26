@@ -11,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_ui/app_error.dart';
 import 'package:repara_ui/ios_list.dart';
+import 'guia_uso_pro_screen.dart';
 
 // Misma URL que Hogar y el monolito -- un único documento legal para todo
 // REPARA, con dos secciones (#privacidad / #terminos).
@@ -92,6 +93,16 @@ class _AcercaProScreenState extends State<AcercaProScreen> {
           IosSection(
             header: 'Ayuda',
             rows: [
+              IosRow(
+                icon: Icons.menu_book_outlined,
+                iconColor: context.colors.brand,
+                title: 'Guía de uso',
+                subtitle: 'Qué hace la app y preguntas frecuentes',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const GuiaUsoProScreen()),
+                ),
+              ),
               IosRow(
                 icon: Icons.email_outlined,
                 iconColor: context.colors.brand,

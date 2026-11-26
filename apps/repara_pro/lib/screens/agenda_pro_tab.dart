@@ -18,12 +18,22 @@
 // (context.colors.brandStrong) -- introducir un acento nuevo solo en esta
 // pantalla rompería la consistencia visual del resto de la app (Fase 5).
 //
-// IMPORTANTE -- limitación documentada a propósito: no hay recordatorios
-// push. No existe ninguna infraestructura de notificaciones programadas en
-// el proyecto (solo reactivas a un evento, ver functions/index.js) --
-// construirla exigiría Cloud Scheduler, con su propia implicación de coste,
-// y el encargo pide explícitamente no fingir notificaciones que no
-// funcionan de verdad. Queda documentado como trabajo futuro, no simulado.
+// IMPORTANTE -- estado real de los recordatorios (revisado noviembre 2026,
+// auditoría de mensajes): la agenda en sí no dispara ningún aviso, pero la
+// infraestructura SÍ existe en el backend -- enviarRecordatorios
+// (functions/index.js), una Cloud Function programada (Cloud Scheduler,
+// cada 30 minutos) que sí cubre, entre otras cosas, las citas marcadas
+// "Compartir con el cliente" (más abajo) dentro de una ventana de 2 horas
+// antes de la hora programada, usando el mismo canal que el resto de
+// notificaciones de la app (interna siempre, más push FCM si el usuario
+// tiene un token registrado). Lo que sigue pendiente de verdad no es la
+// infraestructura, sino probarla en producción: esta sesión nunca ha
+// desplegado Cloud Functions, así que enviarRecordatorios solo se ha
+// probado contra el emulador con una fecha inyectada (functions-tests/
+// recordatorios.test.js), nunca contra el paso real del tiempo ni el
+// scheduler real. La entrega de la push en un dispositivo real depende
+// además de terminar de configurar y probar FCM/APNs, igual que el resto
+// de notificaciones push de la app.
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:repara_core/cita.dart';
@@ -34,6 +44,7 @@ import 'package:repara_core/profesional_service.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_ui/app_dialog.dart';
 import 'package:repara_ui/app_error.dart';
+import 'package:repara_ui/ayuda_primer_uso.dart';
 import '../widgets/boton_ajustes_pro.dart';
 import 'package:repara_ui/ios_list.dart';
 import 'package:repara_ui/scroll_to_top_button.dart';
@@ -92,7 +103,24 @@ class _AgendaProTabState extends State<AgendaProTab> {
     _vista = _VistaAgenda.dia;
   });
 
+  // Ayuda contextual solo la primera vez que se pulsa este botón en este
+  // dispositivo (auditoría de calidad, noviembre 2026 -- mismo mecanismo
+  // que ya usa Hogar, PrimerUsoService + mostrarAyudaPrimerUso). Un único
+  // sitio para ambos disparadores (el FAB y el CTA del estado vacío de un
+  // día), porque los dos llaman a este mismo método.
   Future<void> _nuevaCita() async {
+    await mostrarAyudaPrimerUso(
+      context,
+      clave: 'nueva_cita_pro',
+      icon: Icons.event_outlined,
+      titulo: '¿Para qué sirve la Agenda?',
+      mensaje:
+          'Tu planificación personal -- visitas, citas, cualquier fecha '
+          'importante. Puedes vincularla a un trabajo y, si marcas '
+          '"Compartir con el cliente", la verá también en su REPARA '
+          'Hogar y le llegará un aviso poco antes de la hora.',
+    );
+    if (!mounted) return;
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,

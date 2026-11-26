@@ -27,6 +27,7 @@ import '../models/cliente_profesional.dart';
 import '../services/cliente_profesional_service.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_ui/app_error.dart';
+import 'package:repara_ui/ayuda_primer_uso.dart';
 import '../widgets/boton_ajustes_pro.dart';
 import 'package:repara_ui/ios_list.dart';
 import 'package:repara_ui/scroll_to_top_button.dart';
@@ -61,6 +62,26 @@ class _ClientesProTabState extends State<ClientesProTab> {
     super.dispose();
   }
 
+  // Ayuda contextual solo la primera vez que se pulsa este botón en este
+  // dispositivo (auditoría de calidad, noviembre 2026 -- mismo mecanismo
+  // que ya usa Hogar, PrimerUsoService + mostrarAyudaPrimerUso).
+  Future<void> _nuevoClientePrivado() async {
+    await mostrarAyudaPrimerUso(
+      context,
+      clave: 'nuevo_cliente_privado',
+      icon: Icons.person_add_outlined,
+      titulo: '¿Qué es un cliente privado?',
+      mensaje:
+          'Un cliente que anotas tú mismo, para alguien que todavía no '
+          'tiene REPARA Hogar -- guardas su nombre y contacto para llevar '
+          'organizados sus trabajos. Se distingue con la insignia '
+          '"PRIVADO" de los clientes que vienen de una invitación ya '
+          'aceptada.',
+    );
+    if (!mounted) return;
+    await mostrarEditorClienteProfesional(context);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -89,7 +110,7 @@ class _ClientesProTabState extends State<ClientesProTab> {
         actions: const [BotonAjustesPro()],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => mostrarEditorClienteProfesional(context),
+        onPressed: _nuevoClientePrivado,
         tooltip: 'Nuevo cliente privado',
         child: const Icon(Icons.add),
       ),

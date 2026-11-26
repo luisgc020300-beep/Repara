@@ -12,6 +12,7 @@
 // Firestore, el propio stream pasa al shell solo.
 import 'dart:async';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
 import 'package:repara_core/analytics_service.dart';
@@ -19,6 +20,7 @@ import 'package:repara_core/design_tokens.dart';
 import 'package:repara_core/profesional_service.dart';
 import 'package:repara_ui/app_error.dart';
 
+import '../services/fcm_service.dart';
 import 'repara_pro_shell_screen.dart';
 
 class ActivarProfesionalGateScreen extends StatefulWidget {
@@ -31,7 +33,22 @@ class ActivarProfesionalGateScreen extends StatefulWidget {
 
 class _ActivarProfesionalGateScreenState
     extends State<ActivarProfesionalGateScreen> {
+  // "late final", no una llamada suelta dentro de build(): si no, cada
+  // setState (p.ej. al pulsar "Cerrar sesión" o "Activar cuenta
+  // profesional") creaba un stream nuevo en cada rebuild, y el StreamBuilder
+  // de abajo, al ver una instancia distinta, volvía a ConnectionState.waiting
+  // y mostraba de golpe el Scaffold de carga sin AppBar ni botones -- un
+  // parpadeo real detectado al añadir el botón de cerrar sesión (auditoría
+  // de calidad, noviembre 2026).
+  late final Stream<bool> _esProfesionalStream =
+      ProfesionalService.streamEsProfesional();
   bool _activando = false;
+  // Quien llega aquí con la cuenta equivocada (CEO, auditoría de calidad
+  // noviembre 2026) no tenía ninguna salida -- la única forma de llegar a
+  // Ajustes y cerrar sesión desde ahí era activar el modo profesional
+  // primero. Mismo criterio de botón que onboarding_casa_screen.dart en
+  // Hogar (olvidar el token FCM de este dispositivo antes del signOut).
+  bool _cerrandoSesion = false;
 
   Future<void> _activar() async {
     if (_activando) return;
@@ -49,16 +66,58 @@ class _ActivarProfesionalGateScreenState
     }
   }
 
+  Future<void> _cerrarSesion() async {
+    if (_cerrandoSesion) return;
+    setState(() => _cerrandoSesion = true);
+    try {
+      await FcmService.olvidarEsteDispositivo();
+      await FirebaseAuth.instance.signOut();
+    } catch (e, st) {
+      // FirebaseCrashlytics.instance en sí mismo puede lanzar (p.ej.
+      // "[core/no-app]" en un test de widgets sin Firebase.initializeApp())
+      // -- sin este segundo try/catch, ese fallo de "reportar el error" se
+      // escapaba de este catch y rompía el árbol de widgets entero (mismo
+      // criterio que FcmService._registrarError).
+      try {
+        await FirebaseCrashlytics.instance.recordError(e, st);
+      } catch (_) {
+        // Ver comentario de arriba -- un fallo al reportar el error nunca
+        // debe propagarse.
+      }
+      if (mounted) {
+        AppError.show(context, 'No se pudo cerrar la sesión.');
+      }
+    } finally {
+      if (mounted) setState(() => _cerrandoSesion = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<bool>(
-      stream: ProfesionalService.streamEsProfesional(),
+      stream: _esProfesionalStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
         }
         if (snapshot.data == true) return const ReparaProShellScreen();
         return Scaffold(
+          appBar: AppBar(
+            actions: [
+              TextButton(
+                onPressed: _cerrandoSesion ? null : _cerrarSesion,
+                child: _cerrandoSesion
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Cerrar sesión'),
+              ),
+            ],
+          ),
           body: SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(ReparaSpace.s6),

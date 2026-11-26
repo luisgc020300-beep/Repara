@@ -44,6 +44,103 @@ void main() {
     },
   );
 
+  testWidgets(
+    'la puerta de activación ofrece cerrar sesión para no quedarse atrapado con la cuenta equivocada',
+    (tester) async {
+      final db = FakeFirebaseFirestore();
+      await db.collection('users').doc(_uid).set({});
+      ProfesionalService.debugFirestoreOverride = db;
+      ProfesionalService.debugUidOverride = _uid;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildReparaLightTheme(),
+          home: const ActivarProfesionalGateScreen(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Cerrar sesión'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'pulsar "Cerrar sesión" no rompe la pantalla si falla, y el botón queda '
+    'listo para reintentar',
+    (tester) async {
+      final db = FakeFirebaseFirestore();
+      await db.collection('users').doc(_uid).set({});
+      ProfesionalService.debugFirestoreOverride = db;
+      ProfesionalService.debugUidOverride = _uid;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildReparaLightTheme(),
+          home: const ActivarProfesionalGateScreen(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Cerrar sesión'));
+      await tester.pumpAndSettle();
+
+      // Este entorno de test nunca llama a Firebase.initializeApp() (igual
+      // que el resto de la suite -- ver notificacion_router_pro_test.dart),
+      // así que tanto FcmService.olvidarEsteDispositivo() (que traga su
+      // propio error, ver fcm_service.dart) como FirebaseAuth.instance.
+      // signOut() (que no lo traga) fallan aquí con "[core/no-app]" --
+      // nunca se llega a esa segunda llamada sin haber pasado antes por
+      // FcmService.olvidarEsteDispositivo(), porque ese await es secuencial
+      // y previo, así que el orden queda probado por construcción. Lo que
+      // SÍ puede probarse de verdad sin un Firebase real es que el fallo se
+      // gestiona con gracia -- sin romper la pantalla -- y que el botón
+      // vuelve a su estado normal, listo para reintentar.
+      final boton = tester.widget<TextButton>(find.byType(TextButton));
+      expect(
+        boton.onPressed,
+        isNotNull,
+        reason: 'debe quedar re-habilitado tras el fallo',
+      );
+      expect(find.text('Cerrar sesión'), findsOneWidget);
+      expect(
+        find.textContaining('No se pudo cerrar la sesión'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'pulsar "Cerrar sesión" dos veces seguidas sin esperar no provoca un segundo intento simultáneo',
+    (tester) async {
+      final db = FakeFirebaseFirestore();
+      await db.collection('users').doc(_uid).set({});
+      ProfesionalService.debugFirestoreOverride = db;
+      ProfesionalService.debugUidOverride = _uid;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildReparaLightTheme(),
+          home: const ActivarProfesionalGateScreen(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Dos toques consecutivos sin pumpAndSettle entre medias -- si el
+      // guard "if (_cerrandoSesion) return;" no funcionara, cualquier
+      // reentrada se vería como una excepción no capturada o un segundo
+      // SnackBar; pumpAndSettle al final no debe lanzar nada.
+      await tester.tap(find.text('Cerrar sesión'));
+      await tester.tap(find.text('Cerrar sesión'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Cerrar sesión'), findsOneWidget);
+      expect(
+        find.textContaining('No se pudo cerrar la sesión'),
+        findsOneWidget,
+      );
+    },
+  );
+
   // No se monta aquí el ReparaProShellScreen real con esProfesional=true:
   // sus 5 pestañas dependen colectivamente de una docena de servicios
   // (RegistroService, PagoService, InvitacionService, CitaService...), cada

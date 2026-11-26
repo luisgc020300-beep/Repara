@@ -26,6 +26,7 @@ import '../models/trabajo_profesional.dart';
 import '../services/trabajo_profesional_service.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_ui/app_error.dart';
+import 'package:repara_ui/ayuda_primer_uso.dart';
 import '../widgets/boton_ajustes_pro.dart';
 import 'package:repara_ui/ios_list.dart';
 import 'package:repara_ui/scroll_to_top_button.dart';
@@ -89,6 +90,28 @@ class _TrabajosProTabState extends State<TrabajosProTab> {
     super.dispose();
   }
 
+  // Ayuda contextual solo la primera vez que se pulsa este botón en este
+  // dispositivo (auditoría de calidad, noviembre 2026: "en Hogar, al pulsar
+  // un botón importante por primera vez aparece una breve descripción de
+  // lo que hace -- en Pro no pasa nada de esto"). Mismo mecanismo ya usado
+  // en Hogar (PrimerUsoService + mostrarAyudaPrimerUso, en repara_core/
+  // repara_ui -- compartido, no hace falta nada nuevo).
+  Future<void> _nuevoTrabajoPrivado() async {
+    await mostrarAyudaPrimerUso(
+      context,
+      clave: 'nuevo_trabajo_privado',
+      icon: Icons.build_outlined,
+      titulo: '¿Qué es un trabajo privado?',
+      mensaje:
+          'Un trabajo que lleva tú, sin depender de ninguna invitación de '
+          'REPARA Hogar -- para un cliente que todavía no tiene la app. '
+          'Más tarde, si quiere, puedes vincularlo con su cuenta de REPARA '
+          'Hogar desde la propia ficha del trabajo.',
+    );
+    if (!mounted) return;
+    await mostrarEditorTrabajoProfesional(context);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -118,7 +141,7 @@ class _TrabajosProTabState extends State<TrabajosProTab> {
       ),
       floatingActionButton: _vista == _VistaTrabajosPro.porTrabajo
           ? FloatingActionButton(
-              onPressed: () => mostrarEditorTrabajoProfesional(context),
+              onPressed: _nuevoTrabajoPrivado,
               tooltip: 'Nuevo trabajo privado',
               child: const Icon(Icons.add),
             )
@@ -268,7 +291,7 @@ class _EstadoVacio extends StatelessWidget {
             ),
             const SizedBox(height: ReparaSpace.s4),
             Text(
-              'Aquí gestionas cada trabajo entero (presupuesto, cambios, pagos, documentos) en cuanto aceptes una invitación.',
+              'Aquí gestionas cada trabajo entero (presupuesto, cambios, pagos, documentos) -- en cuanto aceptes una invitación de REPARA Hogar, o toca "+" para anotar uno privado sin esperar a ninguna.',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodySmall,
             ),
@@ -483,6 +506,18 @@ class _ListaPorCliente extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // "Por cliente" solo agrupa trabajos compartidos con REPARA Hogar (los
+    // privados no tienen casaId) -- sin este chequeo, un profesional con
+    // solo clientes privados (o con el filtro de arriba sin resultados)
+    // veía esta vista completamente en blanco bajo los chips, sin ningún
+    // icono ni texto (auditoría de calidad, noviembre 2026). Mismo
+    // EmptyHint que ya usa _ListaPorTrabajo para el mismo caso en "Lista".
+    if (trabajos.isEmpty) {
+      return const EmptyHint(
+        message: 'Ningún trabajo con este filtro.',
+        icon: Icons.filter_alt_off_outlined,
+      );
+    }
     final porCasa = <String, List<TrabajoProAgregado>>{};
     for (final t in trabajos) {
       porCasa.putIfAbsent(t.ref.casaId, () => []).add(t);
