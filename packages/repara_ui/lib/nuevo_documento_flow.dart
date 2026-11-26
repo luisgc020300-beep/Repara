@@ -19,9 +19,11 @@ import 'package:repara_core/registro.dart';
 
 import 'package:repara_core/registro_service.dart';
 import 'package:repara_core/design_tokens.dart';
+import 'package:repara_core/sugerencias_recientes.dart';
 import 'abrir_protegido.dart';
 import 'app_dialog.dart';
 import 'app_error.dart';
+import 'autocompletado_texto.dart';
 import 'ios_list.dart';
 import 'pago_detail_screen.dart';
 import 'seccion_formulario.dart';
@@ -48,6 +50,123 @@ typedef CargarElementosDisponibles =
 typedef CrearElementoNuevo =
     Future<String> Function(String casaId, ElementoNuevoBorrador borrador);
 
+/// Proveedores ya usados en documentos anteriores de esta casa, para
+/// sugerirlos en el campo "Profesional / empresa emisora" (CEO, noviembre
+/// 2026, Fase 1 de reutilización de datos) -- opcional, igual que
+/// [CargarElementosDisponibles]: quien no lo pase (p.ej. Pro, o un
+/// profesional invitado sin acceso a listar todos los documentos de la
+/// casa) simplemente no ve sugerencias, sin que el flujo se rompa.
+typedef CargarProveedoresSugeridos = Future<List<String>> Function(String casaId);
+
+/// Datos mínimos de un contacto para la integración con Contactos en el
+/// escaneo documental (CEO, noviembre 2026) -- mismo motivo que
+/// [ElementoResumen]: evita que este archivo compartido (Hogar + Pro)
+/// dependa del modelo `Contacto`, exclusivo de Hogar. Sin teléfono/notas --
+/// ninguno de los dos hace falta ni para sugerir ni para mostrar la
+/// sugerencia, y no hay motivo para que este archivo compartido los maneje.
+typedef ContactoResumen = ({String id, String nombre, String? especialidad});
+
+typedef CargarContactosDisponibles =
+    Future<List<ContactoResumen>> Function(String casaId);
+
+/// Busca, entre [contactos], el que corresponde a [nombreSugerido] -- el
+/// nombre que la IA devolvió en `proveedorSugerido`, se asume ya EXACTO
+/// salvo mayúsculas/espacios (la propia IA ya tolera errores de OCR/escritura
+/// al elegirlo, ver el prompt de classifyDocument en functions/index.js).
+/// Mismo criterio de comparación que `_buscarIdPorNombre` ya usa para
+/// `elementoSugerido`, con trim además de minúsculas -- más tolerante a
+/// espacios de más al final/principio del nombre.
+///
+/// Si [nombreSugerido] es null, o no coincide con ningún contacto, devuelve
+/// null -- nunca se inventa ni se fuerza una coincidencia dudosa (sección 4
+/// del encargo: "una coincidencia dudosa debe quedar como sugerencia no
+/// confirmada", lo que en la práctica significa "no hay sugerencia").
+///
+/// LIMITACIÓN DOCUMENTADA: si dos contactos de esta casa comparten
+/// exactamente el mismo nombre (duplicado real, poco habitual), se propone
+/// el primero que aparece en [contactos] -- no hay forma de distinguirlos
+/// solo por el nombre, y no se guarda ninguna relación con un id de
+/// contacto en ningún sitio (el proveedor sigue siendo solo texto), así que
+/// la ambigüedad no afecta a lo que el usuario ve ni a lo que se guarda.
+ContactoResumen? buscarContactoSugerido(
+  List<ContactoResumen> contactos,
+  String? nombreSugerido,
+) {
+  if (nombreSugerido == null) return null;
+  final buscado = nombreSugerido.trim().toLowerCase();
+  if (buscado.isEmpty) return null;
+  for (final contacto in contactos) {
+    if (contacto.nombre.trim().toLowerCase() == buscado) return contacto;
+  }
+  return null;
+}
+
+/// Banner de sugerencia cuando la IA cree que el proveedor extraído de un
+/// documento coincide con un contacto ya guardado (CEO, noviembre 2026,
+/// integración de Contactos en el escaneo documental) -- nunca asocia nada
+/// por sí solo: [onConfirmar] y [onDescartar] son la única forma de que
+/// cambie algo, y ambos los decide el usuario, nunca este widget.
+class SugerenciaContactoProveedor extends StatelessWidget {
+  const SugerenciaContactoProveedor({
+    required this.contacto,
+    required this.onConfirmar,
+    required this.onDescartar,
+    super.key,
+  });
+
+  final ContactoResumen contacto;
+  final VoidCallback onConfirmar;
+  final VoidCallback onDescartar;
+
+  @override
+  Widget build(BuildContext context) {
+    final especialidad = contacto.especialidad;
+    return Container(
+      padding: const EdgeInsets.all(ReparaSpace.s3),
+      decoration: BoxDecoration(
+        color: context.colors.brandTint,
+        borderRadius: BorderRadius.circular(ReparaRadius.md),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.person_search_outlined,
+                color: context.colors.brand,
+                size: 20,
+              ),
+              const SizedBox(width: ReparaSpace.s2),
+              Expanded(
+                child: Text(
+                  especialidad == null
+                      ? '¿Es tu contacto "${contacto.nombre}"?'
+                      : '¿Es tu contacto "${contacto.nombre}" ($especialidad)?',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: ReparaSpace.s2),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(onPressed: onDescartar, child: const Text('No es él')),
+              const SizedBox(width: ReparaSpace.s2),
+              FilledButton(
+                onPressed: onConfirmar,
+                child: const Text('Sí, es este contacto'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 Future<void> iniciarNuevoDocumento(
   BuildContext context, {
   required String casaId,
@@ -56,6 +175,8 @@ Future<void> iniciarNuevoDocumento(
   String? habitacionId,
   CargarElementosDisponibles? cargarElementosDisponibles,
   CrearElementoNuevo? crearElementoNuevo,
+  CargarProveedoresSugeridos? cargarProveedoresSugeridos,
+  CargarContactosDisponibles? cargarContactosDisponibles,
 }) async {
   final paginas = await _elegirPaginas(context);
   if (paginas == null || paginas.isEmpty || !context.mounted) return;
@@ -79,6 +200,17 @@ Future<void> iniciarNuevoDocumento(
       elementos = await cargarElementosDisponibles(casaId);
     } catch (e) {
       // sin acceso al listado completo -- se continúa sin sugerencias.
+    }
+  }
+  // Integración de Contactos (CEO, noviembre 2026): mismo criterio de
+  // tolerancia a fallos que arriba -- sin permiso o sin conexión, se sigue
+  // sin sugerencia de contacto en vez de romper el escaneo.
+  List<ContactoResumen> contactos = const [];
+  if (cargarContactosDisponibles != null) {
+    try {
+      contactos = await cargarContactosDisponibles(casaId);
+    } catch (e) {
+      // sin acceso a la libreta de contactos -- se continúa sin sugerencias.
     }
   }
   if (!context.mounted) return;
@@ -118,6 +250,7 @@ Future<void> iniciarNuevoDocumento(
     sugerencia = await DocumentoService.clasificarConIA(
       confirmadas,
       elementosDisponibles: elementos.map((e) => e.nombre).toList(),
+      contactosDisponibles: contactos.map((c) => c.nombre).toList(),
     ).timeout(const Duration(seconds: 55));
   } on FirebaseFunctionsException catch (e) {
     // 'resource-exhausted' (límite diario) y 'unavailable' (sin conexión
@@ -153,10 +286,12 @@ Future<void> iniciarNuevoDocumento(
         paginas: confirmadas,
         sugerencia: sugerencia,
         elementos: elementos,
+        contactos: contactos,
         elementoIdInicial: elementoId,
         registroIdInicial: registroId,
         habitacionIdInicial: habitacionId,
         crearElementoNuevo: crearElementoNuevo,
+        cargarProveedoresSugeridos: cargarProveedoresSugeridos,
       ),
     ),
   );
@@ -177,6 +312,8 @@ Future<void> iniciarNuevoDocumentoManual(
   TipoDocumento? tipoInicial,
   CargarElementosDisponibles? cargarElementosDisponibles,
   CrearElementoNuevo? crearElementoNuevo,
+  CargarProveedoresSugeridos? cargarProveedoresSugeridos,
+  CargarContactosDisponibles? cargarContactosDisponibles,
 }) async {
   List<ElementoResumen> elementos = const [];
   if (cargarElementosDisponibles != null) {
@@ -185,6 +322,14 @@ Future<void> iniciarNuevoDocumentoManual(
     } catch (e) {
       // Mismo motivo que en iniciarNuevoDocumento: un profesional invitado no
       // puede listar todos los elementos de la casa -- se sigue sin sugerencias.
+    }
+  }
+  List<ContactoResumen> contactos = const [];
+  if (cargarContactosDisponibles != null) {
+    try {
+      contactos = await cargarContactosDisponibles(casaId);
+    } catch (e) {
+      // sin acceso a la libreta de contactos -- se continúa sin sugerencias.
     }
   }
   if (!context.mounted) return;
@@ -196,11 +341,13 @@ Future<void> iniciarNuevoDocumentoManual(
         paginas: const [],
         sugerencia: null,
         elementos: elementos,
+        contactos: contactos,
         elementoIdInicial: elementoId,
         registroIdInicial: registroId,
         habitacionIdInicial: habitacionId,
         tipoInicial: tipoInicial,
         crearElementoNuevo: crearElementoNuevo,
+        cargarProveedoresSugeridos: cargarProveedoresSugeridos,
       ),
     ),
   );
@@ -220,6 +367,8 @@ Future<void> elegirFormaDeAnadirDocumento(
   TipoDocumento? tipoInicial,
   CargarElementosDisponibles? cargarElementosDisponibles,
   CrearElementoNuevo? crearElementoNuevo,
+  CargarProveedoresSugeridos? cargarProveedoresSugeridos,
+  CargarContactosDisponibles? cargarContactosDisponibles,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -248,6 +397,8 @@ Future<void> elegirFormaDeAnadirDocumento(
                   habitacionId: habitacionId,
                   cargarElementosDisponibles: cargarElementosDisponibles,
                   crearElementoNuevo: crearElementoNuevo,
+                  cargarProveedoresSugeridos: cargarProveedoresSugeridos,
+                  cargarContactosDisponibles: cargarContactosDisponibles,
                 );
               },
             ),
@@ -268,6 +419,8 @@ Future<void> elegirFormaDeAnadirDocumento(
                   tipoInicial: tipoInicial,
                   cargarElementosDisponibles: cargarElementosDisponibles,
                   crearElementoNuevo: crearElementoNuevo,
+                  cargarProveedoresSugeridos: cargarProveedoresSugeridos,
+                  cargarContactosDisponibles: cargarContactosDisponibles,
                 );
               },
             ),
@@ -742,21 +895,25 @@ class _RevisionDocumentoScreen extends StatefulWidget {
     required this.paginas,
     required this.sugerencia,
     required this.elementos,
+    this.contactos = const [],
     this.elementoIdInicial,
     this.registroIdInicial,
     this.habitacionIdInicial,
     this.tipoInicial,
     this.crearElementoNuevo,
+    this.cargarProveedoresSugeridos,
   });
 
   final String casaId;
   final List<PaginaDocumento> paginas;
   final SugerenciaIA? sugerencia;
   final List<ElementoResumen> elementos;
+  final List<ContactoResumen> contactos;
   final String? elementoIdInicial;
   final String? registroIdInicial;
   final String? habitacionIdInicial;
   final CrearElementoNuevo? crearElementoNuevo;
+  final CargarProveedoresSugeridos? cargarProveedoresSugeridos;
   // Categoría ya elegida antes de llegar aquí (CEO, noviembre 2026: "Añadir"
   // desde Presupuestos/Facturas-Notas) -- gana sobre la sugerencia de la IA,
   // que aquí ni siquiera existe (solo se usa desde iniciarNuevoDocumentoManual).
@@ -776,6 +933,17 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
   late final _proveedorCtrl = TextEditingController(
     text: widget.sugerencia?.proveedor ?? '',
   );
+  final _proveedorFocusNode = FocusNode();
+  // Sugerencias de proveedores ya usados en esta casa (CEO, noviembre 2026,
+  // Fase 1 de reutilización de datos) -- carga única al abrir la pantalla,
+  // no un stream: nadie más añade un documento a la misma casa mientras se
+  // rellena este formulario, así que no hace falta mantenerla viva.
+  List<String> _proveedoresSugeridos = const [];
+  // Integración de Contactos en el escaneo documental (CEO, noviembre
+  // 2026): true en cuanto el usuario confirma o descarta la sugerencia de
+  // contacto -- nunca se vuelve a mostrar después, haya aceptado o no
+  // (confirmar ya dejó su nombre en el campo; descartar ya dijo que no).
+  bool _sugerenciaContactoResuelta = false;
   late final _nifCtrl = TextEditingController(
     text: widget.sugerencia?.nifCif ?? '',
   );
@@ -834,6 +1002,24 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
     return null;
   }
 
+  ContactoResumen? get _contactoSugerido => _sugerenciaContactoResuelta
+      ? null
+      : buscarContactoSugerido(
+          widget.contactos,
+          widget.sugerencia?.proveedorSugerido,
+        );
+
+  void _confirmarContactoSugerido(ContactoResumen contacto) {
+    setState(() {
+      _proveedorCtrl.text = contacto.nombre;
+      _sugerenciaContactoResuelta = true;
+    });
+  }
+
+  void _descartarContactoSugerido() {
+    setState(() => _sugerenciaContactoResuelta = true);
+  }
+
   static TipoRegistro _tipoRegistroPorDefecto(TipoDocumento? t) => switch (t) {
     TipoDocumento.factura ||
     TipoDocumento.presupuesto => TipoRegistro.reparacion,
@@ -849,8 +1035,42 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    // Los contactos ya los tenemos (widget.contactos, cargados antes de
+    // llegar aquí) -- se ofrecen de inmediato en el autocompletado del
+    // proveedor, para poder "elegir otro" sin esperar a nada (integración
+    // de Contactos en el escaneo documental, CEO, noviembre 2026).
+    _proveedoresSugeridos = valoresRecientesSinDuplicados(
+      widget.contactos.map((c) => c.nombre),
+    );
+    // Un profesional invitado a un registro concreto no tiene permiso para
+    // listar todos los documentos de la casa -- igual que con
+    // cargarElementosDisponibles, se sigue sin sugerencias en vez de
+    // reventar el flujo. Pro (y cualquier llamador que no lo pase) tampoco
+    // ve sugerencias -- se sigue exactamente igual que antes.
+    final cargar = widget.cargarProveedoresSugeridos;
+    if (cargar == null) return;
+    cargar(widget.casaId)
+        .then((valores) {
+          if (mounted) {
+            setState(
+              () => _proveedoresSugeridos = valoresRecientesSinDuplicados([
+                ...widget.contactos.map((c) => c.nombre),
+                ...valores,
+              ]),
+            );
+          }
+        })
+        .catchError((Object _) {
+          // sin acceso al listado completo -- se sigue solo con los contactos.
+        });
+  }
+
+  @override
   void dispose() {
     _proveedorCtrl.dispose();
+    _proveedorFocusNode.dispose();
     _nifCtrl.dispose();
     _numeroCtrl.dispose();
     _importeCtrl.dispose();
@@ -1210,12 +1430,21 @@ class _RevisionDocumentoScreenState extends State<_RevisionDocumentoScreen> {
                   ],
                 ),
                 const SizedBox(height: ReparaSpace.s3),
-                TextField(
+                AutocompletadoTexto(
                   controller: _proveedorCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Profesional / empresa emisora',
-                  ),
+                  focusNode: _proveedorFocusNode,
+                  labelText: 'Profesional / empresa emisora',
+                  sugerencias: _proveedoresSugeridos,
                 ),
+                if (_contactoSugerido != null) ...[
+                  const SizedBox(height: ReparaSpace.s2),
+                  SugerenciaContactoProveedor(
+                    contacto: _contactoSugerido!,
+                    onConfirmar: () =>
+                        _confirmarContactoSugerido(_contactoSugerido!),
+                    onDescartar: _descartarContactoSugerido,
+                  ),
+                ],
                 const SizedBox(height: ReparaSpace.s3),
                 TextField(
                   controller: _nifCtrl,

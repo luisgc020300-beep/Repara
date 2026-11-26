@@ -26,6 +26,7 @@ class SugerenciaIA {
     this.garantiaTexto,
     this.observaciones,
     this.elementoSugerido,
+    this.proveedorSugerido,
     this.confianza,
   });
 
@@ -43,6 +44,12 @@ class SugerenciaIA {
   final String? garantiaTexto;
   final String? observaciones;
   final String? elementoSugerido;
+  // Integración de Contactos en el escaneo documental (CEO, noviembre
+  // 2026): mismo criterio que elementoSugerido -- uno de los nombres
+  // EXACTOS de los contactos que se le pasaron a la IA, o null si ninguno
+  // encaja. Nunca se guarda solo: el cliente lo usa solo para proponer un
+  // contacto ya guardado como proveedor, pidiendo confirmación expresa.
+  final String? proveedorSugerido;
   final String? confianza;
 
   factory SugerenciaIA.fromMap(Map<String, dynamic> map) {
@@ -62,6 +69,7 @@ class SugerenciaIA {
       garantiaTexto: map['garantiaTexto'] as String?,
       observaciones: map['observaciones'] as String?,
       elementoSugerido: map['elementoSugerido'] as String?,
+      proveedorSugerido: map['proveedorSugerido'] as String?,
       confianza: map['confianza'] as String?,
     );
   }
@@ -139,6 +147,11 @@ class DocumentoService {
   static Future<SugerenciaIA?> clasificarConIA(
     List<PaginaDocumento> paginas, {
     List<String> elementosDisponibles = const [],
+    // Integración de Contactos (CEO, noviembre 2026): solo nombres, mismo
+    // criterio que elementosDisponibles -- nunca teléfono/especialidad/
+    // notas, que la IA no necesita para identificar quién emitió el
+    // documento. Misma llamada de siempre a classifyDocument, no una nueva.
+    List<String> contactosDisponibles = const [],
   }) async {
     final paginasCodificadas = await Future.wait(paginas.map((p) async {
       final bytes = await p.archivo.readAsBytes();
@@ -148,6 +161,7 @@ class DocumentoService {
     final result = await callable.call<Map<String, dynamic>>({
       'paginas': paginasCodificadas,
       'elementosDisponibles': elementosDisponibles,
+      'contactosDisponibles': contactosDisponibles,
     });
     // Nunca "as Map<String, dynamic>?" directo (CEO, noviembre 2026: el
     // servidor respondía bien -- status 200, JSON válido, confirmado en

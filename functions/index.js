@@ -3570,7 +3570,7 @@ exports.classifyDocument = onCall(
     // [paginas] es la forma nueva (varias páginas de un mismo documento);
     // se mantiene el nombre antiguo imageBase64/mediaType como fallback para
     // no romper si algo sigue llamando a la forma vieja.
-    const { paginas, imageBase64, mediaType, elementosDisponibles } = request.data || {};
+    const { paginas, imageBase64, mediaType, elementosDisponibles, contactosDisponibles } = request.data || {};
     const listaPaginas = Array.isArray(paginas) && paginas.length
         ? paginas
         : (typeof imageBase64 === 'string' && imageBase64 ? [{ data: imageBase64, mediaType: mediaType || 'image/jpeg' }] : []);
@@ -3601,6 +3601,14 @@ exports.classifyDocument = onCall(
     // también un elemento.
     const listaElementos = Array.isArray(elementosDisponibles) ? elementosDisponibles.slice(0, 50) : [];
 
+    // Integración de Contactos en el escaneo documental (CEO, noviembre
+    // 2026): solo nombres, nunca teléfono/especialidad/notas -- la IA solo
+    // necesita el nombre para poder reconocer, con pequeñas diferencias de
+    // escritura, si el proveedor que lee en el documento es uno de los
+    // contactos ya guardados. El cliente decide si confirma la sugerencia,
+    // elige otro contacto o mantiene el proveedor como texto libre.
+    const listaContactos = Array.isArray(contactosDisponibles) ? contactosDisponibles.slice(0, 50) : [];
+
     const apiKey = clavesAnthropicLimpia();
     if (!apiKey) throw new HttpsError('internal', 'API key no configurada en el servidor.');
 
@@ -3621,6 +3629,7 @@ Devuelve EXCLUSIVAMENTE un objeto JSON con esta forma exacta, sin texto adiciona
   "garantiaTexto": "texto literal sobre garantía si aparece, o null",
   "observaciones": "cualquier detalle relevante que no encaje en los campos anteriores, o null",
   "elementoSugerido": "uno de los nombres EXACTOS de la lista de elementos, o null",
+  "proveedorSugerido": "uno de los nombres EXACTOS de la lista de contactos, o null",
   "confianza": "alta|media|baja"
 }
 Reglas estrictas:
@@ -3628,8 +3637,10 @@ Reglas estrictas:
 - "importe" es el total final del documento, no un subtotal.
 - La fecha es la del documento (emisión/factura), nunca la de hoy.
 - "elementoSugerido" debe ser EXACTAMENTE uno de los nombres de la lista de abajo, o null si ninguno encaja -- nunca inventes un nombre nuevo aquí.
+- "proveedorSugerido" debe ser EXACTAMENTE uno de los nombres de la lista de contactos de abajo, o null si ninguno encaja razonablemente o la lista está vacía -- nunca inventes un nombre nuevo aquí. Tolera diferencias pequeñas de mayúsculas, espacios o errores de OCR entre el "proveedor" que extraes del documento y el nombre del contacto, pero si dudas entre varios contactos o el parecido es solo superficial, usa null en vez de arriesgar una coincidencia equivocada -- "proveedor" (el texto libre) nunca depende de este campo, ya lo rellenas igual.
 - "confianza" baja significa que la imagen es difícil de leer o el documento es ambiguo.
-Elementos existentes en esta casa: ${listaElementos.length ? listaElementos.join(', ') : '(ninguno todavía)'}`;
+Elementos existentes en esta casa: ${listaElementos.length ? listaElementos.join(', ') : '(ninguno todavía)'}
+Contactos ya guardados en esta casa: ${listaContactos.length ? listaContactos.join(', ') : '(ninguno todavía)'}`;
 
     const contenido = listaPaginas.map((p) => ({
       type: p.mediaType === 'application/pdf' ? 'document' : 'image',

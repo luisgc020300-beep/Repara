@@ -9,6 +9,8 @@ import 'package:flutter/material.dart';
 import '../models/casa.dart';
 import '../models/elemento.dart';
 import 'package:repara_core/design_tokens.dart';
+import 'package:repara_core/documento_service.dart';
+import '../services/contacto_service.dart';
 import '../services/elemento_service.dart';
 import 'package:repara_ui/ayuda_primer_uso.dart';
 import 'package:repara_ui/ios_list.dart';
@@ -44,6 +46,8 @@ Future<void> mostrarMenuAnadir(BuildContext context, {required Casa casa}) {
                       casaId: casa.id,
                       cargarElementosDisponibles: _cargarElementosDisponibles,
                       crearElementoNuevo: _crearElementoNuevo,
+                      cargarProveedoresSugeridos: _cargarProveedoresSugeridos,
+                      cargarContactosDisponibles: _cargarContactosDisponibles,
                     );
                   },
                 ),
@@ -93,6 +97,26 @@ Future<List<ElementoResumen>> _cargarElementosDisponibles(
 ) async {
   final elementos = await ElementoService.streamElementos(casaId).first;
   return elementos.map((e) => (id: e.id, nombre: e.nombre)).toList();
+}
+
+// Fase 1 de reutilización de datos (CEO, noviembre 2026): proveedores ya
+// usados en documentos anteriores de esta casa, para sugerirlos al escanear
+// o rellenar uno nuevo -- ver AutocompletadoTexto/sugerencias_recientes.dart.
+Future<List<String>> _cargarProveedoresSugeridos(String casaId) async {
+  final documentos = await DocumentoService.streamTodos(casaId).first;
+  return documentos.map((d) => d.proveedor).whereType<String>().toList();
+}
+
+// Integración de Contactos en el escaneo documental (CEO, noviembre 2026):
+// solo nombre/especialidad -- ver ContactoResumen en nuevo_documento_flow.dart,
+// nunca teléfono/notas, que ni la IA ni la sugerencia necesitan.
+Future<List<ContactoResumen>> _cargarContactosDisponibles(
+  String casaId,
+) async {
+  final contactos = await ContactoService.streamContactos(casaId).first;
+  return contactos
+      .map((c) => (id: c.id, nombre: c.nombre, especialidad: c.especialidad))
+      .toList();
 }
 
 Future<String> _crearElementoNuevo(

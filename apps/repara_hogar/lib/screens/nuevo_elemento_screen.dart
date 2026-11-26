@@ -23,7 +23,9 @@ import '../services/contacto_service.dart';
 import '../services/elemento_service.dart';
 import '../services/habitacion_service.dart';
 import 'package:repara_core/design_tokens.dart';
+import 'package:repara_core/sugerencias_recientes.dart';
 import 'package:repara_ui/app_error.dart';
+import 'package:repara_ui/autocompletado_texto.dart';
 import 'package:repara_ui/confirmar_salida_formulario.dart';
 import 'package:repara_ui/seccion_formulario.dart';
 
@@ -95,11 +97,30 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
   List<Contacto> _contactos = const [];
   StreamSubscription<List<Contacto>>? _contactosSub;
 
+  // Para sugerir Marca/Modelo a partir de los elementos que ya existen en
+  // esta casa (CEO, noviembre 2026, Fase 1 de reutilización de datos) --
+  // mismo criterio que _contactos arriba, aplicado a texto libre en vez de
+  // a Contacto. streamElementos ya devuelve la lista ordenada por
+  // createdAt descendente, así que no hace falta ningún campo ni consulta
+  // nueva para aproximar "más reciente primero" (ver sugerencias_recientes.dart).
+  List<Elemento> _elementos = const [];
+  StreamSubscription<List<Elemento>>? _elementosSub;
+  final _marcaFocusNode = FocusNode();
+  final _modeloFocusNode = FocusNode();
+
+  List<String> get _marcasSugeridas =>
+      valoresRecientesSinDuplicados(_elementos.map((e) => e.marca));
+  List<String> get _modelosSugeridas =>
+      valoresRecientesSinDuplicados(_elementos.map((e) => e.modelo));
+
   @override
   void initState() {
     super.initState();
     _contactosSub = ContactoService.streamContactos(widget.casa.id).listen((c) {
       if (mounted) setState(() => _contactos = c);
+    });
+    _elementosSub = ElementoService.streamElementos(widget.casa.id).listen((e) {
+      if (mounted) setState(() => _elementos = e);
     });
   }
 
@@ -107,12 +128,15 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
   void dispose() {
     _nombreCtrl.dispose();
     _marcaCtrl.dispose();
+    _marcaFocusNode.dispose();
     _modeloCtrl.dispose();
+    _modeloFocusNode.dispose();
     _costeCtrl.dispose();
     _profesionalCtrl.dispose();
     _profesionalFocusNode.dispose();
     _intervaloCtrl.dispose();
     _contactosSub?.cancel();
+    _elementosSub?.cancel();
     super.dispose();
   }
 
@@ -351,16 +375,20 @@ class _NuevoElementoScreenState extends State<NuevoElementoScreen> {
                 Row(
                   children: [
                     Expanded(
-                      child: TextField(
+                      child: AutocompletadoTexto(
                         controller: _marcaCtrl,
-                        decoration: const InputDecoration(labelText: 'Marca'),
+                        focusNode: _marcaFocusNode,
+                        labelText: 'Marca',
+                        sugerencias: _marcasSugeridas,
                       ),
                     ),
                     const SizedBox(width: ReparaSpace.s3),
                     Expanded(
-                      child: TextField(
+                      child: AutocompletadoTexto(
                         controller: _modeloCtrl,
-                        decoration: const InputDecoration(labelText: 'Modelo'),
+                        focusNode: _modeloFocusNode,
+                        labelText: 'Modelo',
+                        sugerencias: _modelosSugeridas,
                       ),
                     ),
                   ],

@@ -1468,6 +1468,8 @@ class _DocumentosTab extends StatelessWidget {
                 elementoId: elementoId,
                 registroId: registro.id,
                 cargarElementosDisponibles: _cargarElementosDisponibles,
+                cargarProveedoresSugeridos: _cargarProveedoresSugeridos,
+                cargarContactosDisponibles: _cargarContactosDisponibles,
               ),
               icon: const Icon(Icons.document_scanner_outlined, size: 18),
               label: const Text('Escanear documento'),
@@ -1674,6 +1676,10 @@ class _CuerpoSimple extends StatelessWidget {
                                   tipoInicial: TipoDocumento.presupuesto,
                                   cargarElementosDisponibles:
                                       _cargarElementosDisponibles,
+                                  cargarProveedoresSugeridos:
+                                      _cargarProveedoresSugeridos,
+                                  cargarContactosDisponibles:
+                                      _cargarContactosDisponibles,
                                 ),
                               ),
                               const SizedBox(height: 20),
@@ -1690,6 +1696,10 @@ class _CuerpoSimple extends StatelessWidget {
                                   tipoInicial: TipoDocumento.factura,
                                   cargarElementosDisponibles:
                                       _cargarElementosDisponibles,
+                                  cargarProveedoresSugeridos:
+                                      _cargarProveedoresSugeridos,
+                                  cargarContactosDisponibles:
+                                      _cargarContactosDisponibles,
                                 ),
                               ),
                             ],
@@ -2659,4 +2669,24 @@ const _estadosEditables = [
 Future<List<ElementoResumen>> _cargarElementosDisponibles(String casaId) async {
   final elementos = await ElementoService.streamElementos(casaId).first;
   return elementos.map((e) => (id: e.id, nombre: e.nombre)).toList();
+}
+
+// Fase 1 de reutilización de datos (CEO, noviembre 2026): proveedores ya
+// usados en documentos anteriores de esta casa, para sugerirlos al escanear
+// o rellenar uno nuevo -- ver AutocompletadoTexto/sugerencias_recientes.dart.
+Future<List<String>> _cargarProveedoresSugeridos(String casaId) async {
+  final documentos = await DocumentoService.streamTodos(casaId).first;
+  return documentos.map((d) => d.proveedor).whereType<String>().toList();
+}
+
+// Integración de Contactos en el escaneo documental (CEO, noviembre 2026):
+// solo nombre/especialidad -- ver ContactoResumen en nuevo_documento_flow.dart,
+// nunca teléfono/notas, que ni la IA ni la sugerencia necesitan.
+Future<List<ContactoResumen>> _cargarContactosDisponibles(
+  String casaId,
+) async {
+  final contactos = await ContactoService.streamContactos(casaId).first;
+  return contactos
+      .map((c) => (id: c.id, nombre: c.nombre, especialidad: c.especialidad))
+      .toList();
 }
