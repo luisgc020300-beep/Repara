@@ -10,8 +10,11 @@
 // navegación final del encargo. "Presupuestos" se retiró como pestaña
 // propia en la Fase 2 (su contenido, agrupado por estado, se mudó dentro
 // de Control económico) para no crecer a 6 pestañas al añadir Agenda aquí.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../services/fcm_service.dart';
 import 'agenda_pro_tab.dart';
 import 'clientes_pro_tab.dart';
 import 'control_economico_pro_tab.dart';
@@ -35,6 +38,18 @@ class _ReparaProShellScreenState extends State<ReparaProShellScreen> {
   // Mismo patrón que CasaShellScreen (Hogar) y Convive: deslizar con el
   // dedo entre pestañas, no solo tocar la barra de abajo.
   late final _pageController = PageController(initialPage: widget.initialIndex);
+
+  @override
+  void initState() {
+    super.initState();
+    // Permiso de notificaciones + registro de token (noviembre 2026) --
+    // mismo momento que CasaShellScreen en Hogar: el profesional ya activó
+    // su cuenta y está viendo la app de verdad, mejor momento para pedirlo
+    // que nada más iniciar sesión. A diferencia de Hogar, aquí no hay
+    // ninguna transición de foto que pueda solaparse con el diálogo nativo,
+    // así que no hace falta ningún retraso.
+    unawaited(FcmService.inicializar());
+  }
 
   @override
   void dispose() {

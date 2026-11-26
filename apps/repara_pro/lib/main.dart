@@ -5,10 +5,14 @@
 // BiometricService, exclusivos de Hogar. Pro no necesita ese gate
 // biométrico (no hay "casa" que proteger aquí).
 //
-// Pendiente de conexión real (ver README.md e informe de esta integración):
-// - Notificaciones push (FCM) no están conectadas todavía -- las
-//   notificaciones internas (NotificacionesProScreen) sí funcionan en
-//   cuanto hay backend real, son independientes de FCM.
+// Notificaciones push (FCM, noviembre 2026): el permiso y el guardado de
+// token ocurren en FcmService.inicializar() (llamado desde
+// ReparaProShellScreen, igual que CasaShellScreen en Hogar); el
+// enrutamiento al tocar una notificación push con la app en frío/segundo
+// plano se cablea aquí, mismo patrón ya validado en apps/repara_hogar/lib/
+// main.dart -- navigatorKey porque no hay BuildContext propio cuando la
+// app se abre directamente desde una notificación (proceso frío).
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -17,6 +21,7 @@ import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 import 'package:flutter/material.dart';
@@ -32,6 +37,27 @@ import 'package:repara_ui/login_screen.dart';
 
 import 'firebase_options.dart';
 import 'screens/activar_profesional_gate_screen.dart';
+import 'services/notificacion_router_pro.dart';
+
+final navigatorKey = GlobalKey<NavigatorState>();
+
+// Push tocada con la app en segundo plano, o que abre la app desde frío --
+// misma ruta que la lista interna (notificacion_router_pro.dart), para no
+// duplicar la lógica de navegación.
+Future<void> _abrirDestinoPush(RemoteMessage message) async {
+  final context = navigatorKey.currentContext;
+  final data = message.data;
+  final tipo = data['tipo'] as String?;
+  if (context == null || tipo == null) return;
+  await abrirDestinoNotificacionPro(
+    context,
+    tipo: tipo,
+    casaId: data['casaId'] as String?,
+    elementoId: data['elementoId'] as String?,
+    registroId: data['registroId'] as String?,
+    pagoId: data['pagoId'] as String?,
+  );
+}
 
 // Mismo criterio que lib/main.dart del monolito: SOLO cuando se compila con
 // `--dart-define=USE_EMULATOR=true`. En cualquier build normal este bloque
@@ -96,6 +122,11 @@ void main() async {
     ProfesionalService.sincronizarClaims,
   );
 
+  // Push tocada con la app en segundo plano, o que abre la app desde frío.
+  FirebaseMessaging.onMessageOpenedApp.listen(_abrirDestinoPush);
+  final mensajeInicial = await FirebaseMessaging.instance.getInitialMessage();
+  if (mensajeInicial != null) unawaited(_abrirDestinoPush(mensajeInicial));
+
   runApp(ReparaProApp(themeController: themeController));
 }
 
@@ -109,6 +140,7 @@ class ReparaProApp extends StatelessWidget {
     return AnimatedBuilder(
       animation: themeController,
       builder: (context, _) => MaterialApp(
+        navigatorKey: navigatorKey,
         debugShowCheckedModeBanner: false,
         title: 'REPARA Pro',
         themeMode: themeController.mode,

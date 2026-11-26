@@ -26,6 +26,7 @@ import 'package:repara_ui/seccion_seguridad_documentos.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../services/fcm_service.dart';
 import 'acerca_pro_screen.dart';
 import 'mis_valoraciones_screen.dart';
 
@@ -527,7 +528,10 @@ class _AjustesProScreenState extends State<AjustesProScreen> {
                   title: 'Cerrar sesión',
                   titleColor: context.colors.errorText,
                   showChevron: false,
-                  onTap: () => confirmarYCerrarSesion(context),
+                  onTap: () => confirmarYCerrarSesion(
+                    context,
+                    antesDeCerrarSesion: FcmService.olvidarEsteDispositivo,
+                  ),
                 ),
               ],
             ),
