@@ -499,3 +499,76 @@ pw.Widget galeriaTrabajoPdf(
     ),
   );
 }
+
+/// Grupo fotográfico REDISEÑADO (CEO, noviembre 2026, "expediente completo
+/// de la vivienda") -- a diferencia de [galeriaTrabajoPdf] (que sigue
+/// intacta, la usa elemento_resumen_pdf.dart sin cambios), las fotos
+/// respetan su proporción real (ver fotoProporcionalPdf, nunca
+/// `fit: cover` recortando) y el grupo se expresa como una LISTA de
+/// elementos de nivel superior -- título+primera fila unidos con
+/// [pw.Inseparable] (nunca un título huérfano sin ninguna foto debajo),
+/// pero el resto de filas puede fluir a la página siguiente si el trabajo
+/// tiene muchas fotos, en vez de forzar todo el grupo a una página nueva.
+List<pw.Widget> galeriaTrabajoDocumentalPdf(
+  TrabajoConDetalle t,
+  Map<String, Uint8List> imagenes, {
+  required DateFormat formatoFechaCorta,
+  required double anchoContenido,
+  int maxFotos = 6,
+  int columnas = 2,
+}) {
+  final fotos = t.registro.fotos
+      .take(maxFotos)
+      .map((url) => imagenes[url])
+      .whereType<Uint8List>()
+      .toList();
+  if (fotos.isEmpty) return const [];
+  final profesionales = t.registro.listaProfesionales
+      .map((p) => p.nombre)
+      .join(', ');
+  const espaciado = 10.0;
+  final anchoFoto = (anchoContenido - espaciado * (columnas - 1)) / columnas;
+
+  final filas = <pw.Widget>[];
+  for (var i = 0; i < fotos.length; i += columnas) {
+    final grupo = fotos.skip(i).take(columnas).toList();
+    filas.add(
+      pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          for (var j = 0; j < grupo.length; j++) ...[
+            if (j > 0) pw.SizedBox(width: espaciado),
+            fotoProporcionalPdf(grupo[j], anchoFoto),
+          ],
+        ],
+      ),
+    );
+    if (i + columnas < fotos.length) filas.add(pw.SizedBox(height: espaciado));
+  }
+
+  return [
+    pw.Inseparable(
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            '${t.registro.titulo} · ${t.registro.elementoNombre}',
+            style: pw.TextStyle(fontSize: 10.5, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 2),
+          pw.Text(
+            [
+              formatoFechaCorta.format(t.registro.fecha),
+              if (profesionales.isNotEmpty) profesionales,
+            ].join(' · '),
+            style: const pw.TextStyle(fontSize: 8.5, color: pdfInkMuted),
+          ),
+          pw.SizedBox(height: 7),
+          filas.first,
+        ],
+      ),
+    ),
+    ...filas.skip(1),
+    pw.SizedBox(height: 18),
+  ];
+}

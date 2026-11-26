@@ -155,6 +155,52 @@ pw.Widget franjaResumenPdf(List<pw.Widget> celdas) {
   );
 }
 
+// Un documento capturado con la cámara puede llegar con el nombre técnico
+// interno que le puso el selector de imagen (p.ej. "image_picker_12345...
+// .jpg") en vez de uno escrito por el usuario (rediseño del expediente de
+// vivienda, noviembre 2026: "nunca mostrar... cadenas como image_picker_…").
+// Nunca se modifica el dato guardado -- esto solo decide qué texto mostrar
+// EN EL PDF, sustituyendo por una denominación descriptiva (tipo + fecha)
+// cuando el nombre de archivo no parece haberlo escrito una persona.
+final RegExp _patronNombreTecnicoPdf = RegExp(
+  r'^(image_picker|scaled_|trimmed_|cache|file_picker|tmp|img_\d{10,}|[0-9a-f]{16,}|[0-9]{10,})',
+  caseSensitive: false,
+);
+
+String nombreDocumentoLegiblePdf(
+  String nombreArchivo,
+  String etiquetaTipo, {
+  String? fechaTexto,
+}) {
+  final base = nombreArchivo.split('.').first.trim();
+  final pareceTecnico = base.isEmpty || _patronNombreTecnicoPdf.hasMatch(base);
+  if (!pareceTecnico) return nombreArchivo;
+  return fechaTexto != null ? '$etiquetaTipo · $fechaTexto' : etiquetaTipo;
+}
+
+/// Igual que [miniaturaPdf] pero sin forzar un cuadrado: la altura se
+/// calcula a partir de la proporción real de la imagen decodificada, nunca
+/// con `fit: cover` recortando -- "que no aparezcan deformadas ni
+/// recortadas de manera inadecuada" (rediseño documental, noviembre 2026).
+pw.Widget fotoProporcionalPdf(
+  Uint8List bytes,
+  double ancho, {
+  double bordeRadius = 8,
+  double relacionAspectoAlternativa = 0.75,
+}) {
+  final img = pw.MemoryImage(bytes);
+  final anchoNatural = img.width;
+  final altoNatural = img.height;
+  final alto = (anchoNatural != null && altoNatural != null && anchoNatural > 0)
+      ? ancho * altoNatural / anchoNatural
+      : ancho * relacionAspectoAlternativa;
+  return pw.ClipRRect(
+    horizontalRadius: bordeRadius,
+    verticalRadius: bordeRadius,
+    child: pw.Image(img, width: ancho, height: alto, fit: pw.BoxFit.contain),
+  );
+}
+
 pw.Widget miniaturaPdf(Uint8List? bytes, {double size = 64}) {
   if (bytes == null) return pw.SizedBox(width: size, height: size);
   return pw.ClipRRect(
