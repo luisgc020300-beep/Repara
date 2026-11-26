@@ -49,6 +49,7 @@ Future<void> abrirNuevoRegistroScreen(
   required Casa casa,
   required String elementoId,
   required String elementoNombre,
+  Registro? plantilla,
 }) {
   return Navigator.push(
     context,
@@ -57,6 +58,7 @@ Future<void> abrirNuevoRegistroScreen(
         casa: casa,
         elementoId: elementoId,
         elementoNombre: elementoNombre,
+        plantilla: plantilla,
       ),
     ),
   );
@@ -67,22 +69,36 @@ class _NuevoRegistroScreen extends StatefulWidget {
     required this.casa,
     required this.elementoId,
     required this.elementoNombre,
+    this.plantilla,
   });
 
   final Casa casa;
   final String elementoId;
   final String elementoNombre;
+  // "Repetir mantenimiento" (CEO, noviembre 2026, ver registro_detail_
+  // screen.dart): registro del que se reutilizan solo los datos
+  // descriptivos (tipo/título/descripción/profesionales habituales) para
+  // precargar el formulario. Fecha, coste, presupuesto, plazos, fotos,
+  // documentos y estado NUNCA se leen de aquí -- el nuevo registro nace
+  // con sus propios valores por defecto, igual que si se hubiera abierto
+  // esta pantalla a mano, para que no arrastre nada que haga parecer que
+  // el nuevo trabajo ya está hecho o pagado.
+  final Registro? plantilla;
 
   @override
   State<_NuevoRegistroScreen> createState() => _NuevoRegistroScreenState();
 }
 
 class _NuevoRegistroScreenState extends State<_NuevoRegistroScreen> {
-  TipoRegistro _tipo = TipoRegistro.reparacion;
-  final _tituloCtrl = TextEditingController();
-  final _descripcionCtrl = TextEditingController();
+  late TipoRegistro _tipo;
+  // Para que _hayCambiosSinGuardar() sepa comparar contra el valor con el
+  // que arrancó el formulario -- que al repetir un mantenimiento ya no es
+  // necesariamente TipoRegistro.reparacion.
+  late final TipoRegistro _tipoInicial = _tipo;
+  late final TextEditingController _tituloCtrl;
+  late final TextEditingController _descripcionCtrl;
   final _costeCtrl = TextEditingController();
-  List<ProfesionalRegistro> _profesionales = [];
+  late List<ProfesionalRegistro> _profesionales;
   final _plazoFrecuenciaCtrl = TextEditingController();
   final _plazoImporteCtrl = TextEditingController();
   DateTime _fecha = DateTime.now();
@@ -91,6 +107,10 @@ class _NuevoRegistroScreenState extends State<_NuevoRegistroScreen> {
   // igual (difieren los milisegundos), así que se guarda el valor inicial
   // real en vez de repetir la llamada.
   late final DateTime _fechaInicial = _fecha;
+  // "Repetir mantenimiento" siempre abre el flujo simple -- aunque el
+  // registro original fuera con profesional (presupuesto/invitación
+  // real), repetirlo no debe reactivar ese proceso formal por su cuenta;
+  // el usuario puede volver a activar el interruptor si quiere.
   bool _esConProfesional = false;
   bool _pagaAPlazos = false;
   // CEO, noviembre 2026: "a veces el trabajo no está hecho al registrarlo,
@@ -111,6 +131,21 @@ class _NuevoRegistroScreenState extends State<_NuevoRegistroScreen> {
   /// sheet.dart: no sustituye ese aviso, hace más fácil ver qué campo
   /// exacto falta sin tener que recordar el mensaje que acaba de desaparecer.
   bool _mostrarErrorTitulo = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final plantilla = widget.plantilla;
+    _tipo = plantilla?.tipo ?? TipoRegistro.reparacion;
+    _tituloCtrl = TextEditingController(text: plantilla?.titulo ?? '');
+    _descripcionCtrl = TextEditingController(text: plantilla?.descripcion ?? '');
+    // listaProfesionales ya resuelve el fallback a los campos heredados
+    // (profesionalNombre/profesionalContacto) de un registro antiguo --
+    // mismo criterio que el resto de la app, ver Registro.listaProfesionales.
+    _profesionales = plantilla == null
+        ? []
+        : List.of(plantilla.listaProfesionales);
+  }
 
   @override
   void dispose() {
@@ -240,7 +275,7 @@ class _NuevoRegistroScreenState extends State<_NuevoRegistroScreen> {
           _esConProfesional ||
           _pagaAPlazos ||
           !_yaRealizado ||
-          _tipo != TipoRegistro.reparacion ||
+          _tipo != _tipoInicial ||
           _fecha != _fechaInicial);
 
   @override
@@ -248,18 +283,27 @@ class _NuevoRegistroScreenState extends State<_NuevoRegistroScreen> {
     return ConfirmarSalidaFormulario(
       hayCambiosSinGuardar: _hayCambiosSinGuardar,
       child: Scaffold(
-        appBar: AppBar(title: const Text('Añadir evento')),
+        appBar: AppBar(
+          title: Text(
+            widget.plantilla == null ? 'Añadir evento' : 'Repetir mantenimiento',
+          ),
+        ),
         body: SafeArea(
           child: ListView(
             padding: const EdgeInsets.all(ReparaSpace.s4),
             children: [
               Text(
-                'Añade un evento a mano',
+                widget.plantilla == null
+                    ? 'Añade un evento a mano'
+                    : 'Repetir mantenimiento',
                 style: Theme.of(context).textTheme.displaySmall,
               ),
               const SizedBox(height: ReparaSpace.s1),
               Text(
-                'Rellena los datos del trabajo o incidencia.',
+                widget.plantilla == null
+                    ? 'Rellena los datos del trabajo o incidencia.'
+                    : 'Revisa estos datos y completa la fecha y el importe '
+                          'de este nuevo mantenimiento.',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: ReparaSpace.s4),

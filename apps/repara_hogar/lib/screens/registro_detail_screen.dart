@@ -48,6 +48,7 @@ import 'cercanos_screen.dart';
 import 'contacto_acciones.dart';
 import 'editar_registro_sheet.dart';
 import 'elemento_detail_screen.dart';
+import 'nuevo_registro_screen.dart';
 import 'package:repara_ui/nuevo_documento_flow.dart';
 import 'perfil_profesional_screen.dart';
 import 'package:repara_ui/presupuestos_section.dart';
@@ -57,6 +58,15 @@ import 'registro_simple/registro_simple_acciones.dart';
 import 'registro_simple/registro_simple_progreso.dart';
 
 String _formatoImporte(double v) => v.euros;
+
+/// "Repetir mantenimiento" (CEO, noviembre 2026) solo tiene sentido para
+/// mantenimientos/revisiones periódicas -- una avería, compra, instalación,
+/// reforma, sustitución, reparación puntual o nota libre no es algo que
+/// deba repetirse de un toque. Función pública para poder probar esta
+/// regla sin montar toda la pantalla (ver nuevo_registro_screen_repetir_
+/// test.dart).
+bool puedeRepetirMantenimiento(Registro registro) =>
+    registro.tipo == TipoRegistro.mantenimiento;
 
 class RegistroDetailScreen extends StatelessWidget {
   const RegistroDetailScreen({
@@ -341,6 +351,14 @@ class RegistroDetailScreen extends StatelessWidget {
                     );
                   } else if (v == 'eliminar') {
                     _eliminar(context, registro);
+                  } else if (v == 'repetir') {
+                    abrirNuevoRegistroScreen(
+                      context,
+                      casa: casa,
+                      elementoId: elementoId,
+                      elementoNombre: registro.elementoNombre,
+                      plantilla: registro,
+                    );
                   }
                 },
                 itemBuilder: (_) => [
@@ -358,6 +376,25 @@ class RegistroDetailScreen extends StatelessWidget {
                       ],
                     ),
                   ),
+                  // "Repetir mantenimiento" (CEO, noviembre 2026): solo para
+                  // mantenimientos/revisiones -- no tiene sentido repetir una
+                  // avería, compra, instalación, reforma, etc. (ver
+                  // nuevo_registro_screen.dart para qué datos se reutilizan).
+                  if (puedeRepetirMantenimiento(registro))
+                    PopupMenuItem(
+                      value: 'repetir',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.replay_outlined,
+                            size: 18,
+                            color: context.colors.inkMuted,
+                          ),
+                          const SizedBox(width: 10),
+                          const Text('Repetir mantenimiento'),
+                        ],
+                      ),
+                    ),
                   // "Eliminar evento" se mantiene solo para el registro
                   // simple -- un registro con profesional (un trabajo
                   // contratado, con posible presupuesto/pagos detrás) no
