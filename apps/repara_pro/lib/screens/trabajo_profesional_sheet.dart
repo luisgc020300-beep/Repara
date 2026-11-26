@@ -15,6 +15,7 @@ import '../services/cliente_profesional_service.dart';
 import '../services/trabajo_profesional_service.dart';
 import 'package:repara_core/design_tokens.dart';
 import 'package:repara_ui/app_error.dart';
+import 'package:repara_ui/confirmar_salida_formulario.dart';
 import 'package:repara_ui/ios_list.dart';
 import 'cliente_profesional_sheet.dart';
 import 'registro_pro_detail_screen.dart';
@@ -28,8 +29,16 @@ Future<void> mostrarEditorTrabajoProfesional(
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
+    // El arrastre hacia abajo para cerrar la hoja llama a Navigator.pop
+    // directamente (ver BottomSheet._handleDragEnd), que ignora el
+    // canPop:false de ConfirmarSalidaFormulario -- sin esto, se podría
+    // perder un trabajo a medio rellenar arrastrando la hoja sin que
+    // saltara ningún aviso.
+    enableDrag: false,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(ReparaRadius.lg)),
+      borderRadius: BorderRadius.vertical(
+        top: Radius.circular(ReparaRadius.lg),
+      ),
     ),
     builder: (_) => _EditorTrabajoProfesionalSheet(
       clienteId: clienteId,
@@ -74,10 +83,43 @@ class _EditorTrabajoProfesionalSheetState
   late String? _clienteId = widget.existente?.clienteId ?? widget.clienteId;
   late String? _clienteNombre =
       widget.existente?.clienteNombre ?? widget.clienteNombre;
+  // Ojo: NO leer esto de _tituloCtrl/_tipo/_fechaProgramada/_clienteId -- al
+  // ser "late final"/"late", solo se evaluarían la primera vez que se
+  // accede a ellos, que es dentro de _hayCambiosSinGuardar(), ya con lo que
+  // el usuario haya tecleado o elegido puesto. Mismo valor que usan esos
+  // campos arriba, pero leído directamente de widget.existente/widget.
+  // clienteId, que nunca cambian.
+  late final String _tituloInicial = widget.existente?.titulo ?? '';
+  late final String _descripcionInicial = widget.existente?.descripcion ?? '';
+  late final String _presupuestoInicial =
+      widget.existente?.presupuestoEstimado?.toStringAsFixed(2) ?? '';
+  late final String _direccionInicial =
+      widget.existente?.direccionIntervencion ?? '';
+  late final TipoRegistro _tipoInicial =
+      widget.existente?.tipo ?? TipoRegistro.reparacion;
+  late final DateTime? _fechaProgramadaInicial =
+      widget.existente?.fechaProgramada;
+  late final String? _clienteIdInicial =
+      widget.existente?.clienteId ?? widget.clienteId;
   bool _guardando = false;
   bool _mostrarErrorTitulo = false;
+  // Se pone a true justo antes del pop que sigue a un guardado con éxito --
+  // sin esto, ConfirmarSalidaFormulario preguntaría "¿Salir sin guardar?"
+  // aunque los datos ya estén guardados (mismo criterio que nuevo_registro_
+  // screen.dart en Hogar).
+  bool _guardadoConExito = false;
 
   bool get _esEdicion => widget.existente != null;
+
+  bool _hayCambiosSinGuardar() =>
+      !_guardadoConExito &&
+      (_tituloCtrl.text.trim() != _tituloInicial.trim() ||
+          _descripcionCtrl.text.trim() != _descripcionInicial.trim() ||
+          _presupuestoCtrl.text.trim() != _presupuestoInicial.trim() ||
+          _direccionCtrl.text.trim() != _direccionInicial.trim() ||
+          _tipo != _tipoInicial ||
+          _fechaProgramada != _fechaProgramadaInicial ||
+          _clienteId != _clienteIdInicial);
 
   @override
   void dispose() {
@@ -155,7 +197,9 @@ class _EditorTrabajoProfesionalSheetState
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(ReparaRadius.lg)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(ReparaRadius.lg),
+        ),
       ),
       builder: (_) => _VincularHogarSheet(trabajo: trabajo),
     );
@@ -213,6 +257,7 @@ class _EditorTrabajoProfesionalSheetState
       } else {
         await TrabajoProfesionalService.crear(trabajo);
       }
+      _guardadoConExito = true;
       if (mounted) Navigator.pop(context);
     } catch (e, st) {
       if (mounted) {
@@ -243,7 +288,10 @@ class _EditorTrabajoProfesionalSheetState
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(widget.existente!.titulo, style: Theme.of(context).textTheme.displaySmall),
+              Text(
+                widget.existente!.titulo,
+                style: Theme.of(context).textTheme.displaySmall,
+              ),
               const SizedBox(height: ReparaSpace.s2),
               IosSection(
                 rows: [
@@ -280,129 +328,134 @@ class _EditorTrabajoProfesionalSheetState
       );
     }
     final clienteFijo = widget.clienteId != null || _esEdicion;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => FocusScope.of(context).unfocus(),
-      child: Padding(
-        padding: EdgeInsets.only(
-          left: ReparaSpace.s5,
-          right: ReparaSpace.s5,
-          top: ReparaSpace.s5,
-          bottom: ReparaSpace.s5 + MediaQuery.of(context).viewInsets.bottom,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                _esEdicion ? 'Editar trabajo' : 'Nuevo trabajo',
-                style: Theme.of(context).textTheme.displaySmall,
-              ),
-              const SizedBox(height: ReparaSpace.s3),
-              if (!clienteFijo)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: ReparaSpace.s3),
-                  child: OutlinedButton.icon(
-                    onPressed: _elegirCliente,
-                    icon: const Icon(Icons.person_outline, size: 16),
-                    label: Text(_clienteNombre ?? 'Elige un cliente'),
-                  ),
-                )
-              else if (_clienteNombre != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: ReparaSpace.s3),
-                  child: Text(
-                    'Cliente: ${_clienteNombre!}',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
+    return ConfirmarSalidaFormulario(
+      hayCambiosSinGuardar: _hayCambiosSinGuardar,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Padding(
+          padding: EdgeInsets.only(
+            left: ReparaSpace.s5,
+            right: ReparaSpace.s5,
+            top: ReparaSpace.s5,
+            bottom: ReparaSpace.s5 + MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  _esEdicion ? 'Editar trabajo' : 'Nuevo trabajo',
+                  style: Theme.of(context).textTheme.displaySmall,
                 ),
-              TextField(
-                controller: _tituloCtrl,
-                decoration: InputDecoration(
-                  labelText: 'Título',
-                  errorText: _mostrarErrorTitulo ? 'Escribe un título.' : null,
-                ),
-                onChanged: (_) {
-                  if (_mostrarErrorTitulo) {
-                    setState(() => _mostrarErrorTitulo = false);
-                  }
-                },
-              ),
-              const SizedBox(height: ReparaSpace.s2),
-              DropdownButtonFormField<TipoRegistro>(
-                initialValue: _tipo,
-                decoration: const InputDecoration(labelText: 'Tipo'),
-                items: TipoRegistro.values
-                    .map(
-                      (t) => DropdownMenuItem(
-                        value: t,
-                        child: Text(nombreTipoRegistro(t)),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (v) => setState(() => _tipo = v ?? _tipo),
-              ),
-              const SizedBox(height: ReparaSpace.s2),
-              TextField(
-                controller: _descripcionCtrl,
-                minLines: 1,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: 'Descripción (opcional)',
-                ),
-              ),
-              const SizedBox(height: ReparaSpace.s2),
-              TextField(
-                controller: _presupuestoCtrl,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: const InputDecoration(
-                  labelText: 'Presupuesto estimado (opcional)',
-                  suffixText: '€',
-                ),
-              ),
-              const SizedBox(height: ReparaSpace.s2),
-              TextField(
-                controller: _direccionCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Dirección de la intervención (opcional)',
-                ),
-              ),
-              const SizedBox(height: ReparaSpace.s2),
-              OutlinedButton.icon(
-                onPressed: _elegirFecha,
-                icon: const Icon(Icons.calendar_today_outlined, size: 16),
-                label: Text(
-                  _fechaProgramada == null
-                      ? 'Fecha prevista (opcional)'
-                      : '${_fechaProgramada!.day}/${_fechaProgramada!.month}/${_fechaProgramada!.year}',
-                ),
-              ),
-              if (_esEdicion) ...[
                 const SizedBox(height: ReparaSpace.s3),
-                OutlinedButton.icon(
-                  onPressed: () => _mostrarVincularHogar(widget.existente!),
-                  icon: const Icon(Icons.link, size: 16),
-                  label: const Text('Vincular con REPARA Hogar'),
+                if (!clienteFijo)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: ReparaSpace.s3),
+                    child: OutlinedButton.icon(
+                      onPressed: _elegirCliente,
+                      icon: const Icon(Icons.person_outline, size: 16),
+                      label: Text(_clienteNombre ?? 'Elige un cliente'),
+                    ),
+                  )
+                else if (_clienteNombre != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: ReparaSpace.s3),
+                    child: Text(
+                      'Cliente: ${_clienteNombre!}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                TextField(
+                  controller: _tituloCtrl,
+                  decoration: InputDecoration(
+                    labelText: 'Título',
+                    errorText: _mostrarErrorTitulo
+                        ? 'Escribe un título.'
+                        : null,
+                  ),
+                  onChanged: (_) {
+                    if (_mostrarErrorTitulo) {
+                      setState(() => _mostrarErrorTitulo = false);
+                    }
+                  },
                 ),
-              ],
-              const SizedBox(height: ReparaSpace.s4),
-              FilledButton(
-                onPressed: _guardando ? null : _guardar,
-                child: _guardando
-                    ? SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: context.colors.brandOn,
+                const SizedBox(height: ReparaSpace.s2),
+                DropdownButtonFormField<TipoRegistro>(
+                  initialValue: _tipo,
+                  decoration: const InputDecoration(labelText: 'Tipo'),
+                  items: TipoRegistro.values
+                      .map(
+                        (t) => DropdownMenuItem(
+                          value: t,
+                          child: Text(nombreTipoRegistro(t)),
                         ),
                       )
-                    : Text(_esEdicion ? 'Guardar cambios' : 'Crear trabajo'),
-              ),
-            ],
+                      .toList(),
+                  onChanged: (v) => setState(() => _tipo = v ?? _tipo),
+                ),
+                const SizedBox(height: ReparaSpace.s2),
+                TextField(
+                  controller: _descripcionCtrl,
+                  minLines: 1,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Descripción (opcional)',
+                  ),
+                ),
+                const SizedBox(height: ReparaSpace.s2),
+                TextField(
+                  controller: _presupuestoCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'Presupuesto estimado (opcional)',
+                    suffixText: '€',
+                  ),
+                ),
+                const SizedBox(height: ReparaSpace.s2),
+                TextField(
+                  controller: _direccionCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Dirección de la intervención (opcional)',
+                  ),
+                ),
+                const SizedBox(height: ReparaSpace.s2),
+                OutlinedButton.icon(
+                  onPressed: _elegirFecha,
+                  icon: const Icon(Icons.calendar_today_outlined, size: 16),
+                  label: Text(
+                    _fechaProgramada == null
+                        ? 'Fecha prevista (opcional)'
+                        : '${_fechaProgramada!.day}/${_fechaProgramada!.month}/${_fechaProgramada!.year}',
+                  ),
+                ),
+                if (_esEdicion) ...[
+                  const SizedBox(height: ReparaSpace.s3),
+                  OutlinedButton.icon(
+                    onPressed: () => _mostrarVincularHogar(widget.existente!),
+                    icon: const Icon(Icons.link, size: 16),
+                    label: const Text('Vincular con REPARA Hogar'),
+                  ),
+                ],
+                const SizedBox(height: ReparaSpace.s4),
+                FilledButton(
+                  onPressed: _guardando ? null : _guardar,
+                  child: _guardando
+                      ? SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: context.colors.brandOn,
+                          ),
+                        )
+                      : Text(_esEdicion ? 'Guardar cambios' : 'Crear trabajo'),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -522,7 +575,9 @@ class _VincularHogarSheetState extends State<_VincularHogarSheet> {
                     Expanded(
                       child: Text(
                         'Código para compartir: $_ultimoCodigoGenerado',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(letterSpacing: 1),
+                        style: Theme.of(
+                          context,
+                        ).textTheme.titleMedium?.copyWith(letterSpacing: 1),
                       ),
                     ),
                     IconButton(
@@ -541,13 +596,17 @@ class _VincularHogarSheetState extends State<_VincularHogarSheet> {
                 TextField(
                   controller: _emailCtrl,
                   keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(labelText: 'Email de tu cliente'),
+                  decoration: const InputDecoration(
+                    labelText: 'Email de tu cliente',
+                  ),
                 ),
                 const SizedBox(height: ReparaSpace.s2),
                 TextField(
                   controller: _telefonoCtrl,
                   keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(labelText: 'o teléfono (opcional)'),
+                  decoration: const InputDecoration(
+                    labelText: 'o teléfono (opcional)',
+                  ),
                 ),
                 const SizedBox(height: ReparaSpace.s3),
                 FilledButton(
